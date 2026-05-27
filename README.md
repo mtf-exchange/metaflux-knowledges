@@ -1,34 +1,40 @@
 # MetaFlux Knowledge Base
 
-> Research notes, design rationale, and paper material for the MetaFlux L1 derivatives chain. Synced to GitBook.
+> Integration reference and user-facing docs for the MetaFlux L1 derivatives chain. Synced to GitBook.
 
-This repo is the public-facing companion to the [`mtf-exchange/metaflux`](https://github.com/mtf-exchange/metaflux) source tree. Source code, RFCs, and tightly-coupled module docs live there. This repo holds:
+Welcome. This is the place to start if you are **integrating with** or **building on** MetaFlux. For the source tree see [`mtf-exchange/metaflux`](https://github.com/mtf-exchange/metaflux).
 
-- **Research notes** — captured during implementation, mined for paper material at end-of-project. See [`research/`](./research/).
-- **Architecture deep-dives** — long-form essays that span modules. See [`architecture/`](./architecture/).
-- **Sprint reports** — quarterly retrospectives + measurements.
-- **Paper drafts** — eventual arxiv preprints.
+## Sections
 
-## Why a separate repo
+### [API](./api/)
+- [REST](./api/rest/) — node-native `POST /exchange`, `POST /info`, and the gateway's HL-compat / CCXT-compat surfaces
+- [WS](./api/ws/) — subscriptions (coming)
 
-- **Release cadence decoupling**: source repo ships behind code review on each commit; knowledge base is allowed to be more leisurely + speculative.
-- **External readability**: ordered with a reader (not contributor) in mind. Markdown that renders on GitBook.
-- **No build-system overhead**: pure markdown + figures, no Rust/Docker mixed in.
-- **Per CLAUDE.md §仓库结构**: client SDKs, docs, tooling each live in their own repo so the server repo's release cadence isn't dictated by their churn.
+### [Integration](./integration/)
+- How to bring an HL-style client over with zero code change
+- How to use the MTF-native SDK (Rust / TypeScript)
+- Authentication & signing (EIP-712, agent wallets, multi-sig)
 
-## Sync model
+### [Concepts](./concepts/)
+- Cross-asset portfolio margin
+- Tiered liquidation (T0 yellow card → T1 partial → T2 full → T3 backstop → T4 ADL)
+- API wallets / agent delegation
+- Sub-accounts
 
-Research notes are authored in the source repo under [`docs/research/`](https://github.com/mtf-exchange/metaflux/tree/main/docs/research) first (so the implementation commit and the note ship together). They are then copied here. A future CI job can automate the sync; for now the mirror is manual.
+### [MIP](./mip/)
+- MIP-3 permissionless market deploy (perp / spot)
+- MIP-4 outcomes (deferred to V2 post-launch)
 
-## GitBook
+### [Bridge](./bridge/)
+- USDC via Circle CCTP
+- Other assets via third-party bridges (TBD per S13 ADR)
 
-Connected via GitBook's GitHub integration — pushes to `main` rebuild the published space. The TOC follows the structure below.
+## Conventions
 
-## Layout
+- All endpoints documented here are the **stable, public** surface. Internal node-to-node ports (4001 / 4002 / 4003) are out of scope.
+- Request / response examples use real wire shapes — copy-paste safe.
+- "Status: stable / preview / planned" tag on each doc indicates maturity. Planned-only docs explicitly say so up top.
 
-```
-research/        — numbered notes (NNN-topic.md), append-order. README.md is the index.
-architecture/    — module-spanning deep-dives.
-sprint-reports/  — quarterly + ad-hoc.
-papers/          — drafts.
-```
+## Internal-only material
+
+Research notes, paper drafts, perf bottleneck analyses, and similar engineering R&D **do not live here** — they are in [`mtf-exchange/metaflux`](https://github.com/mtf-exchange/metaflux) under `docs/research/`. Those are team-internal and may be speculative; this knowledge base is reader-facing only.
