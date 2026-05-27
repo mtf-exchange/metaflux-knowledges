@@ -1,19 +1,18 @@
 # MetaFlux Knowledge Base
 
-> Integration reference and user-facing docs for the MetaFlux L1 derivatives chain. Synced to GitBook.
+> Integration reference and user-facing docs for the MetaFlux derivatives exchange. Synced to GitBook.
 
-Welcome. This is the place to start if you are **integrating with** or **building on** MetaFlux. For the source tree see [`mtf-exchange/metaflux`](https://github.com/mtf-exchange/metaflux).
+Welcome. This is the place to start if you are **integrating with** or **building on** MetaFlux.
 
 ## Sections
 
 ### [API](./api/)
-- [REST](./api/rest/) — node-native `POST /exchange`, `POST /info`, and the gateway's HL-compat / CCXT-compat surfaces
+- [REST](./api/rest/) — `POST /exchange`, `POST /info`, and the HL-compat / CCXT-compat surfaces
 - [WS](./api/ws/) — subscriptions (coming)
 
 ### [Integration](./integration/)
 - How to bring an HL-style client over with zero code change
-- How to use the MTF-native SDK (Rust / TypeScript)
-- Authentication & signing (EIP-712, agent wallets, multi-sig)
+- Authentication & signing (EIP-712, agent wallets)
 
 ### [Concepts](./concepts/)
 - Cross-asset portfolio margin
@@ -23,18 +22,20 @@ Welcome. This is the place to start if you are **integrating with** or **buildin
 
 ### [MIP](./mip/)
 - MIP-3 permissionless market deploy (perp / spot)
-- MIP-4 outcomes (deferred to V2 post-launch)
 
 ### [Bridge](./bridge/)
 - USDC via Circle CCTP
-- Other assets via third-party bridges (TBD per S13 ADR)
+- Other assets via a single third-party bridge (selection TBD)
 
 ## Conventions
 
-- All endpoints documented here are the **stable, public** surface. Internal node-to-node ports (4001 / 4002 / 4003) are out of scope.
-- Request / response examples use real wire shapes — copy-paste safe.
-- "Status: stable / preview / planned" tag on each doc indicates maturity. Planned-only docs explicitly say so up top.
+- All endpoints documented here are the **stable, public** wire surface.
+- Request / response examples use real shapes — copy-paste safe.
 
-## Internal-only material
+## Status legend
 
-Research notes, paper drafts, perf bottleneck analyses, and similar engineering R&D **do not live here** — they are in [`mtf-exchange/metaflux`](https://github.com/mtf-exchange/metaflux) under `docs/research/`. Those are team-internal and may be speculative; this knowledge base is reader-facing only.
+Each doc carries a "Status" tag near the top:
+
+- **stable** — wire shape committed for V1; can build against it.
+- **preview** — works today; minor wire changes possible before mainnet (will be called out).
+- **planned** — described but not yet shipped.
