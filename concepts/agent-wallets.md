@@ -158,6 +158,35 @@ Practical implication: the same agent can submit concurrent actions safely as lo
 
 For agent-signed requests, the nonce space is keyed off the **master** (`sender`), not the agent. Two different agents of the same master share the nonce space.
 
+## Production checklist
+
+Battle-tested patterns for running an agent-key fleet in production:
+
+| Item | Why |
+|------|-----|
+| Master in cold storage (hardware wallet / HSM) | Master only signs `ApproveAgent` (and `WithdrawUsdc` on withdrawals) — rare events |
+| One agent per host / container | If a host is compromised, only that agent's authority is exposed; revoke without touching others |
+| `expires_at_ms` set to ≤ 30 days from approval | Forces a renewal cadence; missed renewals are auto-revoke |
+| Agent name encodes the host + start time | Makes audit forensics trivial: `mm-host-3 / 2026-Q2` |
+| Rotation script: pre-stage new agent before old expires | Submit `ApproveAgent` for new key 24h before old expiry; switch traffic; let old expire |
+| Compromise drill: revoke + rotate runbook tested quarterly | When a key actually leaks, mechanical execution matters |
+| Watch `userEvents` for `agentApproved` / `agentExpired` events | Confirm chain-side state matches your expectation |
+| Use a different agent for cancel-only vs full trading | Cancel-only keys are safer in semi-trusted environments |
+
+### Rotation pattern
+
+```
+day -1   submit ApproveAgent { agent: new_key, expires_at_ms: NOW + 30d }
+          wait 1 block (consensus tick); confirm via /info agents
+day 0    flip traffic in your bot: stop using old_key, start using new_key
+day 0    submit ApproveAgent { agent: old_key, expires_at_ms: NOW + 1h }
+          to bound the old key's remaining authority window
+day +1h  old_key expires automatically
+```
+
+The pre-stage avoids any window where both keys could be used in parallel
+(which is also fine — concurrent agents share the master's nonce space).
+
 ## What an agent cannot do
 
 By design, agents have **no withdrawal authority**. Anything that moves funds out of the master account (withdrawals to external chains, transfers to other addresses) must be signed by the master key. Agent management itself (creating or extending approvals) is also master-only — no agent-of-agent recursion.
