@@ -66,24 +66,7 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-Python equivalent (when the Python SDK ships):
-
-```python
-from metaflux import Client
-
-c = Client(private_key=os.environ['PRIVATE_KEY'],
-           base_url='https://gateway.devnet.metaflux.dev',
-           chain_id=31337)
-
-meta = c.info.meta()
-btc_id = next(i for i, m in enumerate(meta['universe']) if m['name'] == 'BTC')
-
-r = c.exchange.order(asset=btc_id, is_buy=True,
-                     price='50000', size='0.1', tif='Gtc')
-print('order id:', r['oid'])
-```
-
-Raw curl (for the HL-compat shape — you build the signature yourself; see [signing](./signing.md)):
+Raw curl (HL-compat shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
 curl -X POST https://gateway.devnet.metaflux.dev/exchange \
