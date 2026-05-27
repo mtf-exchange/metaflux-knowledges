@@ -1,6 +1,8 @@
 # HL-compat REST surface
 
-> Status: **preview**. `/info` covers 15 query types; `/exchange` covers `order` + `cancel` at parity. The remaining HL actions ship over time.
+{% hint style="info" %}
+**Preview.** `/info` covers 15 query types; `/exchange` covers `order` + `cancel` at parity. The remaining HL actions ship over time.
+{% endhint %}
 
 ## TL;DR
 

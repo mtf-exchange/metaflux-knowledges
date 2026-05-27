@@ -1,6 +1,8 @@
 # Margin modes
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 ## TL;DR
 

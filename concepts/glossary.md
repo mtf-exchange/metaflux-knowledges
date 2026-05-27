@@ -1,6 +1,8 @@
 # Glossary
 
-> Status: **stable**. New terms added with each protocol expansion.
+{% hint style="success" %}
+**Stable.** New terms added with each protocol expansion.
+{% endhint %}
 
 Defined terms used throughout the docs. Cross-linked where the topic has its own page.
 

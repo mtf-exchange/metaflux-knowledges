@@ -1,6 +1,8 @@
 # Mark prices
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 ## TL;DR
 

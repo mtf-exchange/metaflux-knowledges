@@ -1,6 +1,8 @@
 # CCXT-compat REST surface
 
-> Status: **preview**. REST subset live; CCXT Pro (WS) coming.
+{% hint style="info" %}
+**Preview.** REST subset live; CCXT Pro (WS) coming.
+{% endhint %}
 
 ## TL;DR
 

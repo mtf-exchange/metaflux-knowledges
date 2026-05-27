@@ -1,6 +1,8 @@
 # Sub-accounts
 
-> Status: **preview**. The user-visible API is stable; the address-derivation scheme is finalised before mainnet.
+{% hint style="info" %}
+**Preview.** The user-visible API is stable; the address-derivation scheme is finalised before mainnet.
+{% endhint %}
 
 ## TL;DR
 

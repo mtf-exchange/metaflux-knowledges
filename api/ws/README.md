@@ -1,6 +1,8 @@
 # WebSocket API
 
-> Status: **planned** for V1 launch. The protocol shape below is committed; channel coverage rolls out incrementally.
+{% hint style="info" %}
+**Status.** **planned** for V1 launch. The protocol shape below is committed; channel coverage rolls out incrementally.
+{% endhint %}
 
 ## TL;DR
 

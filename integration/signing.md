@@ -1,6 +1,8 @@
 # Signing walkthrough
 
-> Status: **stable**. The envelope shape is part of the V1 protocol commitment.
+{% hint style="success" %}
+**Stable.** The envelope shape is part of the V1 protocol commitment.
+{% endhint %}
 
 End-to-end with working examples in TypeScript and Python. Once this clicks, every action is the same — only the inner payload changes.
 

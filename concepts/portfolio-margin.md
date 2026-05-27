@@ -1,6 +1,8 @@
 # Portfolio margin
 
-> Status: **preview**. Action surface is stable; the SPAN-style scenario engine ships in phases before mainnet.
+{% hint style="info" %}
+**Preview.** Action surface is stable; the SPAN-style scenario engine ships in phases before mainnet.
+{% endhint %}
 
 ## TL;DR
 

@@ -1,6 +1,8 @@
 # Tiered liquidation
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 ## TL;DR
 

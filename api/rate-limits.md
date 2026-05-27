@@ -1,6 +1,8 @@
 # Rate limits
 
-> Status: **preview**. The gateway enforces the limits below; the bare node accepts unbounded traffic from authenticated mTLS peers (intended for trusted infra only — do not expose `8080` to the open internet in production).
+{% hint style="info" %}
+**Preview.** The gateway enforces the limits below; the bare node accepts unbounded traffic from authenticated mTLS peers (intended for trusted infra only — do not expose `8080` to the open internet in production).
+{% endhint %}
 
 ## TL;DR
 

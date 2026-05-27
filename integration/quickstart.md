@@ -1,6 +1,8 @@
 # Quickstart — 5-minute end-to-end
 
-> Status: **stable** wire surface. Devnet endpoints, no mainnet warranty.
+{% hint style="info" %}
+**Status.** **stable** wire surface. Devnet endpoints, no mainnet warranty.
+{% endhint %}
 
 Deposit, place an order, cancel, withdraw. By the end of this page your TypeScript / Python / curl session has done a complete round-trip against devnet.
 

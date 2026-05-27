@@ -1,6 +1,8 @@
 # Migrating from Hyperliquid
 
-> Status: **preview**. The HL-compat surface covers `POST /info` (15 query types) and `POST /exchange` (order + cancel today, more action types over time).
+{% hint style="info" %}
+**Preview.** The HL-compat surface covers `POST /info` (15 query types) and `POST /exchange` (order + cancel today, more action types over time).
+{% endhint %}
 
 If your bot already speaks Hyperliquid's protocol, you can point it at MetaFlux with **no code change** for the covered surface — same URL shapes, same request/response JSON, same EIP-712 envelope.
 

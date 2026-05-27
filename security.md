@@ -1,6 +1,8 @@
 # Security model
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 What the protocol guarantees, what it doesn't, and where you carry the risk.
 

@@ -1,6 +1,8 @@
 # Fees
 
-> Status: **stable** in shape; tier values are network parameters and can be updated by governance.
+{% hint style="info" %}
+**Status.** **stable** in shape; tier values are network parameters and can be updated by governance.
+{% endhint %}
 
 ## TL;DR
 

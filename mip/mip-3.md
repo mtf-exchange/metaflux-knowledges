@@ -1,6 +1,8 @@
 # MIP-3 — Permissionless market deploy
 
-> Status: **preview**.
+{% hint style="info" %}
+**Preview.**
+{% endhint %}
 
 Any builder can deploy a new perpetual or spot market on MetaFlux by paying through an on-chain gas auction. There is no protocol-team gate, no review committee, no allow-list. The auction price plus a minimum deposit are the only barriers.
 

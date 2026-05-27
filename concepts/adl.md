@@ -1,6 +1,8 @@
 # Auto-deleverage (ADL)
 
-> Status: **preview**. T4 fires only when the insurance pool can't fully cover a T3 shortfall — rare in normal operations but designed to be deterministic when it does.
+{% hint style="info" %}
+**Preview.** T4 fires only when the insurance pool can't fully cover a T3 shortfall — rare in normal operations but designed to be deterministic when it does.
+{% endhint %}
 
 ## TL;DR
 

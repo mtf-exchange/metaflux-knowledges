@@ -1,6 +1,8 @@
 # Multi-sig accounts
 
-> Status: **preview**.
+{% hint style="info" %}
+**Preview.**
+{% endhint %}
 
 ## TL;DR
 

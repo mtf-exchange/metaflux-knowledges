@@ -1,6 +1,8 @@
 # Networks
 
-> Status: **devnet stable**. Testnet and mainnet endpoints + chainIds published pre-launch.
+{% hint style="info" %}
+**Status.** **devnet stable**. Testnet and mainnet endpoints + chainIds published pre-launch.
+{% endhint %}
 
 ## Summary
 

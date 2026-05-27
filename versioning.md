@@ -1,6 +1,8 @@
 # Versioning & deprecation
 
-> Status: **stable** policy. Specific version transitions are in the change log.
+{% hint style="info" %}
+**Status.** **stable** policy. Specific version transitions are in the change log.
+{% endhint %}
 
 ## TL;DR
 

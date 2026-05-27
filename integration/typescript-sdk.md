@@ -1,6 +1,8 @@
 # TypeScript SDK
 
-> Status: **preview**. The `@metaflux/sdk` package ships before mainnet; the API shape below is committed.
+{% hint style="info" %}
+**Preview.** The `@metaflux/sdk` package ships before mainnet; the API shape below is committed.
+{% endhint %}
 
 ## TL;DR
 

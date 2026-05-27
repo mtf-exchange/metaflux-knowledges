@@ -1,6 +1,8 @@
 # Bridge
 
-> Status: **CCTP preview**, third-party bridges TBD.
+{% hint style="info" %}
+**Status.** **CCTP preview**, third-party bridges TBD.
+{% endhint %}
 
 MetaFlux deliberately picks a **hybrid bridge model** rather than building one in-house monolith:
 
