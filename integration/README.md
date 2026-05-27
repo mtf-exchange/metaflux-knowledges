@@ -11,8 +11,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 | A CCXT-based quant framework | [CCXT integration](../api/rest/ccxt-compat.md) |
 | Greenfield TypeScript / browser | [TypeScript SDK](./typescript-sdk.md) |
 | Greenfield Rust service | [Rust SDK](./rust-sdk.md) |
-| Greenfield Python script | [Python SDK](./python-sdk.md) |
-| Anything that already speaks EIP-712 | [Signing walkthrough](./signing.md) |
+| Anything else (Python, Go, …) | [Signing walkthrough](./signing.md) — implement the EIP-712 envelope yourself |
 
 ## Topics
 
@@ -30,7 +29,8 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 |----------|--------|---------|
 | TypeScript / JavaScript | preview | [`@metaflux/sdk`](./typescript-sdk.md) |
 | Rust | preview | [`metaflux-client`](./rust-sdk.md) |
-| Python | planned | [`metaflux-client`](./python-sdk.md) |
+
+For other languages (Python, Go, Java, C++ …), implement the EIP-712 envelope per the [signing walkthrough](./signing.md) — every step is documented with worked examples. The wire is small enough that a hand-rolled client is the right call for niche stacks.
 
 ## Network endpoints
 

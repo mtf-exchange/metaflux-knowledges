@@ -60,7 +60,6 @@ For developers building on MetaFlux:
 - [Migrating from Hyperliquid](./integration/migrating-from-hl.md)
 - [TypeScript SDK](./integration/typescript-sdk.md)
 - [Rust SDK](./integration/rust-sdk.md)
-- [Python SDK](./integration/python-sdk.md)
 
 ### [MIP](./mip/)
 

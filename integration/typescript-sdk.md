@@ -252,7 +252,7 @@ Log levels: `debug` (everything), `info` (admit + WS connects), `warn` (retries)
 - [Agent wallets howto](./agent-wallets-howto.md)
 - [`POST /exchange`](../api/rest/exchange.md) — full action surface
 - [WS subscriptions](../api/ws/subscriptions.md) — channel catalog
-- [Rust SDK](./rust-sdk.md), [Python SDK](./python-sdk.md)
+- [Rust SDK](./rust-sdk.md)
 
 ## FAQ
 

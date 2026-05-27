@@ -256,7 +256,6 @@ Repository at `mtf-exchange/metaflux-client-rust` ships:
 - [Signing](./signing.md)
 - [Agent wallets howto](./agent-wallets-howto.md)
 - [TypeScript SDK](./typescript-sdk.md)
-- [Python SDK](./python-sdk.md)
 
 ## FAQ
 
