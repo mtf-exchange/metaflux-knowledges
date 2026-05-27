@@ -1,30 +1,39 @@
 # `POST /info` — read path (MTF-native)
 
-> Status: **stable** shape; covered query types grow over time.
+> Status: **stable** shape. Query types are added over time; the envelope is committed.
+
+## TL;DR
 
 Single endpoint, multi-type. Dispatches on the request body's `type` field. Read-only — never mutates state, never requires a signature.
 
 ## URL
 
 ```
-POST  http://{node}:8080/info
+POST  https://<node-or-gateway>/info
 ```
 
-## Request shape
+| Host | Wire shape |
+|------|-----------|
+| Node directly (`:8080`) | MTF-native (this document) |
+| Gateway (`:8443`) | **HL-compat** by default — see [hl-compat.md](./hl-compat.md) |
+| Gateway (`:8443`) `/native/info` | MTF-native (mirrors the node shape) |
+
+## Envelope
+
+Request:
 
 ```json
-{ "type": "<query_type>", ...query-specific fields }
+{ "type": "<query_type>", /* type-specific args */ }
 ```
 
-`type` is required. Other fields depend on the variant.
-
-## Response shape
+Response:
 
 ```json
 { "type": "<query_type>", "data": { /* type-specific */ } }
 ```
 
-On unknown `type`: HTTP 400 with `{ "error": "unknown info type: <foo>" }`.
+On unknown `type`: `400 Bad Request` with `{"error":"unknown info type: <X>"}`.
+On unknown resource (e.g. unknown vault id): `404 Not Found` with `{"error":"<resource> not found"}`.
 
 ## Query types
 
@@ -36,85 +45,385 @@ Static node identity + protocol version. No parameters.
 { "type": "node_info" }
 ```
 
-Returns network variant, validator index, protocol version, build commit.
+Response:
+
+```json
+{
+  "type": "node_info",
+  "data": {
+    "network":           "devnet",
+    "chain_id":          31337,
+    "protocol_version":  "1.0.0",
+    "validator_index":   3,
+    "build_commit":      "<short hex>",
+    "uptime_seconds":    123456
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `network` | `"devnet" \| "testnet" \| "mainnet"` | Network variant |
+| `chain_id` | uint64 | EIP-712 chain id |
+| `protocol_version` | semver string | Wire-protocol version |
+| `validator_index` | uint32 | This node's index in the active validator set |
+| `build_commit` | hex string | Operator-published build identifier |
+| `uptime_seconds` | uint64 | Process uptime |
 
 ### `account_state`
 
-Per-account snapshot: positions, balances, margin numbers, recent fills.
+Per-account snapshot.
 
 ```json
-{ "type": "account_state", "account_id": 42 }
+{ "type": "account_state", "address": "0x<addr>" }
 ```
 
-`account_id` is the chain-internal numeric ID. Most clients use the address-keyed variant via the HL-compat `clearinghouseState` instead.
+| Arg | Type | Required |
+|-----|------|----------|
+| `address` | hex address | yes |
 
-Returns:
-- `account_value` — equity including unrealised PnL, in USDC base units (integer string)
-- `maintenance_margin` — both classical and PM-derived if PM enrolled
-- `positions` — per-asset position, entry price, unrealised PnL
-- `margin_mode` — Cross / Isolated / Strict-Iso per asset
-- `health` — computed `account_value / maintenance_margin`
+Response:
+
+```json
+{
+  "type": "account_state",
+  "data": {
+    "address":           "0x<addr>",
+    "account_value_e6":  "100000000",
+    "free_collateral_e6":"80000000",
+    "maint_margin_e6":   "10000000",
+    "init_margin_e6":    "20000000",
+    "health_e6":         "10000000",
+    "tier":              "Safe",
+    "margin_mode":       "Cross",
+    "pm_enabled":        false,
+    "positions": [
+      {
+        "asset":            0,
+        "size_e8":          "100000000",
+        "entry_px_e8":      "10000000000",
+        "unrealised_pnl_e6":"500000",
+        "isolated":         false,
+        "leverage":         10
+      }
+    ],
+    "balances": {
+      "usdc_e6": "100000000",
+      "spot":    { "ETH_e8": "5000000000" }
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `account_value_e6` | u128 string | Equity including unrealised PnL, USDC base units |
+| `free_collateral_e6` | u128 string | Equity minus initial margin held by open positions |
+| `maint_margin_e6` | u128 string | Maintenance margin requirement |
+| `init_margin_e6` | u128 string | Initial margin requirement |
+| `health_e6` | i128 string | `account_value - maint_margin` (can be negative) |
+| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
+| `margin_mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` |
+| `pm_enabled` | bool | Portfolio margin opt-in state |
+| `positions[*]` | array | Per-asset open positions |
 
 ### `market_info`
 
-Per-market metadata: tick size, min order, oracle config, fee schedule.
+Per-market metadata.
 
 ```json
-{ "type": "market_info", "market_id": 7 }
+{ "type": "market_info", "asset_id": 0 }
 ```
 
-Returns the on-chain market spec including funding parameters and the active mark-price source.
+Or by name:
+
+```json
+{ "type": "market_info", "coin": "BTC" }
+```
+
+Response:
+
+```json
+{
+  "type": "market_info",
+  "data": {
+    "asset_id":        0,
+    "name":            "BTC",
+    "kind":            "Perp",
+    "tick_size_e8":    "100",
+    "step_size_e8":    "10000",
+    "min_order_e8":    "10000",
+    "max_leverage":    50,
+    "maint_margin_ratio_e6": "5000",
+    "init_margin_ratio_e6":  "10000",
+    "funding": {
+      "rate_per_hr_e8":  "1000",
+      "cap_per_hr_e8":   "50000",
+      "interval_ms":     3600000,
+      "next_payment_ts": 1735693200000
+    },
+    "mark_source": "MedianOfOraclesAndMid",
+    "fba_enabled": false,
+    "open_interest_e8": "5000000000"
+  }
+}
+```
 
 ### `vault_state`
 
-Per-vault snapshot for MFlux Vaults and user-created vaults.
+Per-vault snapshot.
 
 ```json
-{ "type": "vault_state", "vault_id": 99 }
+{ "type": "vault_state", "vault": "0x<vault_addr>" }
 ```
 
-Returns vault TVL, share price, depositor table (paginated), and the active strategy if any.
+Response:
+
+```json
+{
+  "type": "vault_state",
+  "data": {
+    "vault":              "0x<addr>",
+    "name":               "MFlux Conservative",
+    "tvl_e6":             "10000000000",
+    "share_price_e8":     "10500000",
+    "depositor_count":    142,
+    "high_water_mark_e8": "10500000",
+    "performance_fee_bps":1000,
+    "lock_period_ms":     86400000,
+    "strategy":           "MarketNeutral"
+  }
+}
+```
 
 ### `staking_state`
 
-Per-account staking snapshot.
-
 ```json
-{ "type": "staking_state", "account_id": 7 }
+{ "type": "staking_state", "address": "0x<addr>" }
 ```
 
-Returns active stakes, pending unstakes, and accrued rewards.
+Response:
+
+```json
+{
+  "type": "staking_state",
+  "data": {
+    "address":         "0x<addr>",
+    "total_staked_e8": "1000000000",
+    "delegations": [
+      {
+        "validator":         "0x<val_addr>",
+        "amount_e8":         "500000000",
+        "since_ts":          1735000000000,
+        "pending_rewards_e8":"1000000"
+      }
+    ],
+    "pending_unstakes": [
+      { "amount_e8": "200000000", "matures_at_ts": 1735780000000 }
+    ]
+  }
+}
+```
 
 ### `fee_schedule`
-
-Network-level fee schedule. No parameters.
 
 ```json
 { "type": "fee_schedule" }
 ```
 
-Returns taker / maker fee tiers, builder rebate config, and the current fee burn ratio.
+Response:
+
+```json
+{
+  "type": "fee_schedule",
+  "data": {
+    "tiers": [
+      { "volume_30d_e6": "0",         "maker_bps_e2": "200", "taker_bps_e2": "500" },
+      { "volume_30d_e6": "100000000", "maker_bps_e2": "150", "taker_bps_e2": "450" },
+      { "volume_30d_e6": "1000000000","maker_bps_e2": "100", "taker_bps_e2": "400" }
+    ],
+    "builder_rebate_bps_e2": "20",
+    "burn_ratio_e6":         "300000",
+    "referrer_share_bps_e2": "100"
+  }
+}
+```
+
+`maker_bps_e2` is basis points × 100 (i.e. `200` = 2 bps = 0.02%). See [fees](../../concepts/fees.md).
+
+### `open_orders`
+
+```json
+{ "type": "open_orders", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "open_orders",
+  "data": {
+    "orders": [
+      {
+        "oid":       12345,
+        "cloid":     "0x...",
+        "asset":     0,
+        "side":      "Buy",
+        "px_e8":     "10050000000",
+        "sz_e8":     "100000000",
+        "remaining_sz_e8":"100000000",
+        "tif":       "Gtc",
+        "reduce_only":false,
+        "placed_at_ts": 1735689600000
+      }
+    ]
+  }
+}
+```
+
+### `user_fills`
+
+```json
+{
+  "type": "user_fills",
+  "address": "0x<addr>",
+  "since_ts": 1735000000000,
+  "limit":    1000
+}
+```
+
+Paginated; `limit` capped at 1000. Returns `cursor` if there are more.
+
+### `recent_trades`
+
+```json
+{ "type": "recent_trades", "asset_id": 0, "limit": 100 }
+```
+
+### `l2_book`
+
+```json
+{ "type": "l2_book", "asset_id": 0, "depth": 20 }
+```
+
+Response:
+
+```json
+{
+  "type": "l2_book",
+  "data": {
+    "bids": [{ "px_e8": "...", "sz_e8": "...", "n_orders": 5 }, ...],
+    "asks": [...]
+  }
+}
+```
+
+### `funding_history`
+
+```json
+{
+  "type": "funding_history",
+  "asset_id": 0,
+  "since_ts": 1735000000000,
+  "limit":    1000
+}
+```
+
+### `block_info`
+
+```json
+{ "type": "block_info", "height": null }
+```
+
+`height: null` returns the latest committed block. Response includes `height`, `commit_ts_ms`, `proposer`, and a digest of the block contents (action count, fill count, withdrawal count).
+
+### `agents`
+
+List active agents for an account.
+
+```json
+{ "type": "agents", "address": "0x<master>" }
+```
+
+Response:
+
+```json
+{
+  "type": "agents",
+  "data": {
+    "agents": [
+      { "agent": "0x...", "name": "bot-1", "approved_at_ts": ..., "expires_at_ms": null }
+    ]
+  }
+}
+```
+
+### `sub_accounts`
+
+```json
+{ "type": "sub_accounts", "address": "0x<master>" }
+```
+
+### `mip3_active_bids`
+
+Live MIP-3 gas-auction bids per stream.
+
+```json
+{ "type": "mip3_active_bids" }
+```
 
 ## Errors
 
 | HTTP | Body | Cause |
 |------|------|-------|
-| 200 | `{ "type": "...", "data": null }` | Query succeeded but the resource doesn't exist (e.g. `vault_state` for an unknown vault_id) |
-| 400 | `{ "error": "unknown info type: <foo>" }` | Misspelled or unknown `type` |
-| 400 | `{ "error": "missing field: <name>" }` | Required type-specific field omitted |
-| 405 | (no body) | Method other than POST |
+| 200 | normal response | success |
+| 400 | `{"error":"unknown info type: <X>"}` | Misspelled or unsupported `type` |
+| 400 | `{"error":"missing field: <X>"}` | Required type-specific arg omitted |
+| 400 | `{"error":"invalid hex"}` | Address arg malformed |
+| 404 | `{"error":"account not found"}` | Address has never appeared on-chain |
+| 404 | `{"error":"market not found"}` | Asset id / coin name unknown |
+| 404 | `{"error":"vault not found"}` | Vault address unknown |
+| 405 | (no body) | Not POST |
+| 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | See [rate limits](../rate-limits.md) |
 
 ## Read-after-write consistency
 
-`/info` reads from the most recent committed block. A `POST /exchange` that admits at time T may not be visible in `/info` queries until the leader commits the block containing it — typically <200 ms at default tick.
+`/info` reads from the most recent committed block. A `POST /exchange` admitted at time `T` is not visible in `/info` until the leader commits the block containing it (typically <200 ms at default tick).
 
-For read-your-writes semantics, the WebSocket `userEvents` channel (coming) streams admitted-then-committed events in order so clients don't need to poll.
+For read-your-writes semantics, subscribe to the [`userEvents` WS channel](../ws/subscriptions.md#userevents); admitted-then-committed events arrive in order, removing the need to poll.
 
-## HL-compat alternative
+## Sequence — query an account, see your own order
 
-If your client speaks HL's `/info` shape (camelCase, `user` instead of `account_id`, more query types like `allMids` and `userFills`), use the gateway's [HL-compat `/info`](./hl-compat.md#info) instead. Same data; different wire shape.
+```
+client                     gateway              node
+  │                          │                    │
+  │ POST /exchange Order     │                    │
+  ├─────────────────────────►│───────────────────►│  admit
+  │ 202 Accepted             │                    │
+  │◄─────────────────────────┤◄───────────────────┤
+  │                          │                    │
+  │  ... ~100 ms commit ...                       │
+  │                          │                    │
+  │ POST /info open_orders   │                    │
+  ├─────────────────────────►│───────────────────►│
+  │                          │                    │ read committed state
+  │ 200 [order present]      │                    │
+  │◄─────────────────────────┤◄───────────────────┤
+```
 
 ## See also
 
 - [`POST /exchange`](./exchange.md) — write path
-- [HL-compat `/info`](./hl-compat.md#info) — camelCase shape
+- [HL-compat `/info`](./hl-compat.md) — camelCase shape, additional query types
+- [WS subscriptions](../ws/subscriptions.md) — push equivalents
+
+## FAQ
+
+**Q: Why both `asset_id` and `coin` accepted on `market_info`?**
+A: `asset_id` is canonical; `coin` is a convenience for human callers. Both resolve to the same record.
+
+**Q: How do I paginate `user_fills`?**
+A: Loop with `since_ts` from the last fill's timestamp + 1ms. The response includes `cursor` for `limit`-bounded paging; pass it back as `cursor` on the next request.
+
+**Q: Is the response deterministic across nodes?**
+A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ; the response includes the height it answered at.
