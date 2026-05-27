@@ -2,19 +2,31 @@
 
 Three protocol families, deliberately separate so the choice of client wire shape doesn't constrain anything else.
 
-| Protocol | Where it lives | Use when |
-|----------|---------------|----------|
-| **MTF-native** | `node:8080` directly, or `gateway/native/*` | Building a new client. Wire shape is small, snake_case, gRPC + REST. Exposes everything the chain does, including MTF differentiation features (RFQ, FBA, portfolio margin enrollment, cross-chain primitives) that other surfaces don't surface. |
-| **HL-compat** | `gateway/info`, `gateway/exchange` | Bringing an existing Hyperliquid client over. URL layout + request shapes match HL exactly — zero code change for `order`, `cancel` (more variants ship over time). |
-| **CCXT-compat** | `gateway/ccxt/*` | Bringing any quant framework that already speaks CCXT. Minimal subset today: `fetchMarkets`, `fetchTicker`, `fetchOrderBook`, `fetchOHLCV`, `createOrder`, `cancelOrder`, `fetchBalance`, `fetchPositions`, `fetchMyTrades`. CCXT Pro WS coming. |
+| Family | Where | Use when |
+|--------|-------|----------|
+| **MTF-native** | Gateway `/exchange`, `/info`, `/native/*` | New clients. Compact snake_case shape. Exposes everything, including MTF differentiation features (RFQ, FBA, PM enrollment, cross-chain). |
+| **HL-compat** | Gateway `/exchange`, `/info` (default routing) | Bringing an existing Hyperliquid client over. URL + JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
+| **CCXT-compat** | Gateway `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
 
 ## REST
 
-- [`POST /exchange`](./rest/exchange.md) — submit a signed action (MTF-native)
-- `POST /info` — coming
-- HL-compat — coming
-- CCXT-compat — coming
+- [`POST /exchange`](./rest/exchange.md) — MTF-native; full action catalog
+- [`POST /info`](./rest/info.md) — MTF-native; per-type schemas
+- [HL-compat](./rest/hl-compat.md) — mirror of Hyperliquid's wire
+- [CCXT-compat](./rest/ccxt-compat.md) — CCXT REST methods
 
-## WS
+## WebSocket
 
-Coming. Subscriptions will mirror HL's naming for the compat surface and use a smaller MTF-native subscription protocol for new clients.
+- [WS protocol](./ws/README.md) — connection lifecycle, frames, auth, resume
+- [Subscriptions](./ws/subscriptions.md) — full channel catalog
+
+## Cross-cutting
+
+- [Errors](./errors.md) — complete error catalog with remediation
+- [Rate limits](./rate-limits.md) — per-IP weight + per-account QPS budgets
+
+## See also
+
+- [Integration quickstart](../integration/quickstart.md) — 5-minute end-to-end
+- [Signing walkthrough](../integration/signing.md) — EIP-712 envelope
+- [Networks](../networks.md) — endpoints per network

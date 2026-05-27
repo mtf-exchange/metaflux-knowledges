@@ -99,6 +99,106 @@ Optional. If you want to use features HL doesn't have:
 
 These are MTF-native actions only and require talking to the gateway's MTF-native surface or the node directly.
 
+## Top 5 HL bot patterns — concrete migration
+
+### 1. Simple limit-order MM (the canonical pattern)
+
+```diff
+- const HL_URL = 'https://api.hyperliquid.xyz';
++ const MTF_URL = 'https://gateway.metaflux.dev';
+
+- const HL_CHAIN_ID = 1337;
++ const MTF_CHAIN_ID = 31337;     // devnet; production TBD
+
+- const HL_DOMAIN_NAME = 'HyperliquidSignTransaction';   // varies by mode
++ const MTF_DOMAIN_NAME = 'MetaFlux';
++ const MTF_DOMAIN_VERSION = '1';
+
+  // asset lookup runs against /info { type: "meta" } — same call, different result
+  const meta = await fetch(MTF_URL + '/info', {
+    method: 'POST',
+    body: JSON.stringify({ type: 'meta' }),
+  }).then(r => r.json());
+
+  const BTC = meta.universe.findIndex(m => m.name === 'BTC');  // may not be 0
+
+  // order, cancel — unchanged HL wire shape
+  await place_order(BTC, 'B', '100', '0.1', 'Gtc');
+```
+
+Switching `chainId` + base URL is ~5 minutes of work for a typical client.
+
+### 2. Liquidation-watching bot (margin-top-up)
+
+HL emits `liquidation` events when accounts hit the partial / market tier. MTF adds **`yellowCard`** as the earliest signal.
+
+```diff
+  ws.subscribe('userEvents', { user: address }, (event) => {
+    switch (event.data.kind) {
++     case 'yellowCard':
++       // T0 — one block to act. ALO orders already cancelled.
++       deposit(YELLOW_CARD_DEPOSIT);
++       break;
+      case 'liquidation':
+-       // HL partial / market
++       // T1 partial OR T2 full — too late for prevention
+        emergency_unwind();
+        break;
+    }
+  });
+```
+
+See [risk-watcher](./risk-watcher.md) for the full pattern.
+
+### 3. Funding-rate arb bot
+
+Funding cadence is similar (HL is hourly; MTF is hourly by default but configurable per market). Formula structure is identical.
+
+```diff
+  const funding = await fetch(URL + '/info', {
+    body: JSON.stringify({ type: 'fundingHistory', coin: 'BTC' }),
+  }).then(r => r.json());
+
+- // HL funding rate at funding[0].fundingRate
++ // MTF same shape; values may differ because oracle composition differs
+  const rate = funding[0].fundingRate;
+```
+
+MTF's oracle composition is published per-market (`market_info.oracle_sources`) — if your arb depends on specific oracle providers, verify the source list matches your expectation. See [mark prices](../concepts/mark-prices.md).
+
+### 4. Multi-account / institutional setup
+
+HL: master + agents per host. MTF: same, plus first-class **multi-sig accounts**.
+
+```diff
+  // existing: master + agents
+  await master.approveAgent(host1_agent);
+  await master.approveAgent(host2_agent);
+
++ // new on MTF: convert master to multi-sig for cold custody
++ await master.convertToMultiSigUser({
++   threshold: 2,
++   signers: [signer1, signer2, signer3],
++ });
++ // every subsequent master-level action requires 2 sigs
++ // agents still work as before for trading actions
+```
+
+See [multi-sig](../concepts/multi-sig.md).
+
+### 5. Sub-account portfolio manager
+
+HL sub-accounts: up to 8. MTF: up to 32. The wire shape matches:
+
+```diff
+- // HL: create one of up to 8 subs
++ // MTF: create one of up to 32 subs (otherwise identical)
+  await master.createSubAccount({ name: 'desk-A' });
+  await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
+```
+
+Per-sub agent management, per-sub PM enrollment, per-sub margin modes are all supported identically.
+
 ## Reference table
 
 | Action you used on HL | Status on MTF |
