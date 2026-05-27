@@ -1,11 +1,28 @@
 # Concepts
 
-Plain-language explanations of MetaFlux's core mechanisms — what they do, how to use them, and what to expect under stress. Implementation-level detail (RFCs, source paths, math derivations) is intentionally elsewhere.
+Plain-language explanations of MetaFlux's core mechanisms — what they do, how to use them, and what to expect under stress.
 
-## Read order
+## Read order for integrators
 
-1. [Agent wallets](./agent-wallets.md) — hot-key delegation, the way HL market makers actually trade
-2. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation under one master key
-3. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
-4. [Tiered liquidation](./tiered-liquidation.md) — T0 yellow card → T4 ADL ladder
-5. [Multi-sig](./multi-sig.md) — institutional 3-of-N treasury (coming)
+1. [Agent wallets](./agent-wallets.md) — hot-key delegation, the standard market-maker setup
+2. [Order types](./order-types.md) — TIF, STP, triggers, TWAP, scale
+3. [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso
+4. [Mark prices](./mark-prices.md) — what drives margin, liquidation, triggers
+5. [Tiered liquidation](./tiered-liquidation.md) — T0 yellow card → T4 ADL
+6. [Funding rates](./funding-rates.md) — hourly user-to-user payment
+7. [Fees](./fees.md) — maker/taker tiers + burn
+8. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
+9. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
+
+## Advanced
+
+- [ADL](./adl.md) — T4 auto-deleverage math
+- [Multi-sig](./multi-sig.md) — institutional M-of-N
+- [Vaults](./vaults.md) — MFlux Vault + user vaults
+- [Staking](./staking.md) — delegate MTF, earn rewards
+- [RFQ](./rfq.md) — request-for-quote for size
+- [FBA](./fba.md) — frequent batch auction matching
+
+## Reference
+
+- [Glossary](./glossary.md) — every protocol-specific term defined
