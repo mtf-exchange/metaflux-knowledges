@@ -1,6 +1,8 @@
 # Order types
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 ## TL;DR
 

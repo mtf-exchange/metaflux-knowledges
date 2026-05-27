@@ -1,6 +1,8 @@
 # Staking
 
-> Status: **preview**.
+{% hint style="info" %}
+**Preview.**
+{% endhint %}
 
 ## TL;DR
 

@@ -1,6 +1,8 @@
 # MIP — Market Improvement Proposals
 
-> Status: **MIP-3 preview**, **MIP-4 deferred to V2 post-launch**.
+{% hint style="info" %}
+**Status.** **MIP-3 preview**, **MIP-4 deferred to V2 post-launch**.
+{% endhint %}
 
 MetaFlux follows a numbered improvement-proposal model (analogous to Hyperliquid's HIP) for protocol-level changes that affect listed markets or core fee mechanisms.
 

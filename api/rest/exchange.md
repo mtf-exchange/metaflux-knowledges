@@ -1,6 +1,8 @@
 # `POST /exchange` — submit a signed action
 
-> Status: **stable** for the listed action variants. Endpoint shape committed for V1.
+{% hint style="info" %}
+**Status.** **stable** for the listed action variants. Endpoint shape committed for V1.
+{% endhint %}
 
 ## TL;DR
 

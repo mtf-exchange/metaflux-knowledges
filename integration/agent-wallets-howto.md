@@ -1,6 +1,8 @@
 # Agent wallets in practice
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 Concrete code, end-to-end, walking through approval, trading, and rotation. For the conceptual background see [agent wallets](../concepts/agent-wallets.md).
 

@@ -1,6 +1,8 @@
 # Frequent batch auctions (FBA)
 
-> Status: **preview**. Per-market opt-in via [MIP-3](../mip/mip-3.md); not all markets run FBA.
+{% hint style="info" %}
+**Preview.** Per-market opt-in via [MIP-3](../mip/mip-3.md); not all markets run FBA.
+{% endhint %}
 
 ## TL;DR
 

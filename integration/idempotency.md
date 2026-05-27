@@ -1,6 +1,8 @@
 # Idempotency
 
-> Status: **stable**.
+{% hint style="success" %}
+**Stable.**
+{% endhint %}
 
 How to retry safely without double-spending nonces or duplicating orders.
 

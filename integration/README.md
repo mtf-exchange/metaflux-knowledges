@@ -1,3 +1,8 @@
+---
+description: Bring a client up against MetaFlux — SDKs, signing, migration, idempotency, error handling.
+icon: code
+---
+
 # Integration
 
 How to connect a client to MetaFlux. Pick the path that matches your starting point.

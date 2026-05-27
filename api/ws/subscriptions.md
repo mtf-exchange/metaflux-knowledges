@@ -1,6 +1,8 @@
 # WS subscription channels
 
-> Status: **planned** at V1. Public-data channels ship first; private channels follow with auth.
+{% hint style="info" %}
+**Status.** **planned** at V1. Public-data channels ship first; private channels follow with auth.
+{% endhint %}
 
 The connection lifecycle and frame format are documented in the [WS README](./README.md). This page is the channel-by-channel catalog: args, payload shape, frequency, ordering guarantees, auth.
 

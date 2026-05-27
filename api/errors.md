@@ -1,6 +1,8 @@
 # Error catalog
 
-> Status: **stable** for the codes listed. New error strings may be added; existing ones are stable.
+{% hint style="info" %}
+**Status.** **stable** for the codes listed. New error strings may be added; existing ones are stable.
+{% endhint %}
 
 A complete enumeration of HTTP status codes, error-string conventions, root causes, and remediation. When in doubt about how to handle a non-`202`, look here first.
 

@@ -1,3 +1,8 @@
+---
+description: REST and WebSocket surface — three protocol families, all backed by the same chain.
+icon: terminal
+---
+
 # API Reference
 
 Three protocol families, deliberately separate so the choice of client wire shape doesn't constrain anything else.

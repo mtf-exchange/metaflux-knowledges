@@ -1,6 +1,8 @@
 # `POST /info` — read path (MTF-native)
 
-> Status: **stable** shape. Query types are added over time; the envelope is committed.
+{% hint style="info" %}
+**Status.** **stable** shape. Query types are added over time; the envelope is committed.
+{% endhint %}
 
 ## TL;DR
 

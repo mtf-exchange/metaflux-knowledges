@@ -1,3 +1,8 @@
+---
+description: Core mechanisms — agent wallets, margin, liquidation, order types, vaults, fees, and the glossary.
+icon: book-open
+---
+
 # Concepts
 
 Plain-language explanations of MetaFlux's core mechanisms — what they do, how to use them, and what to expect under stress.

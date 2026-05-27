@@ -1,6 +1,8 @@
 # Rust SDK
 
-> Status: **preview**. The `metaflux-client` crate ships before mainnet; the API shape below is committed.
+{% hint style="info" %}
+**Preview.** The `metaflux-client` crate ships before mainnet; the API shape below is committed.
+{% endhint %}
 
 ## TL;DR
 

@@ -1,8 +1,32 @@
+---
+description: Integration reference, API surface, and core concepts for the MetaFlux derivatives exchange.
+cover: .gitbook/assets/cover.svg
+coverY: 0
+layout:
+  cover:
+    visible: true
+    size: full
+  title:
+    visible: true
+  description:
+    visible: true
+  tableOfContents:
+    visible: true
+  outline:
+    visible: true
+  pagination:
+    visible: true
+---
+
 # MetaFlux Knowledge Base
 
-> Integration reference and user-facing docs for the MetaFlux derivatives exchange. Synced to GitBook.
-
 Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
+
+{% hint style="info" %}
+**New?** Start with the [Quickstart](./integration/quickstart.md) (5 minutes, deposit → trade → withdraw).
+**Migrating from another perps DEX?** Jump to [Migrating from Hyperliquid](./integration/migrating-from-hl.md) — the patterns translate to other HL-compatible bots.
+**Building on-chain?** See [MIP-3 permissionless market deploy](./mip/mip-3.md).
+{% endhint %}
 
 ## Quick links
 
