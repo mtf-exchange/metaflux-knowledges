@@ -19,9 +19,9 @@ T0 yellow card  →  T1 partial  →  T2 full  →  T3 backstop  →  T4 ADL
 T3 hands the dying account's position to a backstop multisig and pays out of the insurance pool. If `insurance_pool < shortfall`, the protocol moves to T4: the remaining unfunded loss is allocated as a position haircut to profitable counter-parties.
 
 ```
-shortfall_e6  =  liquidation_loss - insurance_pool_drawn
-if shortfall_e6 > 0:
-    fire_adl(asset, shortfall_e6)
+shortfall  =  liquidation_loss - insurance_pool_drawn
+if shortfall > 0:
+    fire_adl(asset, shortfall)
 ```
 
 Insurance pool drawdown is itself rate-limited — see [tiered liquidation](./tiered-liquidation.md#t3-backstop).
@@ -101,8 +101,8 @@ ADL events fire on [`userEvents` WS channel](../api/ws/subscriptions.md#usereven
 {
   "kind":        "adl",
   "asset":       0,
-  "haircut_sz_e8": "50000000",
-  "realised_pnl_e6": "5000000",
+  "haircut_sz": "50000000",
+  "realised_pnl": "5000000",
   "block":       12345
 }
 ```
@@ -110,7 +110,7 @@ ADL events fire on [`userEvents` WS channel](../api/ws/subscriptions.md#usereven
 Plus an account-wide notification:
 
 ```json
-{ "kind": "marginChange", "free_e6": "...", ... }
+{ "kind": "marginChange", "free": "...", ... }
 ```
 
 For automated bots, treat `adl` events as you would a forced fill — your position changed, the protocol gave you the fill price (mark at the haircut block), you'd typically re-evaluate your strategy.

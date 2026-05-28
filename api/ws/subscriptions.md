@@ -28,10 +28,10 @@ Push payload:
       {
         "asset_id": 0,
         "name":     "BTC",
-        "tick_size_e8":      "100",
-        "step_size_e8":      "10000",
+        "tick_size":      "100",
+        "step_size":      "10000",
         "max_leverage":      50,
-        "maint_margin_ratio_e6": "5000",
+        "maint_margin_ratio": "5000",
         "kind": "Perp"
       }
     ]
@@ -151,7 +151,7 @@ Mark price stream for one asset.
 {
   "ch": "mark",
   "seq": 1234,
-  "data": { "coin": "BTC", "mark_e8": "10055000000", "oracle_e8": "10054200000" }
+  "data": { "coin": "BTC", "mark": "10055000000", "oracle": "10054200000" }
 }
 ```
 
@@ -171,7 +171,7 @@ Funding-rate updates per market.
   "seq": 42,
   "data": {
     "coin":          "BTC",
-    "rate_per_hr_e8": "1000",
+    "rate_per_hr": "1000",
     "next_payment_ts": 1735693200000
   }
 }
@@ -201,11 +201,11 @@ Intervals: `"1m"`, `"5m"`, `"15m"`, `"30m"`, `"1h"`, `"4h"`, `"1d"`.
     "coin": "BTC",
     "interval": "1m",
     "open_ts":  1735689540000,
-    "open_e8":  "10050000000",
-    "high_e8":  "10060000000",
-    "low_e8":   "10049000000",
-    "close_e8": "10055000000",
-    "volume_e8":"5000000",
+    "open":  "10050000000",
+    "high":  "10060000000",
+    "low":   "10049000000",
+    "close": "10055000000",
+    "volume":"5000000",
     "closed":   false
   }
 }
@@ -227,8 +227,8 @@ Best bid / offer for one asset (a thinner `l2Book`).
   "seq": 999,
   "data": {
     "coin": "BTC",
-    "bid_px_e8": "10049000000", "bid_sz_e8": "1000000",
-    "ask_px_e8": "10051000000", "ask_sz_e8": "2000000"
+    "bid_px": "10049000000", "bid_sz": "1000000",
+    "ask_px": "10051000000", "ask_sz": "2000000"
   }
 }
 ```
@@ -256,12 +256,12 @@ Push payload union (dispatch on `kind`):
 
 ```json
 { "ch": "userEvents", "seq": 1, "data": { "kind": "orderResting", "oid": 12345, "cloid": "0x...", "asset": 0 } }
-{ "ch": "userEvents", "seq": 2, "data": { "kind": "fill",         "oid": 12345, "px_e8": "...", "sz_e8": "...", "side": "Buy", "fee_e6": "100" } }
+{ "ch": "userEvents", "seq": 2, "data": { "kind": "fill",         "oid": 12345, "px": "...", "sz": "...", "side": "Buy", "fee": "100" } }
 { "ch": "userEvents", "seq": 3, "data": { "kind": "orderCancelled","oid": 12345, "reason": "user" } }
-{ "ch": "userEvents", "seq": 4, "data": { "kind": "marginChange",  "asset": 0, "free_e6": "...", "locked_e6": "..." } }
-{ "ch": "userEvents", "seq": 5, "data": { "kind": "liquidation",   "asset": 0, "tier": "T1", "closed_sz_e8": "..." } }
-{ "ch": "userEvents", "seq": 6, "data": { "kind": "yellowCard",    "ts": ..., "health_e6": "...", "alo_cancelled": 3 } }
-{ "ch": "userEvents", "seq": 7, "data": { "kind": "transferIn",    "from": "0x...", "amount_e6": "..." } }
+{ "ch": "userEvents", "seq": 4, "data": { "kind": "marginChange",  "asset": 0, "free": "...", "locked": "..." } }
+{ "ch": "userEvents", "seq": 5, "data": { "kind": "liquidation",   "asset": 0, "tier": "T1", "closed_sz": "..." } }
+{ "ch": "userEvents", "seq": 6, "data": { "kind": "yellowCard",    "ts": ..., "health": "...", "alo_cancelled": 3 } }
+{ "ch": "userEvents", "seq": 7, "data": { "kind": "transferIn",    "from": "0x...", "amount": "..." } }
 ```
 
 Commit-derived. Resume: yes.
@@ -301,9 +301,9 @@ Margin-only stream (less chatty than `userEvents` for risk monitors).
   "ch": "marginEvents",
   "seq": 1,
   "data": {
-    "account_value_e6": "100000000",
-    "maint_margin_e6":  "10000000",
-    "health_e6":        "10000000",
+    "account_value": "100000000",
+    "maint_margin":  "10000000",
+    "health":        "10000000",
     "tier":             "Safe"
   }
 }
@@ -342,8 +342,8 @@ Per-TWAP slice events.
     "twap_id": "0x...",
     "slice_idx": 7,
     "slice_total": 60,
-    "filled_e8": "100000",
-    "avg_px_e8": "10052000000"
+    "filled": "100000",
+    "avg_px": "10052000000"
   }
 }
 ```

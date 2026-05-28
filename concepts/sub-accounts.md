@@ -92,11 +92,11 @@ Response:
 ```json
 {
   "type": "SubAccountTransfer",
-  "params": { "sub_index": 0, "deposit": true, "amount_e6": "1000000000" }
+  "params": { "sub_index": 0, "deposit": true, "amount": "1000000000" }
 }
 ```
 
-`amount_e6` in USDC base units (6 decimals). `deposit: true` is master → sub; `false` is sub → master.
+`amount` in USDC base units (6 decimals). `deposit: true` is master → sub; `false` is sub → master.
 
 For spot assets use `SubAccountSpotTransfer` (adds `asset` field).
 

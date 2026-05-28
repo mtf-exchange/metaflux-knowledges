@@ -134,7 +134,7 @@ async function emergencyUnwind(c: MetaFluxClient) {
 To bring health from H₀ to target H₁:
 
 ```
-needed_deposit_e6 = (H₁ - H₀) × maint_margin_e6
+needed_deposit = (H₁ - H₀) × maint_margin
 ```
 
 Example: maint = 10 USDC, current health 1.0, target 1.5.

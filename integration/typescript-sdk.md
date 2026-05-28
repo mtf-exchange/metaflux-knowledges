@@ -227,7 +227,7 @@ c.ws().subscribe('userFills', { user: c.address }, (e) => {
 
 ## Numeric handling
 
-All `_e8` / `_e6` fields are `string` in both inputs and outputs. The SDK does not coerce to `number` because IEEE-754 silently loses precision past 2^53.
+All fixed-point integer and USDC base-unit fields are `string` in both inputs and outputs. The SDK does not coerce to `number` because IEEE-754 silently loses precision past 2^53.
 
 For arithmetic, use a big-int library (`bigint`, `bignumber.js`, etc.):
 

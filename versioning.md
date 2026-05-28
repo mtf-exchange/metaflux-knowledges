@@ -35,7 +35,7 @@ Wire shape is everything a client commits to in its serialisation / signing logi
 | Wire-shape | Examples |
 |-----------|----------|
 | Yes | Action `type` strings, field names, field types, enum values, response shape, status codes, error strings, EIP-712 domain |
-| Yes | Numerical scaling conventions (`_e8`, `_e6`) |
+| Yes | Numerical scaling conventions (fixed-point integers, USDC base units) |
 | Yes | WS channel names, payload shapes, frame format |
 | No | Server-internal storage; consensus implementation; mark/oracle source weights (governance-controlled, not protocol-versioned); fee tier thresholds (governance) |
 
@@ -72,7 +72,7 @@ During the overlap window, responses to the old shape include a non-fatal warnin
     "field":      "params.price",
     "deprecated_at_version": "2.0.0",
     "removal_at_version":    "3.0.0",
-    "migration": "use price_e8 (string, fixed-point 10^8)"
+    "migration": "use px (string, fixed-point 10^8)"
   }
 }
 ```

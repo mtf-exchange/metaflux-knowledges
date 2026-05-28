@@ -15,18 +15,18 @@ Using last-trade for margin is exploitable: a small adversarial trade at a manip
 ## Composition
 
 ```
-mark_e8 = median(
-   mid_e8,
-   oracle_e8,
-   ema_mid_e8
+mark = median(
+   mid,
+   oracle,
+   ema_mid
 )
 ```
 
 | Source | Definition |
 |--------|-----------|
-| `mid_e8` | Best-bid–best-offer midpoint at last commit. `null` if book empty on either side. |
-| `oracle_e8` | External price feed — see [Oracle composition](#oracle-composition) below. |
-| `ema_mid_e8` | EMA of `mid_e8` over `mark_ema_window_ms` (default 5 minutes). |
+| `mid` | Best-bid–best-offer midpoint at last commit. `null` if book empty on either side. |
+| `oracle` | External price feed — see [Oracle composition](#oracle-composition) below. |
+| `ema_mid` | EMA of `mid` over `mark_ema_window_ms` (default 5 minutes). |
 
 The median of three values is robust to a single outlier — if mid spikes from a thin-book burst, the median falls back to oracle + ema_mid. If the oracle pauses, median = mid + ema_mid.
 
@@ -42,10 +42,10 @@ When fewer than 3 valid sources exist (e.g. empty book → no mid), the rule deg
 
 ## Oracle composition
 
-`oracle_e8` is itself a composition of external feeds. Defaults per market are governance-set; common shape:
+`oracle` is itself a composition of external feeds. Defaults per market are governance-set; common shape:
 
 ```
-oracle_e8 = TWA(
+oracle = TWA(
    external_cex_feeds,  // e.g. weighted median across CEXes
    window_ms = 30_000
 )
@@ -72,7 +72,7 @@ Per-feed sub-rules:
 - A feed that hasn't updated within `feed_staleness_ms` (default 60 s) is dropped from the median.
 - A feed > `feed_deviation_pct` (default 5%) from the venue median is dropped as an outlier.
 
-The composed `oracle_e8` is itself published once per block, signed by the oracle validators in the active validator set.
+The composed `oracle` is itself published once per block, signed by the oracle validators in the active validator set.
 
 ## Sanity bands
 
@@ -128,10 +128,10 @@ Returns the latest mark + the components:
   "type": "market_info",
   "data": {
     "asset_id":  0,
-    "mark_e8":   "10055000000",
-    "mid_e8":    "10055000000",
-    "oracle_e8": "10054200000",
-    "ema_mid_e8":"10055100000",
+    "mark":   "10055000000",
+    "mid":    "10055000000",
+    "oracle": "10054200000",
+    "ema_mid":"10055100000",
     "mark_status": "Ok"
   }
 }
@@ -144,7 +144,7 @@ Streaming via [WS `mark` channel](../api/ws/subscriptions.md#mark).
 ## Edge cases
 
 - **Genuine 5% move in 1 s.** The band clamps the first 10 blocks; mark catches up at ~0.05% per block, then the regime-shift detection widens the band, and mark catches up faster. The total lag is ~1–2 seconds; large but bounded.
-- **Oracle outage > `feed_staleness_ms`.** All feeds drop; `oracle_e8` is null; median falls back to mid + ema_mid. If both are also unavailable (empty book + oracle out), mark freezes at the prior value. Liquidations halt during freeze.
+- **Oracle outage > `feed_staleness_ms`.** All feeds drop; `oracle` is null; median falls back to mid + ema_mid. If both are also unavailable (empty book + oracle out), mark freezes at the prior value. Liquidations halt during freeze.
 - **Empty book.** mid = null. Median uses oracle + ema_mid only. Funding computation uses the available oracle. Liquidations proceed against oracle-anchored mark.
 - **Stale ema_mid.** ema_mid is by construction always defined once at least one mid has ever been published. Decay continues even with an empty book — `ema_mid_t = ema_mid_{t-1}` while no new mid arrives.
 - **Trigger orders during freeze.** Trigger evaluation uses mark; during freeze, no trigger fires. Resting orders sit until a real mark resumes.
