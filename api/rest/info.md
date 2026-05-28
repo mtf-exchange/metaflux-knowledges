@@ -240,18 +240,18 @@ Response:
   "type": "fee_schedule",
   "data": {
     "tiers": [
-      { "volume_30d": "0",         "maker_bps_e2": "200", "taker_bps_e2": "500" },
-      { "volume_30d": "100000000", "maker_bps_e2": "150", "taker_bps_e2": "450" },
-      { "volume_30d": "1000000000","maker_bps_e2": "100", "taker_bps_e2": "400" }
+      { "volume_30d": "0",         "maker_bps": "2.0", "taker_bps": "5.0" },
+      { "volume_30d": "100000000", "maker_bps": "1.5", "taker_bps": "4.5" },
+      { "volume_30d": "1000000000","maker_bps": "1.0", "taker_bps": "4.0" }
     ],
-    "builder_rebate_bps_e2": "20",
-    "burn_ratio":         "300000",
-    "referrer_share_bps_e2": "100"
+    "builder_rebate_bps": "0.2",
+    "burn_ratio":         "0.30",
+    "referrer_share_bps": "1.0"
   }
 }
 ```
 
-`maker_bps_e2` is basis points × 100 (i.e. `200` = 2 bps = 0.02%). See [fees](../../concepts/fees.md).
+Fee rates are decimal **basis points** as strings (`"2.0"` = 2 bps = 0.02%). `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned). See [fees](../../concepts/fees.md).
 
 ### `open_orders`
 
