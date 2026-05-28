@@ -62,8 +62,8 @@ Faster intervals reduce the wait but increase computational cost. The 1-second d
   "params": {
     "asset":     42,
     "side":      "Buy",
-    "price_e8":  "10050000000",
-    "size_e8":   "100000000",
+    "px":  "10050000000",
+    "size":   "100000000",
     "batch_id":  9876,
     "cloid":     "0x..."
   }
@@ -173,14 +173,14 @@ curl -X POST https://gateway/info \
     "asset_id":           42,
     "current_batch_id":   9876,
     "batch_close_at_ms":  1735689601000,
-    "queued_buy_volume_e8":  "1000000000",
-    "queued_sell_volume_e8": "900000000",
-    "indicative_clearing_e8":"10050000000"
+    "queued_buy_volume":  "1000000000",
+    "queued_sell_volume": "900000000",
+    "indicative_clearing":"10050000000"
   }
 }
 ```
 
-`indicative_clearing_e8` is what p* would be if the batch closed now — useful for traders deciding whether to add to the batch.
+`indicative_clearing` is what p* would be if the batch closed now — useful for traders deciding whether to add to the batch.
 
 ## See also
 

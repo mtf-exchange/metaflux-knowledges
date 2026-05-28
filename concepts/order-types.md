@@ -120,9 +120,9 @@ Use `PositionTpsl` for "I always want a stop on my net position" — the same TP
   "type": "ScaleOrder",
   "params": {
     "asset": 0, "side": "Buy",
-    "total_size_e8": "1000000000",
-    "start_price_e8": "9900000000",
-    "end_price_e8":   "9800000000",
+    "total_size": "1000000000",
+    "start_price": "9900000000",
+    "end_price":   "9800000000",
     "n_levels": 10,
     "shape": "Flat"
   }
@@ -146,7 +146,7 @@ Each leg gets an auto-assigned `cloid` derived from `cloid_prefix + leg_index`. 
 ```
 duration = 1 hour = 3,600,000 ms
 slices   = duration / SLICE_INTERVAL  (default 60s slice; 60 slices per hour)
-sz_per_slice = size_e8 / slices
+sz_per_slice = size / slices
 
 slice  1: send IOC near mid at t = randomize(0, SLICE_INTERVAL * (1 + jitter%))
 slice  2: send IOC at t = slice_1_t + SLICE_INTERVAL * (1 + jitter%)

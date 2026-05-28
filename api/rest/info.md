@@ -91,27 +91,27 @@ Response:
   "type": "account_state",
   "data": {
     "address":           "0x<addr>",
-    "account_value_e6":  "100000000",
-    "free_collateral_e6":"80000000",
-    "maint_margin_e6":   "10000000",
-    "init_margin_e6":    "20000000",
-    "health_e6":         "10000000",
+    "account_value":  "100000000",
+    "free_collateral":"80000000",
+    "maint_margin":   "10000000",
+    "init_margin":    "20000000",
+    "health":         "10000000",
     "tier":              "Safe",
     "margin_mode":       "Cross",
     "pm_enabled":        false,
     "positions": [
       {
         "asset":            0,
-        "size_e8":          "100000000",
-        "entry_px_e8":      "10000000000",
-        "unrealised_pnl_e6":"500000",
+        "size":          "100000000",
+        "entry_px":      "10000000000",
+        "unrealised_pnl":"500000",
         "isolated":         false,
         "leverage":         10
       }
     ],
     "balances": {
-      "usdc_e6": "100000000",
-      "spot":    { "ETH_e8": "5000000000" }
+      "usdc": "100000000",
+      "spot":    { "ETH": "5000000000" }
     }
   }
 }
@@ -119,11 +119,11 @@ Response:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `account_value_e6` | u128 string | Equity including unrealised PnL, USDC base units |
-| `free_collateral_e6` | u128 string | Equity minus initial margin held by open positions |
-| `maint_margin_e6` | u128 string | Maintenance margin requirement |
-| `init_margin_e6` | u128 string | Initial margin requirement |
-| `health_e6` | i128 string | `account_value - maint_margin` (can be negative) |
+| `account_value` | u128 string | Equity including unrealised PnL, USDC base units |
+| `free_collateral` | u128 string | Equity minus initial margin held by open positions |
+| `maint_margin` | u128 string | Maintenance margin requirement |
+| `init_margin` | u128 string | Initial margin requirement |
+| `health` | i128 string | `account_value - maint_margin` (can be negative) |
 | `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
 | `margin_mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` |
 | `pm_enabled` | bool | Portfolio margin opt-in state |
@@ -152,21 +152,21 @@ Response:
     "asset_id":        0,
     "name":            "BTC",
     "kind":            "Perp",
-    "tick_size_e8":    "100",
-    "step_size_e8":    "10000",
-    "min_order_e8":    "10000",
+    "tick_size":    "100",
+    "step_size":    "10000",
+    "min_order":    "10000",
     "max_leverage":    50,
-    "maint_margin_ratio_e6": "5000",
-    "init_margin_ratio_e6":  "10000",
+    "maint_margin_ratio": "5000",
+    "init_margin_ratio":  "10000",
     "funding": {
-      "rate_per_hr_e8":  "1000",
-      "cap_per_hr_e8":   "50000",
+      "rate_per_hr":  "1000",
+      "cap_per_hr":   "50000",
       "interval_ms":     3600000,
       "next_payment_ts": 1735693200000
     },
     "mark_source": "MedianOfOraclesAndMid",
     "fba_enabled": false,
-    "open_interest_e8": "5000000000"
+    "open_interest": "5000000000"
   }
 }
 ```
@@ -187,10 +187,10 @@ Response:
   "data": {
     "vault":              "0x<addr>",
     "name":               "MFlux Conservative",
-    "tvl_e6":             "10000000000",
-    "share_price_e8":     "10500000",
+    "tvl":             "10000000000",
+    "share_price":     "10500000",
     "depositor_count":    142,
-    "high_water_mark_e8": "10500000",
+    "high_water_mark": "10500000",
     "performance_fee_bps":1000,
     "lock_period_ms":     86400000,
     "strategy":           "MarketNeutral"
@@ -211,17 +211,17 @@ Response:
   "type": "staking_state",
   "data": {
     "address":         "0x<addr>",
-    "total_staked_e8": "1000000000",
+    "total_staked": "1000000000",
     "delegations": [
       {
         "validator":         "0x<val_addr>",
-        "amount_e8":         "500000000",
+        "amount":         "500000000",
         "since_ts":          1735000000000,
-        "pending_rewards_e8":"1000000"
+        "pending_rewards":"1000000"
       }
     ],
     "pending_unstakes": [
-      { "amount_e8": "200000000", "matures_at_ts": 1735780000000 }
+      { "amount": "200000000", "matures_at_ts": 1735780000000 }
     ]
   }
 }
@@ -240,12 +240,12 @@ Response:
   "type": "fee_schedule",
   "data": {
     "tiers": [
-      { "volume_30d_e6": "0",         "maker_bps_e2": "200", "taker_bps_e2": "500" },
-      { "volume_30d_e6": "100000000", "maker_bps_e2": "150", "taker_bps_e2": "450" },
-      { "volume_30d_e6": "1000000000","maker_bps_e2": "100", "taker_bps_e2": "400" }
+      { "volume_30d": "0",         "maker_bps_e2": "200", "taker_bps_e2": "500" },
+      { "volume_30d": "100000000", "maker_bps_e2": "150", "taker_bps_e2": "450" },
+      { "volume_30d": "1000000000","maker_bps_e2": "100", "taker_bps_e2": "400" }
     ],
     "builder_rebate_bps_e2": "20",
-    "burn_ratio_e6":         "300000",
+    "burn_ratio":         "300000",
     "referrer_share_bps_e2": "100"
   }
 }
@@ -271,9 +271,9 @@ Response:
         "cloid":     "0x...",
         "asset":     0,
         "side":      "Buy",
-        "px_e8":     "10050000000",
-        "sz_e8":     "100000000",
-        "remaining_sz_e8":"100000000",
+        "px":     "10050000000",
+        "sz":     "100000000",
+        "remaining_sz":"100000000",
         "tif":       "Gtc",
         "reduce_only":false,
         "placed_at_ts": 1735689600000
@@ -314,7 +314,7 @@ Response:
 {
   "type": "l2_book",
   "data": {
-    "bids": [{ "px_e8": "...", "sz_e8": "...", "n_orders": 5 }, ...],
+    "bids": [{ "px": "...", "sz": "...", "n_orders": 5 }, ...],
     "asks": [...]
   }
 }

@@ -59,8 +59,8 @@ Quotes are visible to the taker only (not on the public book). Other participant
   "params": {
     "asset":          0,
     "side":           "Buy",
-    "size_e8":        "10000000000",
-    "reference_px_e8":"10050000000",
+    "size":        "10000000000",
+    "reference_px":"10050000000",
     "max_slippage_bps": 50,
     "ttl_ms":         5000
   }
@@ -69,7 +69,7 @@ Quotes are visible to the taker only (not on the public book). Other participant
 
 | Field | Meaning |
 |-------|---------|
-| `reference_px_e8` | The taker's hint price (often the public mark); used by makers to anchor quotes |
+| `reference_px` | The taker's hint price (often the public mark); used by makers to anchor quotes |
 | `max_slippage_bps` | Upper bound on price deviation from reference; quotes outside are dropped |
 | `ttl_ms` | How long the RFQ stays open before auto-expire |
 
@@ -90,8 +90,8 @@ The RFQ is broadcast to opted-in makers via [`rfqEvents` WS channel](../api/ws/s
   "type": "RfqQuote",
   "params": {
     "rfq_id":       "0x<...>",
-    "price_e8":     "10049000000",
-    "size_e8":      "10000000000",
+    "px":     "10049000000",
+    "size":      "10000000000",
     "expires_at_ms":1735690000000
   }
 }
@@ -111,8 +111,8 @@ A maker can submit multiple quotes (e.g. partial fills at different prices) over
 ```
 
 Settlement is atomic in the next block:
-- Taker's position grows by `size_e8` at `price_e8`.
-- Maker's position grows by `size_e8` opposite-side at the same price.
+- Taker's position grows by `size` at `px`.
+- Maker's position grows by `size` opposite-side at the same price.
 - Other quotes for this `rfq_id` expire.
 - Fee structure: same maker/taker tiers as a public-book fill ([fees](./fees.md)).
 
@@ -133,11 +133,11 @@ To be eligible to quote on an asset, a maker registers via `RfqRegister`:
 ```json
 {
   "type": "RfqRegister",
-  "params": { "asset": 0, "active": true, "min_size_e8": "1000000000" }
+  "params": { "asset": 0, "active": true, "min_size": "1000000000" }
 }
 ```
 
-`min_size_e8` lets makers ignore small RFQs they don't want to be paged on. Unregister with `active: false`.
+`min_size` lets makers ignore small RFQs they don't want to be paged on. Unregister with `active: false`.
 
 Registered makers receive RFQ broadcasts on `rfqEvents`. They are NOT obligated to quote — quoting is opt-in per RFQ.
 
@@ -145,7 +145,7 @@ Registered makers receive RFQ broadcasts on `rfqEvents`. They are NOT obligated 
 
 | Property | RFQ fill |
 |----------|----------|
-| Price | Quote's `price_e8`, regardless of public book |
+| Price | Quote's `px`, regardless of public book |
 | Counter-party | One maker only (the chosen quote's signer) |
 | Book impact | None — the trade does not match against resting orders |
 | Public visibility | Trade tape shows the fill ex-post, tagged `rfq` |

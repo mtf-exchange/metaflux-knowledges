@@ -53,7 +53,7 @@ HL and MTF both use integer asset IDs but **the integers are not the same**. `0`
 
 ### 5. Numeric precision
 
-Both chains use scaled integers (e.g. `price_e8`) and represent them as strings in JSON because IEEE-754 loses precision past 2^53. If your bot is doing JSON parsing with default JS `JSON.parse`, switch to a big-int aware parser for these fields — the wire shape is the same as HL but the failure mode (silent precision loss) is the same too.
+Both chains use scaled integers (e.g. `px`) and represent them as strings in JSON because IEEE-754 loses precision past 2^53. If your bot is doing JSON parsing with default JS `JSON.parse`, switch to a big-int aware parser for these fields — the wire shape is the same as HL but the failure mode (silent precision loss) is the same too.
 
 ### 6. Liquidation behaviour
 

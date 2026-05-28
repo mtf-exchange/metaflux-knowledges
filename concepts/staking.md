@@ -21,7 +21,7 @@ Hold MTF, delegate to a validator, earn protocol emissions + a share of fee reve
 ```
 delegator
    │
-   │  Delegate { validator, amount_e8 }
+   │  Delegate { validator, amount }
    ├──────────────────────────────────────────────►
    │                                                 ┌── stake registered next block
    │                                                 │
@@ -32,7 +32,7 @@ delegator
    ├──────────────────────────────────────────────►  │
    │                                                 │  pending_rewards → balance
    │                                                 │
-   │  Undelegate { validator, amount_e8 }            │
+   │  Undelegate { validator, amount }            │
    ├──────────────────────────────────────────────►  │
    │                                                 │  enter unbonding queue
    │                                                 │  matures after lock_period (7 days)
@@ -51,7 +51,7 @@ delegator
 ```json
 {
   "type": "Delegate",
-  "params": { "validator": "0x<val_addr>", "amount_e8": "10000000000" }
+  "params": { "validator": "0x<val_addr>", "amount": "10000000000" }
 }
 ```
 
@@ -62,7 +62,7 @@ Moves MTF from balance to the validator's delegation pool. Effective at next blo
 ```json
 {
   "type": "Undelegate",
-  "params": { "validator": "0x<val_addr>", "amount_e8": "10000000000" }
+  "params": { "validator": "0x<val_addr>", "amount": "10000000000" }
 }
 ```
 
@@ -73,7 +73,7 @@ Removes from active stake; enters unbonding queue. Doesn't earn rewards during u
 ```json
 {
   "type": "Redelegate",
-  "params": { "from": "0x<val1>", "to": "0x<val2>", "amount_e8": "10000000000" }
+  "params": { "from": "0x<val1>", "to": "0x<val2>", "amount": "10000000000" }
 }
 ```
 
@@ -88,7 +88,7 @@ Move stake between validators **without** entering the unbonding queue. Limited 
 }
 ```
 
-Sweep accrued rewards from `pending_rewards_e8` to the delegator's MTF balance. No-op if pending is zero.
+Sweep accrued rewards from `pending_rewards` to the delegator's MTF balance. No-op if pending is zero.
 
 Auto-claim is **not** automatic — claim on a cadence (daily / weekly) or before changing delegation.
 
@@ -138,7 +138,7 @@ Validators are slashed for:
 | Downtime (missed `downtime_blocks` consecutive proposer slots) | 0.1% of stake + jail | Pro-rata 0.1% lost |
 | Vote on invalid fork | 5% + permanent removal | Pro-rata 5% |
 
-Slashed delegators see their `delegation.amount_e8` reduced at the slash block. No notice — slashing is consensus-derived.
+Slashed delegators see their `delegation.amount` reduced at the slash block. No notice — slashing is consensus-derived.
 
 Mitigations:
 - Pick well-operated validators (uptime track record, commission stability).
@@ -157,8 +157,8 @@ Returns the active validator set with:
 {
   "validator":          "0x<val>",
   "moniker":            "alpha-validator",
-  "total_stake_e8":     "10000000000000",
-  "self_bond_e8":       "100000000000",
+  "total_stake":     "10000000000000",
+  "self_bond":       "100000000000",
   "commission_pct":     5,
   "uptime_30d_pct":     99.95,
   "slash_count":        0,
@@ -180,9 +180,9 @@ Pick by:
 {
   "type": "staking_apr",
   "data": {
-    "total_active_stake_e8":  "100000000000000",
-    "emission_per_block_e8":  "100000000",
-    "fee_revenue_30d_e6":     "1000000000",
+    "total_active_stake":  "100000000000000",
+    "emission_per_block":  "100000000",
+    "fee_revenue_30d":     "1000000000",
     "implied_apr_pct":        18.5
   }
 }

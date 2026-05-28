@@ -35,7 +35,7 @@ Implication: a 10% adverse move on BTC reduces account-wide health, even if your
 
 ## Isolated
 
-When you toggle `is_isolated: true` for an asset, the protocol moves `isolated_amount_e6` USDC from cross balance into a per-position bucket. That position's gain/loss settles into the bucket only:
+When you toggle `is_isolated: true` for an asset, the protocol moves `isolated_amount` USDC from cross balance into a per-position bucket. That position's gain/loss settles into the bucket only:
 
 ```
                      ┌──────────────────┐
@@ -52,11 +52,11 @@ You can deposit/withdraw to the bucket while the position is open:
 ```json
 // add 500 USDC to the isolated bucket on asset 0
 { "type":"UpdateIsolatedMargin", "params": {
-  "asset": 0, "is_isolated": true, "isolated_amount_e6": "500000000"
+  "asset": 0, "is_isolated": true, "isolated_amount": "500000000"
 }}
 ```
 
-`isolated_amount_e6` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected.
+`isolated_amount` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected.
 
 ## Strict-Iso
 
@@ -89,7 +89,7 @@ Switching modes is a `UpdateMarginMode` action and is allowed only when:
 
 | From → To | Allowed when |
 |-----------|--------------|
-| Cross → Isolated | You specify `isolated_amount_e6` covering at least the maintenance margin |
+| Cross → Isolated | You specify `isolated_amount` covering at least the maintenance margin |
 | Isolated → Cross | Bucket merges into cross balance; allowed any time the merged account stays in `Safe` tier |
 | Isolated → Strict-Iso | Always (no margin movement) |
 | Strict-Iso → Isolated | Always |
@@ -125,7 +125,7 @@ client                                node
   │                                    │
   │ UpdateIsolatedMargin                                  │
   │   asset=0, is_isolated=true,                          │
-  │   isolated_amount_e6=1000000000   (1000 USDC)          │
+  │   isolated_amount=1000000000   (1000 USDC)          │
   ├───────────────────────────────────►│
   │                                    │ 1) check 1000 ≥ maint_margin(BTC, 1)
   │                                    │ 2) move 1000 USDC: cross → BTC bucket
@@ -141,7 +141,7 @@ client                                node
 
 ## Edge cases
 
-- **Auto-deposit on margin add.** Isolated positions take maintenance shortfall from the bucket only — once the bucket is depleted, the position liquidates. Cross does NOT auto-cover an Isolated bucket; you must manually `UpdateIsolatedMargin` with positive `isolated_amount_e6` to top up.
+- **Auto-deposit on margin add.** Isolated positions take maintenance shortfall from the bucket only — once the bucket is depleted, the position liquidates. Cross does NOT auto-cover an Isolated bucket; you must manually `UpdateIsolatedMargin` with positive `isolated_amount` to top up.
 - **Closing an Isolated position.** Closing the full position releases the bucket back into cross balance.
 - **Mode of a fresh asset.** New positions default to Cross unless the asset's `meta` flag `onlyIsolated: true` forces Isolated (set per-market at deploy time via [MIP-3](../mip/mip-3.md)).
 - **Isolated under PM master.** PM netting credit applies to Cross positions only. Isolated positions are summed classically. A PM-enrolled master with one giant Isolated position and tiny Cross book sees almost no PM benefit.

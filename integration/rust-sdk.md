@@ -138,7 +138,7 @@ The WS client returns `Stream<Item = Result<Event<T>>>`-shaped subscription hand
 
 ## Numeric types
 
-Public-spec scaled integers (`*_e8`, `*_e6`) are wrapped in dedicated types that prevent accidental float arithmetic:
+Public-spec scaled integers (fixed-point price/size, USDC base units) are wrapped in dedicated types that prevent accidental float arithmetic:
 
 ```rust
 pub struct PriceE8(pub u128);     // price × 10^8

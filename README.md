@@ -108,7 +108,7 @@ Asset bridging:
 
 - Endpoints documented here are the **stable, public** wire surface.
 - Request / response examples use real shapes — copy-paste safe.
-- Numerical fields ending in `_e8` / `_e6` are scaled integers transmitted as JSON strings.
+- Price and size fields are fixed-point integers (8-decimal scale); USDC amounts are 6-decimal base units. Both are transmitted as JSON strings to avoid IEEE-754 precision loss.
 - All times in `_ts` / `_ms` fields are unix milliseconds (consensus-derived).
 
 ## Status legend

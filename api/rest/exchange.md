@@ -75,12 +75,12 @@ See [networks](../../networks.md) for endpoints. Signing against the wrong `chai
 | Type | Wire form | Why |
 |------|----------|-----|
 | `uint64` ≤ 2^53 | JSON number | Safe in IEEE-754 |
-| `uint64` > 2^53, `u128`, scaled `_e8` / `_e6` | JSON string | Native JSON numbers silently lose precision past 2^53 |
+| `uint64` > 2^53, `u128`, scaled integers | JSON string | Native JSON numbers silently lose precision past 2^53 |
 | Address | hex string `"0x..."` | 20 bytes, 40 hex chars (with or without `0x`) |
 | Booleans | `true` / `false` | Literal JSON |
 | Optional fields | `null` or omit | Both accepted; `null` is canonical |
 
-**Scaled-integer fields** end in `_e8` (8-decimal fixed-point) or `_e6` (USDC base units). `price_e8 = "10050000000"` means `100.50`. Always send as a string; the server parses to `u128`.
+**Fixed-point fields.** Price and size fields are 8-decimal fixed-point integers; USDC amounts are 6-decimal base units. The value carries the scale, not the field name — e.g. `px = "10050000000"` means `100.50`. Always send as a string; the server parses to `u128`.
 
 ## Signed-by semantics
 
@@ -180,11 +180,11 @@ Place one or many orders atomically.
       {
         "asset":        0,
         "side":         "Buy",
-        "price_e8":     "10050000000",
-        "size_e8":      "100000000",
+        "px":     "10050000000",
+        "size":      "100000000",
         "tif":          "Gtc",
         "reduce_only":  false,
-        "stp_mode":     "CancelNewest",
+        "stp":     "CancelNewest",
         "cloid":        "0x1234...0000",
         "trigger":      null
       }
@@ -198,24 +198,24 @@ Place one or many orders atomically.
 |-------|------|-------|-------------|
 | `orders[*].asset` | uint32 | `[0, market_count)` | Asset id; look up via `meta` info query |
 | `orders[*].side` | enum | `"Buy"` / `"Sell"` | — |
-| `orders[*].price_e8` | string `u128` | `> 0` | Limit price × 10^8 |
-| `orders[*].size_e8` | string `u128` | `> 0` | Size × 10^8; market-step rounded down |
+| `orders[*].px` | string `u128` | `> 0` | Limit price × 10^8 |
+| `orders[*].size` | string `u128` | `> 0` | Size × 10^8; market-step rounded down |
 | `orders[*].tif` | enum | `"Gtc"`, `"Ioc"`, `"Alo"`, `"Fok"` | See [order types](../../concepts/order-types.md) |
 | `orders[*].reduce_only` | bool | — | If true, rejected at admission if it would grow position |
-| `orders[*].stp_mode` | enum | `"CancelNewest"`, `"CancelOldest"`, `"CancelBoth"`, `"DecrementAndCancel"`, `"None"` | Self-trade prevention; see [STP modes](../../concepts/order-types.md#self-trade-prevention) |
+| `orders[*].stp` | enum | `"CancelNewest"`, `"CancelOldest"`, `"CancelBoth"`, `"DecrementAndCancel"`, `"None"` | Self-trade prevention; see [STP modes](../../concepts/order-types.md#self-trade-prevention) |
 | `orders[*].cloid` | hex string 16 bytes \| null | — | Client order id, unique per account; enables `CancelByCloid` and dedup |
 | `orders[*].trigger` | object \| null | — | If present: stop-loss / take-profit; see [`Trigger`](#trigger) |
 | `grouping` | enum | `"Na"`, `"NormalTpsl"`, `"PositionTpsl"` | Order family grouping; see [order types](../../concepts/order-types.md#grouping) |
 
 **Idempotency**: a duplicate `cloid` on the same account is rejected at admission with `error: "duplicate cloid"`. Use `cloid` as your client-side dedup key.
 
-**Common errors**: `price_e8` not tick-aligned, `size_e8` below market minimum, `reduce_only` would grow position, `stp_mode` rejected via STP, account in T1+ liquidation tier.
+**Common errors**: `px` not tick-aligned, `size` below market minimum, `reduce_only` would grow position, `stp` rejected via STP, account in T1+ liquidation tier.
 
 **Response status entries** (per order, in order):
 
 ```json
 {"resting": {"oid": 12345, "cloid": "0x..."}}      // posted to book
-{"filled":  {"total_sz_e8": "100000000", "avg_px_e8": "10050000000", "oid": 12345}}
+{"filled":  {"total_sz": "100000000", "avg_px": "10050000000", "oid": 12345}}
 {"error":   "<reason>"}                             // admission rejected this entry only
 ```
 
@@ -275,11 +275,11 @@ Atomic cancel-replace. Server-side it's a single state transition; if the cancel
     "oid":           12345,
     "asset":         0,
     "side":          "Buy",
-    "price_e8":      "10049000000",
-    "size_e8":       "100000000",
+    "px":      "10049000000",
+    "size":       "100000000",
     "tif":           "Gtc",
     "reduce_only":   false,
-    "stp_mode":      "CancelNewest",
+    "stp":      "CancelNewest",
     "cloid":         "0x...new"
   }
 }
@@ -308,7 +308,7 @@ Atomicity: all-or-nothing within the same block. If any entry would fail at admi
 
 ### `ScaleOrder`
 
-Place a ladder of limit orders between `start_price_e8` and `end_price_e8` in `n_levels` steps.
+Place a ladder of limit orders between `start_price` and `end_price` in `n_levels` steps.
 
 ```json
 {
@@ -316,9 +316,9 @@ Place a ladder of limit orders between `start_price_e8` and `end_price_e8` in `n
   "params": {
     "asset":           0,
     "side":            "Buy",
-    "total_size_e8":   "1000000000",
-    "start_price_e8":  "9900000000",
-    "end_price_e8":    "9800000000",
+    "total_size":   "1000000000",
+    "start_price":  "9900000000",
+    "end_price":    "9800000000",
     "n_levels":        10,
     "shape":           "Flat",
     "tif":             "Gtc",
@@ -330,7 +330,7 @@ Place a ladder of limit orders between `start_price_e8` and `end_price_e8` in `n
 
 | Field | Description |
 |-------|-------------|
-| `total_size_e8` | Total size distributed across legs |
+| `total_size` | Total size distributed across legs |
 | `n_levels` | Number of price levels (`[2, 50]`) |
 | `shape` | `"Flat"` (equal size per leg), `"Linear"` (linear distribution), `"Geometric"` (geometric) |
 | `cloid_prefix` | 8 bytes; legs auto-extend to full 16-byte `cloid` with leg index |
@@ -349,7 +349,7 @@ Schedule a time-weighted average price order. Slices into the book over `duratio
   "params": {
     "asset":          0,
     "side":           "Buy",
-    "size_e8":        "1000000000",
+    "size":        "1000000000",
     "duration_ms":    3600000,
     "randomize_pct":  20,
     "reduce_only":    false,
@@ -391,9 +391,9 @@ Place a stop-loss or take-profit. Resting orders that arm on a mark-price trigge
   "params": {
     "asset":        0,
     "side":         "Sell",
-    "size_e8":      "100000000",
-    "trigger_px_e8":"9500000000",
-    "limit_px_e8":  "9450000000",
+    "size":      "100000000",
+    "trigger_px":"9500000000",
+    "limit_px":  "9450000000",
     "trigger_kind": "StopLoss",
     "reduce_only":  true,
     "cloid":        "0x..."
@@ -404,7 +404,7 @@ Place a stop-loss or take-profit. Resting orders that arm on a mark-price trigge
 | Field | Description |
 |-------|-------------|
 | `trigger_kind` | `"StopLoss"`, `"TakeProfit"`, `"StopLimit"`, `"TakeProfitLimit"` |
-| `limit_px_e8` | If `null`: market order on trigger. Otherwise: limit order at this price |
+| `limit_px` | If `null`: market order on trigger. Otherwise: limit order at this price |
 
 See [order types — triggers](../../concepts/order-types.md#triggers) for the firing semantics.
 
@@ -435,12 +435,12 @@ Rejected if applying the new leverage would drop the account to T1 or worse on t
   "params": {
     "asset":            0,
     "is_isolated":      true,
-    "isolated_amount_e6": "1000000000"
+    "isolated_amount": "1000000000"
   }
 }
 ```
 
-Toggles isolated margin per asset and, when isolating, deposits `isolated_amount_e6` of USDC into the isolated bucket.
+Toggles isolated margin per asset and, when isolating, deposits `isolated_amount` of USDC into the isolated bucket.
 
 ---
 
@@ -520,7 +520,7 @@ Master-only. Spawns a sub. Cap of 32 subs per master. See [sub-accounts](../../c
   "params": {
     "sub_index": 0,
     "deposit":   true,
-    "amount_e6": "1000000000"
+    "amount": "1000000000"
   }
 }
 ```
@@ -582,7 +582,7 @@ The outer envelope's `sender` is the multi-sig account address. Outer `signature
   "type": "UsdcTransfer",
   "params": {
     "to":        "0x<recipient_addr>",
-    "amount_e6": "5000000"
+    "amount": "5000000"
   }
 }
 ```
@@ -599,7 +599,7 @@ Internal MetaFlux transfer (no bridge). Master-only.
   "params": {
     "to":       "0x<recipient>",
     "asset":    7,
-    "amount_e8":"100000000"
+    "amount":"100000000"
   }
 }
 ```
@@ -612,7 +612,7 @@ Internal MetaFlux transfer (no bridge). Master-only.
 {
   "type": "WithdrawUsdc",
   "params": {
-    "amount_e6":         "100000000",
+    "amount":         "100000000",
     "destination_chain": "Arbitrum",
     "destination_addr":  "0x..."
   }
@@ -634,8 +634,8 @@ Initiates a CCTP burn on MetaFlux; finalised on the destination chain by submitt
   "type": "RfqQuote",
   "params": {
     "rfq_id":     "0x...",
-    "price_e8":   "10050000000",
-    "size_e8":    "1000000000",
+    "px":   "10050000000",
+    "size":    "1000000000",
     "expires_at_ms": 1735690000000
   }
 }
@@ -664,8 +664,8 @@ See [RFQ](../../concepts/rfq.md).
   "params": {
     "asset":    42,
     "side":     "Buy",
-    "price_e8": "10050000000",
-    "size_e8":  "100000000",
+    "px": "10050000000",
+    "size":  "100000000",
     "batch_id": 9876,
     "cloid":    "0x..."
   }
@@ -682,13 +682,13 @@ See [FBA](../../concepts/fba.md). `batch_id` selects which auction the order joi
 {
   "type": "PriorityBid",
   "params": {
-    "bid_e6":        "500",
+    "bid":        "500",
     "inner_action":  { /* an Order action object */ }
   }
 }
 ```
 
-Pays `bid_e6` USDC for one-block priority of the inner action. Highest bid per asset wins the front of the block; ties broken by `nonce`.
+Pays `bid` USDC for one-block priority of the inner action. Highest bid per asset wins the front of the block; ties broken by `nonce`.
 
 ---
 
@@ -700,7 +700,7 @@ Pays `bid_e6` USDC for one-block priority of the inner action. Highest bid per a
   "params": {
     "asset":     "USDC",
     "side":      "Borrow",
-    "amount_e6": "1000000"
+    "amount": "1000000"
   }
 }
 ```
@@ -845,7 +845,7 @@ client                gateway                 node                  consensus
 - **Race between `ApproveAgent` and first agent-signed order.** Submit `ApproveAgent`, await `orderEvents`/commit, then start agent traffic. Or, accept that the first 1–2 requests will `401` and retry with linear backoff for ≤2 blocks (~200 ms).
 - **Cancel arrives after fill commits.** Returns `"order not found"`. Harmless. Watch fills first if accuracy matters.
 - **Order admits but fails at commit** (e.g. reduce-only violation discovered post-admit because of intervening fills). The commit event carries `{"error":"<reason>"}`; the order is not on the book.
-- **Numeric overflow on `_e8`.** Anything fitting in `u128` is accepted. The server rejects with `400 invalid numeric` if your encoded string exceeds `2^128 - 1`.
+- **Numeric overflow on fixed-point fields.** Anything fitting in `u128` is accepted. The server rejects with `400 invalid numeric` if your encoded string exceeds `2^128 - 1`.
 - **Empty `orders[]` / `cancels[]`.** Rejected at admission with `400 empty batch`.
 - **Cross-block atomicity.** `Order` with multiple legs is **block-atomic** — all legs see the same begin-block state. They are NOT cross-block atomic (a second `Order` action in a later block sees the result of the first).
 

@@ -19,7 +19,7 @@ For each market, every hour:
 ```
 premium_index  =  EMA(mid - oracle, window=60_min)
 funding_rate   =  clamp(premium_index / oracle, -cap, +cap)
-payment_e8     =  position_size_e8 * mark_e8 * funding_rate
+payment     =  position_size * mark * funding_rate
 ```
 
 | Symbol | Meaning |
@@ -102,7 +102,7 @@ curl -X POST https://gateway/info \
 Returns array of:
 
 ```json
-{ "asset": 0, "ts": 1735689600000, "rate_e8": "5000", "premium_e8": "5000000" }
+{ "asset": 0, "ts": 1735689600000, "rate": "5000", "premium": "5000000" }
 ```
 
 Live updates stream on [`fundingTicks` WS channel](../api/ws/subscriptions.md#fundingticks).

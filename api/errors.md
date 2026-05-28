@@ -54,7 +54,7 @@ with `status: "err"` carrying a string in `response` for application-level error
 | `nonce must increase` | Reused or out-of-order `nonce` | Use a monotonic counter (e.g. `Date.now()`) |
 | `duplicate cloid` | `Order`/`ModifyOrder` reused a client order id | Use a fresh `cloid` |
 | `empty batch` | `orders[]` or `cancels[]` empty | Send at least one entry |
-| `invalid numeric` | `_e8` field not parseable as `u128` | Send as a JSON string, base-10, no leading `+` or whitespace |
+| `invalid numeric` | fixed-point field not parseable as `u128` | Send as a JSON string, base-10, no leading `+` or whitespace |
 | `unknown info type: <X>` | `/info` `type` not recognised | Check the [info reference](./rest/info.md) |
 | `chain_id mismatch` | The chainId field of a multi-sig wrapper doesn't match the network | Match the network's `chainId` |
 
@@ -93,8 +93,8 @@ Request was well-formed and the signature was valid, but the action itself is lo
 
 | `error` | Triggered when | Remediation |
 |---------|----------------|-------------|
-| `price not tick-aligned` | `price_e8` is not a multiple of the market's tick size | Round to the nearest valid tick |
-| `size below market minimum` | `size_e8` < market min | Increase size or hit a different market |
+| `price not tick-aligned` | `px` is not a multiple of the market's tick size | Round to the nearest valid tick |
+| `size below market minimum` | `size` < market min | Increase size or hit a different market |
 | `reduce_only would grow position` | Reduce-only set, but the order would open or extend position | Drop `reduce_only` or check current position |
 | `leverage above asset cap` | Requested leverage > `max_leverage` for asset | Use `≤ max_leverage` (see `meta` info) |
 | `pm_min_equity_not_met` | `UserPortfolioMargin{enabled:true}` but account below threshold | Increase equity or stay on classical |

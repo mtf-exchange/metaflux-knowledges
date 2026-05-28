@@ -23,12 +23,12 @@ The protocol's own pool. It plays three roles:
   "type": "VaultDeposit",
   "params": {
     "vault":       "<mflux_vault_addr>",
-    "amount_e6":   "1000000000"
+    "amount":   "1000000000"
   }
 }
 ```
 
-Mints `amount_e6 / share_price_e8 × 10^8` shares to the depositor at the next block.
+Mints `amount / share_price × 10^8` shares to the depositor at the next block.
 
 ### Withdrawing
 
@@ -37,12 +37,12 @@ Mints `amount_e6 / share_price_e8 × 10^8` shares to the depositor at the next b
   "type": "VaultWithdraw",
   "params": {
     "vault":       "<mflux_vault_addr>",
-    "shares_e8":   "100000000000"
+    "shares":   "100000000000"
   }
 }
 ```
 
-Burns `shares_e8` shares; pays out `shares_e8 × share_price_e8 / 10^8` USDC at the next block.
+Burns `shares` shares; pays out `shares × share_price / 10^8` USDC at the next block.
 
 ### Lock-up
 
@@ -74,7 +74,7 @@ deployer                                 chain
   │   lock_period_ms,                     │
   │   manager: 0x<mgr_addr> }             │
   ├──────────────────────────────────────►│  spawn vault_addr
-  │                                       │  share_price_e8 = 1e8 (1 USDC = 1 share)
+  │                                       │  share_price = 1e8 (1 USDC = 1 share)
   │                                       │
   │ users deposit                         │
   │  VaultDeposit { vault_addr, amount }  │
@@ -120,10 +120,10 @@ The vault address is a first-class account in the state machine — it has its o
 ### Pricing
 
 ```
-share_price_e8(t) = vault_account_value_e6(t) / total_shares_e8(t) × 10^8
+share_price(t) = vault_account_value(t) / total_shares(t) × 10^8
 ```
 
-`vault_account_value_e6` includes unrealised PnL on open positions.
+`vault_account_value` includes unrealised PnL on open positions.
 
 Pricing updates every commit. Deposits mint at the **post-commit** share price (you don't get the prior block's price); withdrawals burn at the post-commit share price.
 
@@ -170,15 +170,15 @@ curl -X POST https://gateway/info \
     "vault":              "0x<addr>",
     "name":               "Yield Arb Strategy",
     "manager":            "0x<mgr>",
-    "tvl_e6":             "10000000000",
-    "share_price_e8":     "11500000",
+    "tvl":             "10000000000",
+    "share_price":     "11500000",
     "depositor_count":    142,
-    "high_water_mark_e8": "11500000",
+    "high_water_mark": "11500000",
     "performance_fee_bps":1500,
     "management_fee_bps": 100,
     "lock_period_ms":     86400000,
-    "your_shares_e8":     "5000000000",
-    "your_position_value_e6": "575000",
+    "your_shares":     "5000000000",
+    "your_position_value": "575000",
     "your_withdrawable_at_ts": 1735690000000
   }
 }

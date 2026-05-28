@@ -155,7 +155,7 @@ when account enters T3:
 
 The dying account's residual equity is **not** refunded. T3 is the "give up" point where the protocol takes over and the user gets nothing back from the maintenance margin.
 
-Insurance pool drawdown is rate-limited per block (`insurance_drawdown_cap_per_block_e6`); shortfalls that exceed the cap queue and absorb over multiple blocks.
+Insurance pool drawdown is rate-limited per block (`insurance_drawdown_cap_per_block`); shortfalls that exceed the cap queue and absorb over multiple blocks.
 
 ## T4 ADL
 

@@ -82,7 +82,7 @@ The burned amount per-block is published via:
 curl -X POST https://gateway/info -d '{"type":"protocol_metrics"}'
 ```
 
-Returns cumulative `burned_e8`, `treasury_e8`, fee revenue per epoch.
+Returns cumulative `burned`, `treasury`, fee revenue per epoch.
 
 ## Referrer share
 
