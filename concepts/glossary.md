@@ -108,7 +108,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **MFlux Vault.** Protocol-operated insurance + market-making pool. See [vaults](./vaults.md#mflux-vault).
 
-**MIP — Market Improvement Proposal.** Numbered protocol improvement (analogous to Hyperliquid's HIP). See [MIP](../mip/).
+**MIP — Market Improvement Proposal.** Numbered protocol improvement (analogous to the improvement-proposal schemes used by established on-chain perp protocols). See [MIP](../mip/).
 
 **msgpack.** Binary serialisation format. The signed payload of an action is msgpack bytes. See [signing](../integration/signing.md).
 

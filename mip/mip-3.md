@@ -10,7 +10,7 @@ Any builder can deploy a new perpetual or spot market on MetaFlux by paying thro
 
 A core differentiation axis. Centralised exchanges curate listings; MetaFlux makes the listing process itself part of the protocol. Builders who want a market for some niche asset don't need permission — they need to win an auction and supply seed parameters.
 
-This is MetaFlux's port of the Hyperliquid MIP-3 design with the following equivalences and adjustments preserved:
+This is MetaFlux's adaptation of the permissionless-market-deploy design pioneered by leading on-chain perp venues, with the following equivalences and adjustments preserved:
 
 - Three distinct gas-auction streams (perp deploy, spot pair deploy, token register) — same structure as HL
 - Auction parameters (decay, refund window, slot interval) governance-configurable

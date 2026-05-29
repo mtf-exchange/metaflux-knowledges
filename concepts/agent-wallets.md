@@ -6,7 +6,7 @@
 
 An **agent wallet** (a.k.a. "API wallet") is a key that signs trading actions on behalf of a master account without ever holding withdrawal authority. It's how every serious market maker actually operates: the master key stays in cold storage, a hot key runs the bots.
 
-Same primitive as Hyperliquid's API wallets. Drop-in compatible at the protocol level.
+Same primitive as the dominant on-chain perp DEX's API wallets. Drop-in compatible at the protocol level.
 
 ## Why use one
 
