@@ -78,9 +78,13 @@ The new market lives in the canonical asset registry from the next block. Liquid
 
 Builders typically combine MIP-3 deploy with a stake to MFlux Vault on the same market (or a third-party LP source) to bootstrap depth.
 
-## MIP-4 (deferred)
+## MIP-4 — Perps Liquidity Aggregator / Internalizer
 
-Outcomes / prediction markets reuse the MIP-3 auction infrastructure but add a binary settlement layer. Deferred to V2 to keep V1 launch scope tight; the auction & escrow machinery in V1 is designed to accept MIP-4 actions without breaking existing state.
+MIP-4 is a MetaFlux-operated **perps liquidity aggregator / internalizer** (Citadel-Securities-style). It runs its own order book and a two-tier execution path: order flow is first matched internally against the aggregator's book, with residual flow routed out to the canonical on-chain CLOB. The aggregator is operated by MetaFlux, not by third-party builders.
+
+This is a separate workstream from MIP-3 permissionless deploy; it does not reuse the gas-auction infrastructure.
+
+Outcomes / prediction markets — previously sketched here as MIP-4 — have been renumbered to **MIP-6** and deferred to V3.
 
 ## See also
 

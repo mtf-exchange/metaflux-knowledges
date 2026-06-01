@@ -9,7 +9,7 @@ What the protocol guarantees, what it doesn't, and where you carry the risk.
 ## TL;DR
 
 - The protocol guarantees: deterministic state-machine semantics, signature-bound authorisation, on-chain auditability of every action.
-- The protocol does NOT guarantee: oracle correctness beyond the published composition, third-party bridge security, your private-key storage, or absence of governance risk.
+- The protocol does NOT guarantee: oracle correctness beyond the published composition, your private-key storage, or absence of governance risk.
 - Bug bounties run on third-party platforms; coordinated disclosure expected.
 
 ## Trust surface
@@ -42,7 +42,7 @@ A node not following these rules is not a valid validator; consensus rejects it.
 |-------|------------------|
 | Oracle composition | Trust the validator-published oracle within the documented composition |
 | CCTP | Trust Circle's attestation service for USDC bridging |
-| Third-party bridges | Trust the chosen bridge per the [bridge](./bridge/) selection ADR |
+| MetaBridge | Trust the MetaFlux validator set's M-of-N signature on non-USDC bridge transfers (same set as consensus; see [bridge](./bridge/)) |
 | Governance | Parameter changes are governance-controlled; trust governance to act in the protocol's interest |
 
 The principle: trust is minimised, not eliminated. Where shared trust is unavoidable (oracles, attestation services), the trust surface is documented and bounded.
