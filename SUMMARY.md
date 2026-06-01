@@ -58,3 +58,4 @@
 
 * [MIP — Market Improvement Proposals](mip/README.md)
   * [MIP-3 — Permissionless market deploy](mip/mip-3.md)
+  * [MIP-4 — Perps liquidity aggregator / internalizer](mip/mip-4.md)
