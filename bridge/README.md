@@ -1,15 +1,15 @@
 # Bridge
 
 {% hint style="info" %}
-**Status.** **CCTP preview**, third-party bridges TBD.
+**Status.** **CCTP preview**, **MetaBridge in design** (ADR-021).
 {% endhint %}
 
-MetaFlux deliberately picks a **hybrid bridge model** rather than building one in-house monolith:
+MetaFlux runs a **hybrid bridge model**:
 
 - **USDC** — Circle CCTP (Cross-Chain Transfer Protocol). Native, Circle-attested, no extra trust assumption beyond Circle itself.
-- **All other assets** — third-party general-purpose bridges (LayerZero / Across / Wormhole — selection TBD).
+- **All other assets** — **MetaBridge**, a MetaFlux validator-signed bridge across Solana, Base, and Arbitrum (ADR-021). Inbound transfers are admitted on an M-of-N validator signature over the source-chain event; no third-party bridge sits on the critical path.
 
-The hybrid reduces blast radius: USDC is the dominant asset by volume and gets the cleanest path; the long tail rides infrastructure whose security model already covers many other chains. We don't build a single critical-path bridge whose failure would compromise everything.
+The hybrid reduces blast radius: USDC is the dominant asset by volume and gets the cleanest path; everything else rides MetaBridge under the same validator-set trust assumption as the chain itself, rather than an external bridge whose failure would compromise the long tail.
 
 ## CCTP (USDC)
 
@@ -50,21 +50,20 @@ The same flow runs in reverse for withdrawals — MTF emits the burn event, Circ
 
 Per-corridor runtime caps prevent any single direction from concentrating attestation risk. Caps are governance-controlled.
 
-## Third-party bridges (TBD)
+## MetaBridge (non-USDC assets)
 
-A single general-purpose bridge gets selected via a published ADR before mainnet. Candidates differ on:
+MetaBridge is a MetaFlux-operated, validator-signed bridge for all non-USDC assets (ADR-021). It carries no third-party bridge on the critical path:
 
-- **Validation model** — committee-based (LayerZero), optimistic (Across), guardian network (Wormhole)
-- **Latency** — minutes for committee/guardian; ≤30s optimistic challenge window
-- **Asset support** — LayerZero is widest, Wormhole is broadest non-EVM, Across is EVM-only
-- **Audit history** — all three have been audited multiple times; incident histories differ
+- **Validation model** — M-of-N MetaFlux validator signatures over the source-chain deposit event; the same validator set that secures consensus. No external committee, guardian network, or optimistic challenge window.
+- **Supported chains** — Solana, Base, Arbitrum at launch. Each chain runs a MetaBridge lock/mint contract whose authority is the validator set's threshold key.
+- **Trust assumption** — equal to the chain's own consensus trust assumption, not an additional external bridge.
 
-The chosen bridge handles all non-USDC asset transfers. The selection ADR will be published here when finalised.
+The detailed design is in ADR-021; this page is updated as MetaBridge ships per network.
 
 ## Out of scope for V1
 
-- An MTF-built general bridge (`MetaBridge`) — V2 post-mainnet. Will eventually replace the third-party route for assets where MTF can offer a tighter security model.
 - Cross-chain composability (calling EVM contracts on other chains from MTF) — V2.
+- MetaBridge support beyond Solana / Base / Arbitrum — added per-chain as governance approves.
 
 ## See also
 
