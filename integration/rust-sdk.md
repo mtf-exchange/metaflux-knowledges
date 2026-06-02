@@ -19,7 +19,7 @@ use metaflux_client::{Client, ClientOpts, OrderParams, Side, Tif};
 async fn run() -> anyhow::Result<()> {
     let c = Client::new(ClientOpts {
         private_key: std::env::var("PRIVATE_KEY")?.parse()?,
-        base_url:    "https://gateway.devnet.metaflux.dev".into(),
+        base_url:    "https://gateway.devnet.mtf.exchange".into(),
         chain_id:    31337,
         ..Default::default()
     })?;

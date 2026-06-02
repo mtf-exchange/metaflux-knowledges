@@ -107,7 +107,7 @@ These are MTF-native actions only and require talking to the gateway's MTF-nativ
 
 ```diff
 - const HL_URL = 'https://api.hyperliquid.xyz';
-+ const MTF_URL = 'https://gateway.metaflux.dev';
++ const MTF_URL = 'https://gateway.mtf.exchange';
 
 - const HL_CHAIN_ID = 1337;
 + const MTF_CHAIN_ID = 31337;     // devnet; production TBD

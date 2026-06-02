@@ -49,7 +49,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const master = new MetaFluxClient({
   privateKey: process.env.MASTER_KEY!,
-  baseUrl:    'https://gateway.devnet.metaflux.dev',
+  baseUrl:    'https://gateway.devnet.mtf.exchange',
   chainId:    31337,
 });
 
@@ -103,7 +103,7 @@ const agent = new MetaFluxClient({
   privateKey:     agentPrivateKey.toString('hex'),  // agent signs
   signerAddress:  agentAddress,
   senderAddress:  master.address,                   // sender = master
-  baseUrl:        'https://gateway.devnet.metaflux.dev',
+  baseUrl:        'https://gateway.devnet.mtf.exchange',
   chainId:        31337,
 });
 

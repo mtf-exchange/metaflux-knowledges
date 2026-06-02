@@ -16,24 +16,24 @@ Deposit, place an order, cancel, withdraw. By the end of this page your TypeScri
 
 | Service | URL (devnet) |
 |---------|--------------|
-| Gateway REST | `https://gateway.devnet.metaflux.dev` |
-| Gateway WS | `wss://gateway.devnet.metaflux.dev/ws` |
-| Faucet | `https://faucet.devnet.metaflux.dev` |
-| Explorer | `https://explorer.devnet.metaflux.dev` |
+| Gateway REST | `https://gateway.devnet.mtf.exchange` |
+| Gateway WS | `wss://gateway.devnet.mtf.exchange/ws` |
+| Faucet | `https://faucet.devnet.mtf.exchange` |
+| Explorer | `https://explorer.devnet.mtf.exchange` |
 
 See [networks](../networks.md) for the full list including testnet and (post-launch) mainnet.
 
 ## Step 1 — Get devnet USDC
 
 ```bash
-curl -X POST https://faucet.devnet.metaflux.dev/usdc \
+curl -X POST https://faucet.devnet.mtf.exchange/usdc \
   -d 'address=0x<YOUR_ADDRESS>&amount=10000'
 ```
 
 The faucet drips 10 000 USDC per request, rate-limited at 1 / hour / address. Confirm the balance:
 
 ```bash
-curl -X POST https://gateway.devnet.metaflux.dev/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
 ```
@@ -49,7 +49,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://gateway.devnet.metaflux.dev',
+  baseUrl:    'https://gateway.devnet.mtf.exchange',
   chainId:    31337,
 });
 
@@ -71,7 +71,7 @@ console.log('order id:', result.oid);
 Raw curl (HL-compat shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
-curl -X POST https://gateway.devnet.metaflux.dev/exchange \
+curl -X POST https://gateway.devnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -81,7 +81,7 @@ where `order.json` is the HL-shape envelope you assembled.
 ## Step 3 — Check the order is on the book
 
 ```bash
-curl -X POST https://gateway.devnet.metaflux.dev/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
 ```
@@ -105,7 +105,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://gateway.devnet.metaflux.dev/exchange \
+curl -X POST https://gateway.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

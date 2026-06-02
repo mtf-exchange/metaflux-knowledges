@@ -209,7 +209,7 @@ import ccxt from 'ccxt';
 const ex = new ccxt.metaflux({
   apiKey: process.env.METAFLUX_API_KEY,
   secret: process.env.METAFLUX_SECRET,
-  urls: { api: 'https://gateway.metaflux.dev' },
+  urls: { api: 'https://gateway.mtf.exchange' },
 });
 
 await ex.loadMarkets();

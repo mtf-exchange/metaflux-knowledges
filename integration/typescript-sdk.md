@@ -15,7 +15,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const c = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://gateway.devnet.metaflux.dev',
+  baseUrl:    'https://gateway.devnet.mtf.exchange',
   chainId:    31337,
 });
 

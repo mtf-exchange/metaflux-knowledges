@@ -18,11 +18,11 @@ The integration sandbox. Free USDC via the faucet; ephemeral state (occasional r
 
 | Service | Endpoint |
 |---------|----------|
-| Gateway REST | `https://gateway.devnet.metaflux.dev` |
-| Gateway WS | `wss://gateway.devnet.metaflux.dev/ws` |
-| Faucet | `https://faucet.devnet.metaflux.dev` |
-| Explorer | `https://explorer.devnet.metaflux.dev` |
-| Status | `https://status.devnet.metaflux.dev` |
+| Gateway REST | `https://gateway.devnet.mtf.exchange` |
+| Gateway WS | `wss://gateway.devnet.mtf.exchange/ws` |
+| Faucet | `https://faucet.devnet.mtf.exchange` |
+| Explorer | `https://explorer.devnet.mtf.exchange` |
+| Status | `https://status.devnet.mtf.exchange` |
 
 | Signing parameters | Value |
 |--------------------|-------|
@@ -40,13 +40,13 @@ USDC bridging: CCTP sandbox attestation pubkey. Sandbox transfers only — do no
 - 1 request / minute / IP.
 
 ```bash
-curl -X POST https://faucet.devnet.metaflux.dev/usdc \
+curl -X POST https://faucet.devnet.mtf.exchange/usdc \
   -d 'address=0x<YOUR_ADDRESS>&amount=10000'
 ```
 
 ### State resets
 
-Devnet may be reset for protocol upgrades. Cadence: on demand during pre-mainnet development; weekly notice when possible. Watch [status](https://status.devnet.metaflux.dev) for reset announcements.
+Devnet may be reset for protocol upgrades. Cadence: on demand during pre-mainnet development; weekly notice when possible. Watch [status](https://status.devnet.mtf.exchange) for reset announcements.
 
 ## Testnet (planned)
 
@@ -106,7 +106,7 @@ See [bridge](./bridge/) for the full flow.
 
 Operational status, incident history, and planned maintenance:
 
-- Devnet: `https://status.devnet.metaflux.dev`
+- Devnet: `https://status.devnet.mtf.exchange`
 - Testnet: TBD
 - Mainnet: TBD
 
