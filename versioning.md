@@ -81,7 +81,7 @@ The `_deprecation` field is always optional in your parser — clients on the ne
 
 ## Change log
 
-The protocol change log is published at `https://metaflux.dev/changelog` (TBD URL pre-launch) and mirrored in this repo at `CHANGELOG.md`. Each entry has:
+The protocol change log is published at `https://mtf.exchange/changelog` (TBD URL pre-launch) and mirrored in this repo at `CHANGELOG.md`. Each entry has:
 
 - Version triple
 - Date of activation
@@ -89,7 +89,7 @@ The protocol change log is published at `https://metaflux.dev/changelog` (TBD UR
 - Per-change description with migration notes for MAJOR / MINOR
 
 Subscribe via:
-- RSS at `https://metaflux.dev/changelog.rss`
+- RSS at `https://mtf.exchange/changelog.rss`
 - GitHub Releases on this repo
 - WS push on a planned `_meta` channel (TBD)
 

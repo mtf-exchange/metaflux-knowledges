@@ -77,7 +77,7 @@ These are not security issues. They are operational risk users carry.
 For security vulnerabilities:
 
 1. **Do not** open a public GitHub issue.
-2. Email `security@metaflux.dev` (PGP key on the website pre-launch) with:
+2. Email `security@mtf.exchange` (PGP key on the website pre-launch) with:
    - A description of the vulnerability
    - Reproduction steps
    - Your assessment of impact
