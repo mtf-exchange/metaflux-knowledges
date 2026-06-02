@@ -57,5 +57,7 @@
 ## MIP — Market Improvement Proposals
 
 * [MIP — Market Improvement Proposals](mip/README.md)
-  * [MIP-3 — Permissionless market deploy](mip/mip-3.md)
+  * [MIP-1 — Spot token standard + market deployment](mip/mip-1.md)
+  * [MIP-2 — Metaliquidity](mip/mip-2.md)
+  * [MIP-3 — Permissionless perp market deploy](mip/mip-3.md)
   * [MIP-4 — Perps liquidity aggregator / internalizer](mip/mip-4.md)
