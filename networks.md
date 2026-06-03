@@ -33,16 +33,22 @@ The integration sandbox. Free USDC via the faucet; ephemeral state (occasional r
 
 USDC bridging: CCTP sandbox attestation pubkey. Sandbox transfers only — do not use production CCTP keys against devnet.
 
-### Faucet rules
+### Faucet
 
-- 10 000 USDC per request.
-- 1 request / hour / address.
-- 1 request / minute / IP.
+`POST /usdc` with a JSON body credits an address with test USDC cross-collateral.
+Devnet/testnet only (mainnet refuses). The grant is **`"queued"`** — staged for
+the next block, so the balance updates after ~1 block, not synchronously.
 
 ```bash
 curl -X POST https://faucet.devnet.mtf.exchange/usdc \
-  -d 'address=0x<YOUR_ADDRESS>&amount=10000'
+  -H 'content-type: application/json' \
+  -d '{"address":"0x<YOUR_ADDRESS>","amount":10000}'
+# -> {"address":"0x…","amount":10000,"status":"queued"}
 ```
+
+- `amount` is optional (whole USDC); omitted or above the cap → the default 10 000.
+- Rate-limited: 1 request / hour / address **and** 1 request / minute / IP (`429` when exceeded).
+- `400` invalid address · `429` rate-limited · `503` backlog full — body `{"error":"…"}`.
 
 ### State resets
 
