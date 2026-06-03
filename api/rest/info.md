@@ -713,6 +713,283 @@ Response:
 | `bids[*].submitted_at_ms` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
 
+### `protocol_metrics`
+
+Protocol-wide committed accumulators / counters. No parameters. Every field is
+read straight off committed `Exchange` state (counters, fee pools, BOLE reserves,
+staking) — nothing is computed off the match engine or oracle, so a replay
+reproduces it exactly.
+
+```json
+{ "type": "protocol_metrics" }
+```
+
+Response:
+
+```json
+{
+  "type": "protocol_metrics",
+  "data": {
+    "counters": {
+      "total_orders":               1000,
+      "total_fills":                750,
+      "total_liquidations":         3,
+      "total_deposits":             40,
+      "total_withdrawals":          12,
+      "total_vault_transfers":      0,
+      "total_sub_account_transfers":0
+    },
+    "fee_pools": {
+      "burned":         "8000",
+      "mflux_vault":    "0",
+      "validator_pool": "1000",
+      "treasury":       "1000",
+      "burned_mtf":     "55"
+    },
+    "insurance_fund_total":    "750",
+    "treasury_backstop_total": "9000",
+    "bole_pool": {
+      "total_deposits":  "20000",
+      "shortfall_total": "7"
+    },
+    "open_interest_total_1e8": "1500000",
+    "staking": {
+      "total_stake":   "100",
+      "n_validators":  1,
+      "n_active":      1,
+      "n_jailed":      0,
+      "current_epoch": 4
+    },
+    "counts": {
+      "n_markets":             1,
+      "n_spot_pairs":          5,
+      "n_user_vaults":         0,
+      "n_accounts_with_state": 12
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `counters.total_orders` | uint64 | Lifetime orders admitted |
+| `counters.total_fills` | uint64 | Lifetime fills (the only itemized trade signal — a **count**, not a notional) |
+| `counters.total_liquidations` | uint64 | Lifetime liquidations |
+| `counters.total_deposits` / `total_withdrawals` | uint64 | Lifetime deposit / withdrawal counts |
+| `counters.total_vault_transfers` | uint64 | Lifetime vault deposit/withdraw transfers |
+| `counters.total_sub_account_transfers` | uint64 | Lifetime sub-account transfers |
+| `fee_pools.burned` | Decimal string | Cumulative USDC routed to buyback-and-burn (whole-USDC) |
+| `fee_pools.mflux_vault` | Decimal string | Cumulative MFlux-vault fee accrual (`"0"` — vault share zeroed, ADR-012) |
+| `fee_pools.validator_pool` | Decimal string | Cumulative validator-pool fee accrual (whole-USDC) |
+| `fee_pools.treasury` | Decimal string | Cumulative treasury fee accrual (whole-USDC) |
+| `fee_pools.burned_mtf` | Decimal string | Cumulative MTF retired by the ADR-012 buyback executor |
+| `insurance_fund_total` | Decimal string | Σ per-asset `bole_pool.insurance_fund` reserves (whole-USDC) |
+| `treasury_backstop_total` | Decimal string | Σ per-asset `bole_pool.treasury_backstop` reserves (whole-USDC) |
+| `bole_pool.total_deposits` | Decimal string | BOLE lending-pool total deposits (whole-USDC) |
+| `bole_pool.shortfall_total` | Decimal string | Σ residual bad debt parked after the ADL → insurance → treasury waterfall |
+| `open_interest_total_1e8` | u128 string | Σ per-market open interest, **1e8 book plane** (labelled `_1e8`, NOT whole-USDC) |
+| `staking.total_stake` | Decimal string | Total staked MTF (whole-MTF) |
+| `staking.n_validators` | uint64 | Validators in the committed set |
+| `staking.n_active` | uint64 | Validators active this epoch |
+| `staking.n_jailed` | uint64 | Currently-jailed validators |
+| `staking.current_epoch` | uint64 | Current staking epoch |
+| `counts.n_markets` | uint64 | Registered MIP-3 perp markets (`mip3_market_specs`) |
+| `counts.n_spot_pairs` | uint64 | Registered spot pairs (`mip3_spot_pair_specs`) |
+| `counts.n_user_vaults` | uint64 | Registered user vaults |
+| `counts.n_accounts_with_state` | uint64 | Accounts with committed user-state |
+
+{% hint style="info" %}
+**No cumulative traded-notional figure.** The engine tracks per-user **30-day fee
+volume** (see [`user_fees`](#user_fees)) and a lifetime fill **count**
+(`counters.total_fills`) — there is **no committed running protocol-wide traded-USD
+accumulator**, so this read intentionally omits one rather than implying a volume
+total exists. Counters are monotonic activity tallies, not money.
+{% endhint %}
+
+State source: `locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + registry sizes.
+
+### `user_fees`
+
+Per-account fee / volume tier. Required: `account_id` (u64) **OR** `address` (0x hex).
+
+```json
+{ "type": "user_fees", "account_id": 42 }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `account_id` | uint64 | one of `account_id` / `address` |
+| `address` | hex address | one of `account_id` / `address` |
+
+Neither present → `400`. An account with no fee state returns a **200** with
+zeroed figures (and `from_global: true`) — the established zeroed idiom.
+
+Response:
+
+```json
+{
+  "type": "user_fees",
+  "data": {
+    "address":          "0x<addr>",
+    "account_id":       42,
+    "taker_volume_30d": "1250000",
+    "maker_volume_30d": "800000",
+    "vip_tier":         2,
+    "mm_tier":          1,
+    "referrer":         "0x<referrer>",
+    "referrer_credit":  "420",
+    "maker_bps":        1,
+    "taker_bps":        5,
+    "from_global":      true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | hex address | Resolved account address |
+| `account_id` | uint64 | Echoed only when the request used `account_id` |
+| `taker_volume_30d` | Decimal string | Rolling 30-day taker volume (whole-USDC) |
+| `maker_volume_30d` | Decimal string | Rolling 30-day maker volume (whole-USDC) |
+| `vip_tier` | uint | Committed per-user VIP tier index; `0` when untracked |
+| `mm_tier` | uint | Committed per-user market-maker tier index; `0` when untracked |
+| `referrer` | hex address \| null | This account's referrer if set, else `null` |
+| `referrer_credit` | Decimal string | Σ rebate accrued *to* this address acting as a referrer (whole-USDC) |
+| `maker_bps` | uint | Effective maker fee bps (the global default — see flag) |
+| `taker_bps` | uint | Effective taker fee bps (the global default — see flag) |
+| `from_global` | bool | Always `true` today — the bps come from the global schedule (see flag) |
+
+{% hint style="warning" %}
+**`maker_bps` / `taker_bps` are the GLOBAL schedule defaults, flagged
+`from_global: true`.** `vip_tier` / `mm_tier` are **real** committed per-user tier
+*indices*, but the engine carries **no committed index→bps discount table yet**, so
+those indices do not map to committed bps. The bps reported here are
+`global_schedule.default_{maker,taker}_bps` (`5` / `1` at the flat tier). Treat
+`vip_tier` / `mm_tier` + the volume trackers as the live tiering signal; the
+[`fee_schedule`](#fee_schedule) ladder is the *target* schedule, not yet charged.
+{% endhint %}
+
+State source: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + `global_schedule`.
+
+### `staking_apr`
+
+Effective annual staking emission rate + its committed inputs. No parameters.
+
+```json
+{ "type": "staking_apr" }
+```
+
+Response:
+
+```json
+{
+  "type": "staking_apr",
+  "data": {
+    "total_stake":             "1000000",
+    "effective_apr":           "0.08",
+    "effective_apr_bps":       "800",
+    "governance_rate_bps":     800,
+    "emission_floor_stake":    "50000000",
+    "n_active_validators":     1,
+    "current_epoch":           2,
+    "is_gross_pre_commission": true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_stake` | Decimal string | Total staked MTF (whole-MTF) |
+| `effective_apr` | Decimal string | Annual emission rate the begin-block reward effect actually applies (fraction) |
+| `effective_apr_bps` | Decimal string | `effective_apr × 10_000`, truncated |
+| `governance_rate_bps` | uint | Governance-set `reward_rate_bps` (committed) — see flag |
+| `emission_floor_stake` | uint string | Floor stake (`50M` MTF) below which the rate is flat |
+| `n_active_validators` | uint64 | Validators active this epoch |
+| `current_epoch` | uint64 | Current staking epoch |
+| `is_gross_pre_commission` | bool | Always `true` — APR is gross, pre per-validator commission |
+
+`effective_apr` is the curve the begin-block reward effect derives:
+
+```text
+effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
+```
+
+i.e. a **flat 8%** at/below 50M MTF staked, decaying ∝ 1/√stake above it (e.g.
+total stake = 200M ⇒ 4× floor ⇒ ratio 1/4 ⇒ √ = 1/2 ⇒ 4% / 400 bps).
+
+{% hint style="warning" %}
+**`governance_rate_bps` is committed but NOT consumed by the reward effect.** The
+reward effect derives the payout rate from the **stake curve** above, not from
+`reward_rate_bps`. Both are surfaced so the divergence is observable rather than
+hidden — the effective payout APR is `effective_apr`, not `governance_rate_bps`.
+And `effective_apr` is a **gross emission** rate (`is_gross_pre_commission: true`):
+an individual delegator's net APR is `effective_apr × (1 − commission)`.
+{% endhint %}
+
+State source: `c_staking.{total_stake, reward_rate_bps, current_epoch, validators}` + the emission curve.
+
+### `oracle_sources`
+
+The committed per-market oracle-source subset. Resolves the market by `asset_id`
+(u32) **OR** `coin` (symbol).
+
+```json
+{ "type": "oracle_sources", "asset_id": 0 }
+```
+
+Or by name:
+
+```json
+{ "type": "oracle_sources", "coin": "BTC" }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `asset_id` | uint32 | one of `asset_id` / `coin` |
+| `coin` | symbol | one of `asset_id` / `coin` |
+
+Missing both → `400`; unknown market → `404 {"error":"market not found"}`.
+
+Response:
+
+```json
+{
+  "type": "oracle_sources",
+  "data": {
+    "asset_id":          0,
+    "name":              "BTC",
+    "oracle_set":        true,
+    "source_count":      3,
+    "num_sources":       10,
+    "enabled_sources":   [0, 2, 5],
+    "subset_mask":       37,
+    "weights_committed": false
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `asset_id` | uint32 | Echoed / resolved asset id |
+| `name` | string | Market symbol |
+| `oracle_set` | bool | Whether the deployer explicitly confirmed the subset via `SetOracle` |
+| `source_count` | uint64 | Number of enabled sources (popcount of the mask) |
+| `num_sources` | uint8 | Total source slots (`NUM_ORACLE_SOURCES = 10`) |
+| `enabled_sources` | uint8[] | Set bit indices of the subset mask (the enabled source slots) |
+| `subset_mask` | uint16 | Committed 10-bit `oracle_source_subset_mask` (bit `i` set ⇒ source `i` feeds the median) |
+| `weights_committed` | bool | Always `false` — per-source weights are NOT committed (see flag) |
+
+{% hint style="warning" %}
+**Only the numeric bitmask is on-chain — venue NAMES and WEIGHTS are NOT
+committed** (`weights_committed: false`). The 10 source identities are
+protocol-fixed off-chain (ADR-018 / PLAN §H.1) and their weights are
+protocol-fixed, so committed state carries only the subset bitmask. This read
+surfaces `enabled_sources` as **bit indices**, not named venues, and emits no
+per-venue weight list rather than fabricating one.
+{% endhint %}
+
+State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
+
 ## Differentiator query types (RFQ / FBA / portfolio margin)
 
 These read the live state behind the MTF differentiator engines — they complement

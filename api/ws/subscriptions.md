@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `all_mids`, `fills`, and `user_events` are live and push real committed data per block. `candles` is a recognized name that acks + returns an empty snapshot but has no live source yet (needs a rolling OHLCV store). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`) require a `coin`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, and `user_events` are live and push real committed data per block. `candles` is a recognized name that acks + returns an empty snapshot but has no live source yet (needs a rolling OHLCV store). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -23,6 +23,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `l2_book` | **live** | `coin` (required) | committed book, per commit |
 | `bbo` | **live** | `coin` (required) | committed book, per commit |
 | `trades` | **live** | `coin` (required) | committed-block fills, per commit |
+| `active_asset_ctx` | **live** | `coin` (required) | per-market mark / oracle / funding / OI, per commit |
 | `all_mids` | **live** | none | per-market mark, per commit |
 | `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
@@ -106,6 +107,52 @@ Public trade tape for one market — one record per fill on that market each com
 
 ```json
 { "channel": "trades", "data": { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker", "0x..maker"] } }
+```
+
+### `active_asset_ctx`
+
+Per-market context for one market — mark / oracle price, funding, and open
+interest — pushed each commit. **Requires `coin`.** The body carries the same
+fields and units as the REST [`market_info`](../rest/info.md#market_info) read:
+`mark_px` / `oracle_px` are **whole-USDC**, tick-snapped (truncated to the market's
+price tick), and the `funding` block mirrors `market_info.funding`. Built from the
+same per-market record builder as the REST read, so a WS ctx push never drifts
+from `market_info`.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "active_asset_ctx", "coin": "BTC" } }
+```
+
+```json
+{
+  "channel": "active_asset_ctx",
+  "data": {
+    "coin": "BTC",
+    "mark_px": "66735.25",
+    "oracle_px": "66700",
+    "funding": {
+      "rate_per_hr": "0",
+      "cap_per_hr": "400",
+      "interval_ms": 3600000,
+      "next_payment_ts": 0
+    },
+    "open_interest": "5000000000"
+  }
+}
+```
+
+- `mark_px` / `oracle_px` — whole-USDC, tick-snapped (`"0"` when unset). Same plane as `market_info`, NOT the 1e8 book plane.
+- `funding` — `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block.
+- `open_interest` — current open interest, fixed-point string (`"0"` when no book).
+
+Frequency: one frame per committed block in which this market has a live subscriber.
+
+If the coin maps to no known market you still get the ack, but the snapshot is the
+**honest-empty** body — zeroed prices / OI and a `null` funding block — and no
+pushes follow (so a client deserializing a fixed ctx struct never breaks):
+
+```json
+{ "channel": "active_asset_ctx", "data": { "coin": "DOGE", "mark_px": "0", "oracle_px": "0", "funding": null, "open_interest": "0" } }
 ```
 
 ### `all_mids`

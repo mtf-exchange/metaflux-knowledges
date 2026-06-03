@@ -108,11 +108,11 @@ The builder must be a registered address (see [`approve_builder_fee`](../api/res
 
 **80 %** of protocol revenue (`burn_bps = 8_000`) goes to buyback-and-burn — accrued USDC market-buys MTF, which is then burned. (ADR-012 revision 2026-05-28; the earlier `0.30` ratio is obsolete.) The acquired-and-burned MTF exits circulation permanently.
 
-The cumulative amounts (`burned` USDC pool, `burned_mtf`, `treasury`, validator pool) are tracked in committed state.
+The cumulative amounts (`burned` USDC pool, `burned_mtf`, `treasury`, validator pool) are tracked in committed state and exposed on the read path via [`protocol_metrics`](../api/rest/info.md#protocol_metrics) (`fee_pools.{burned, burned_mtf, treasury, validator_pool, mflux_vault}`):
 
-> **Planned read.** A `protocol_metrics` `/info` query type is **not yet wired**
-> into the node dispatch — the burn/treasury accumulators live in committed state
-> but aren't exposed on the read path today.
+```bash
+curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+```
 
 ## Referrer share
 
@@ -143,8 +143,11 @@ The intended model: liquidation fills charge a liquidation fee on top of the sta
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
 curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — HL-compat shape under /hl on the gateway
-# (no native per-user fee read on the node yet; see content-gap note)
+# your personal tier and recent volume — MTF-native (gateway default path)
+curl -X POST https://gateway.devnet.mtf.exchange/info \
+  -d '{"type":"user_fees","address":"0x<addr>"}'
+
+# or the HL-compat shape under /hl on the gateway
 curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
   -d '{"type":"userFees","user":"0x<addr>"}'
 ```
@@ -178,6 +181,8 @@ A market-maker with $5B 30-day volume:
 ## See also
 
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
+- [`POST /info user_fees`](../api/rest/info.md#user_fees) — MTF-native per-user tier / 30-day volume
+- [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — cumulative fee pools (burn / treasury / validator)
 - [`POST /info userFees`](../api/rest/hl-compat.md#userfees) — HL-compat
 - [Tiered liquidation](./tiered-liquidation.md) — liquidation-fee mechanics
 

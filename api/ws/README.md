@@ -1,11 +1,11 @@
 # WebSocket API
 
 {% hint style="info" %}
-**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `all_mids`, `fills`, `user_events` (all push real committed data per block), plus `post` (request/response over WS) and `ping`/`pong`. Only `candles` is still a stub (acks + empty snapshot, no live source yet). See [subscriptions](./subscriptions.md) for the per-channel shapes.
+**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `fills`, `user_events` (all push real committed data per block), plus `post` (request/response over WS) and `ping`/`pong`. Only `candles` is still a stub (acks + empty snapshot, no live source yet). See [subscriptions](./subscriptions.md) for the per-channel shapes.
 {% endhint %}
 
 {% hint style="info" %}
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `fills`, `candles`, `user_events`. Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to the native snake_case underneath. Per the unified-gateway routing: `gateway.<net>.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to the native snake_case underneath. Per the unified-gateway routing: `gateway.<net>.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
 {% endhint %}
 
 ## TL;DR
@@ -66,7 +66,7 @@ All frames are JSON **text** frames. Binary frames are rejected with an error fr
 ```
 
 - `subscription.type` (required) — the channel name (snake_case, e.g. `l2_book`). Unknown names produce an error frame.
-- `subscription.coin` (required for per-market channels `l2_book` / `bbo`; omitted for `user_events`) — see [Coin parameter](#coin-parameter).
+- `subscription.coin` (required for per-market channels `l2_book` / `bbo` / `trades` / `active_asset_ctx`; omitted for `user_events`) — see [Coin parameter](#coin-parameter).
 
 The server replies with **two** frames, in order:
 
