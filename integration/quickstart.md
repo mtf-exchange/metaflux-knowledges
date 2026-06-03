@@ -14,23 +14,30 @@ Deposit, place an order, cancel, withdraw. By the end of this page your TypeScri
 
 ## Endpoints
 
+The gateway is the single public front door. MTF-native is the default path;
+HL-compat lives under `/hl/*`.
+
 | Service | URL (devnet) |
 |---------|--------------|
-| Gateway REST (HL/CCXT compat) | `https://gateway.devnet.mtf.exchange` |
-| Gateway WS | `wss://gateway.devnet.mtf.exchange/ws` |
-| Node API (MTF-native `/info` · `/exchange` · `/faucet`) | `https://api.devnet.mtf.exchange` |
-| Explorer | `https://explorer.devnet.mtf.exchange` |
+| Gateway front door | `https://gateway.devnet.mtf.exchange` |
+| MTF-native (default) | `POST /info` · `POST /exchange` · `GET /ws` |
+| HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
+| CCXT-compat | `/ccxt/*` |
+| EVM JSON-RPC | `POST /evm` |
+| Faucet (devnet) | `POST /faucet` |
+| Explorer | `https://devnet.mtf.exchange/explorer` |
 
 > The faucet is **not** a separate service — it's the `POST /faucet` route on the
-> node's MTF-native API (same origin as `/info` + `/exchange`; local devnet
-> `http://localhost:8080/faucet`). See [`POST /faucet`](../api/rest/faucet.md).
+> gateway front door. Running the node yourself? The same native surface
+> (`/info` · `/exchange` · `/ws` · `/faucet`) is served directly at
+> `http://localhost:8080`. See [`POST /faucet`](../api/rest/faucet.md).
 
 See [networks](../networks.md) for the full list including testnet and (post-launch) mainnet.
 
 ## Step 1 — Get devnet USDC
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/faucet \
+curl -X POST https://gateway.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -42,14 +49,14 @@ rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
 *downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
-The raw curls below use the **HL-compat** shape on the **gateway** (camelCase
-types like `clearinghouseState` / `openOrders`, msgpack-signed envelopes) — handy
-if you already have an HL client. The `@metaflux/sdk` examples instead speak
-MTF-native against the **node** (`api.devnet.mtf.exchange`). Pick one lane; they
-hit different origins.
+The raw curls below use the **HL-compat** shape under `/hl/*` on the gateway
+(camelCase types like `clearinghouseState` / `openOrders`, msgpack-signed
+envelopes) — handy if you already have an HL client. The `@metaflux/sdk` examples
+instead speak MTF-native on the gateway's default path (`/info` · `/exchange`).
+Pick one lane; both go through the same front door, just different paths.
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
   -H 'content-type: application/json' \
   -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
 ```
@@ -65,7 +72,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://api.devnet.mtf.exchange',   // MTF-native node API (:8080) — NOT the gateway
+  baseUrl:    'https://gateway.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -87,7 +94,7 @@ console.log('order id:', result.oid);
 Raw curl (HL-compat shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/exchange \
+curl -X POST https://gateway.devnet.mtf.exchange/hl/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -97,7 +104,7 @@ where `order.json` is the HL-shape envelope you assembled.
 ## Step 3 — Check the order is on the book
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
   -H 'content-type: application/json' \
   -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
 ```
@@ -121,7 +128,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://gateway.devnet.mtf.exchange/exchange \
+curl -X POST https://gateway.devnet.mtf.exchange/hl/exchange \
   -d @cancel.json
 ```
 

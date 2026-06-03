@@ -22,11 +22,12 @@
 | WS subscriptions per connection | 256 | — | — |
 
 All limits are governance-controlled. A per-account budget snapshot is available
-via the native [`user_rate_limit`](./rest/info.md) read on the node (the gateway
-exposes the same data as HL-compat `userRateLimit`):
+via the native [`user_rate_limit`](./rest/info.md) read on the gateway default
+path (the gateway also exposes the same data as HL-compat `userRateLimit` under
+`/hl`):
 
 ```bash
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```
@@ -129,7 +130,7 @@ A `429` response with `retry_after_ms` tells you exactly when the bucket will ho
 
 ### High-frequency liquidator
 
-- Run from your own mTLS-authenticated node connection (bare `:8080`), bypassing gateway limits.
+- Run from your own self-hosted node (mTLS-authenticated, `localhost:8080`), bypassing the public gateway's limits.
 - Acknowledge this requires running infra peered with a validator.
 - Public gateway access is enough for tens-of-orders-per-second workloads; not enough for HFT.
 

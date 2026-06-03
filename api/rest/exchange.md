@@ -25,16 +25,17 @@ Posting a system action's native tag returns `400 unsupported action`.
 ## URL
 
 ```
-POST  https://<node-or-gateway>/exchange
+POST  https://gateway.<net>.mtf.exchange/exchange
 ```
 
-| Host | Path | Wire shape |
-|------|------|-----------|
-| Node directly (`:8080`) | `/exchange` | **MTF-native** (this document) |
-| Gateway (`:8443`) | `/exchange` | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
+| Path | Wire shape |
+|------|-----------|
+| `POST /exchange` (gateway default) | **MTF-native** (this document) |
+| `POST /hl/exchange` (gateway, under `/hl`) | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
 
-MTF-native clients post directly to the **node** `:8080`. The gateway only serves
-the HL-compat shape on `/exchange` — there is no `/native/*` passthrough.
+MTF-native is the gateway's default path; HL-compat is namespaced under `/hl/*`.
+Running the node yourself, the same native `/exchange` is served directly at
+`http://localhost:8080`.
 
 ## Request envelope
 

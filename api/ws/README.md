@@ -11,10 +11,10 @@ A single WS connection multiplexes subscriptions to many channels. The wire prot
 ## URL
 
 ```
-ws://<node>:8080/ws
+wss://gateway.<net>.mtf.exchange/ws
 ```
 
-The node binds plain `ws://` on `:8080/ws`. In production the gateway / load-balancer terminates TLS in front of it (`wss://`), but the node itself speaks plain WS and the frame protocol is identical either way.
+MTF-native WS is the gateway's default at `/ws`; HL-compat WS is under `/hl/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
 
 ## Connection lifecycle
 

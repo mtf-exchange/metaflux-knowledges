@@ -19,7 +19,7 @@ use metaflux_client::{Client, ClientOpts, OrderParams, Side, Tif};
 async fn run() -> anyhow::Result<()> {
     let c = Client::new(ClientOpts {
         private_key: std::env::var("PRIVATE_KEY")?.parse()?,
-        base_url:    "https://api.devnet.mtf.exchange".into(),  // MTF-native node API (:8080)
+        base_url:    "https://gateway.devnet.mtf.exchange".into(),  // MTF-native is the gateway default path
         chain_id:    31337,
         ..Default::default()
     })?;
@@ -52,9 +52,10 @@ pub struct ClientOpts {
     /// Override `sender` address. Used for agent-wallet pattern.
     pub sender_address: Option<Address>,
 
-    /// MTF-native **node** API URL (`https://api.<net>.mtf.exchange`, local
-    /// `http://localhost:8080`). The SDK speaks MTF-native only and hits the
-    /// node directly, NOT the HL-compat gateway (ADR-019).
+    /// Gateway front door (`https://gateway.<net>.mtf.exchange`). The SDK speaks
+    /// MTF-native, which is the gateway's default path (`/info` · `/exchange` ·
+    /// `/ws`); HL-compat lives under `/hl/*`. Running the node yourself? Point at
+    /// `http://localhost:8080`.
     pub base_url:       String,
     pub chain_id:       u64,
     pub timeout:        Duration,           // default 5s
@@ -212,7 +213,7 @@ let c = Client::new(ClientOpts {
 let agent_client = Client::new(ClientOpts {
     private_key:    Some(agent_priv),
     sender_address: Some(master_addr),    // ← master is sender
-    base_url:       "https://api.devnet.mtf.exchange".into(),
+    base_url:       "https://gateway.devnet.mtf.exchange".into(),
     chain_id:       31337,
     ..Default::default()
 })?;

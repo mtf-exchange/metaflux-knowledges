@@ -41,13 +41,20 @@ For other languages (Python, Go, Java, C++ …), implement the EIP-712 envelope 
 
 See [networks](../networks.md) for the full per-network reference.
 
-| Endpoint | Default port (devnet) | Purpose |
-|----------|----------------------|---------|
-| Gateway REST | `8443` | Multi-protocol adapter (HL-compat + CCXT-compat + MTF-native) |
-| Gateway WS | `8443/ws` | Subscriptions |
-| Node API (MTF-native) | `8080` | `/info` · `/exchange` · `/ws` · `/faucet` (devnet/testnet `POST /faucet` test tap — same origin, not a separate port) |
+The gateway (`https://gateway.<net>.mtf.exchange`) is the single public front door.
 
-Production deployments terminate TLS at the gateway and front it with a CDN; node REST is intentionally not internet-facing in production.
+| Path | Serves | Purpose |
+|------|--------|---------|
+| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native (default) | Native snake_case surface |
+| `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` | HL-compat | Hyperliquid wire shape |
+| `/ccxt/*` | CCXT-compat | CCXT REST methods |
+| `POST /evm` | EVM JSON-RPC | EVM sidechain RPC |
+| `POST /faucet` | Faucet | devnet/testnet test tap |
+
+Production deployments terminate TLS at the gateway and front it with a CDN; the
+node is intentionally not internet-facing — it sits behind the gateway. Running
+the node yourself, the same native surface is served directly at
+`http://localhost:8080` (raw EVM RPC at `http://localhost:8545`).
 
 ## Common patterns
 

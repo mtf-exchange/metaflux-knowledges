@@ -11,16 +11,17 @@ Single endpoint, multi-type. Dispatches on the request body's `type` field. Read
 ## URL
 
 ```
-POST  https://<node-or-gateway>/info
+POST  https://gateway.<net>.mtf.exchange/info
 ```
 
-| Host | Wire shape |
+| Path | Wire shape |
 |------|-----------|
-| Node directly (`:8080`) | MTF-native (this document) |
-| Gateway (`:8443`) | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
+| `POST /info` (gateway default) | MTF-native (this document) |
+| `POST /hl/info` (gateway, under `/hl`) | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
 
-MTF-native clients read directly from the **node** `:8080`. The gateway only serves
-the HL-compat shape on `/info` — there is no `/native/*` passthrough.
+MTF-native is the gateway's default path; HL-compat is namespaced under `/hl/*`.
+Running the node yourself, the same native `/info` is served directly at
+`http://localhost:8080`.
 
 ## Envelope
 

@@ -169,7 +169,7 @@ t=1.0s   batch_id = 9877 opens
 
 ```bash
 # planned — not yet served by /info
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -d '{"type":"fba_batch_state","asset_id":42}'
 ```
 

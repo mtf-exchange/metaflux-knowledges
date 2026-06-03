@@ -172,7 +172,7 @@ read path. Track live RFQs via the `rfq*` WS events meanwhile.
 
 ```bash
 # planned — not yet served by /info
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open","asset":0}'
 ```
@@ -183,7 +183,7 @@ For your own RFQs:
 
 ```bash
 # planned — not yet served by /info
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","user":"0x..."}'
 ```
