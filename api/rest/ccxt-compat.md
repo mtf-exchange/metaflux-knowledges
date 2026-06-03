@@ -1,98 +1,100 @@
 # CCXT-compat REST surface
 
 {% hint style="info" %}
-**Preview.** REST subset live; CCXT Pro (WS) coming.
+**Preview.** A **9-method REST subset** is mounted today, each returning the exact [CCXT](https://docs.ccxt.com/) unified shape. **Symbol parsing, market lookup, and JWT auth are real**; monetary fields are stubbed (`"0.0"` / empty arrays / `0` ids) until the gateway → node read backhaul and the [indexer](../data-files.md) land. CCXT Pro (WS) is coming.
 {% endhint %}
 
 ## TL;DR
 
-For quant frameworks that already speak the [CCXT](https://github.com/ccxt/ccxt) wire — set the exchange URL to MetaFlux's gateway. The wire shape matches CCXT's expectations for the supported methods. Use this if you already have CCXT integration; for new clients start with the [HL-compat](./hl-compat.md) or [MTF-native](./exchange.md) surfaces.
+For quant frameworks that already speak the CCXT wire — point the exchange's base URL at MetaFlux's gateway. The wire shape matches CCXT's expectations for the supported methods. Use this if you already have a CCXT integration; for new clients start with [HL-compat](./hl-compat.md) or [MTF-native](./exchange.md).
+
+Like [HL-compat](./hl-compat.md), this surface lives **only on the gateway** — it translates the MTF-native node reads into CCXT's unified shapes. The node itself is MTF-native (see [`/info`](./info.md)); CCXT shapes never touch the node.
 
 ## URL
 
 ```
-https://<gateway>/ccxt/<method>
+https://<gateway>/ccxt/<path>
 ```
 
-Default port `8443` on devnet.
+All CCXT routes are mounted under the `/ccxt/` prefix (disambiguates from the HL-compat `/info` + `/exchange` surface). A request to an un-prefixed path (`/markets`) returns 404 — the prefix is load-bearing.
 
-## Supported methods (REST)
+## CCXT method → route → MTF-native node read
 
-| Method | URL | Auth | Status |
-|--------|-----|------|--------|
-| `fetchMarkets` | `GET  /ccxt/markets` | no | live |
-| `fetchCurrencies` | `GET  /ccxt/currencies` | no | live |
-| `fetchTicker` | `GET  /ccxt/ticker?symbol={S}` | no | live |
-| `fetchTickers` | `GET  /ccxt/tickers` | no | live |
-| `fetchOrderBook` | `GET  /ccxt/orderbook?symbol={S}&limit={N}` | no | live |
-| `fetchOHLCV` | `GET  /ccxt/ohlcv?symbol={S}&timeframe={T}&since={N}&limit={N}` | no | shape live; indexer in progress |
-| `fetchTrades` | `GET  /ccxt/trades?symbol={S}&since={N}&limit={N}` | no | live |
-| `fetchBalance` | `GET  /ccxt/balance` | yes | live |
-| `fetchPositions` | `GET  /ccxt/positions` | yes | live |
-| `fetchMyTrades` | `GET  /ccxt/myTrades?symbol={S}&since={N}&limit={N}` | yes | live |
-| `fetchOpenOrders` | `GET  /ccxt/openOrders?symbol={S}` | yes | live |
-| `fetchOrder` | `GET  /ccxt/orders/{id}` | yes | live |
-| `createOrder` | `POST /ccxt/orders` | yes | live |
-| `cancelOrder` | `DELETE /ccxt/orders/{id}` | yes | live |
-| `cancelAllOrders` | `DELETE /ccxt/orders?symbol={S}` | yes | live |
-| `fetchFundingRate` | `GET  /ccxt/fundingRate?symbol={S}` | no | live |
-| `fetchFundingHistory` | `GET  /ccxt/fundingHistory?symbol={S}` | yes | live |
-| `setLeverage` | `POST /ccxt/leverage` body `{symbol, leverage}` | yes | live |
-| `setMarginMode` | `POST /ccxt/marginMode` body `{symbol, marginMode}` | yes | live |
+The 9 REST methods that ship today, plus the auth bootstrap. **Translation** is CCXT-unified-shape ← node MTF-native: snake_case → CCXT camelCase, `u32` market id → CCXT `BASE/QUOTE:SETTLE` symbol, integer magnitudes → decimal strings.
 
-CCXT Pro WS coming — see [WS subscriptions](../ws/subscriptions.md) for the underlying channels.
+| CCXT method | Route | Auth | Status | Node MTF-native source |
+|-------------|-------|------|--------|------------------------|
+| `fetchMarkets` | `GET /ccxt/markets` | no | shape live; static genesis fixture | [`markets`](./info.md#markets) |
+| `fetchTicker` | `GET /ccxt/ticker?symbol=` | no | shape live; prices stubbed | [`market_info`](./info.md#market_info) + mid |
+| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | no | shape live; empty book | [`l2_book`](./info.md#l2_book) |
+| `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | no | 🚧 indexer | [indexer](../data-files.md) ← `node_trades` |
+| `createOrder` | `POST /ccxt/orders` | Bearer | shape live | → [`/exchange`](./exchange.md) |
+| `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | shape live | → [`/exchange`](./exchange.md) |
+| `fetchBalance` | `GET /ccxt/balance` | Bearer | shape live; balances stubbed | [`account_state`](./info.md#account_state) |
+| `fetchPositions` | `GET /ccxt/positions` | Bearer | shape live; positions stubbed | [`account_state`](./info.md#account_state) |
+| `fetchMyTrades` | `GET /ccxt/my-trades?symbol=` | Bearer | 🚧 indexer | [indexer](../data-files.md) ← `node_fills` |
+| — auth bootstrap — | `POST /ccxt/auth` | no | real | EIP-712 login → JWT |
+
+Legend: **shape live** = route mounted, CCXT-correct shape returned, monetary fields are stubs awaiting the read backhaul · 🚧 indexer = served once the [data-file indexer](../data-files.md) lands.
+
+{% hint style="warning" %}
+**Surface is deliberately minimal.** Methods CCXT defines but the gateway does **not** mount yet — `fetchTickers`, `fetchTrades` (public tape), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` beyond the stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — return 404. They attach under `/ccxt/` as the read backhaul + indexer expand. `fetchOpenOrders` / `fetchOrder` will translate from the node [`open_orders`](./info.md#open_orders) read; `fetchTrades` / `fetchOHLCV` / `fetchMyTrades` / `fetchClosedOrders` are indexer-backed.
+{% endhint %}
 
 ## Symbol format
 
-CCXT uses `"BASE/QUOTE:SETTLE"` for derivatives. MetaFlux markets render:
+CCXT uses `"BASE/QUOTE:SETTLE"` for derivatives. MetaFlux perp markets render:
 
 ```
 BTC/USDC:USDC      # perpetual, settled in USDC
 ETH/USDC:USDC
 ```
 
-Spot markets use `"BASE/QUOTE"` without the `:SETTLE` suffix:
-
-```
-ETH/USDC
-WBTC/USDC
-```
-
-`fetchMarkets` returns every per-market field CCXT expects (precision, limits, fees, contract size, settlement currency, etc.).
+Spot markets (once a spot universe lands) use `"BASE/QUOTE"` without the `:SETTLE` suffix. The market registry today is a **static genesis fixture** (`with_genesis_markets` — the genesis perps); a gRPC-backed registry that refreshes from the node's [`markets`](./info.md#markets) read swaps in with the read backhaul. Symbol parsing is **real**: malformed symbols → 400, unknown symbols → 400.
 
 ## Timeframes
 
-`fetchOHLCV` accepts CCXT's standard set: `"1m"`, `"5m"`, `"15m"`, `"30m"`, `"1h"`, `"4h"`, `"1d"`, `"1w"`. Invalid timeframes return HTTP 400.
+`fetchOHLCV` accepts CCXT's standard tokens: `"1m"`, `"5m"`, `"15m"`, `"30m"`, `"1h"`, `"4h"`, `"1d"`, `"1w"`. Invalid timeframes return 400. Bars are 🚧 indexer-backed — shape-correct empty until the indexer lands; use the WS [`candle`](../ws/subscriptions.md) channel for live data.
 
 ## Authentication
 
-Authenticated methods accept either:
+Authenticated methods (`createOrder`, `cancelOrder`, `fetchBalance`, `fetchPositions`, `fetchMyTrades`) require a **JWT Bearer token**. There is **one** auth scheme — JWT minted from an EIP-712 login envelope. (No HMAC `X-API-KEY` scheme.)
 
-### API key + secret (HMAC, CCXT-standard)
+### 1. Login — `POST /ccxt/auth`
 
-```
-GET /ccxt/balance HTTP/1.1
-X-API-KEY: <pub>
-X-API-SIGN: HMAC-SHA256(secret, "GET\n/ccxt/balance\n" + timestamp)
-X-API-TIMESTAMP: 1735689600
-```
+Post an EIP-712-signed login envelope; receive a session JWT. The envelope mirrors the node's `SignedEnvelope` — the gateway re-derives the EIP-712 digest over `(address, nonce, expiry)` and verifies the signature, then mints an HS256 JWT whose `sub` is the address.
 
-The gateway maps `X-API-KEY` to an internal account; per-key budgets are operator-set.
-
-### Wallet signing (EIP-712 envelope)
-
-Set CCXT's `walletAddress` parameter and provide a signing function. The gateway accepts an EIP-712-signed envelope identical to [`/exchange`](./exchange.md):
-
-```
-POST /ccxt/orders HTTP/1.1
-X-MTF-SENDER: 0x<addr>
-X-MTF-SIGNATURE: 0x<65-byte hex>
-content-type: application/json
-
-{ "symbol": "BTC/USDC:USDC", "type": "limit", "side": "buy", "price": "100.5", "amount": "1.0" }
+```bash
+curl -X POST https://gateway/ccxt/auth \
+  -H 'content-type: application/json' \
+  -d '{
+    "address":   "0x<addr>",
+    "nonce":     1735689600000,
+    "expiry":    1735689660000,
+    "signature": "<base64 65-byte r||s||v>"
+  }'
 ```
 
-The signed payload is `keccak256("ccxt:" || canonical_body_msgpack)` wrapped in the EIP-712 envelope. See [signing walkthrough](../../integration/signing.md).
+```json
+{ "token": "<jwt>", "expiresAt": 1735693200 }
+```
+
+| Envelope field | Type | Notes |
+|----------------|------|-------|
+| `address` | `0x` hex | EVM address claiming login |
+| `nonce` | u64 | Replay-protection nonce (verified at the node layer; the JWT is the session token) |
+| `expiry` | u64 ms | Envelope rejected past this |
+| `signature` | base64 | 65-byte `r‖s‖v` (EVM convention), base64-encoded |
+
+See the [signing walkthrough](../../integration/signing.md) for the EIP-712 digest construction.
+
+### 2. Call — `Authorization: Bearer <jwt>`
+
+```bash
+curl https://gateway/ccxt/balance -H "Authorization: Bearer $TOKEN"
+```
+
+Missing / expired / wrong-signature tokens are rejected `401`. The JWT's `sub` address scopes every authenticated read/write to that account.
 
 ## Examples
 
@@ -105,36 +107,73 @@ curl https://gateway/ccxt/markets
 ```json
 [
   {
-    "id":            "BTC-PERP",
-    "symbol":        "BTC/USDC:USDC",
-    "base":          "BTC",
-    "quote":         "USDC",
-    "settle":        "USDC",
-    "type":          "swap",
-    "linear":        true,
-    "contract":      true,
-    "contractSize":  1,
-    "precision":     { "price": 8, "amount": 8 },
-    "limits":        { "amount": { "min": 0.0001 }, "price": { "min": 0.01 } },
-    "maker":         0.0002,
-    "taker":         0.0005,
-    "active":        true
+    "id":           "BTC-PERP",
+    "symbol":       "BTC/USDC:USDC",
+    "base":         "BTC",
+    "quote":        "USDC",
+    "settle":       "USDC",
+    "type":         "swap",
+    "swap":         true,
+    "spot":         false,
+    "linear":       true,
+    "contract":     true,
+    "contractSize": 1,
+    "precision":    { "price": 8, "amount": 8 },
+    "limits":       { "amount": { "min": 0.0001 }, "price": { "min": 0.01 } },
+    "maker":        0.0002,
+    "taker":        0.0005,
+    "active":       true
   }
 ]
 ```
+
+### Fetch ticker
+
+```bash
+curl 'https://gateway/ccxt/ticker?symbol=BTC/USDC:USDC'
+```
+
+```json
+{
+  "symbol":      "BTC/USDC:USDC",
+  "bid":         "0.0",
+  "ask":         "0.0",
+  "last":        "0.0",
+  "high":        "0.0",
+  "low":         "0.0",
+  "open":        "0.0",
+  "close":       "0.0",
+  "baseVolume":  "0.0",
+  "quoteVolume": "0.0"
+}
+```
+
+Monetary fields are `"0.0"` stubs today; the read backhaul fills them from the node mid / [`market_info`](./info.md#market_info). The CCXT shape is byte-correct so clients deserialize cleanly now and get real numbers transparently later.
+
+### Fetch order book
+
+```bash
+curl 'https://gateway/ccxt/orderbook?symbol=BTC/USDC:USDC&limit=50'
+```
+
+```json
+{ "symbol": "BTC/USDC:USDC", "bids": [], "asks": [], "timestamp": 0, "nonce": 0 }
+```
+
+`bids` / `asks` are `[[price, amount], …]` arrays (CCXT shape). `limit` truncation applies once real levels land from [`l2_book`](./info.md#l2_book).
 
 ### Place an order
 
 ```bash
 curl -X POST https://gateway/ccxt/orders \
-  -H "X-API-KEY: $KEY" -H "X-API-SIGN: $SIG" -H "X-API-TIMESTAMP: $TS" \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' \
   -d '{
     "symbol": "BTC/USDC:USDC",
     "type":   "limit",
     "side":   "buy",
-    "price":  "100.5",
     "amount": "1.0",
+    "price":  "100.5",
     "params": { "timeInForce": "GTC", "reduceOnly": false }
   }'
 ```
@@ -143,103 +182,63 @@ Response (CCXT order object):
 
 ```json
 {
-  "id":          "12345",
+  "id":            "12345",
   "clientOrderId": null,
-  "symbol":      "BTC/USDC:USDC",
-  "type":        "limit",
-  "side":        "buy",
-  "price":       100.5,
-  "amount":      1.0,
-  "filled":      0.0,
-  "remaining":   1.0,
-  "status":      "open",
-  "timestamp":   1735689600000,
-  "fee":         { "currency": "USDC", "cost": 0.0 },
-  "info":        { /* raw chain response */ }
+  "symbol":        "BTC/USDC:USDC",
+  "type":          "limit",
+  "side":          "buy",
+  "price":         100.5,
+  "amount":        1.0,
+  "filled":        0.0,
+  "remaining":     1.0,
+  "status":        "open",
+  "timestamp":     1735689600000,
+  "fee":           { "currency": "USDC", "cost": 0.0 },
+  "info":          { /* raw chain response */ }
 }
 ```
+
+`createOrder` translates the CCXT order into an [`/exchange`](./exchange.md) write under the JWT's `sub` account.
 
 ### Cancel an order
 
 ```bash
-curl -X DELETE https://gateway/ccxt/orders/12345 \
-  -H "X-API-KEY: $KEY" -H "X-API-SIGN: $SIG" -H "X-API-TIMESTAMP: $TS"
+curl -X DELETE https://gateway/ccxt/orders/12345 -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Errors
 
-CCXT-compat returns proper HTTP status codes (not HL's 200-with-status convention):
+CCXT-compat returns proper HTTP status codes (not HL's 200-with-`status` convention), with CCXT-named error bodies so client SDKs route them into the right exception class:
 
 | HTTP | Body | Cause |
 |------|------|-------|
-| 400 | `{"error":"InvalidOrder","message":"..."}` | Bad symbol, bad price, bad size |
-| 401 | `{"error":"AuthenticationError"}` | HMAC mismatch / bad signature |
-| 404 | `{"error":"OrderNotFound"}` | `fetchOrder` / `cancelOrder` with unknown id |
-| 422 | `{"error":"InsufficientFunds"}` | Margin / balance issue |
-| 429 | `{"error":"RateLimitExceeded","retry_after":N}` | See [rate limits](../rate-limits.md) |
-
-Error names match CCXT's exception hierarchy so CCXT clients route them naturally.
+| 400 | `{"error":"<message>"}` | Malformed/unknown symbol, bad params, bad timeframe |
+| 401 | `{"error":"<message>"}` | Missing / expired / wrong-signature Bearer token |
+| 404 | — | Unknown route / un-prefixed path / unmounted method |
 
 ## CCXT Pro (WebSocket) — planned
 
-Coming. Channel coverage mirrors REST:
+A 5-channel WS upgrade (`GET /ccxt/ws`) is scaffolded; full coverage mirrors REST:
 
 - `watchTicker` ← `/ws bbo` + `/ws mark`
 - `watchOrderBook` ← `/ws l2Book`
 - `watchTrades` ← `/ws trades`
 - `watchOHLCV` ← `/ws candle`
 - `watchMyTrades` ← `/ws userFills`
-- `watchOrders` ← `/ws orderEvents`
-- `watchPositions` ← `/ws userEvents` (filtered)
-- `watchBalance` ← `/ws userEvents` (filtered)
 
-See [WS subscriptions](../ws/subscriptions.md) for the underlying channels — CCXT Pro will translate these one-to-one.
+See [WS subscriptions](../ws/subscriptions.md) for the underlying channels — CCXT Pro translates these one-to-one.
 
 ## Limitations vs full CCXT spec
 
-- `fetchOHLCV` returns shape-correct empty bars during the indexer rollout. Use [WS `candle`](../ws/subscriptions.md#candle) for live data.
-- `fetchClosedOrders` and `fetchOrders` use the [HL-compat `historicalOrders`](./hl-compat.md) shape internally — wire is CCXT-shaped but pagination semantics match HL's.
-- `fetchDeposits` / `fetchWithdrawals` track CCTP transfers only; native MTF transfers between accounts use the [HL-compat `userFills`](./hl-compat.md) variants.
-
-## Worked example — TypeScript
-
-```typescript
-import ccxt from 'ccxt';
-
-const ex = new ccxt.metaflux({
-  apiKey: process.env.METAFLUX_API_KEY,
-  secret: process.env.METAFLUX_SECRET,
-  urls: { api: 'https://gateway.mtf.exchange' },
-});
-
-await ex.loadMarkets();
-const ticker = await ex.fetchTicker('BTC/USDC:USDC');
-console.log('mid:', ticker.last);
-
-const order = await ex.createOrder(
-  'BTC/USDC:USDC', 'limit', 'buy', 1.0, 100.5,
-  { timeInForce: 'GTC', reduceOnly: false }
-);
-console.log('placed:', order.id);
-```
-
-`ccxt.metaflux` is the published exchange adapter once the SDK lands. Until then, use `ccxt.exchange()` with `urls.api` pointed at the gateway and the default settings work — the wire shape is fully CCXT-compliant.
+- **Monetary fields are stubs** (`"0.0"` / empty arrays / `0` ids) on every shape-live method until the gateway → node read backhaul lands. The shape is final; only the values are pending.
+- **Historical methods** (`fetchOHLCV`, `fetchMyTrades`, and the future `fetchTrades` / `fetchClosedOrders`) are 🚧 **indexer-backed** — served from the [node data-file](../data-files.md) indexer (`node_trades` / `node_fills` / `node_order_statuses`), not the live node. Use the WS [`candle`](../ws/subscriptions.md) / [`userFills`](../ws/subscriptions.md) channels for live data meanwhile.
+- **No HMAC API-key auth.** Only the EIP-712 → JWT scheme above. Clients retain key custody — the gateway escrows no secret.
 
 ## See also
 
-- [HL-compat](./hl-compat.md) — alternative for HL-style clients
-- [`POST /exchange`](./exchange.md) — MTF-native
+- [HL-compat](./hl-compat.md) — the other compat surface
+- [`POST /exchange`](./exchange.md) · [`POST /info`](./info.md) — MTF-native (what these translate from)
+- [Node data files](../data-files.md) — the indexer feedstock behind the 🚧 methods
 - [WS subscriptions](../ws/subscriptions.md) — CCXT Pro underlying
+- [Signing walkthrough](../../integration/signing.md) — EIP-712 login envelope
 - [Rate limits](../rate-limits.md)
-- [Signing walkthrough](../../integration/signing.md) — wallet-signing variant
-
-## FAQ
-
-**Q: Which auth mode should I use?**
-A: API-key for off-chain bots that don't need end-to-end key ownership; wallet-signing for clients that want to retain custody of the private key (no key escrow at the gateway).
-
-**Q: Are CCXT and HL-compat budgets shared?**
-A: Yes — both routes hit the same gateway rate-limit pool. Don't double up.
-
-**Q: Can I mix CCXT and MTF-native on the same account?**
-A: Yes. They're different wire shapes, same underlying account. Nonces are per-account, so all your tools need to agree on monotonicity — easiest is one client per account at a time, or a shared nonce service.

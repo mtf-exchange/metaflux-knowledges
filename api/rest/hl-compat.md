@@ -1,12 +1,14 @@
 # HL-compat REST surface
 
 {% hint style="info" %}
-**Preview.** `/info` covers 15 query types; `/exchange` covers `order` + `cancel` at parity. The remaining HL actions ship over time.
+**Preview.** The gateway answers every HL `/info` request type with HL's exact wire shape. Some types are **wired** to live node state today; the rest return HL's **honest-empty** shape (never `null`, never a fabricated value) until the corresponding node read or [indexer](../data-files.md) lands. The status of each type is in the [translation table](#hl-info-type--mtf-native-node-type) below.
 {% endhint %}
 
 ## TL;DR
 
-The gateway exposes URLs and request/response shapes identical to Hyperliquid's. HL bots point at MetaFlux with [zero code change](../../integration/migrating-from-hl.md) for the covered surface. The wire format, including HL's `{"status":"ok"|"err"}` envelope and `errors-are-200s` convention, is preserved exactly.
+The gateway exposes URLs and request/response shapes identical to Hyperliquid's. HL bots point at MetaFlux with [zero code change](../../integration/migrating-from-hl.md) for the covered surface. The wire format — HL's `{"error":...}` 400 envelope, camelCase fields, `[bids, asks]` tuples, decimal-string monetary magnitudes — is preserved exactly.
+
+**The gateway is the ONLY place HL/camelCase shapes live (ADR-010).** The node is MTF-native end to end (snake_case, integer/`u32` ids — see [`/info`](./info.md)). Every HL response here is a *translation* of a node MTF-native read; the node never speaks HL.
 
 ## URL
 
@@ -15,96 +17,62 @@ POST  https://<gateway>/info
 POST  https://<gateway>/exchange
 ```
 
-Both mount on the **gateway**, not the bare node. Pointing HL clients at `node:8080` returns 400s because the bare node speaks MTF-native shapes.
+Both mount on the **gateway**, not the bare node. Pointing HL clients at `node:8080` returns MTF-native shapes (and rejects HL-only fields), because the bare node speaks MTF-native only.
 
 ## Envelope convention
 
-All responses are HTTP 200 with:
-
-```json
-{ "status": "ok",  "response": <type-specific> }
-{ "status": "err", "response": "<error string>" }
-```
-
-This is HL's convention. Transport-level errors (malformed JSON, wrong method) still surface as 4xx; application-level errors are 200s with `status:"err"`.
+- `/info` reads: HTTP 200 with the bare type-specific JSON body. On a bad request (unknown `type`, missing/invalid `user`), HTTP 400 with `{"error":"<message>"}`. A node-backhaul fault surfaces honestly: 502 `{"error":...}` for transport/5xx, 400 for params the node rejected — **never** a fabricated empty success.
+- `/exchange` writes: HL's `{"status":"ok"|"err", "response":<...>}` convention (errors-are-200s). See [`/exchange` below](#exchange--write-path).
 
 ---
 
 ## `/info` — read path
 
-Read-only. Dispatches on `type`. Mirrors HL's `/info`.
+Read-only. Dispatches on the request body's `type`. Mirrors HL's `/info`.
 
-### Query types
+### HL info type → MTF-native node type
 
-#### `meta`
+This is the master map. **Translation** is always: snake_case → camelCase, integer/cents/`u32`-id → decimal-string / `0x`-address, node `{type,data}` envelope unwrapped. The translation layer lives only in the gateway.
 
-```bash
-curl -X POST https://gateway/info \
-  -H 'content-type: application/json' \
-  -d '{"type":"meta"}'
-```
+| HL `/info` type | Status | Node MTF-native source | Notes |
+|-----------------|--------|------------------------|-------|
+| `clearinghouseState` / `userState` | **wired** | [`account_state`](./info.md#account_state) | `marginSummary` from node `balance_quote`; `assetPositions:[]` until node surfaces per-position state |
+| `delegations` | **wired** | [`staking_state`](./info.md#staking_state) | node is keyed by compact `account_id`; a real keccak address with no compact id returns an honest error (not a fake empty) |
+| `userFees` | **wired** | [`fee_schedule`](./info.md#fee_schedule) | `feeSchedule` is live; `activeReferrer`/`userVolumes`/`dailyUserVlm` await node `user_referrer`/`user_volume` reads |
+| `l2Book` | stub | [`l2_book`](./info.md#l2_book) | node read exists; gateway translation to `{coin,levels,time}` not yet wired — returns HL-empty book |
+| `meta` | stub | — | needs a node list-all-markets / universe read (node `market_info` is per-id); returns `{universe:[],marginTables:[]}` |
+| `allMids` | stub | — | needs the universe read (same blocker as `meta`); returns `{}` |
+| `metaAndAssetCtxs` | stub | — | `[meta, []]` until the universe read + asset-ctx aggregation land |
+| `openOrders` | stub | [`open_orders`](./info.md#open_orders) | node read exists; gateway translation not yet wired — returns `[]` |
+| `frontendOpenOrders` | stub | [`open_orders`](./info.md#open_orders) | `openOrders` + UI hints; returns `[]` |
+| `vaultDetails` | stub | [`vault_state`](./info.md#vault_state) | needs a leader-address → `vault_id` registry (node keys by `vault_id`); echoes request `user`, zeroed financials |
+| `subAccounts` | stub | [`sub_accounts`](./info.md#sub_accounts) | node read exists; translation not yet wired — returns `[]` |
+| `referral` | stub | — | referrer is `Action::setReferrer`-set, immutable; returns `referredBy:null` |
+| `spotClearinghouseState` | stub | — | no spot universe on the node yet; returns `{balances:[]}` |
+| `spotMeta` / `spotMetaAndAssetCtxs` | stub | — | no spot universe; returns `{tokens:[],universe:[]}` |
+| `predictedFundings` | stub | — | returns `[]` |
+| `orderStatus` | stub | — | resolves to `{status:"unknownOid",order:null}` |
+| `maxBuilderFee` | stub | — | returns `0` until `approveBuilderFee` lands (cap 8 bps, PLAN §L.5.2) |
+| `userRateLimit` | stub | — | budget snapshot |
+| `userNonFundingLedgerUpdates` | stub | — | returns `[]` |
+| `userFunding` / `userFundings` | 🚧 indexer | — | per-user funding-payment history — fed by [indexer](../data-files.md) |
+| `fundingHistory` | 🚧 indexer | [`funding_history`](./info.md#funding_history) (live samples) | per-coin historical rates over a window — archived by the indexer |
+| `userFills` | 🚧 indexer | [`user_fills`](./info.md#user_fills) (honest-empty on node) | itemized fill log — fed by [`node_fills`](../data-files.md#node_fills--per-fill-records) |
+| `userFillsByTime` | 🚧 indexer | — | time-windowed `userFills` |
+| `historicalOrders` | 🚧 indexer | — | terminal-state orders — fed by [`node_order_statuses`](../data-files.md#node_order_statuses--order-lifecycle) |
+| `candleSnapshot` | 🚧 indexer | — | OHLCV bars — fed by [`node_trades`](../data-files.md#node_trades--public-trade-tape) |
 
-Response (HL shape):
+Legend: **wired** = live node state today · stub = HL-correct empty shape, no node backing yet · 🚧 indexer = served once the [data-file indexer](../data-files.md) lands.
 
-```json
-{
-  "status": "ok",
-  "response": {
-    "universe": [
-      {
-        "name":         "BTC",
-        "szDecimals":   5,
-        "maxLeverage":  50,
-        "onlyIsolated": false
-      }
-    ]
-  }
-}
-```
+{% hint style="info" %}
+The **honest-empty** contract is load-bearing: HL clients iterate these responses unconditionally. A stub must emit `[]` / `{}` / the typed zero — **never** `null` where a client expects an object — so unmodified HL SDKs deserialize identically whether the data is live or pending.
+{% endhint %}
 
-#### `metaAndAssetCtxs`
+### Wired types
 
-```json
-{"type":"metaAndAssetCtxs"}
-```
+#### `clearinghouseState` / `userState`
 
-Returns `[meta, [assetCtx_per_universe_entry...]]` (HL's tuple shape):
-
-```json
-{
-  "status": "ok",
-  "response": [
-    { "universe": [...] },
-    [
-      {
-        "funding":      "0.0000125",
-        "openInterest": "1234.567",
-        "prevDayPx":    "100.0",
-        "markPx":       "100.5",
-        "oraclePx":     "100.45",
-        "midPx":        "100.6"
-      }
-    ]
-  ]
-}
-```
-
-#### `allMids`
-
-```json
-{"type":"allMids"}
-```
-
-```json
-{
-  "status": "ok",
-  "response": { "BTC": "100.55", "ETH": "3200.0" }
-}
-```
-
-#### `userState` / `clearinghouseState`
-
-Two aliases — both return per-user clearinghouse state. HL exposes both for compat.
+Two aliases — both return per-user clearinghouse state. **Wired** to node [`account_state`](./info.md#account_state). The node's `balance_quote` (whole-dollar USDC collateral) maps onto the HL margin summary. Per-position detail is not yet on the node surface, so `assetPositions` is `[]`.
 
 ```json
 {"type":"clearinghouseState", "user":"0x..."}
@@ -114,122 +82,85 @@ Response (HL shape):
 
 ```json
 {
-  "status": "ok",
-  "response": {
-    "assetPositions": [
-      {
-        "type":     "oneWay",
-        "position": {
-          "coin":              "BTC",
-          "szi":               "1.0",
-          "entryPx":           "100.0",
-          "leverage":          { "type": "cross", "value": 10 },
-          "marginUsed":        "10.5",
-          "unrealizedPnl":     "0.5",
-          "returnOnEquity":    "0.05",
-          "liquidationPx":     "92.5",
-          "positionValue":     "100.5",
-          "maxLeverage":       50,
-          "cumFunding":        { "allTime": "0.123", "sinceOpen": "0.05" }
-        }
-      }
-    ],
-    "marginSummary": {
-      "accountValue":    "1000.0",
-      "totalNtlPos":     "100.5",
-      "totalRawUsd":     "899.5",
-      "totalMarginUsed": "10.5"
-    },
-    "crossMarginSummary": { /* same shape, cross-only */ },
-    "crossMaintenanceMarginUsed": "5.0",
-    "withdrawable":              "899.5",
-    "time":                      1735689600000
+  "assetPositions": [],
+  "marginSummary": {
+    "accountValue":    "1000.0",
+    "totalNtlPos":     "0.0",
+    "totalRawUsd":     "1000.0",
+    "totalMarginUsed": "0.0"
+  },
+  "crossMarginSummary":         { "accountValue": "1000.0", "totalNtlPos": "0.0", "totalRawUsd": "1000.0", "totalMarginUsed": "0.0" },
+  "crossMaintenanceMarginUsed": "0.0",
+  "withdrawable":               "1000.0",
+  "time":                       0
+}
+```
+
+Once the node surfaces per-position state, `assetPositions[]` fills with HL's shape:
+
+```json
+{
+  "type":     "oneWay",
+  "position": {
+    "coin":           "BTC",
+    "szi":            "1.0",
+    "entryPx":        "100.0",
+    "leverage":       { "type": "cross", "value": 10 },
+    "marginUsed":     "10.5",
+    "unrealizedPnl":  "0.5",
+    "returnOnEquity": "0.05",
+    "liquidationPx":  "92.5",
+    "positionValue":  "100.5",
+    "maxLeverage":    50,
+    "cumFunding":     { "allTime": "0.123", "sinceOpen": "0.05" }
   }
 }
 ```
 
-#### `openOrders`
+#### `userFees`
+
+**Wired**: `feeSchedule` backhauls live from node [`fee_schedule`](./info.md#fee_schedule) (snake→camel re-cased; bps stay JSON numbers, bounded < 65536). The per-user pieces (`activeReferrer`, `userVolumes`, `dailyUserVlm`) await node `user_referrer` / `user_volume` reads.
 
 ```json
-{"type":"openOrders","user":"0x..."}
+{"type":"userFees","user":"0x..."}
 ```
 
 ```json
 {
-  "status": "ok",
-  "response": [
-    {
-      "coin":           "BTC",
-      "side":           "B",
-      "limitPx":        "100.5",
-      "sz":             "1.0",
-      "oid":            12345,
-      "timestamp":      1735689600000,
-      "origSz":         "1.0",
-      "reduceOnly":     false,
-      "orderType":      "Limit",
-      "tif":            "Gtc",
-      "cloid":          "0x..."
-    }
-  ]
+  "activeReferrer": null,
+  "userVolumes":    [],
+  "feeSchedule": {
+    "takerBps":         5,
+    "makerBps":         2,
+    "referrerShareBps": 0,
+    "builderCapBps":    8,
+    "deployerCapBps":   0,
+    "burnBps":          0,
+    "vaultBps":         0,
+    "validatorBps":     0,
+    "treasuryBps":      0
+  },
+  "dailyUserVlm":   "0.0"
 }
 ```
 
-`side`: `"B"` (buy) or `"A"` (ask/sell), per HL.
+#### `delegations`
 
-#### `frontendOpenOrders`
-
-Same as `openOrders` plus UI-oriented fields (`triggerCondition`, `isPositionTpsl`, `isTrigger`, etc.) for displays.
+**Wired** to node [`staking_state`](./info.md#staking_state). The node keys staking by compact `account_id` (u64), so the gateway inverts its address embedding; a real keccak address with no compact id returns an honest error rather than a fabricated empty list.
 
 ```json
-{"type":"frontendOpenOrders","user":"0x..."}
-```
-
-#### `userFills`
-
-```json
-{"type":"userFills","user":"0x..."}
+{"type":"delegations","user":"0x..."}
 ```
 
 ```json
-{
-  "status": "ok",
-  "response": [
-    {
-      "coin":          "BTC",
-      "px":            "100.55",
-      "sz":            "0.5",
-      "side":          "B",
-      "time":          1735689600000,
-      "startPosition": "0.0",
-      "dir":           "Open Long",
-      "closedPnl":     "0.0",
-      "hash":          "0x...",
-      "oid":           12345,
-      "crossed":       true,
-      "fee":           "0.005",
-      "tid":           987654321,
-      "feeToken":      "USDC"
-    }
-  ]
-}
+[
+  { "validator": "0x<val>", "amount": "100.0", "lockedUntilTimestamp": 1735000000000 }
+]
 ```
 
-#### `userFillsByTime`
+### Stub types (HL-correct empty shape)
 
-```json
-{"type":"userFillsByTime","user":"0x...","startTime":1735000000000,"endTime":1735100000000}
-```
-
-Time-bounded variant; same record shape as `userFills`.
-
-#### `historicalOrders`
-
-```json
-{"type":"historicalOrders","user":"0x..."}
-```
-
-Returns paginated historical (terminal-state) orders.
+These return HL's exact shape with zeroed/empty contents. The node read exists for several (`l2Book`, `openOrders`, `subAccounts`, `vaultDetails`) — only the gateway *translation* is pending; for the rest the node backing itself is pending.
 
 #### `l2Book`
 
@@ -239,126 +170,138 @@ Returns paginated historical (terminal-state) orders.
 
 ```json
 {
-  "status": "ok",
-  "response": {
-    "coin": "BTC",
-    "levels": [
-      [ /* bids */ { "px": "100.5", "sz": "1.0", "n": 3 } ],
-      [ /* asks */ { "px": "100.6", "sz": "2.0", "n": 5 } ]
-    ],
-    "time": 1735689600000
-  }
+  "coin": "BTC",
+  "levels": [ [ /* bids */ ], [ /* asks */ ] ],
+  "time": 0
 }
 ```
 
-`levels` is a `[bids, asks]` tuple — HL shape.
+`levels` is a `[bids, asks]` tuple (HL shape); each level is `{"px":"...","sz":"...","n":N}`. Backs onto node [`l2_book`](./info.md#l2_book) once the translation is wired.
+
+#### `meta`
+
+```json
+{"type":"meta"}
+```
+
+```json
+{ "universe": [], "marginTables": [] }
+```
+
+Each `universe` entry (once the node universe read lands): `{"name":"BTC","szDecimals":5,"maxLeverage":50,"onlyIsolated":false}`.
+
+#### `metaAndAssetCtxs`
+
+`[meta, [assetCtx...]]` (HL's tuple shape). Each `assetCtx`: `{"funding","openInterest","prevDayPx","markPx","oraclePx","midPx"}` — all decimal strings. Stub: `[{"universe":[],"marginTables":[]}, []]`.
+
+#### `allMids`
+
+```json
+{"type":"allMids"}
+```
+
+Map of asset name → mid price: `{"BTC":"100.55","ETH":"3200.0"}`. Stub: `{}`.
+
+#### `openOrders` / `frontendOpenOrders`
+
+```json
+{"type":"openOrders","user":"0x..."}
+```
+
+Array of `{"coin","side","limitPx","sz","oid","timestamp","origSz","reduceOnly","orderType","tif","cloid"}`. `side`: `"B"` (buy) / `"A"` (sell). `frontendOpenOrders` adds UI fields (`triggerPx`, `isTrigger`, `isPositionTpsl`, `orderType`). Backs onto node [`open_orders`](./info.md#open_orders). Stub: `[]`.
 
 #### `vaultDetails`
 
 ```json
-{"type":"vaultDetails","vaultAddress":"0x..."}
-```
-
-Returns vault summary. MetaFlux vaults are not HL vaults — same query shape, different entities (MFlux Vault / user vaults).
-
-#### `delegations`
-
-```json
-{"type":"delegations","user":"0x..."}
+{"type":"vaultDetails","user":"0x..."}
 ```
 
 ```json
 {
-  "status": "ok",
-  "response": [
-    {
-      "validator":      "0x<val>",
-      "amount":         "100.0",
-      "lockedUntilTimestamp": 1735000000000
-    }
-  ]
+  "vaultAddress":     "0x...",
+  "leader":           "0x...",
+  "shares":           "0.0",
+  "navUsd":           "0.0",
+  "isPaused":         false,
+  "managementFeeBps": 1000,
+  "withdrawalLockMs": 345600000,
+  "createdAtMs":      0,
+  "followerCount":    0
 }
 ```
 
-#### `userFees`
-
-```json
-{"type":"userFees","user":"0x..."}
-```
-
-```json
-{
-  "status": "ok",
-  "response": {
-    "dailyUserVlm":           [{ "date": "2026-05-27", "userCross": "100", "userAdd": "50", "exchange": "0" }],
-    "feeSchedule": {
-      "cross":       "0.00025",
-      "add":         "0.00005",
-      "spotCross":   "0.0005",
-      "spotAdd":     "0.00015",
-      "tiers": {
-        "vip": [
-          { "ntlCutoff": "1000000", "cross": "0.0002", "add": "0.00003" }
-        ]
-      }
-    },
-    "userAddRate":   "0.00005",
-    "userCrossRate": "0.00025",
-    "activeReferralDiscount": "0.04"
-  }
-}
-```
+MetaFlux vaults are not HL vaults — same query shape, different entities (see [vaults](../../concepts/vaults.md), [MIP-2](../../mip/mip-2.md)). Backs onto node [`vault_state`](./info.md#vault_state) once the leader→`vault_id` registry is wired. `managementFeeBps` / `withdrawalLockMs` are bounded JSON numbers (HL keeps numbers for parameters, strings for monetary quantities).
 
 #### `subAccounts`
 
-```json
-{"type":"subAccounts","user":"0x<master>"}
-```
+Array of `{"subAccountUser","name","master","clearinghouseState"}`. Backs onto node [`sub_accounts`](./info.md#sub_accounts). Stub: `[]`.
+
+#### `spotClearinghouseState`
 
 ```json
-{
-  "status": "ok",
-  "response": [
-    {
-      "name":          "scalping-desk",
-      "subAccountUser":"0x<sub_addr>",
-      "master":        "0x<master>",
-      "clearinghouseState": { /* same shape as userState */ }
-    }
-  ]
-}
+{"type":"spotClearinghouseState","user":"0x..."}
 ```
+
+`{"balances":[]}`; each balance `{coin, token, hold, total, entryNtl}`. No spot universe on the node yet.
+
+#### `spotMeta` / `spotMetaAndAssetCtxs`
+
+`{"tokens":[],"universe":[]}` (and `[spotMeta, []]` for the AssetCtxs tuple variant). No spot universe yet.
 
 #### `referral`
 
 ```json
-{"type":"referral","user":"0x..."}
-```
-
-```json
 {
-  "status": "ok",
-  "response": {
-    "referredBy":           { "referrer": "0x...", "code": "FRIEND2026" },
-    "cumVlm":               "100000.0",
-    "unclaimedRewards":     "10.5",
-    "claimedRewards":       "100.0",
-    "referrerState":        { "stage": "ready", "data": { "code": "MYCODE", "referralStates": [...] } },
-    "rewardHistory":        []
-  }
+  "referredBy": null,
+  "referrerState": {
+    "cumVlm": "0.0",
+    "cumRewardedFeesSinceReferred": "0.0",
+    "cumFeesRewardedToReferrer": "0.0",
+    "claimedRewards": "0.0"
+  },
+  "rewardHistory": []
 }
 ```
+
+`referredBy` is `null` (not `{}`) — HL clients distinguish "no referrer ever set" from "set but inactive". Referrer is `setReferrer`-immutable (PLAN §L.5.1).
+
+#### Other stubs
+
+| Type | Stub response |
+|------|---------------|
+| `predictedFundings` | `[]` |
+| `orderStatus` | `{"status":"unknownOid","order":null}` |
+| `maxBuilderFee` | bare number `0` (HL emits the integer, not an object) |
+| `userRateLimit` | per-address weight-budget snapshot |
+| `userNonFundingLedgerUpdates` | `[]` |
+
+### 🚧 Indexer-backed types
+
+Served once the [data-file indexer](../data-files.md) lands. Each returns HL's empty shape today:
+
+| Type | Empty stub | Fed by |
+|------|------------|--------|
+| `userFills` | `[]` | [`node_fills`](../data-files.md#node_fills--per-fill-records) |
+| `userFillsByTime` | `[]` | `node_fills` |
+| `historicalOrders` | `[]` | [`node_order_statuses`](../data-files.md#node_order_statuses--order-lifecycle) |
+| `candleSnapshot` | `[]` | [`node_trades`](../data-files.md#node_trades--public-trade-tape) |
+| `fundingHistory` | `[]` | indexer (node keeps live samples in [`funding_history`](./info.md#funding_history)) |
+| `userFunding` / `userFundings` | `[]` | indexer |
+
+The HL fill record shape (once live): `{coin, px, sz, side, time, startPosition, dir, closedPnl, hash, oid, crossed, fee, tid, feeToken}`.
 
 ### Errors on `/info`
 
 | HTTP | Body | Cause |
 |------|------|-------|
-| 200 | `{"status":"err","response":"unknown info type: <X>"}` | Misspelled `type` |
-| 200 | `{"status":"err","response":"missing field: user"}` | Required arg omitted |
-| 200 | `{"status":"err","response":"unknown user"}` | Account never seen |
-| 200 | `{"status":"err","response":"unknown coin"}` | Asset name unknown |
-| 400 | `{"error":"<X>"}` | Malformed body / wrong content-type |
-| 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | See [rate limits](../rate-limits.md) |
+| 400 | `{"error":"missing field \`type\`"}` | No `type` discriminator |
+| 400 | `{"error":"unknown request type: <X>"}` | Misspelled / unsupported `type` |
+| 400 | `{"error":"missing field user"}` | Required `user` omitted |
+| 400 | `{"error":"invalid user address: <X>"}` | `user` not `0x` + 40 hex |
+| 400 | `{"error":"missing field coin"}` | `l2Book` / `fundingHistory` / `candleSnapshot` without `coin` |
+| 502 | `{"error":"<node error>"}` | Wired type whose node backhaul faulted (transport/5xx) |
+
+HL's `/info` uses standard HTTP status codes with `{"error":...}` (unlike `/exchange`, which uses the 200-with-`status` envelope).
 
 ---
 
@@ -384,6 +327,15 @@ Returns vault summary. MetaFlux vaults are not HL vaults — same query shape, d
 
 Signature is over the EIP-712 envelope (see [signing walkthrough](../../integration/signing.md)) using the **MetaFlux** domain (`chainId = 31337` on devnet; TBD per network — see [networks](../../networks.md)).
 
+### Response envelope
+
+Writes use HL's `{"status":"ok"|"err","response":<...>}` convention (errors-are-200s):
+
+```json
+{ "status": "ok",  "response": <type-specific> }
+{ "status": "err", "response": "<error string>" }
+```
+
 ### Supported action types
 
 | `action.type` | Status | Notes |
@@ -391,22 +343,15 @@ Signature is over the EIP-712 envelope (see [signing walkthrough](../../integrat
 | `order` | supported | limit / IOC / ALO; full TIF set |
 | `cancel` | supported | by `oid` |
 | `cancelByCloid` | rolling out | by `cloid` |
-| `modify` | rolling out | single cancel-replace |
-| `batchModify` | rolling out | batched modifies |
+| `modify` / `batchModify` | rolling out | cancel-replace |
 | `scheduleCancel` | rolling out | dead-man's switch |
-| `updateLeverage` | rolling out | — |
-| `updateIsolatedMargin` | rolling out | — |
-| `usdSend` | rolling out | USDC transfer between accounts |
-| `spotSend` | rolling out | spot asset transfer |
+| `updateLeverage` / `updateIsolatedMargin` | rolling out | — |
+| `usdSend` / `spotSend` / `usdClassTransfer` | rolling out | transfers |
 | `withdraw3` | rolling out | external withdraw (CCTP) |
-| `usdClassTransfer` | rolling out | spot/perp class transfer |
 | `approveAgent` | rolling out | agent wallet approval |
-| `vaultTransfer` | rolling out | user vault deposit/withdraw |
-| `subAccountTransfer` | rolling out | sub-account fund movement |
-| `setReferrer` | rolling out | — |
-| `convertToMultiSigUser` | rolling out | — |
-| `twapOrder` | rolling out | — |
-| `twapCancel` | rolling out | — |
+| `vaultTransfer` / `subAccountTransfer` | rolling out | fund movement |
+| `setReferrer` / `convertToMultiSigUser` | rolling out | — |
+| `twapOrder` / `twapCancel` | rolling out | — |
 | (everything else HL ships) | returns `{"status":"err","response":"unimplemented action: <type>"}` | Use [MTF-native](./exchange.md) for those |
 
 ### `order` example
@@ -416,14 +361,7 @@ Signature is over the EIP-712 envelope (see [signing walkthrough](../../integrat
   "action": {
     "type": "order",
     "orders": [
-      {
-        "a": 0,
-        "b": true,
-        "p": "100.5",
-        "s": "1.0",
-        "r": false,
-        "t": { "limit": { "tif": "Gtc" } }
-      }
+      { "a": 0, "b": true, "p": "100.5", "s": "1.0", "r": false, "t": { "limit": { "tif": "Gtc" } } }
     ],
     "grouping": "na"
   },
@@ -433,41 +371,20 @@ Signature is over the EIP-712 envelope (see [signing walkthrough](../../integrat
 }
 ```
 
-Field shorthand (HL convention):
-- `a` = asset id
-- `b` = is_buy (true=buy, false=sell)
-- `p` = limit price (string)
-- `s` = size (string)
-- `r` = reduce_only
-- `t.limit.tif` = `"Gtc"` / `"Ioc"` / `"Alo"`
-- `c` = optional 16-byte `cloid`
+Field shorthand (HL convention): `a`=asset id · `b`=is_buy · `p`=limit price · `s`=size · `r`=reduce_only · `t.limit.tif`=`"Gtc"`/`"Ioc"`/`"Alo"` · `c`=optional 16-byte `cloid`.
 
-Trigger orders:
-
-```json
-{
-  "a": 0, "b": false, "p": "95.0", "s": "1.0", "r": true,
-  "t": { "trigger": { "isMarket": false, "triggerPx": "96.0", "tpsl": "sl" } }
-}
-```
+Trigger orders: `"t": { "trigger": { "isMarket": false, "triggerPx": "96.0", "tpsl": "sl" } }`.
 
 ### `order` response
 
 ```json
 {
   "status": "ok",
-  "response": {
-    "type": "order",
-    "data": {
-      "statuses": [
-        { "resting": { "oid": 12345, "cloid": "0x..." } }
-      ]
-    }
-  }
+  "response": { "type": "order", "data": { "statuses": [ { "resting": { "oid": 12345, "cloid": "0x..." } } ] } }
 }
 ```
 
-Per-order status entries (one per `orders[]` entry, in order):
+Per-order status (one per `orders[]` entry, in order):
 
 | Variant | Meaning |
 |---------|---------|
@@ -479,41 +396,23 @@ Per-order status entries (one per `orders[]` entry, in order):
 
 ```json
 {
-  "action": {
-    "type": "cancel",
-    "cancels": [{ "a": 0, "o": 12345 }]
-  },
+  "action": { "type": "cancel", "cancels": [{ "a": 0, "o": 12345 }] },
   "nonce": 1735689600001,
   "signature": { "r": "0x...", "s": "0x...", "v": 27 },
   "vaultAddress": null
 }
 ```
 
-Response:
-
-```json
-{
-  "status": "ok",
-  "response": {
-    "type": "cancel",
-    "data": { "statuses": ["success"] }
-  }
-}
-```
-
-Per-cancel status entries: `"success"` or `{"error":"<reason>"}`.
+Response: `{"status":"ok","response":{"type":"cancel","data":{"statuses":["success"]}}}`. Per-cancel entry: `"success"` or `{"error":"<reason>"}`.
 
 ### Errors on `/exchange`
 
-| HTTP | Body | Cause |
-|------|------|-------|
-| 200 | `{"status":"err","response":"signature_invalid"}` | Recovered address ≠ signer / wrong chainId |
-| 200 | `{"status":"err","response":"unimplemented action: <type>"}` | Compat surface doesn't yet cover this action |
-| 200 | `{"status":"err","response":"nonce too small"}` | Reused nonce |
-| 200 | `{"status":"err","response":"agent_not_approved"}` | Agent signed but no approval exists |
-| 200 | `{"status":"err","response":"agent_expired"}` | Agent approval has expired |
-| 400 | (4xx body) | Body malformed at parse |
-| 429 | (4xx body) | Rate-limited |
+| Body | Cause |
+|------|-------|
+| `{"status":"err","response":"signature_invalid"}` | Recovered address ≠ signer / wrong chainId |
+| `{"status":"err","response":"unimplemented action: <type>"}` | Compat surface doesn't yet cover this action |
+| `{"status":"err","response":"nonce too small"}` | Reused nonce |
+| `{"status":"err","response":"agent_not_approved"}` | Agent signed but no approval exists |
 
 ---
 
@@ -522,15 +421,15 @@ Per-cancel status entries: `"success"` or `{"error":"<reason>"}`.
 See [migrating from HL](../../integration/migrating-from-hl.md) for the full reference. Quick highlights:
 
 - **`chainId`** in the signing domain is MetaFlux's (`31337` devnet / TBD prod), NOT HL's.
-- **Asset IDs are not numerically the same** as HL's. Look up via `info { "type": "meta" }` at startup; never hard-code.
+- **Asset IDs are not numerically the same** as HL's. Look up via `info { "type": "meta" }` once that read is wired; never hard-code.
 - **T0 yellow card** liquidation tier exists on MTF (between healthy and HL's "Partial Liquidation"). Bots that watch liquidation events see one more event type.
-- **HL action types beyond `order` / `cancel`** return `err` on the compat surface during rollout. Use MTF-native [`POST /exchange`](./exchange.md) for unsupported actions, or wait for compat expansion.
-- **Per-corridor caps on withdrawals via CCTP** — see [bridge](../../bridge/).
+- **HL action types beyond `order` / `cancel`** return `err` during rollout. Use MTF-native [`POST /exchange`](./exchange.md), or wait.
+- **Historical / itemized reads** (`userFills`, `historicalOrders`, `candleSnapshot`, `fundingHistory`) are 🚧 indexer-backed — empty until the [data-file indexer](../data-files.md) lands. Use the WS [`userFills`](../ws/subscriptions.md) channel for live fills meanwhile.
 
 ## See also
 
-- [`POST /exchange`](./exchange.md) — MTF-native equivalent
-- [`POST /info`](./info.md) — MTF-native equivalent
-- [Migrating from HL](../../integration/migrating-from-hl.md)
-- [Signing walkthrough](../../integration/signing.md)
-- [Errors](../errors.md)
+- [`POST /info`](./info.md) — MTF-native node reads these HL types translate from
+- [`POST /exchange`](./exchange.md) — MTF-native write path
+- [CCXT-compat](./ccxt-compat.md) — the other compat surface
+- [Node data files](../data-files.md) — the indexer feedstock behind the 🚧 types
+- [Migrating from HL](../../integration/migrating-from-hl.md) · [Signing walkthrough](../../integration/signing.md) · [Errors](../errors.md)
