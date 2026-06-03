@@ -18,9 +18,9 @@ The integration sandbox. Free USDC via the faucet; ephemeral state (occasional r
 
 | Service | Endpoint |
 |---------|----------|
-| Gateway REST | `https://gateway.devnet.mtf.exchange` |
+| Gateway REST (HL/CCXT compat) | `https://gateway.devnet.mtf.exchange` |
 | Gateway WS | `wss://gateway.devnet.mtf.exchange/ws` |
-| Faucet | `https://faucet.devnet.mtf.exchange` |
+| Node API (MTF-native `/info` · `/exchange` · `/faucet`) | `https://api.devnet.mtf.exchange` |
 | Explorer | `https://explorer.devnet.mtf.exchange` |
 | Status | `https://status.devnet.mtf.exchange` |
 
@@ -35,20 +35,24 @@ USDC bridging: CCTP sandbox attestation pubkey. Sandbox transfers only — do no
 
 ### Faucet
 
-`POST /usdc` with a JSON body credits an address with test USDC cross-collateral.
-Devnet/testnet only (mainnet refuses). The grant is **`"queued"`** — staged for
-the next block, so the balance updates after ~1 block, not synchronously.
+`POST /faucet` on the node's MTF-native API (same origin as `/info` + `/exchange`,
+NOT a separate host) credits an address with test funds. Devnet/testnet only —
+the route is **never mounted on mainnet** (`chainId 8964`). The grant is
+**`"queued"`** — staged for the next block, so the balance updates after ~1 block,
+not synchronously. Full contract: [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://faucet.devnet.mtf.exchange/usdc \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
-  -d '{"address":"0x<YOUR_ADDRESS>","amount":10000}'
-# -> {"address":"0x…","amount":10000,"status":"queued"}
+  -d '{"address":"0x<YOUR_ADDRESS>"}'
+# -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
-- `amount` is optional (whole USDC); omitted or above the cap → the default 10 000.
-- Rate-limited: 1 request / hour / address **and** 1 request / minute / IP (`429` when exceeded).
-- `400` invalid address · `429` rate-limited · `503` backlog full — body `{"error":"…"}`.
+- Grants **3000 USDC** cross-collateral **+ 10 MTF** spot — **once ever per
+  address** (second claim → `429 address already funded`).
+- `amount` optional (whole USDC); caps the USDC grant *downward* (≤ 3000). MTF fixed.
+- Rate-limited 1 request / minute / IP (`429` when exceeded).
+- `400` invalid address · `429` already funded / IP-throttled · `503` backlog full — body `{"error":"…"}`.
 
 ### State resets
 

@@ -16,25 +16,31 @@ Deposit, place an order, cancel, withdraw. By the end of this page your TypeScri
 
 | Service | URL (devnet) |
 |---------|--------------|
-| Gateway REST | `https://gateway.devnet.mtf.exchange` |
+| Gateway REST (HL/CCXT compat) | `https://gateway.devnet.mtf.exchange` |
 | Gateway WS | `wss://gateway.devnet.mtf.exchange/ws` |
-| Faucet | `https://faucet.devnet.mtf.exchange` |
+| Node API (MTF-native `/info` · `/exchange` · `/faucet`) | `https://api.devnet.mtf.exchange` |
 | Explorer | `https://explorer.devnet.mtf.exchange` |
+
+> The faucet is **not** a separate service — it's the `POST /faucet` route on the
+> node's MTF-native API (same origin as `/info` + `/exchange`; local devnet
+> `http://localhost:8080/faucet`). See [`POST /faucet`](../api/rest/faucet.md).
 
 See [networks](../networks.md) for the full list including testnet and (post-launch) mainnet.
 
 ## Step 1 — Get devnet USDC
 
 ```bash
-curl -X POST https://faucet.devnet.mtf.exchange/usdc \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
-  -d '{"address":"0x<YOUR_ADDRESS>","amount":10000}'
-# -> {"address":"0x…","amount":10000,"status":"queued"}
+  -d '{"address":"0x<YOUR_ADDRESS>"}'
+# -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
-The faucet drips up to 10 000 USDC per request (`amount` optional), rate-limited
-at 1 / hour / address + 1 / minute / IP. The grant is `"queued"` — it lands in the
-next block, so wait ~1 block before confirming the balance:
+One claim grants **3000 USDC** cross-collateral **and 10 MTF** spot tokens —
+**once ever per address** (a second claim returns `429 address already funded`),
+rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
+*downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
+later, so wait a moment before confirming the balance:
 
 ```bash
 curl -X POST https://gateway.devnet.mtf.exchange/info \
@@ -42,7 +48,7 @@ curl -X POST https://gateway.devnet.mtf.exchange/info \
   -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
 ```
 
-You should see `marginSummary.accountValue: "10000.0"`.
+You should see `marginSummary.accountValue: "3000.0"`.
 
 ## Step 2 — Place a limit order
 
