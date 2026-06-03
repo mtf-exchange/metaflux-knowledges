@@ -11,7 +11,7 @@ Maker / taker per-fill fees with volume-tiered rebates. Builder rebate routes a 
 ## Tier table (default — see live values)
 
 ```bash
-curl -X POST http://<node>:8080/info -d '{"type":"fee_schedule"}'
+curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 ```
 
 | 30-day volume | Maker | Taker |
@@ -140,12 +140,12 @@ The intended model: liquidation fills charge a liquidation fee on top of the sta
 ## Querying
 
 ```bash
-# tier overview (MTF-native, node)
-curl -X POST http://<node>:8080/info -d '{"type":"fee_schedule"}'
+# tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
+curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — HL-compat shape on the GATEWAY
+# your personal tier and recent volume — HL-compat shape under /hl on the gateway
 # (no native per-user fee read on the node yet; see content-gap note)
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
   -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 

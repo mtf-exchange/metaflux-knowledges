@@ -16,7 +16,7 @@ Like [HL-compat](./hl-compat.md), this surface lives **only on the gateway** —
 https://<gateway>/ccxt/<path>
 ```
 
-All CCXT routes are mounted under the `/ccxt/` prefix (disambiguates from the HL-compat `/info` + `/exchange` surface). A request to an un-prefixed path (`/markets`) returns 404 — the prefix is load-bearing.
+All CCXT routes are mounted under the `/ccxt/` prefix (disambiguates from the MTF-native default `/info` + `/exchange` surface and the HL-compat `/hl/*` surface). A request to an un-prefixed path (`/markets`) returns 404 — the prefix is load-bearing.
 
 ## CCXT method → route → MTF-native node read
 

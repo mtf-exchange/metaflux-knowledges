@@ -13,11 +13,14 @@ The gateway exposes URLs and request/response shapes identical to Hyperliquid's.
 ## URL
 
 ```
-POST  https://<gateway>/info
-POST  https://<gateway>/exchange
+POST  https://<gateway>/hl/info
+POST  https://<gateway>/hl/exchange
 ```
 
-Both mount on the **gateway**, not the bare node. Pointing HL clients at `node:8080` returns MTF-native shapes (and rejects HL-only fields), because the bare node speaks MTF-native only.
+HL-compat is namespaced under `/hl/*` on the gateway front door. The gateway's
+top-level `/info` · `/exchange` are MTF-native (the default path) — point HL
+clients at `/hl/*`, not the bare paths, or you'll hit the native surface (which
+rejects HL-only fields). The HL↔native translation lives only in the gateway.
 
 ## Envelope convention
 

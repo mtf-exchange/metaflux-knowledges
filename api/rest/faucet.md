@@ -16,18 +16,22 @@ is never even mounted there. Never depend on it in a production flow.
 One `POST /faucet` claim grants **3000 USDC** cross-collateral **and 10 MTF** spot
 tokens (token id `104`) to an arbitrary address. **Once-ever per address.** The
 response is `"queued"` — the credits land after ~1 block (they are injected as
-validator system actions, not committed synchronously). Mounted on the **same
-listener** as `/info` + `/exchange` (`:8080`), same origin — NOT a separate port.
+validator system actions, not committed synchronously). Served as `POST /faucet`
+on the gateway front door, alongside the native `/info` + `/exchange` default
+path.
 
 ## URL
 
 ```
-POST  http://<node>:8080/faucet
+POST  https://gateway.<net>.mtf.exchange/faucet
 ```
+
+Running the node yourself, the same `/faucet` route is served directly at
+`http://localhost:8080`.
 
 | Where | Mounted? |
 |-------|----------|
-| Devnet (`31337`) / testnet (`114514`) node, faucet enabled | yes |
+| Devnet (`31337`) / testnet (`114514`), faucet enabled | yes |
 | Mainnet (`8964`) | **no** — route never mounted; a stray hit gets `403` from the defensive handler guard |
 | Faucet disabled in node config | no |
 
@@ -47,7 +51,7 @@ structurally unreachable from the `/exchange` handler tree.
 | `amount` | uint64 (whole USDC) | no | Optional USDC grant; **caps DOWNWARD** at the configured max (3000) — a larger value clamps to 3000, never above. `0` is rejected. MTF (10) is fixed regardless. |
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/faucet \
+curl -s -X POST https://gateway.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```

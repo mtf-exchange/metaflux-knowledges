@@ -30,10 +30,14 @@ Update one constant in your signing code and the rest of the EIP-712 envelope is
 
 ```
 HL:  https://api.hyperliquid.xyz/{info,exchange}
-MTF: https://gateway.<your-deployment>/{info,exchange}
+MTF: https://gateway.<your-deployment>/hl/{info,exchange}
 ```
 
-Devnet runs the gateway on port `8443` and the bare node on `8080`. The gateway is the HL-compat entry point; node port is MTF-native only.
+The gateway is the single front door. HL-compat lives under `/hl/*`
+(`/hl/info`, `/hl/exchange`, `/hl/ws`) — so an HL client just gains the `/hl`
+prefix. The gateway's default top-level path (`/info`, `/exchange`) is
+MTF-native; running the node yourself, the same surface is served at
+`http://localhost:8080`.
 
 ### 3. Action types not yet on the compat layer
 
@@ -82,7 +86,7 @@ HL vaults and MetaFlux vaults are not the same product. `vaultDetails` returns i
 For HL actions not yet on the MTF compat layer:
 
 - **Modify orders** — for now, cancel + re-submit. The `modify` action lands in a subsequent compat update.
-- **Set leverage / margin mode** — use the MTF-native action via `POST /exchange` against the node (`UpdateLeverage`, `UpdateIsolatedMargin`). Same EIP-712 envelope; different action variant name.
+- **Set leverage / margin mode** — use the MTF-native action via `POST /exchange` on the gateway default path (`UpdateLeverage`, `UpdateIsolatedMargin`). Same EIP-712 envelope; different action variant name.
 - **Transfer / withdraw** — MTF-native.
 
 ### Day 2 — wire the new signals
@@ -99,7 +103,7 @@ Optional. If you want to use features HL doesn't have:
 - **FBA** — frequent batch auction matching for designated markets, reduces MEV
 - **Cross-chain primitives** — bridge primitives natively callable from EVM contracts
 
-These are MTF-native actions only and require talking to the node's MTF-native surface directly (`:8080` — the gateway is HL-compat + CCXT only, with no `/native/*` passthrough; see [ADR-019 / API overview](../api/README.md)).
+These are MTF-native actions, sent on the gateway's default path (`POST /exchange` — MTF-native is the default; HL-compat is under `/hl/*`; see [API overview](../api/README.md)).
 
 ## Top 5 HL bot patterns — concrete migration
 
@@ -107,7 +111,7 @@ These are MTF-native actions only and require talking to the node's MTF-native s
 
 ```diff
 - const HL_URL = 'https://api.hyperliquid.xyz';
-+ const MTF_URL = 'https://gateway.mtf.exchange';
++ const MTF_URL = 'https://gateway.mtf.exchange/hl';   // HL-compat is under /hl/*
 
 - const HL_CHAIN_ID = 1337;
 + const MTF_CHAIN_ID = 114514;    // testnet (mainnet 8964, devnet 31337)
@@ -157,6 +161,7 @@ See [risk-watcher](./risk-watcher.md) for the full pattern.
 Funding cadence is similar (HL is hourly; MTF is hourly by default but configurable per market). Formula structure is identical.
 
 ```diff
+  // URL is the /hl base from pattern 1 (gateway .../hl) — HL-compat shape
   const funding = await fetch(URL + '/info', {
     body: JSON.stringify({ type: 'fundingHistory', coin: 'BTC' }),
   }).then(r => r.json());

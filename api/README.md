@@ -5,17 +5,20 @@ icon: terminal
 
 # API Reference
 
-Three protocol families, deliberately separate so the choice of client wire shape doesn't constrain anything else.
+Three protocol families, all served by the same gateway front door
+(`https://gateway.<net>.mtf.exchange`) — the choice of client wire shape is just a
+choice of path.
 
 | Family | Where | Use when |
 |--------|-------|----------|
-| **MTF-native** | **Node directly** (`:8080`) `/exchange`, `/info`, `/ws`, `/faucet` | New clients. Compact snake_case shape. Exposes everything, including MTF differentiation features (RFQ, FBA, PM enrollment, cross-chain). |
-| **HL-compat** | Gateway (`:8443`) `/exchange`, `/info`, `/ws` | Bringing an existing Hyperliquid client over. URL + JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
-| **CCXT-compat** | Gateway (`:8443`) `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
+| **MTF-native** | Gateway **default** path: `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | New clients. Compact snake_case shape. Exposes everything, including MTF differentiation features (RFQ, FBA, PM enrollment, cross-chain). |
+| **HL-compat** | Gateway under `/hl/*`: `POST /hl/exchange`, `POST /hl/info`, `GET /hl/ws` | Bringing an existing Hyperliquid client over. JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
+| **CCXT-compat** | Gateway under `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
 
-> MTF-native clients talk to the **node** directly. The gateway is the HL-compat +
-> CCXT translation layer only — it does **not** expose a `/native/*` passthrough
-> (ADR-019: native clients use the node; HL/CCXT clients use the gateway).
+> The gateway is the unified front door — MTF-native is the default path
+> (`/info`, `/exchange`), HL-compat is namespaced under `/hl/*`, CCXT under
+> `/ccxt/*`. Running the node yourself? It serves the same native surface
+> directly at `http://localhost:8080`.
 
 ## REST
 

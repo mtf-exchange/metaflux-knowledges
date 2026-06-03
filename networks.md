@@ -16,13 +16,25 @@
 
 The integration sandbox. Free USDC via the faucet; ephemeral state (occasional resets).
 
+The gateway is the single public front door. MTF-native is the default path
+(`/info` · `/exchange` · `/ws`); HL-compat lives under `/hl/*`; CCXT under
+`/ccxt/*`; EVM JSON-RPC at `/evm`.
+
 | Service | Endpoint |
 |---------|----------|
-| Gateway REST (HL/CCXT compat) | `https://gateway.devnet.mtf.exchange` |
-| Gateway WS | `wss://gateway.devnet.mtf.exchange/ws` |
-| Node API (MTF-native `/info` · `/exchange` · `/faucet`) | `https://api.devnet.mtf.exchange` |
-| Explorer | `https://explorer.devnet.mtf.exchange` |
-| Status | `https://status.devnet.mtf.exchange` |
+| Gateway front door | `https://gateway.devnet.mtf.exchange` |
+| MTF-native (default) | `POST /info` · `POST /exchange` · `GET /ws` |
+| HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
+| CCXT-compat | `/ccxt/*` |
+| EVM JSON-RPC | `POST /evm` |
+| Faucet (devnet/testnet) | `POST /faucet` |
+| Gateway WS (native) | `wss://gateway.devnet.mtf.exchange/ws` |
+| Explorer | `https://devnet.mtf.exchange/explorer` |
+| Status | `https://status.mtf.exchange/devnet` |
+
+Running the node yourself? The node serves the same native surface directly at
+`http://localhost:8080` (`/info` · `/exchange` · `/ws` · `/faucet`), and its raw
+EVM RPC at `http://localhost:8545`. Those are the self-hosted ports, not public URLs.
 
 | Signing parameters | Value |
 |--------------------|-------|
@@ -35,14 +47,13 @@ USDC bridging: CCTP sandbox attestation pubkey. Sandbox transfers only — do no
 
 ### Faucet
 
-`POST /faucet` on the node's MTF-native API (same origin as `/info` + `/exchange`,
-NOT a separate host) credits an address with test funds. Devnet/testnet only —
-the route is **never mounted on mainnet** (`chainId 8964`). The grant is
-**`"queued"`** — staged for the next block, so the balance updates after ~1 block,
-not synchronously. Full contract: [`POST /faucet`](api/rest/faucet.md).
+`POST /faucet` on the gateway front door credits an address with test funds.
+Devnet/testnet only — the route is **never mounted on mainnet** (`chainId 8964`).
+The grant is **`"queued"`** — staged for the next block, so the balance updates
+after ~1 block, not synchronously. Full contract: [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/faucet \
+curl -X POST https://gateway.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -56,7 +67,7 @@ curl -X POST https://api.devnet.mtf.exchange/faucet \
 
 ### State resets
 
-Devnet may be reset for protocol upgrades. Cadence: on demand during pre-mainnet development; weekly notice when possible. Watch [status](https://status.devnet.mtf.exchange) for reset announcements.
+Devnet may be reset for protocol upgrades. Cadence: on demand during pre-mainnet development; weekly notice when possible. Watch [status](https://status.mtf.exchange/devnet) for reset announcements.
 
 ## Testnet (planned)
 
@@ -116,7 +127,7 @@ See [bridge](./bridge/) for the full flow.
 
 Operational status, incident history, and planned maintenance:
 
-- Devnet: `https://status.devnet.mtf.exchange`
+- Devnet: `https://status.mtf.exchange/devnet`
 - Testnet: TBD
 - Mainnet: TBD
 

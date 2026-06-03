@@ -168,7 +168,7 @@ A more balanced book where no single asset exceeds 50 % of net value pays **no**
 ## Querying
 
 ```bash
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<addr>"}'
 ```

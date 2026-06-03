@@ -150,7 +150,7 @@ A master can keep classical while a sub goes PM; useful when one sub runs a hedg
 ## Querying
 
 ```bash
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -d '{"type":"sub_accounts","address":"0x<master>"}'
 ```
 

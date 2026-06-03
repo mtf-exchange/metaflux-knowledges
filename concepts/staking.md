@@ -148,7 +148,7 @@ Mitigations:
 ## Validator selection
 
 ```bash
-curl -X POST http://<node>:8080/info -d '{"type":"validator_summaries"}'
+curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 Returns the active validator set (`{epoch, total_stake, n_active, validators[]}`);

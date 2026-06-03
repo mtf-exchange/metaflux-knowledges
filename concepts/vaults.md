@@ -159,7 +159,7 @@ The vault address is on-chain forever; even an empty vault sticks around (gas-pa
 ### Querying
 
 ```bash
-curl -X POST http://<node>:8080/info \
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -d '{"type":"vault_state","vault":"0x<vault>"}'
 ```
 
