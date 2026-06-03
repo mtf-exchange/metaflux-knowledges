@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, and `user_events` are live and push real committed data per block. `candles` is a recognized name that acks + returns an empty snapshot but has no live source yet (needs a rolling OHLCV store). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, and `candles` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -27,7 +27,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `all_mids` | **live** | none | per-market mark, per commit |
 | `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
-| `candles` | stub (ack + empty snapshot, no pushes) | `coin` | none yet (needs a rolling OHLCV store) |
+| `candles` | **live** | `coin` + `interval` (both required) | committed-block fills folded into OHLCV bars, per commit |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -189,27 +189,41 @@ Per-account event feed. Requires `user` (the 0x address) — NOT a `coin`. Today
 
 The native channel name is `user_events` (snake_case); on the gateway's `/hl/ws` (HL-compat) the equivalent is HL's `userEvents`.
 
-## Stub channel
+{% hint style="warning" %}
+`user_events` is per-account data but currently has **no authentication** — any connection can subscribe to any address's feed. Do not treat it as a private channel until the auth-at-subscribe gate lands; for authenticated reads/writes use `post` with a signed action.
+{% endhint %}
 
 ### `candles`
 
-OHLCV bar updates. Recognized so SDKs can wire it ahead of the source, but it acks + returns an empty snapshot (`[]`) and pushes nothing — it needs a rolling OHLCV store keyed by `(coin, interval)` that doesn't exist yet.
+Rolling OHLCV bars for one market at one bar size. **Requires both `coin` and `interval`** — they form the routing key together, so a `1m` and a `5m` subscription on the same market are independent subscriptions, each with its own snapshot and pushes.
 
 ```json
-{ "channel": "candles", "data": [] }
+{ "method": "subscribe", "subscription": { "type": "candles", "coin": "BTC", "interval": "1m" } }
 ```
+
+- `interval` ∈ `1m` / `5m` / `15m` / `1h` / `4h` / `1d`. A missing or unrecognized `interval` is normalized to **`1m`** (the ack echoes the interval actually used).
+- The ack echoes `interval` back in the subscription so a client can correlate `(coin, interval)`.
+
+The **initial snapshot** is an **array** of the recent bars (closed + the open bar), oldest first — `[]` until the market has traded:
 
 ```json
-{ "method": "subscribe", "subscription": { "type": "user_events" } }
+{ "channel": "candles", "data": [
+  { "coin": "BTC", "interval": "1m", "t": 1735689600000, "T": 1735689659999, "o": "6700000000000", "h": "6700500000000", "l": "6699000000000", "c": "6700250000000", "v": "12000000", "n": 8 }
+] }
 ```
+
+Each **push** is a **single bar object** (not the array) — the current open bar for that `(coin, interval)`, re-emitted on every committed block whose fills land in this market:
 
 ```json
-{ "channel": "user_events", "data": [] }
+{ "channel": "candles", "data": { "coin": "BTC", "interval": "1m", "t": 1735689600000, "T": 1735689659999, "o": "6700000000000", "h": "6700500000000", "l": "6699000000000", "c": "6700250000000", "v": "12000000", "n": 8 } }
 ```
 
-{% hint style="warning" %}
-`user_events` is per-account data but currently has **no authentication** — it accepts any subscribe and emits an empty snapshot. Do not treat it as a private channel until the auth gate and event source land.
-{% endhint %}
+- `t` / `T` — bar open / close epoch-ms (consensus-derived); the bar covers `[t, T]` and a fill rolls into a new bar when its block timestamp crosses `T`.
+- `o` / `h` / `l` / `c` — open / high / low / close, **raw 1e8-plane** decimal strings (same plane as `l2_book` / `trades` px; per-asset tick scaling is applied downstream in the gateway), NOT the whole-USDC plane `market_info` reports.
+- `v` — base-asset volume folded into the bar (1e8-plane size string). `n` — number of fills in the bar.
+- `coin` — the canonical market symbol; `interval` — the bar size, echoed.
+
+A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing. On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's `candle` (singular).
 
 ---
 
