@@ -53,24 +53,26 @@ Response:
 {
   "type": "node_info",
   "data": {
-    "network":           "devnet",
-    "chain_id":          31337,
+    "network":           "testnet",
+    "chain_id":          114514,
     "protocol_version":  "1.0.0",
-    "validator_index":   3,
-    "build_commit":      "<short hex>",
-    "uptime_seconds":    123456
+    "validator_index":   null,
+    "build_commit":      "unknown",
+    "uptime_seconds":    0
   }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `network` | `"devnet" \| "testnet" \| "mainnet"` | Network variant |
-| `chain_id` | uint64 | EIP-712 chain id |
+| `network` | `"devnet" \| "testnet" \| "mainnet"` | Network variant, derived from `chain_id` (`31337`=devnet, `114514`=testnet, `8964`=mainnet) |
+| `chain_id` | uint64 | EIP-712 chain id — the SAME value the `/exchange` signing domain must use |
 | `protocol_version` | semver string | Wire-protocol version |
-| `validator_index` | uint32 | This node's index in the active validator set |
-| `build_commit` | hex string | Operator-published build identifier |
-| `uptime_seconds` | uint64 | Process uptime |
+| `validator_index` | uint32 \| null | This node's index in the active validator set; **FLAGGED:** `null` until the runtime calls `set_validator_index` |
+| `build_commit` | hex string | Operator-published build identifier; **FLAGGED:** `"unknown"` until published |
+| `uptime_seconds` | uint64 | Process uptime; **FLAGGED:** `0` until the runtime calls `set_uptime_seconds` |
+
+These are **per-node** fields (node identity / runtime), NOT consensus state, so they legitimately differ across nodes.
 
 ### `account_state`
 
@@ -84,50 +86,64 @@ Per-account snapshot.
 |-----|------|----------|
 | `address` | hex address | yes |
 
-Response:
+An **unknown address** (never seen on-chain) returns **200** with a fully zeroed
+record (`account_value:"0"`, empty `positions` / `balances.spot`), NOT a `404`.
+
+Response (a faucet-funded account, no positions):
 
 ```json
 {
   "type": "account_state",
   "data": {
-    "address":           "0x<addr>",
-    "account_value":  "100000000",
-    "free_collateral":"80000000",
-    "maint_margin":   "10000000",
-    "init_margin":    "20000000",
-    "health":         "10000000",
-    "tier":              "Safe",
-    "margin_mode":       "Cross",
-    "pm_enabled":        false,
-    "positions": [
-      {
-        "asset":            0,
-        "size":          "100000000",
-        "entry_px":      "10000000000",
-        "unrealised_pnl":"500000",
-        "isolated":         false,
-        "leverage":         10
-      }
-    ],
+    "address":         "0x00000000000000000000000000000000000ca11e",
+    "account_value":   "3000",
+    "free_collateral": "3000",
+    "maint_margin":    "0",
+    "init_margin":     "0",
+    "health":          "3000",
+    "tier":            "Safe",
+    "margin_mode":     "Cross",
+    "pm_enabled":      false,
+    "positions": [],
     "balances": {
-      "usdc": "100000000",
-      "spot":    { "ETH": "5000000000" }
+      "usdc": "3000",
+      "spot": { "MTF": "10" }
     }
   }
 }
 ```
 
+A positioned account adds entries under `positions`:
+
+```json
+{
+  "asset":          0,
+  "size":           "100000000",
+  "entry_px":       "67000.00",
+  "unrealised_pnl": "5.00",
+  "isolated":       false,
+  "leverage":       10
+}
+```
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `account_value` | u128 string | Equity including unrealised PnL, USDC base units |
-| `free_collateral` | u128 string | Equity minus initial margin held by open positions |
-| `maint_margin` | u128 string | Maintenance margin requirement |
-| `init_margin` | u128 string | Initial margin requirement |
-| `health` | i128 string | `account_value - maint_margin` (can be negative) |
-| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
-| `margin_mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` |
+| `account_value` | Decimal string | Equity incl. settled PnL, **whole-USDC plane** (`"3000"` = 3000 USDC, NOT base units) |
+| `free_collateral` | Decimal string | Equity minus initial margin held by open positions |
+| `maint_margin` | Decimal string | Σ per-asset margin used (maintenance) |
+| `init_margin` | Decimal string | Held initial-margin requirement |
+| `health` | Decimal string | `account_value − maint_margin` (signed; can be negative) |
+| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / maint_margin`; `"Safe"` when no maint margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
+| `margin_mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` (derived from the account's open positions) |
 | `pm_enabled` | bool | Portfolio margin opt-in state |
-| `positions[*]` | array | Per-asset open positions |
+| `positions[*].asset` | uint32 | Asset id |
+| `positions[*].size` | i128 string | Signed position size, **1e8 fixed-point plane** |
+| `positions[*].entry_px` | Decimal string | `\|entry_notional\| / \|size\|` (whole-USDC plane) |
+| `positions[*].unrealised_pnl` | Decimal string | Mark-to-market PnL, whole-USDC plane (signed) |
+| `positions[*].isolated` | bool | `true` unless the position is cross-margined |
+| `positions[*].leverage` | uint8 | Position max leverage |
+| `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
+| `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); empty if none |
 
 ### `market_info`
 
@@ -151,25 +167,41 @@ Response:
   "data": {
     "asset_id":        0,
     "name":            "BTC",
-    "kind":            "Perp",
-    "tick_size":    "100",
-    "step_size":    "10000",
-    "min_order":    "10000",
+    "kind":            "perp",
+    "sz_decimals":     5,
+    "mark_px":         "67079.265",
+    "oracle_px":       "67073.35",
+    "tick_size":       "1000000",
+    "step_size":       "1",
+    "min_order":       "1",
     "max_leverage":    50,
-    "maint_margin_ratio": "5000",
-    "init_margin_ratio":  "10000",
+    "maint_margin_ratio": "300",
+    "init_margin_ratio":  "200",
     "funding": {
-      "rate_per_hr":  "1000",
-      "cap_per_hr":   "50000",
+      "rate_per_hr":  "0",
+      "cap_per_hr":   "400",
       "interval_ms":     3600000,
-      "next_payment_ts": 1735693200000
+      "next_payment_ts": 0
     },
     "mark_source": "MedianOfOraclesAndMid",
     "fba_enabled": false,
-    "open_interest": "5000000000"
+    "open_interest": "0"
   }
 }
 ```
+
+{% hint style="info" %}
+**Price reporting plane.** On this read both `mark_px` and `oracle_px` are in the
+**whole-USDC Decimal plane** (human dollars — `"67079.265"` / `"67073.35"`), the
+same unit as account positions' mark. `mark_px` is the on-book mark scaled down
+from the engine's internal 1e8 fixed-point representation, falling back to the
+oracle px when the book has no mark yet; `oracle_px` is the latest committed index
+price. Either is `"0"` when unset. Note the **order/book submission plane stays
+1e8 fixed-point** — `l2_book` level px and order `limit_px` are NOT whole-USDC; MTF
+keeps those two scale planes distinct, and only the human-facing reads (`market_info`,
+`markets`, positions) report prices in whole-USDC. Field semantics for the rest of
+the record are in the [`markets`](#markets) table below.
+{% endhint %}
 
 ### `markets`
 
@@ -193,22 +225,25 @@ Response:
     {
       "asset_id":        0,
       "name":            "BTC",
-      "kind":            "Perp",
-      "tick_size":    "100",
-      "step_size":    "10000",
-      "min_order":    "10000",
+      "kind":            "perp",
+      "sz_decimals":     5,
+      "mark_px":         "67042.335",
+      "oracle_px":       "67042.335",
+      "tick_size":       "1000000",
+      "step_size":       "1",
+      "min_order":       "1",
       "max_leverage":    50,
-      "maint_margin_ratio": "5000",
-      "init_margin_ratio":  "10000",
+      "maint_margin_ratio": "300",
+      "init_margin_ratio":  "200",
       "funding": {
-        "rate_per_hr":  "1000",
-        "cap_per_hr":   "50000",
+        "rate_per_hr":  "0",
+        "cap_per_hr":   "400",
         "interval_ms":     3600000,
-        "next_payment_ts": 1735693200000
+        "next_payment_ts": 0
       },
       "mark_source": "MedianOfOraclesAndMid",
       "fba_enabled": false,
-      "open_interest": "5000000000"
+      "open_interest": "0"
     }
   ]
 }
@@ -218,8 +253,11 @@ Response:
 |-------|------|-------------|
 | `asset_id` | uint32 | Canonical asset id (sort key) |
 | `name` | string | Market symbol, e.g. `"BTC"` |
-| `kind` | `"Perp"` | Market kind |
-| `tick_size` | i128 string | Minimum price increment, fixed-point |
+| `kind` | `"perp"` | Market kind (lowercase) |
+| `sz_decimals` | uint8 | Size display decimals (from the underlying spot token registry; `0` if no token spec) |
+| `mark_px` | Decimal string | On-book mark, **whole-USDC plane** (book mark scaled out of 1e8, oracle fallback; `"0"` if unset) |
+| `oracle_px` | Decimal string | Index price, **whole-USDC plane** (`"0"` if unset) |
+| `tick_size` | i128 string | Minimum price increment, **1e8 fixed-point** (order/book submission plane) |
 | `step_size` | u128 string | Minimum size increment (lot size), fixed-point |
 | `min_order` | u128 string | Minimum order size |
 | `max_leverage` | uint8 | Maximum leverage |
@@ -533,11 +571,11 @@ Response:
 {
   "type": "block_info",
   "data": {
-    "height":       123,
-    "round":        456,
-    "epoch":        4,
-    "timestamp_ms": 1700000111222,
-    "block_hash":   "0x0000000000000000000000000000000000000000000000000000000000000000"
+    "height":       562,
+    "round":        562,
+    "epoch":        0,
+    "timestamp_ms": 1780475491562,
+    "block_hash":   "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c"
   }
 }
 ```
@@ -548,7 +586,7 @@ Response:
 | `round` | uint64 | Consensus round of that block |
 | `epoch` | uint64 | Current epoch |
 | `timestamp_ms` | uint64 | Block timestamp (consensus ms) |
-| `block_hash` | hex string (32 bytes) | **FLAGGED:** currently the all-zero hash — the block hash is not yet plumbed into the read state |
+| `block_hash` | hex string (32 bytes) | Real committed block hash (now plumbed into the read state — no longer the all-zero placeholder) |
 
 ### `agents`
 
@@ -669,7 +707,7 @@ The following query types bring the node `/info` surface to parity with the Hype
 
 ### `spot_meta`
 
-Spot pair universe. No parameters.
+Spot pair universe + per-token registry. No parameters.
 
 ```json
 { "type": "spot_meta" }
@@ -682,22 +720,48 @@ Response:
   "type": "spot_meta",
   "data": {
     "pairs": [
-      { "id": 101, "name": "BTC/USDC", "base": 0, "quote": 100, "taker_fee_bps": 5, "min_notional": "1000", "active": true }
+      { "id": 100, "name": "USDC", "base": 100, "quote": 100, "taker_fee_bps": 0, "min_notional": "0", "active": true },
+      { "id": 101, "name": "BTC",  "base": 101, "quote": 101, "taker_fee_bps": 0, "min_notional": "0", "active": false },
+      { "id": 104, "name": "MTF",  "base": 104, "quote": 104, "taker_fee_bps": 0, "min_notional": "0", "active": false },
+      { "id": 110, "name": "BTC/USDC", "base": 101, "quote": 100, "taker_fee_bps": 5, "min_notional": "100", "active": true },
+      { "id": 113, "name": "MTF/USDC", "base": 104, "quote": 100, "taker_fee_bps": 5, "min_notional": "100", "active": true }
+    ],
+    "tokens": [
+      { "id": 100, "name": "USDC", "sz_decimals": 2, "wei_decimals": 6 },
+      { "id": 101, "name": "BTC",  "sz_decimals": 5, "wei_decimals": 8 },
+      { "id": 102, "name": "ETH",  "sz_decimals": 4, "wei_decimals": 18 },
+      { "id": 103, "name": "SOL",  "sz_decimals": 2, "wei_decimals": 9 },
+      { "id": 104, "name": "MTF",  "sz_decimals": 2, "wei_decimals": 8 }
     ]
   }
 }
 ```
 
+{% hint style="info" %}
+**`pairs` carries two kinds of entry.** The per-token "self pairs" (`id` =
+token id, `base == quote`, e.g. `100`/USDC, `101`/BTC, …, `104`/MTF) are the
+token registry projected as pairs; the **real tradable pairs** have ids `110+`
+(`BTC/USDC`=110, `ETH/USDC`=111, `SOL/USDC`=112, `MTF/USDC`=113) with distinct
+`base`/`quote` and `active:true`. A self-pair's `active` reflects whether that
+token's standalone book is live (only USDC is, on devnet).
+{% endhint %}
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `pairs[*].id` | uint32 | Pair id (`SpotPairSpec.pair_id`) |
+| `pairs[*].id` | uint32 | Pair id (`SpotPairSpec.pair_id`); `110+` = real `BASE/USDC` pairs |
 | `pairs[*].name` | string | Pair name (e.g. `"BTC/USDC"`) |
-| `pairs[*].base` / `quote` | uint32 | Base / quote asset id |
+| `pairs[*].base` / `quote` | uint32 | Base / quote asset id (equal for self-pairs) |
 | `pairs[*].taker_fee_bps` | uint16 | Taker fee (bps); `0` if unset |
 | `pairs[*].min_notional` | decimal string | Min notional (USDC cents); `"0"` if unset |
 | `pairs[*].active` | bool | Whether the pair is active for trading |
+| `tokens[*].id` | uint32 | Spot token asset id (`100`=USDC, `101`=BTC, `102`=ETH, `103`=SOL, `104`=MTF) |
+| `tokens[*].name` | string | Token name (e.g. `"USDC"`, `"MTF"`) |
+| `tokens[*].sz_decimals` | uint8 | Display / size precision |
+| `tokens[*].wei_decimals` | uint8 | Native (ERC-20-style) token decimals (USDC=6, BTC=8, ETH=18, SOL=9, MTF=8) |
 
-State source: `Exchange.mip3_spot_pair_specs`.
+`tokens` and `pairs` are in committed `BTreeMap` order (by asset / pair id).
+
+State source: `Exchange.mip3_spot_pair_specs` (pairs) + `Exchange.mip3_spot_token_specs` (tokens).
 
 ### `spot_clearinghouse_state`
 
@@ -714,14 +778,14 @@ Response:
   "type": "spot_clearinghouse_state",
   "data": {
     "address": "0x<addr>",
-    "balances": [ { "asset": 101, "name": "BTC/USDC", "balance": "500" } ]
+    "balances": [ { "asset": 104, "name": "MTF", "balance": "10" } ]
   }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `balances[*].asset` | uint32 | Spot asset id |
+| `balances[*].asset` | uint32 | Spot asset id (`104` = MTF) |
 | `balances[*].name` | string | Token / pair name, else `asset:<id>` |
 | `balances[*].balance` | decimal string | Balance, truncated toward zero |
 
@@ -1326,7 +1390,7 @@ The Hyperliquid NODE info-server (`github.com/hyperliquid-dex/node`, `--serve-in
 | HL node info type | MTF-native type | Status | Notes |
 |----------------------------|------------------------------|--------|-------|
 | `meta` | `markets` | ✅ | already served (S6) |
-| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` |
+| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
 | `clearinghouseState` | `account_state` | ✅ | already served (S6) |
 | `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | keyed by `(owner, asset)` |
 | `exchangeStatus` | `exchange_status` | ✅ | scalar flags |
@@ -1360,15 +1424,21 @@ The Hyperliquid NODE info-server (`github.com/hyperliquid-dex/node`, `--serve-in
 
 | HTTP | Body | Cause |
 |------|------|-------|
-| 200 | normal response | success |
+| 200 | normal response | success (an **unknown address** on `account_state` etc. is a **200** with a zeroed record, NOT a 404) |
+| 400 | `{"error":"missing field \`type\`"}` | No `type` discriminator |
 | 400 | `{"error":"unknown info type: <X>"}` | Misspelled or unsupported `type` |
-| 400 | `{"error":"missing field: <X>"}` | Required type-specific arg omitted |
+| 400 | `{"error":"missing field: address"}` / `{"error":"missing field market_id"}` | Required type-specific arg omitted (casing varies by reader) |
 | 400 | `{"error":"invalid hex"}` | Address arg malformed |
-| 404 | `{"error":"account not found"}` | Address has never appeared on-chain |
-| 404 | `{"error":"market not found"}` | Asset id / coin name unknown |
-| 404 | `{"error":"vault not found"}` | Vault address unknown |
+| 404 | `{"error":"market not found"}` | Asset id / coin name unknown (`market_info` only) |
+| 404 | `{"error":"vault not found"}` | Vault address unknown (`vault_state` only) |
 | 405 | (no body) | Not POST |
 | 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | See [rate limits](../rate-limits.md) |
+
+{% hint style="warning" %}
+There is **no `account not found`** error: account-keyed readers (`account_state`,
+`open_orders`, `user_rate_limit`, `staking_state`, …) return a **200** zeroed
+record for an address that has never appeared on-chain — they never 404.
+{% endhint %}
 
 ## Read-after-write consistency
 
@@ -1398,6 +1468,7 @@ client                     gateway              node
 ## See also
 
 - [`POST /exchange`](./exchange.md) — write path
+- [`POST /faucet`](./faucet.md) — devnet/testnet test-fund grant (USDC + MTF)
 - [HL-compat `/info`](./hl-compat.md) — camelCase shape, additional query types
 - [WS subscriptions](../ws/subscriptions.md) — push equivalents
 
@@ -1410,4 +1481,4 @@ A: `asset_id` is canonical; `coin` is a convenience for human callers. Both reso
 A: Both are honest-empty today — committed state keeps aggregate counters and the per-book `last_trade_ms` scalar, but not an itemized fill / trade log. The arrays populate once the indexer lands; subscribe to the [WS feed](../ws/subscriptions.md) for live fills in the meantime.
 
 **Q: Is the response deterministic across nodes?**
-A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ; the response includes the height it answered at.
+A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. Use [`block_info`](#block_info) to see the height a node has committed to.

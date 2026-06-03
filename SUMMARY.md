@@ -1,64 +1,77 @@
 # Table of contents
 
 * [MetaFlux Knowledge Base](README.md)
-* [Networks](networks.md)
+
+## Getting started
+
+* [Networks & chain IDs](networks.md)
 * [Security model](security.md)
 * [Versioning & deprecation](versioning.md)
 
-## API Reference
+## API reference
 
-* [API Reference](api/README.md)
+* [Overview](api/README.md)
+* REST
   * [POST /exchange](api/rest/exchange.md)
   * [POST /info](api/rest/info.md)
+  * [POST /faucet](api/rest/faucet.md)
   * [HL-compat](api/rest/hl-compat.md)
   * [CCXT-compat](api/rest/ccxt-compat.md)
+* WebSocket
+  * [Overview](api/ws/README.md)
+  * [Subscriptions](api/ws/subscriptions.md)
+* Reference
   * [Node data files](api/data-files.md)
-  * [WebSocket API](api/ws/README.md)
-    * [Subscriptions](api/ws/subscriptions.md)
   * [Errors](api/errors.md)
   * [Rate limits](api/rate-limits.md)
 
-## Bridge
-
-* [Bridge](bridge/README.md)
-
 ## Concepts
 
-* [Concepts](concepts/README.md)
-  * [Agent wallets](concepts/agent-wallets.md)
+* [Overview](concepts/README.md)
+* Trading
   * [Order types](concepts/order-types.md)
-  * [Margin modes](concepts/margin-modes.md)
-  * [Mark prices](concepts/mark-prices.md)
-  * [Tiered liquidation](concepts/tiered-liquidation.md)
-  * [Funding rates](concepts/funding-rates.md)
-  * [Fees](concepts/fees.md)
-  * [Sub-accounts](concepts/sub-accounts.md)
-  * [Portfolio margin](concepts/portfolio-margin.md)
-  * [ADL](concepts/adl.md)
-  * [Multi-sig](concepts/multi-sig.md)
-  * [Vaults](concepts/vaults.md)
-  * [Staking](concepts/staking.md)
+  * [FBA — frequent batch auctions](concepts/fba.md)
   * [RFQ](concepts/rfq.md)
-  * [FBA](concepts/fba.md)
-  * [Glossary](concepts/glossary.md)
+  * [Fees](concepts/fees.md)
+  * [Funding rates](concepts/funding-rates.md)
+  * [Mark prices](concepts/mark-prices.md)
+* Margin & risk
+  * [Margin modes](concepts/margin-modes.md)
+  * [Portfolio margin](concepts/portfolio-margin.md)
+  * [Tiered liquidation](concepts/tiered-liquidation.md)
+  * [ADL — auto-deleveraging](concepts/adl.md)
+* Account & access
+  * [Sub-accounts](concepts/sub-accounts.md)
+  * [Agent wallets](concepts/agent-wallets.md)
+  * [Multi-sig](concepts/multi-sig.md)
+  * [Staking](concepts/staking.md)
+  * [Vaults](concepts/vaults.md)
+* [Glossary](concepts/glossary.md)
 
 ## Integration
 
-* [Integration](integration/README.md)
-  * [Quickstart](integration/quickstart.md)
-  * [Signing walkthrough](integration/signing.md)
-  * [Agent wallets howto](integration/agent-wallets-howto.md)
-  * [Idempotency](integration/idempotency.md)
-  * [Error handling](integration/error-handling.md)
-  * [Risk-watcher pattern](integration/risk-watcher.md)
-  * [Migrating from Hyperliquid](integration/migrating-from-hl.md)
+* [Overview](integration/README.md)
+* [Quickstart](integration/quickstart.md)
+* [Signing walkthrough](integration/signing.md)
+* [Agent wallets how-to](integration/agent-wallets-howto.md)
+* [Idempotency](integration/idempotency.md)
+* [Error handling](integration/error-handling.md)
+* [Risk-watcher pattern](integration/risk-watcher.md)
+* [Migrating from Hyperliquid](integration/migrating-from-hl.md)
+* SDKs
   * [TypeScript SDK](integration/typescript-sdk.md)
   * [Rust SDK](integration/rust-sdk.md)
 
-## MIP — Market Improvement Proposals
+## Bridge
 
-* [MIP — Market Improvement Proposals](mip/README.md)
-  * [MIP-1 — Spot token standard + market deployment](mip/mip-1.md)
-  * [MIP-2 — Metaliquidity](mip/mip-2.md)
-  * [MIP-3 — Permissionless perp market deploy](mip/mip-3.md)
-  * [MIP-4 — Perps liquidity aggregator / internalizer](mip/mip-4.md)
+* [Overview](bridge/README.md)
+
+## MIP — Improvement proposals
+
+* [Overview](mip/README.md)
+* [MIP-1 — Spot token standard + market deploy](mip/mip-1.md)
+* [MIP-2 — Metaliquidity](mip/mip-2.md)
+* [MIP-3 — Permissionless perp market deploy](mip/mip-3.md)
+* [MIP-4 — Perps liquidity aggregator / internalizer](mip/mip-4.md)
+* [MIP-5 — Reserved](mip/mip-5.md)
+* [MIP-6 — Outcomes / prediction markets (deferred V3)](mip/mip-6.md)

@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-Perpetual positions accrue a hourly funding payment proportional to the gap between **mark price** and an EMA-smoothed **oracle price**. Longs pay shorts when mark > oracle; shorts pay longs when mark < oracle. The cap is a per-market governance parameter (default `±0.05% / hour`).
+Perpetual positions accrue a continuous funding payment (settled every **8 s** on-chain) proportional to the gap between **mark price** and an EMA-smoothed **oracle price**. Longs pay shorts when mark > oracle; shorts pay longs when mark < oracle. The cap is a per-market governance parameter (default **`±4% / hour`**).
 
 ## Why funding exists
 
@@ -14,78 +14,130 @@ Perps have no expiry, so there's no arbitrage force to peg them to the underlyin
 
 ## Formula
 
-For each market, every hour:
+> The TL;DR above is the conceptual model. The numbers below are the **implemented** values — sourced from `ADR-014` (`docs/adr/ADR-014-funding-ema-decay.md`), `RFC-003 §G` (`docs/rfc/RFC-003-liquidation-risk.md`), and the on-chain effect handlers. Where the prose and the code differ, the code wins; the differences are flagged inline.
+
+### How it's computed
+
+Funding is driven by a **deterministic EMA** of the premium (mark − oracle), settled every **8 seconds**, not hourly. The cap is **4 % / hour**, not 0.05 %.
+
+Two begin-block effects run the cycle, each behind an 8000 ms `BucketGuard`:
+
+- **effect 4 `update_funding_rates`** — folds the latest premium sample into the per-asset EMA, then clamps.
+- **effect 2 `distribute_funding`** — settles each open position against the cumulative funding index.
+
+Source: `crates/core-state/src/effects/handlers.rs` (`update_funding_rates`, `distribute_funding`), `crates/core-state/src/primitives.rs` (`DeterministicEma`).
+
+#### 1. Premium EMA (per market)
+
+The EMA accumulator stores a fixed-point fraction `(num, denom)` — no floats, exact `rust_decimal::Decimal` arithmetic so node-to-node state is bit-identical (CLAUDE rule #2). Each sample folds in as:
 
 ```
-premium_index  =  EMA(mid - oracle, window=60_min)
-funding_rate   =  clamp(premium_index / oracle, -cap, +cap)
-payment     =  position_size * mark * funding_rate
+num'   = num   * decay + sample
+denom' = denom * decay + 1
+value  = num / denom
 ```
 
-| Symbol | Meaning |
-|--------|---------|
-| `mid` | Mid-price across the venue's book |
-| `oracle` | Composed oracle price — see [mark prices](./mark-prices.md) |
-| EMA window | 60-minute exponential moving average; α tuned for stability |
-| `cap` | Governance per market; default `0.0005 / hour` = `0.05%` |
+- `sample` = latest premium for the asset × the per-asset `funding_rate_multiplier` (default `1.0`; auto-driven by the S15 dynamic-risk engine, RFC-003 §E).
+- `decay = 0.5` (ADR-014 proposed default → ≈ 7 s half-life at the 5 s sample cadence). Clamped to `[0, 1]` at update time.
+- Sample cadence: **5 s**; EMA fold + settle cadence: **8000 ms** (`funding_update_guard` / `funding_distribute_guard`).
 
-`funding_rate` is signed: positive → longs pay shorts; negative → shorts pay longs.
+> **Status:** the per-tick premium *driver* (`crates/oracle/src/funding.rs`) is a stub pending S8 — it documents the 5 s sample / 8000 ms settle wiring but does not yet feed live samples. The EMA accumulator, the cap, and the settle arithmetic are implemented and determinism-locked today.
+
+#### 2. Cap (clamp)
+
+After the EMA update, the absolute value is clamped to the per-hour cap by truncating the running numerator (preserves `denom > 0`):
+
+```
+cap_per_hour = 0.04          # 4 %/h default, per PLAN §H.3 / RFC-003 §G
+if |value| > cap_per_hour:
+    num = sign(value) * cap_per_hour * denom
+```
+
+The cap is a per-market governance parameter: a `dynamic_risk_overrides[asset].funding_rate_cap` replaces the `0.04` default when set.
+
+#### 3. Payment (per position, per settle)
+
+Funding accrues into a cumulative index per market (`clearinghouse.cumulative_funding`); each position carries its last-settled index (`funding_entry`). At settle:
+
+```
+payment = size_signed * oracle_px * (cum_global - funding_entry) * funding_rate_multiplier[asset]
+funding_entry := cum_global      # roll forward
+```
+
+(`crates/core-state/src/effects/handlers.rs::distribute_funding` — the arithmetic is wired and determinism-locked; the actual balance transfer lands with full BOLE settlement, PLAN §C.3.)
+
+| Symbol | Meaning / plane |
+|--------|-----------------|
+| `size_signed` | Signed position size; `i128`. Long > 0, short < 0. |
+| `oracle_px` | Composed oracle price — whole-USDC `Decimal` plane (see [mark prices](./mark-prices.md)). |
+| `cum_global − funding_entry` | Cumulative funding accrued for this market since the position last settled. |
+| `decay` | EMA decay 0.5 (ADR-014). |
+| `cap_per_hour` | Default `0.04` (4 %/h); per-market override via dynamic risk. |
+| `funding_rate_multiplier` | Per-asset multiplier, default `1.0`, auto-driven by dynamic risk (RFC-003 §E). |
+
+`funding_rate` (the EMA value) is signed: positive → longs pay shorts; negative → shorts pay longs.
+
+**Base interest:** `0.0000125/h` (= `0.01%/8h`), per RFC-003 §G — the baseline carry the premium EMA is added to.
+
+> ⚠️ **Correction vs. prior text.** The older prose said "every hour", "60-minute EMA window", and "cap 0.05 %/hour". The implementation settles every **8 s**, the EMA `decay` is **0.5** (≈ 7 s half-life), and the cap is **4 %/hour**. The hourly mental model is fine for back-of-envelope carry math, but the on-chain cadence and cap are as above.
 
 ## Payment cadence
 
-Funding pays **every hour** at the top of the hour by default, with a governance hook to shorten to 15-minute or stretch to 8-hour for individual markets. Active positions at the exact hour-mark are charged; positions opened mid-hour pay a proportional fraction at the next hour-mark.
+Funding settles **every 8 seconds** (the `funding_distribute_guard` interval), driven by consensus-derived block timestamps — not wall-clock hours. Positions are settled against the cumulative funding index, so a position opened mid-interval only pays for the accrual since it opened (no "snapshot at the hour" step).
 
 ```
-T-0:00      ─────── snapshot positions
-T+0:00      ─────── compute funding_rate
-T+0:00.5s   ─────── apply payments (single block)
+every 8000ms (BucketGuard fires):
+  effect 4  ─── fold latest premium into per-asset EMA, clamp to cap
+  effect 2  ─── settle each open position vs cumulative_funding index
 ```
 
 Payments settle as balance adjustments — no on-chain trade, no fee. They show on the user's history as `kind: "funding"`.
 
 ## Worked example
 
-Market: BTC perp, current state:
+Market: BTC perp, current state (oracle plane in whole USDC):
 
 ```
-mark        = 100.50  (= mid, equal because deep)
-oracle      = 100.00
-premium     = 0.005  → 0.5% above oracle
-funding cap = 0.05% / hour
+mark         = 100.50
+oracle       = 100.00
+premium      = mark - oracle = 0.50
+EMA(premium) settles toward 0.50 with decay 0.5 over a few 5s samples
+funding cap  = 4% / hour (default)
 ```
 
-Account positions:
+Suppose the EMA value resolves to a funding rate of `+0.0005` (0.05 %) for the interval (well inside the 4 %/h cap). Account positions:
 
 ```
 long 1 BTC      → pays funding
 short 0.5 BTC   → receives funding
 ```
 
-Funding period: 1 hour.
-
 ```
-funding_rate    = clamp(0.005 / 100.00, -0.0005, +0.0005) = +0.0005
-                   (capped at +0.05% / hour)
+funding_rate = clamp(ema_value, -0.04, +0.04) = +0.0005   (not capped — far below 4%/h)
 
 long 1 BTC:
-  payment       = 1 * 100.50 * 0.0005 = 0.05025 USDC  (long pays)
+  payment = +1   * oracle_px * Δcum  ≈ +1   * 100.00 * 0.0005 = +0.0500 USDC  (long pays)
 
 short 0.5 BTC:
-  payment       = -0.5 * 100.50 * 0.0005 = -0.02513 USDC (short receives 0.02513)
+  payment = -0.5 * oracle_px * Δcum  ≈ -0.5 * 100.00 * 0.0005 = -0.0250 USDC  (short receives 0.0250)
 ```
 
-Note this is per-hour. Over a day at the same rate, longs pay 1.2%. The cap matters most for sustained one-sided imbalance.
+(Payment uses `size_signed * oracle_px * (cum_global - funding_entry)`; here `Δcum` is the funding accrued since the position last settled.) Settled every 8 s, the per-interval magnitude is tiny; the cap matters only for sustained one-sided imbalance, where 4 %/h is the ceiling.
 
 ## Funding caps & dynamic limits
 
-| Parameter | Default | Bounds | Notes |
-|-----------|---------|--------|-------|
-| `max_funding_per_hour` | `0.0005` (`0.05%`) | governance | Hard clip on `funding_rate` |
-| `ema_window_minutes` | `60` | governance | Premium EMA window |
-| `payment_interval_ms` | `3_600_000` (1 h) | governance | Payment cadence |
-| `damping_factor` | `1.0` | governance | Multiplier on rate (regime-dependent) |
+Sourced from `crates/core-state/src/effects/handlers.rs::update_funding_rates`, `primitives.rs::DeterministicEma`, ADR-014, RFC-003 §G.
 
-The `damping_factor` lets the protocol respond to volatility regimes — in calm markets damping defaults to `1.0`; during stress periods governance can reduce it to slow funding swings without dropping the cap.
+| Parameter | Default | Source / override |
+|-----------|---------|-------------------|
+| funding cap (per hour) | `0.04` (`4 %/h`) | `dynamic_risk_overrides[asset].funding_rate_cap` (RFC-003 §E, governance vote) |
+| EMA `decay` | `0.5` (≈ 7 s half-life) | ADR-014 (Proposed; S8 calibration may retune to 0.3/0.7) |
+| sample cadence | `5 s` | PLAN §H.3 / RFC-003 §G |
+| settle / update interval | `8000 ms` | `funding_distribute_guard` / `funding_update_guard` BucketGuards |
+| base interest | `0.0000125/h` (`0.01 %/8h`) | RFC-003 §G |
+| `funding_rate_multiplier` | `1.0` | per-asset, auto-driven by dynamic risk (RFC-003 §E) |
+
+The per-asset `funding_rate_multiplier` is MTF's differentiation over HL's governance-static value: it's auto-driven from 30-day realized volatility by the dynamic-risk engine (RFC-003 §E), scaling the premium sample before it enters the EMA.
 
 ## Funding history
 
@@ -130,7 +182,7 @@ Live updates stream on [`fundingTicks` WS channel](../api/ws/subscriptions.md#fu
 ## FAQ
 
 **Q: Is funding the same as on a CEX?**
-A: Same mental model. Most CEXes pay every 8 hours; MetaFlux defaults to hourly so the impact per payment is smaller and the carry is steadier.
+A: Same mental model. Most CEXes pay every 8 hours; MetaFlux settles every 8 seconds (the `funding_distribute_guard` interval) so the impact per payment is tiny and the carry is steadier. The 4 %/h cap is what bounds a sustained one-sided rate.
 
 **Q: Can funding force-liquidate me?**
 A: Yes — a funding payment reduces `account_value`. If you're already in the T0 band, a funding charge can push you into T1. Watch `health` near hour-marks if your position is large.

@@ -19,6 +19,39 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 
 `account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
 
+## How tiers are computed
+
+> Sourced from `crates/liquidation/src/bole.rs` (`BoleEngine::decide`) and the begin-block driver `crates/core-state/src/effects/handlers.rs::apply_bole_liquidations`. `RFC-003` (`docs/rfc/RFC-003-liquidation-risk.md`) is the design freeze. The bands below are the **literal code constants**, not approximations.
+
+`BoleEngine::decide(account, account_value: i128, maintenance_margin: u128, ts_ms)` is a **pure function** — it reads cooldown state but never mutates — returning one `BoleDecision`:
+
+```
+if maintenance_margin == 0            → Idle
+if account_value < 0                  → Backstop { deficit = maintenance_margin + |account_value| }
+
+health = account_value / maintenance_margin            # Decimal division
+
+if health ≥ 1.1   (yellow_card_threshold)              → Idle            (Safe)
+if health ≥ 1.0                                        → YellowCard      (T0)
+if health < 0.667 (full_market_floor)                 → Backstop { deficit = maintenance_margin − account_value }   (T3)
+if health < 0.8   (partial_threshold)                 → FullMarket { size_to_close = maintenance_margin }           (T2)
+# else 0.8 ≤ health < 1.0  (T1):
+if partial_cooldown_active(account)                   → FullMarket { size_to_close = maintenance_margin }
+else                                                  → PartialMarket50 { size_to_close = maintenance_margin / 2 }
+```
+
+| Constant | Value | `bole.rs` symbol |
+|----------|-------|------------------|
+| Yellow-card threshold (T0 top) | `1.1` | `default_yellow_card_threshold` |
+| Partial threshold (T1 top) | `0.8` | `default_partial_threshold` |
+| Full-market floor (T3 entry) | `0.667` (≈ 2/3) | `full_market_floor` |
+| Partial→full cooldown | `30_000 ms` | `DEFAULT_PARTIAL_COOLDOWN_MS` |
+
+- All comparisons are `rust_decimal::Decimal` (no floats). When `account_value` would exceed `Decimal::MAX`, `decide` right-shifts both operands by a common bit-count first — this preserves the health ratio so the chosen tier is unchanged at those magnitudes.
+- **Only `PartialMarket50` arms the cooldown** (`record_attempt`); a `FullMarket` or `Backstop` does not block subsequent partials. So the T1 partial→full escalation only fires when a *prior partial* is still inside its 30 s window.
+- `size_to_close` for a partial is `maintenance_margin / 2` (integer-truncated). The `deficit` for backstop is `maintenance_margin − account_value` when `account_value ≥ 0`, else `maintenance_margin + |account_value|`.
+- The driver evaluates an **incremental dirty set** each block (event-dirtied accounts + a rolling self-heal slice), not a full scan — proven equivalent to a from-scratch scan by fuzz test. T0 accounts get their resting ALO liquidity force-cancelled after classification.
+
 ## The full state machine
 
 ```
