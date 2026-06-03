@@ -161,33 +161,40 @@ t=1.0s   batch_id = 9877 opens
 
 ## Querying
 
-> **Planned read.** The FBA matching engine and per-market `fba_enabled` flag
-> (visible in [`market_info`](../api/rest/info.md#market_info)) are live, but the
-> `fba_batch_state` `/info` query type below is **not yet wired** into the node
-> dispatch — the live batch / indicative-clearing snapshot isn't exposed on the
-> read path today.
+The live FBA pool + indicative clearing is exposed on the node `/info` read path
+via [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — see that entry for
+the full response shape and field table. It takes `market_id` (u32). FBA is a
+per-market opt-in, so an unregistered market is **not a 404** — it returns a 200
+with zeroed fields (`enabled:false`, empty `orders`, `indicative:null`).
 
 ```bash
-# planned — not yet served by /info
 curl -X POST https://gateway.devnet.mtf.exchange/info \
-  -d '{"type":"fba_batch_state","asset_id":42}'
+  -H 'content-type: application/json' \
+  -d '{"type":"fba_batch_state","market_id":42}'
 ```
 
 ```json
 {
   "type": "fba_batch_state",
   "data": {
-    "asset_id":           42,
-    "current_batch_id":   9876,
-    "batch_close_at_ms":  1735689601000,
-    "queued_buy_volume":  "1000000000",
-    "queued_sell_volume": "900000000",
-    "indicative_clearing":"10050000000"
+    "market_id":      42,
+    "enabled":        true,
+    "period_ms":      1000,
+    "min_lot":        "1",
+    "last_settle_ms": 1735689600000,
+    "next_settle_ms": 1735689601000,
+    "order_count":    11,
+    "bid_count":      5,
+    "ask_count":      6,
+    "bid_size":       "1000000000",
+    "ask_size":       "900000000",
+    "orders":         [ /* {oid, owner, side, price, size, stp_group, submitted_at_ms} */ ],
+    "indicative":     { "clearing_px": "10050000000", "matched_size": "800000000" }
   }
 }
 ```
 
-`indicative_clearing` is what p* would be if the batch closed now — useful for traders deciding whether to add to the batch.
+Prices / sizes are raw **1e8 fixed-point** integer strings (the book / order plane). `next_settle_ms` is **derived** as `last_settle_ms + period_ms`. The `indicative` block is the volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, not yet settled — and is `null` when there is no cross (one-sided or empty window). This is what p\* would be if the batch closed now, useful for traders deciding whether to add to the batch.
 
 ## See also
 
