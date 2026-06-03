@@ -43,7 +43,7 @@ EVM RPC at `http://localhost:8545`. Those are the self-hosted ports, not public 
 | EIP-712 domain `version` | `"1"` |
 | EIP-712 domain `verifyingContract` | `0x0000000000000000000000000000000000000000` |
 
-USDC bridging: CCTP sandbox attestation pubkey. Sandbox transfers only — do not use production CCTP keys against devnet.
+USDC bridging: via the **MetaBridge custody bridge** ([bridge](./bridge/)), not Circle CCTP (ADR-024). Testnet deposits use the Base Sepolia `MetaBridgeUSDC` deployment + Circle's Base Sepolia test USDC.
 
 ### Faucet
 
@@ -83,7 +83,7 @@ Pre-mainnet rehearsal network with stability guarantees.
 Testnet `chainId`: `114514` (`0x1bf52`). (Never 998 — that is Hyperliquid's testnet id; MetaFlux is an independent network.)
 
 Testnet differences from mainnet:
-- USDC is sandbox CCTP (not real USDC).
+- USDC is bridged via MetaBridge from a testnet source chain (Base Sepolia test USDC), not real USDC.
 - Validator set is operator-controlled.
 - No real economic value.
 
@@ -102,26 +102,23 @@ Production network. Real USDC, real value, real validators.
 Mainnet `chainId`: `8964` (`0x2304`).
 
 Mainnet differences from devnet/testnet:
-- USDC is production CCTP (real USDC).
+- USDC is real, bridged via MetaBridge custody from Base (and later Arbitrum / Solana).
 - Validator set is permissionless (governance-elected).
 - Real economic value.
 - Rate limits and fees per [rate limits](./api/rate-limits.md) and [fees](./concepts/fees.md).
 
-## CCTP corridors
+## Bridge corridors
 
-USDC bridging via Circle CCTP. Supported source/destination chains:
+USDC (and other assets) bridge via the **MetaBridge custody bridge** — validator
+⅔ stake-weighted co-signing, no Circle CCTP dependency (ADR-024). Source chains:
 
-| Chain | CCTP domain |
-|-------|------------:|
-| Ethereum mainnet | 0 |
-| Avalanche | 1 |
-| OP mainnet | 2 |
-| Arbitrum | 3 |
-| Base | 6 |
-| MetaFlux mainnet | TBD |
-| MetaFlux testnet | TBD |
+| Chain | Status |
+|-------|--------|
+| Base | **live on Base Sepolia** (`MetaBridgeUSDC` `0x8FA28b0D…`); mainnet pre-audit |
+| Arbitrum | planned |
+| Solana | planned |
 
-See [bridge](./bridge/) for the full flow.
+See [bridge](./bridge/) for the deposit / withdraw flow + the deployment table.
 
 ## Status
 
@@ -148,7 +145,7 @@ The status page exposes:
 
 ## See also
 
-- [Bridge](./bridge/) — CCTP details
+- [Bridge](./bridge/) — MetaBridge custody bridge details
 - [Versioning](./versioning.md) — wire-shape change policy
 - [Quickstart](./integration/quickstart.md) — first call against devnet
 - [Signing](./integration/signing.md) — chainId usage

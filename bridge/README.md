@@ -1,70 +1,100 @@
 # Bridge
 
 {% hint style="info" %}
-**Status.** **CCTP preview**, **MetaBridge in design** (ADR-021).
+**Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet); L1
+deposit→credit + withdraw co-signing implemented; relayer + multi-chain rollout in
+progress. Governed by ADR-024 (supersedes the earlier CCTP-hybrid plan).
 {% endhint %}
 
-MetaFlux runs a **hybrid bridge model**:
+MetaFlux bridges **all assets — including USDC — through MetaBridge**, a
+MetaFlux-validator-signed custody bridge (HL-Bridge2 equivalent). There is **no
+third-party bridge and no Circle CCTP dependency** on the critical path.
 
-- **USDC** — Circle CCTP (Cross-Chain Transfer Protocol). Native, Circle-attested, no extra trust assumption beyond Circle itself.
-- **All other assets** — **MetaBridge**, a MetaFlux validator-signed bridge across Solana, Base, and Arbitrum (ADR-021). Inbound transfers are admitted on an M-of-N validator signature over the source-chain event; no third-party bridge sits on the critical path.
+## Why custody, not CCTP
 
-The hybrid reduces blast radius: USDC is the dominant asset by volume and gets the cleanest path; everything else rides MetaBridge under the same validator-set trust assumption as the chain itself, rather than an external bridge whose failure would compromise the long tail.
+CCTP only moves USDC between chains Circle has enrolled as CCTP *domains*. MetaFlux
+is an independent L1; being added as a CCTP domain is a Circle business decision we
+don't control. A deposit path that needs a third party's blessing to exist isn't a
+foundation to build on, so MetaFlux runs its own custody bridge under the **same
+validator-set trust assumption as the chain itself** — no external committee,
+guardian network, or gatekeeper. (ADR-024.)
 
-## CCTP (USDC)
+## Model
 
-Circle's official USDC bridge. The chain holds Circle's published attestation pubkey and verifies attestation signatures on inbound transfers; outbound transfers emit the standard burn event Circle's other-chain MessageTransmitter recognises.
+A custody **Bridge contract on the source chain** (Base first) holds deposited
+tokens. MetaFlux validators observe deposits and credit the L1; withdrawals are
+released by the contract on a ⅔ stake-weighted validator co-signature set behind a
+dispute window.
 
-Domain mapping (CCTP "domain" ≠ chain ID):
-
-| Chain | CCTP domain | MetaFlux domain |
-|-------|-------------|-----------------|
-| Ethereum mainnet | 0 | — |
-| Avalanche | 1 | — |
-| OP mainnet | 2 | — |
-| Arbitrum | 3 | — |
-| Base | 6 | — |
-| MetaFlux mainnet | TBD | — |
-| MetaFlux testnet | TBD | (publicly assigned by Circle pre-mainnet) |
-
-CCTP attestation pubkeys are network-specific. Sandbox and production use distinct keys. The on-chain verifier loads the appropriate key per environment.
-
-### Deposit flow
+### Deposit (source chain → MetaFlux)
 
 ```
-EVM source chain (e.g. Arbitrum):
-  1. user.approve(USDC, TokenMessenger)
-  2. TokenMessenger.depositForBurn(amount, dst_domain=MTF, dst_recipient)
-  3. Circle attests after ~13 finality blocks
-  4. attestation served at iris-api(.sandbox).circle.com
+Base:
+  1. user.approve(USDC, bridge)
+  2. bridge.deposit(mtfDest, amount)        // USDC pulled into custody
+  3. bridge emits Deposit{user, mtfDest, amount, nonce, …}
 
-MetaFlux side:
-  5. anyone submits ReceiveMessage(message, attestation) action
-  6. chain verifies attestation against the network's Circle pubkey
-  7. on success, USDC is minted on MTF to `dst_recipient`
+MetaFlux:
+  4. each validator observes the Deposit event and submits an mbAttest
+     (an Inbound MetaBridgeMsg partial co-signature) — validator authority,
+     NEVER the public /exchange path
+  5. on ⅔ stake-weighted quorum the L1 credits the user's USDC cross-collateral
+     (the same system-credit primitive the faucet uses); each deposit credits
+     EXACTLY ONCE (idempotent by message id)
 ```
 
-The same flow runs in reverse for withdrawals — MTF emits the burn event, Circle attests after MTF finality, the destination chain's MessageTransmitter accepts the attestation.
+The `Deposit` event is byte-compatible with the L1 deterministic `message_id`
+(`crates/bridge/meta_bridge.rs`): `keccak256(chain ‖ direction ‖ user ‖ asset ‖
+amount ‖ dst ‖ nonce)`.
 
-### Caps
+### Withdraw (MetaFlux → source chain)
 
-Per-corridor runtime caps prevent any single direction from concentrating attestation risk. Caps are governance-controlled.
+```
+MetaFlux:
+  1. user submits a withdraw action (Outbound MetaBridgeMsg)
+  2. validators co-sign it to ⅔ quorum; the L1 retains the signature set
 
-## MetaBridge (non-USDC assets)
+Base:
+  3. a relayer calls bridge.withdraw(user, amount, dst, nonce, sigs…)
+     — the contract recovers signers, sums their stake, requires ≥⅔, queues it
+  4. after the dispute window, bridge.claim(id) releases USDC to the user
+     (bridge.dispute(id) is the admin challenge hook that cancels a queued one)
+```
 
-MetaBridge is a MetaFlux-operated, validator-signed bridge for all non-USDC assets (ADR-021). It carries no third-party bridge on the critical path:
+## Security model
 
-- **Validation model** — M-of-N MetaFlux validator signatures over the source-chain deposit event; the same validator set that secures consensus. No external committee, guardian network, or optimistic challenge window.
-- **Supported chains** — Solana, Base, Arbitrum at launch. Each chain runs a MetaBridge lock/mint contract whose authority is the validator set's threshold key.
-- **Trust assumption** — equal to the chain's own consensus trust assumption, not an additional external bridge.
+- **Authority** — ⅔ stake-weighted MetaFlux validator multisig (secp256k1, the same
+  keys that secure consensus; quorum `6700` bps). The validator multisig + the
+  withdrawal dispute window are load-bearing: bridge-key compromise = fund loss, so
+  the contracts get the consensus/signing review tier and a pre-mainnet audit.
+- **Replay** — each `message_id` is honored once, on both the L1 (finalized set) and
+  the contract (`withdrawalSeen`).
+- **Off `/exchange`** — deposit credits inject via the validator system path and are
+  structurally unreachable from the public user `/exchange` surface.
+- **Custody caveat** — USDC on MetaFlux is a bridged claim backed by the Base
+  contract's balance, not Circle-canonical on MetaFlux (same as the HL model).
 
-The detailed design is in ADR-021; this page is updated as MetaBridge ships per network.
+## Deployments
 
-## Out of scope for V1
+| Network | Contract | Address |
+|---------|----------|---------|
+| Base **Sepolia** | `MetaBridgeUSDC` | [`0x8FA28b0D3327e7671c93085F1c21652d398a33e6`](https://sepolia.basescan.org/address/0x8FA28b0D3327e7671c93085F1c21652d398a33e6) |
+| Base mainnet | — | (pre-audit) |
 
-- Cross-chain composability (calling EVM contracts on other chains from MTF) — V2.
-- MetaBridge support beyond Solana / Base / Arbitrum — added per-chain as governance approves.
+Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); `usdcAssetId 0`, ⅔ quorum,
+300 s dispute window. Contracts + deploy runbook live in the
+[`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts)
+repo (the L1-side co-signature / credit logic stays in the node repo's `crates/bridge`).
+
+## Roadmap
+
+- Real Base deposit-watcher + withdrawal relayer (the deterministic L1 core +
+  the Base contract are done; the off-chain observers are being wired).
+- Multi-chain rollout: Arbitrum + Solana custody contracts under the same model.
+- Security audit before any value-bearing (mainnet) deployment.
+- Cross-chain composability (calling other-chain contracts from MTF) — V2.
 
 ## See also
 
-- Concepts: USDC vs other-asset accounting — *coming*
+- [Networks](../networks.md) — per-network endpoints + chain IDs
+- ADR-024 (custody bridge, drop CCTP) + ADR-021 (MetaBridge co-signature core) in the node repo
