@@ -49,7 +49,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const master = new MetaFluxClient({
   privateKey: process.env.MASTER_KEY!,
-  baseUrl:    'https://gateway.devnet.mtf.exchange',
+  baseUrl:    'https://api.devnet.mtf.exchange',   // MTF-native node API (:8080)
   chainId:    31337,
 });
 
@@ -103,7 +103,7 @@ const agent = new MetaFluxClient({
   privateKey:     agentPrivateKey.toString('hex'),  // agent signs
   signerAddress:  agentAddress,
   senderAddress:  master.address,                   // sender = master
-  baseUrl:        'https://gateway.devnet.mtf.exchange',
+  baseUrl:        'https://api.devnet.mtf.exchange',
   chainId:        31337,
 });
 
@@ -117,7 +117,7 @@ The SDK's `signerAddress / senderAddress` distinction is how it knows to fill `s
 
 ```typescript
 const sig = signEip712(action, agentPrivateKey, chainId);
-await fetch('https://gateway/exchange', {
+await fetch('https://api.devnet.mtf.exchange/exchange', {
   method:  'POST',
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({
@@ -231,7 +231,7 @@ T+29d+1h  old agent expires; bot has fully migrated
 ## See also
 
 - [Agent wallets](../concepts/agent-wallets.md) — concepts
-- [`POST /exchange ApproveAgent`](../api/rest/exchange.md#approveagent)
+- [`POST /exchange approve_agent`](../api/rest/exchange.md#approve_agent)
 - [Signing walkthrough](./signing.md) — what the SDK does internally
 - [Idempotency](./idempotency.md) — nonce semantics for concurrent agents
 - [Sub-accounts](../concepts/sub-accounts.md) — sub-level agent setup

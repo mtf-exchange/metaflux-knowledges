@@ -43,10 +43,10 @@ MTF carries prices on **two distinct numeric planes** — the #1 source of scale
 
 | Plane | Type | Scale | Used by |
 |-------|------|-------|---------|
-| **Book / order / mark plane** | `FixedPrice` (`i128`) / `price_e8` | **1e8 fixed-point** (raw integer = price × 10⁸) | order book, `last_mark_px`, the EVM precompiles (`mark_px_e8`, `entry_px_e8`), `market_info.mark`/`mid`/`oracle` wire fields |
-| **Oracle / notional / collateral plane** | `rust_decimal::Decimal` | **whole-USDC** (1 unit = 1 USDC) | the oracle aggregator + `MarkPriceComputer` (C1/C2/C3 all in `Decimal`), funding `oracle_px`, PM scenario engine, margin/health |
+| **Book / order / mark plane** | `FixedPrice` (`i128`) / `price_e8` | **1e8 fixed-point** (raw integer = price × 10⁸) | order book, `last_mark_px`, the EVM precompiles (`mark_px_e8`, `entry_px_e8`), `l2_book` level `px`, order `limit_px`, `tick_size` |
+| **Oracle / notional / collateral plane** | `rust_decimal::Decimal` | **whole-USDC** (1 unit = 1 USDC) | the oracle aggregator + `MarkPriceComputer` (C1/C2/C3 all in `Decimal`), funding `oracle_px`, PM scenario engine, margin/health, and the human `market_info`/`markets` read fields `mark_px`/`oracle_px` |
 
-The `MarkPriceComputer` and the oracle aggregation operate entirely in the **`Decimal` whole-USDC plane**. The result is converted to the **1e8 `FixedPrice` plane** when written to the book / `last_mark_px` and when serialized into `market_info` (where `"mark": "10055000000"` is `100.55 × 10⁸`). PnL/funding *settlement* runs on a third minor convention — USDC `1e6` (`accumulated_funding_e6` in `mark_settle`). Always check which plane a formula is in before comparing magnitudes.
+The `MarkPriceComputer` and the oracle aggregation operate entirely in the **`Decimal` whole-USDC plane**. The result is converted to the **1e8 `FixedPrice` plane** when written to the book / `last_mark_px`. The human `market_info` / `markets` read, however, reports `mark_px` and `oracle_px` already scaled back into the **whole-USDC plane** (e.g. `"67042.335"`, not raw 1e8) — only the order/book *submission* fields (`l2_book` level px, order `limit_px`, `tick_size`) stay 1e8. PnL/funding *settlement* runs on a third minor convention — USDC `1e6` (`accumulated_funding_e6` in `mark_settle`). Always check which plane a formula is in before comparing magnitudes.
 
 ## Oracle composition
 
@@ -70,22 +70,24 @@ The default table is a fallback. A governance-only `SetOracleWeights { asset_id,
 
 **Missing-source handling** (ADR-018): a venue absent in a tick is treated as weight 0 and the rest are renormalized. If less than **50 %** of total weight is present in a tick, the oracle slot is **not updated** — the previous good tick persists (the hard fallback that prevents a single CEX dominating during a market-wide outage).
 
-The full per-market source list is published in the `market_info` response:
+The per-market source list is the committed oracle-weights table (the default
+above, or a per-symbol `SetOracleWeights` override) — conceptually:
 
-```json
-{
-  "type": "market_info",
-  "data": {
-    "asset_id": 0,
-    "mark_source": "MedianOfOraclesAndMid",
-    "oracle_sources": [
-      { "kind": "cex_feed", "venue": "BinanceSpot", "weight": 1 },
-      { "kind": "cex_feed", "venue": "OkxSpot",     "weight": 1 },
-      { "kind": "cex_feed", "venue": "BybitSpot",   "weight": 1 }
-    ]
-  }
-}
 ```
+mark_source = "MedianOfOraclesAndMid"
+oracle_sources = [
+  { venue: BinanceSpot, weight: 3 },
+  { venue: OkxSpot,     weight: 2 },
+  { venue: BybitSpot,   weight: 2 },
+  ...
+]
+```
+
+The [`market_info`](../api/rest/info.md#market_info) read surfaces `mark_source`
+(the descriptor `"MedianOfOraclesAndMid"`) but does **not** yet enumerate the
+weighted source list as a wire field — the weights live in committed state
+(`SetOracleWeights`, ADR-018). See the [content-gap note](../api/rest/info.md) if
+you need the per-market source list exposed on the read path.
 
 Per-feed sub-rules:
 - A feed that hasn't updated within `feed_staleness_ms` (default 60 s) is dropped from the median.
@@ -137,32 +139,35 @@ Consumers that use **last trade** instead of mark:
 ## Querying
 
 ```bash
-curl -X POST https://gateway/info \
+curl -X POST http://<node>:8080/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-Returns the latest mark + the components (all values on the **1e8 fixed-point plane** — `"10055000000"` = `100.55 × 10⁸`):
+The [`market_info`](../api/rest/info.md#market_info) read reports `mark_px` and
+`oracle_px` on the **whole-USDC plane** (e.g. `"67042.335"`), plus the
+`mark_source` descriptor:
 
 ```json
 {
   "type": "market_info",
   "data": {
-    "asset_id":  0,
+    "asset_id":    0,
     "mark_source": "MedianOfOraclesAndMid",
-    "mark":   "10055000000",
-    "c1":     "10054200000",
-    "c2":     "10055000000",
-    "c3":     "10054800000",
-    "oracle": "10054200000",
-    "mark_status": "Ok"
+    "mark_px":     "67042.335",
+    "oracle_px":   "67042.335"
   }
 }
 ```
 
-`c1`/`c2`/`c3` are the three components (oracle+EMA anchor / internal-book median / external-perp weighted median). `mark_status` ∈ `"Ok"`, `"Banded"`, `"Frozen"`. Banded means the band clamped the candidate this block; Frozen means all sources failed and the protocol is holding prior mark.
+The three internal components `C1`/`C2`/`C3` (oracle+EMA anchor / internal-book
+median / external-perp weighted median) and the band-state (`Ok` / `Banded` /
+`Frozen`) live inside `MarkPriceComputer` (`crates/oracle/src/mark.rs`); they are
+**not** broken out as `market_info` wire fields today — only the composed
+`mark_px` is published. Banded means the band clamped the candidate this block;
+Frozen means all sources failed and the protocol is holding prior mark.
 
-Streaming via [WS `mark` channel](../api/ws/subscriptions.md#mark).
+A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available) (not yet streaming); poll [`market_info`](../api/rest/info.md#market_info) for `mark_px` meanwhile.
 
 ## Edge cases
 
@@ -199,7 +204,7 @@ The defence is structural: to move the median an adversary must move at least **
 
 - [Funding rates](./funding-rates.md) — funding uses mark vs oracle
 - [Tiered liquidation](./tiered-liquidation.md) — tier eval against mark
-- [`mark` WS channel](../api/ws/subscriptions.md#mark)
+- [`mark` WS channel (roadmap)](../api/ws/subscriptions.md#roadmap--not-yet-available)
 - [Oracle](#oracle-composition) — full source list per market
 
 ## FAQ
@@ -208,7 +213,7 @@ The defence is structural: to move the median an adversary must move at least **
 A: A pure-oracle mark gives the oracle operators the ability to liquidate the book by manipulating the feed. Median-of-three diversifies the trust surface.
 
 **Q: Can I see what the band did historically?**
-A: Yes — mark history with `mark_status` is in the `mark` WS channel's replay buffer and in archival indexer responses.
+A: Mark history with band-state will be exposed once the `mark` WS channel ships (roadmap) and via archival indexer responses; it is not on the live read surface yet.
 
 **Q: Will the band cause unfair liquidations?**
 A: The band slows mark relative to the underlying — so during a real crash, your maintenance can hold healthy for an extra ~1 second longer than at a venue that uses last-trade. The reverse is also true (mark unwinds slowly). Net effect: liquidation behaviour is more deterministic and harder to weaponise.

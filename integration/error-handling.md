@@ -121,7 +121,7 @@ The action was admitted (`202`) but failed at commit. You learn about it only vi
 | `evicted_under_cap_pressure` | Admitted but evicted from mempool before block | YES (with backoff) |
 | `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch | NO — fix margin first |
 
-Subscribe to [`orderEvents` WS](../api/ws/subscriptions.md#orderevents) and dispatch on the event kind:
+Subscribe to [`userEvents` WS](../api/ws/subscriptions.md#userevents) (order lifecycle events ride this channel) and dispatch on the event kind:
 
 ```typescript
 ws.subscribe('orderEvents', { user: address }, (event) => {

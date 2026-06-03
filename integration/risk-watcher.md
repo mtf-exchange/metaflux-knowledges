@@ -174,7 +174,7 @@ T = 5.3s    marginEvents push: tier=Safe; reaction loop continues
 ## See also
 
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — the ladder you're defending against
-- [`marginEvents` WS](../api/ws/subscriptions.md#marginevents)
-- [`UpdateIsolatedMargin`](../api/rest/exchange.md#updateisolatedmargin)
+- [`userEvents` WS](../api/ws/subscriptions.md#userevents) — margin / tier transitions ride this channel
+- [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin)
 - [Agent wallets](../concepts/agent-wallets.md) — watcher needs its own approved agent
 - [Error handling](./error-handling.md) — for the deposit submission retry logic

@@ -148,33 +148,38 @@ Mitigations:
 ## Validator selection
 
 ```bash
-curl -X POST https://gateway/info -d '{"type":"validators"}'
+curl -X POST http://<node>:8080/info -d '{"type":"validator_summaries"}'
 ```
 
-Returns the active validator set with:
+Returns the active validator set (`{epoch, total_stake, n_active, validators[]}`);
+each entry carries:
 
 ```json
 {
   "validator":          "0x<val>",
-  "moniker":            "alpha-validator",
-  "total_stake":     "10000000000000",
-  "self_bond":       "100000000000",
-  "commission_pct":     5,
-  "uptime_30d_pct":     99.95,
-  "slash_count":        0,
-  "delegator_count":    1245
+  "signer":             "0x<signer>",
+  "validator_index":    3,
+  "stake":              "10000000000000",
+  "self_stake":         "100000000000",
+  "commission_bps":     500,
+  "is_active":          true,
+  "is_jailed":          false,
+  "first_active_epoch": 12
 }
 ```
 
 Pick by:
-- **Uptime** > 99.9% over 30 days.
-- **Commission**: lower → higher net APR. But beware bait-and-switch (cap raises).
-- **Self-bond**: higher → operator has skin in the game.
-- **Slash history**: 0 is the only acceptable answer for a serious delegator.
+- **Commission** (`commission_bps`): lower → higher net APR. But beware bait-and-switch (cap raises).
+- **Self-stake** (`self_stake`): higher → operator has skin in the game.
+- **Jail status** (`is_jailed`): a currently-jailed validator earns nothing until unjailed.
+- **Active** (`is_active`): only `is_active: true` validators are in the live signing set.
 
 ## APR estimation
 
-`/info staking_apr` returns the current estimated annual return:
+> **Planned read.** A dedicated `staking_apr` `/info` query type is **not yet
+> wired** into the node dispatch. Until it ships, derive APR client-side from
+> `validator_summaries` (`total_stake`, per-validator `commission_bps`) plus the
+> emission schedule. The intended shape:
 
 ```json
 {

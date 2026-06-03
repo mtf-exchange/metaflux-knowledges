@@ -99,7 +99,7 @@ Optional. If you want to use features HL doesn't have:
 - **FBA** — frequent batch auction matching for designated markets, reduces MEV
 - **Cross-chain primitives** — bridge primitives natively callable from EVM contracts
 
-These are MTF-native actions only and require talking to the gateway's MTF-native surface or the node directly.
+These are MTF-native actions only and require talking to the node's MTF-native surface directly (`:8080` — the gateway is HL-compat + CCXT only, with no `/native/*` passthrough; see [ADR-019 / API overview](../api/README.md)).
 
 ## Top 5 HL bot patterns — concrete migration
 
@@ -166,7 +166,7 @@ Funding cadence is similar (HL is hourly; MTF is hourly by default but configura
   const rate = funding[0].fundingRate;
 ```
 
-MTF's oracle composition is published per-market (`market_info.oracle_sources`) — if your arb depends on specific oracle providers, verify the source list matches your expectation. See [mark prices](../concepts/mark-prices.md).
+MTF's oracle composition is governed per-market (committed `SetOracleWeights`, ADR-018) — if your arb depends on specific oracle providers, verify the weighted source list matches your expectation. See [mark prices](../concepts/mark-prices.md).
 
 ### 4. Multi-account / institutional setup
 

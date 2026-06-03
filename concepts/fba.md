@@ -46,7 +46,7 @@ The fill price is **uniform** across all participants in the batch — no one is
 | Spot pairs | Continuous CLOB | Convention |
 | Index / structured products | FBA | Composite pricing needs synchronous clearing |
 
-Each market's matching mode is in `market_info.fba_enabled`. Markets with FBA on accept both [`FbaOrder`](../api/rest/exchange.md#fbaorder) (batch-targeted) and [`Order`](../api/rest/exchange.md#order) (treated as FBA orders for the next batch).
+Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info.md#market_info). Markets with FBA on accept both `FbaOrder` (batch-targeted) and [`submit_order`](../api/rest/exchange.md#submit_order) (treated as FBA orders for the next batch). See the [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` is a recognized-but-unmapped stub today.
 
 ## Batch interval
 
@@ -161,8 +161,15 @@ t=1.0s   batch_id = 9877 opens
 
 ## Querying
 
+> **Planned read.** The FBA matching engine and per-market `fba_enabled` flag
+> (visible in [`market_info`](../api/rest/info.md#market_info)) are live, but the
+> `fba_batch_state` `/info` query type below is **not yet wired** into the node
+> dispatch — the live batch / indicative-clearing snapshot isn't exposed on the
+> read path today.
+
 ```bash
-curl -X POST https://gateway/info \
+# planned — not yet served by /info
+curl -X POST http://<node>:8080/info \
   -d '{"type":"fba_batch_state","asset_id":42}'
 ```
 
@@ -185,7 +192,7 @@ curl -X POST https://gateway/info \
 ## See also
 
 - [Order types](./order-types.md)
-- [`POST /exchange FbaOrder`](../api/rest/exchange.md#fbaorder)
+- [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` (recognized-but-unmapped stub today)
 - [MIP-3](../mip/mip-3.md) — markets opt into FBA at deploy
 - [`market_info`](../api/rest/info.md#market_info) — check `fba_enabled` per market
 

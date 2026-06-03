@@ -35,7 +35,7 @@ sell 2.0 reduce_only=true   →  rejected: would flip to short 1
 buy  0.5 reduce_only=true   →  rejected: would grow long to 1.5
 ```
 
-Reduce-only is evaluated **at commit**, not admission, when the position is read from the latest committed state. A racing fill that closes your position between admit and dispatch can cause a commit-time `reduce_only_violation_post_admit` (see [errors](../api/errors.md#commit-time-errors)).
+Reduce-only is evaluated **at commit**, not admission, when the position is read from the latest committed state. A racing fill that closes your position between admit and dispatch can cause a commit-time `reduce_only_violation_post_admit` (see [errors](../api/errors.md#commit-time-errors-not-http-in-event-stream)).
 
 ## Self-trade prevention
 
@@ -137,7 +137,7 @@ Shapes:
 | `Linear` | Linear ramp from one end to the other |
 | `Geometric` | Geometric ramp (smaller near the spread, larger far away) |
 
-Each leg gets an auto-assigned `cloid` derived from `cloid_prefix + leg_index`. Cancel the whole ladder by cancelling each leg, or use [`CancelByCloid`](../api/rest/exchange.md#cancelbycloid) with the prefix's expansion.
+Each leg gets an auto-assigned `cloid` derived from `cloid_prefix + leg_index`. Cancel the whole ladder by cancelling each leg, or use [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) with the prefix's expansion.
 
 ## TWAP
 
@@ -156,7 +156,7 @@ slice 60: send last IOC just before t = duration
 
 `randomize_pct` ∈ `[0, 50]` jitters slice times by ±`randomize_pct/100 × slice_interval`. Set higher to be harder to detect; set lower for tight time-control.
 
-Slices are submitted by the protocol; nothing for the client to do after submitting `TwapOrder`. Slice events stream on the [`twapEvents` WS channel](../api/ws/subscriptions.md#twapevents).
+Slices are submitted by the protocol; nothing for the client to do after submitting `TwapOrder`. Slice events ride the [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) (a dedicated `twap*` stream is roadmap).
 
 TWAP is cancellable mid-run via `TwapCancel`; already-filled slices stay filled, future slices stop.
 
@@ -188,7 +188,7 @@ Caveat: ALL market orders are subject to the **mark-price band** — if the best
                           └── reject ─►[Rejected]
 ```
 
-Each state transition emits a corresponding event on [`orderEvents`](../api/ws/subscriptions.md#orderevents).
+Each state transition emits a corresponding event on [`userEvents`](../api/ws/subscriptions.md#userevents) (order-lifecycle events ride this channel).
 
 ## Edge cases
 

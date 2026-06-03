@@ -218,7 +218,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 - Watch `health` via `userState` queries (HL-compat) or [`account_state`](../api/rest/info.md#account_state).
 - Set internal alerts at `health < 1.2` — well above T0.
 - For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when health crosses a threshold.
-- Watch `marginEvents` on the [WS feed](../api/ws/subscriptions.md#marginevents) for immediate tier transitions.
+- Watch [`userEvents`](../api/ws/subscriptions.md#userevents) on the WS feed for immediate tier transitions (margin / liquidation events ride this channel).
 
 ## Edge cases
 
@@ -233,7 +233,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 - [ADL allocation algorithm](./adl.md) — math behind T4
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso scopes the ladder
 - [Mark prices](./mark-prices.md) — what drives health
-- [`marginEvents` WS channel](../api/ws/subscriptions.md#marginevents) — tier transitions in real time
+- [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) — tier transitions ride this channel
 - [Risk-watcher pattern](../integration/risk-watcher.md) — automated margin top-up
 
 ## FAQ

@@ -67,4 +67,4 @@ The detailed design is in ADR-021; this page is updated as MetaBridge ships per 
 
 ## See also
 
-- [Concepts: USDC vs other-asset accounting](../concepts/balances.md) — coming
+- Concepts: USDC vs other-asset accounting — *coming*

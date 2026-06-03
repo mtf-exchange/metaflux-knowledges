@@ -160,24 +160,24 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 ## Querying
 
 ```bash
-curl -X POST https://gateway/info \
-  -d '{"type":"multisig_state","address":"0x<multisig>"}'
+curl -X POST http://<node>:8080/info \
+  -d '{"type":"user_to_multi_sig_signers","user":"0x<multisig>"}'
 ```
 
 ```json
 {
-  "type": "multisig_state",
+  "type": "user_to_multi_sig_signers",
   "data": {
-    "is_multisig":  true,
+    "address":      "0x<multisig>",
+    "is_multi_sig": true,
     "threshold":    2,
-    "signers":      ["0x...", "0x...", "0x..."],
-    "set_version":  3,
-    "last_change_ts": 1735000000000
+    "signers":      ["0x...", "0x...", "0x..."]
   }
 }
 ```
 
-`set_version` increments on every `UpdateMultiSig` — useful for clients to invalidate cached signer lists.
+`is_multi_sig` is `false` (and `signers` empty) for a plain account. The signer
+set + threshold come straight from the committed `multi_sig_tracker` config.
 
 ## Sequence — multi-sig order
 
@@ -207,8 +207,8 @@ T+commit   inner Order applied; orderEvents fires; multi-sig account
 
 ## See also
 
-- [`POST /exchange ConvertToMultiSigUser`](../api/rest/exchange.md#converttomultisiguser)
-- [`POST /exchange MultiSig`](../api/rest/exchange.md#multisig)
+- [`POST /exchange convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)
+- [`/exchange` signed-by semantics](../api/rest/exchange.md#signed-by-semantics) — multi-sig wrapper envelope
 - [Agent wallets](./agent-wallets.md) — combine multi-sig with agent delegation
 - [Sub-accounts](./sub-accounts.md) — multi-sig accounts can have subs
 

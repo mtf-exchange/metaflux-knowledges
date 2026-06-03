@@ -21,11 +21,20 @@
 | Mempool actions per account | 50 outstanding | drains as actions commit | — |
 | WS subscriptions per connection | 256 | — | — |
 
-All limits are governance-controlled; the gateway publishes the active values via `GET /limits`:
+All limits are governance-controlled. A per-account budget snapshot is available
+via the native [`user_rate_limit`](./rest/info.md) read on the node (the gateway
+exposes the same data as HL-compat `userRateLimit`):
 
 ```bash
-curl https://gateway/limits
+curl -X POST http://<node>:8080/info \
+  -H 'content-type: application/json' \
+  -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```
+
+> **Planned read.** A dedicated `GET /limits` route publishing the *static*
+> per-IP / per-account config below is **not yet implemented** — the values are
+> the configured defaults, not yet served from an endpoint. Treat the JSON below
+> as reference defaults:
 
 ```json
 {
