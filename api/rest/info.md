@@ -17,8 +17,10 @@ POST  https://<node-or-gateway>/info
 | Host | Wire shape |
 |------|-----------|
 | Node directly (`:8080`) | MTF-native (this document) |
-| Gateway (`:8443`) | **HL-compat** by default — see [hl-compat.md](./hl-compat.md) |
-| Gateway (`:8443`) `/native/info` | MTF-native (mirrors the node shape) |
+| Gateway (`:8443`) | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
+
+MTF-native clients read directly from the **node** `:8080`. The gateway only serves
+the HL-compat shape on `/info` — there is no `/native/*` passthrough.
 
 ## Envelope
 

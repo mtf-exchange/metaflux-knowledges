@@ -32,7 +32,9 @@ POST  https://<node-or-gateway>/exchange
 |------|------|-----------|
 | Node directly (`:8080`) | `/exchange` | **MTF-native** (this document) |
 | Gateway (`:8443`) | `/exchange` | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
-| Gateway (`:8443`) | `/native/exchange` | **MTF-native** (mirrors the node shape) |
+
+MTF-native clients post directly to the **node** `:8080`. The gateway only serves
+the HL-compat shape on `/exchange` — there is no `/native/*` passthrough.
 
 ## Request envelope
 

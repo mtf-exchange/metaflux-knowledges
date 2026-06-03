@@ -45,7 +45,7 @@ See [networks](../networks.md) for the full per-network reference.
 |----------|----------------------|---------|
 | Gateway REST | `8443` | Multi-protocol adapter (HL-compat + CCXT-compat + MTF-native) |
 | Gateway WS | `8443/ws` | Subscriptions |
-| Faucet (devnet only) | `8444` | Devnet USDC tap |
+| Node API (MTF-native) | `8080` | `/info` · `/exchange` · `/ws` · `/faucet` (devnet/testnet `POST /faucet` test tap — same origin, not a separate port) |
 
 Production deployments terminate TLS at the gateway and front it with a CDN; node REST is intentionally not internet-facing in production.
 

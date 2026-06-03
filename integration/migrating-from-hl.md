@@ -20,9 +20,9 @@ MetaFlux is its own L1, not an HL deployment. Sign against the MetaFlux chain ID
 
 | Network | HL `chainId` | MTF `chainId` |
 |---------|--------------|---------------|
-| Mainnet | 1337 | TBD |
-| Testnet | 998 | TBD |
-| Devnet / local | 1337 | **31337** |
+| Mainnet | 1337 | **8964** (`0x2304`) |
+| Testnet | 998 | **114514** (`0x1bf52`) |
+| Devnet / local | 1337 | **31337** (`0x7a69`) |
 
 Update one constant in your signing code and the rest of the EIP-712 envelope is identical. The MTF domain uses `name = "MetaFlux"`, `version = "1"`, `verifyingContract = 0x0`.
 
@@ -110,7 +110,7 @@ These are MTF-native actions only and require talking to the gateway's MTF-nativ
 + const MTF_URL = 'https://gateway.mtf.exchange';
 
 - const HL_CHAIN_ID = 1337;
-+ const MTF_CHAIN_ID = 31337;     // devnet; production TBD
++ const MTF_CHAIN_ID = 114514;    // testnet (mainnet 8964, devnet 31337)
 
 - const HL_DOMAIN_NAME = 'HyperliquidSignTransaction';   // varies by mode
 + const MTF_DOMAIN_NAME = 'MetaFlux';
