@@ -12,6 +12,7 @@
   * [POST /info](api/rest/info.md)
   * [HL-compat](api/rest/hl-compat.md)
   * [CCXT-compat](api/rest/ccxt-compat.md)
+  * [Node data files](api/data-files.md)
   * [WebSocket API](api/ws/README.md)
     * [Subscriptions](api/ws/subscriptions.md)
   * [Errors](api/errors.md)

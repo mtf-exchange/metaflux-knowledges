@@ -663,6 +663,699 @@ Response:
 | `bids[*].submitted_at_ms` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
 
+## HL-node parity query types
+
+The following query types bring the node `/info` surface to parity with the Hyperliquid NODE info-server (`--serve-info`) snapshot set. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index).
+
+### `spot_meta`
+
+Spot pair universe. No parameters.
+
+```json
+{ "type": "spot_meta" }
+```
+
+Response:
+
+```json
+{
+  "type": "spot_meta",
+  "data": {
+    "pairs": [
+      { "id": 101, "name": "BTC/USDC", "base": 0, "quote": 100, "taker_fee_bps": 5, "min_notional": "1000", "active": true }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pairs[*].id` | uint32 | Pair id (`SpotPairSpec.pair_id`) |
+| `pairs[*].name` | string | Pair name (e.g. `"BTC/USDC"`) |
+| `pairs[*].base` / `quote` | uint32 | Base / quote asset id |
+| `pairs[*].taker_fee_bps` | uint16 | Taker fee (bps); `0` if unset |
+| `pairs[*].min_notional` | decimal string | Min notional (USDC cents); `"0"` if unset |
+| `pairs[*].active` | bool | Whether the pair is active for trading |
+
+State source: `Exchange.mip3_spot_pair_specs`.
+
+### `spot_clearinghouse_state`
+
+Per-account spot token balances. Required: `address` (0x hex).
+
+```json
+{ "type": "spot_clearinghouse_state", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "spot_clearinghouse_state",
+  "data": {
+    "address": "0x<addr>",
+    "balances": [ { "asset": 101, "name": "BTC/USDC", "balance": "500" } ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `balances[*].asset` | uint32 | Spot asset id |
+| `balances[*].name` | string | Token / pair name, else `asset:<id>` |
+| `balances[*].balance` | decimal string | Balance, truncated toward zero |
+
+State source: `locus.spot_clearinghouse.balances` (keyed by `(owner, asset)`).
+
+### `exchange_status`
+
+Global trading status. No parameters.
+
+```json
+{ "type": "exchange_status" }
+```
+
+Response:
+
+```json
+{
+  "type": "exchange_status",
+  "data": {
+    "spot_disabled": false,
+    "post_only_until_time_ms": 0,
+    "post_only_until_height": 0,
+    "scheduled_freeze_height": null,
+    "mip3_enabled": true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `spot_disabled` | bool | Spot trading globally disabled |
+| `post_only_until_time_ms` | uint64 | Post-only window end (consensus ms); `0` = none |
+| `post_only_until_height` | uint64 | Post-only window end (height); `0` = none |
+| `scheduled_freeze_height` | uint64 \| null | Scheduled upgrade-halt height, `null` if none |
+| `mip3_enabled` | bool | `true` once any MIP-3 market/pair spec is registered |
+
+State source: `spot_disabled`, `post_only_until_*`, `scheduled_freeze_height`, `mip3_market_specs` / `mip3_spot_pair_specs`.
+
+### `frontend_open_orders`
+
+Like `open_orders`, plus each order's `tif` / `cloid` / `trigger` detail. Required: `address` (0x hex).
+
+```json
+{ "type": "frontend_open_orders", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "frontend_open_orders",
+  "data": {
+    "address": "0x<addr>",
+    "orders": [
+      {
+        "oid": 7, "market_id": 0, "side": "bid", "px": "50000", "size": "20000",
+        "tif": "gtc", "cloid": "0x000…cafe",
+        "trigger": { "trigger_px": "49000", "trigger_above": false },
+        "inserted_at_ms": 1700000000000
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `orders[*].oid` | uint64 | On-chain order id |
+| `orders[*].market_id` | uint32 | Asset id |
+| `orders[*].side` | `"bid" \| "ask"` | Order side |
+| `orders[*].px` / `size` | decimal string | Resting price / remaining size |
+| `orders[*].tif` | `"alo" \| "ioc" \| "gtc"` | Time-in-force |
+| `orders[*].cloid` | hex string \| null | Client order id, `null` if none |
+| `orders[*].trigger` | object \| null | `{trigger_px, trigger_above}` if a trigger is registered for the oid, else `null` |
+| `orders[*].inserted_at_ms` | uint64 | Insertion timestamp (consensus ms) |
+
+State source: per-book resting orders + `Exchange.trigger_registry`.
+
+### `liquidatable`
+
+Accounts currently flagged for liquidation. No parameters.
+
+```json
+{ "type": "liquidatable" }
+```
+
+Response:
+
+```json
+{
+  "type": "liquidatable",
+  "data": { "accounts": [ { "address": "0x<addr>", "tier": "PartialMarket50" } ] }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `accounts[*].address` | hex address | Needs-action account |
+| `accounts[*].tier` | `"YellowCard" \| "PartialMarket50" \| "FullMarket" \| "BackstopTakeover"` | BOLE tier |
+
+State source: `Exchange.bole_index.tier` (the BOLE needs-action index — **not** a full account rescan).
+
+> **FLAGGED.** `bole_index` is `#[serde(skip)]` derived, non-canonical state, rebuilt by a full scan on first use / after snapshot load. On a freshly published snapshot it is empty until the runtime has run the BOLE pass at least once.
+
+### `active_asset_data`
+
+A user's per-asset leverage / margin-mode / max trade size. Required: `address` (0x hex) + `asset_id` (u32).
+
+```json
+{ "type": "active_asset_data", "address": "0x<addr>", "asset_id": 0 }
+```
+
+Response:
+
+```json
+{
+  "type": "active_asset_data",
+  "data": {
+    "address": "0x<addr>", "asset_id": 0, "leverage": 7,
+    "margin_mode": "isolated", "max_trade_size": "5000000000", "has_position": true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `leverage` | uint32 | Position leverage if open, else account default, else market max |
+| `margin_mode` | `"cross" \| "isolated" \| "strict_iso"` | Effective margin mode |
+| `max_trade_size` | decimal string | Per-asset max-order ceiling (see `max_market_order_ntls`) |
+| `has_position` | bool | Whether the user has a non-zero position on this asset |
+
+State source: `locus.clearinghouses[asset].positions[addr]`, `locus.user_account_configs[addr]`, market spec / dynamic risk.
+
+### `max_market_order_ntls`
+
+Per-asset max market-order notional. No parameters.
+
+```json
+{ "type": "max_market_order_ntls" }
+```
+
+Response:
+
+```json
+{
+  "type": "max_market_order_ntls",
+  "data": { "ntls": [ { "asset_id": 0, "max_market_order_ntl": "5000000000" } ] }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ntls[*].asset_id` | uint32 | Asset id |
+| `ntls[*].max_market_order_ntl` | decimal string | OI-cap-derived size ceiling |
+
+State source: per-market `PerpAnnotation.oi_cap`, else `default_mip3_limits.max_oi_per_market`.
+
+> **FLAGGED.** No dedicated per-asset "max market-order notional" field exists in committed state; the OI cap is the closest committed risk ceiling, reported in **size** units (the matching layer converts to notional at the live mark).
+
+### `vault_summaries`
+
+All vaults summary. No parameters.
+
+```json
+{ "type": "vault_summaries" }
+```
+
+Response:
+
+```json
+{
+  "type": "vault_summaries",
+  "data": {
+    "vaults": [
+      { "id": 7, "address": "0x<vault>", "leader": "0x<leader>", "tvl": "10000000000", "follower_count": 2, "kind": "user" }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `vaults[*].id` | uint64 | Vault id |
+| `vaults[*].address` / `leader` | hex address | Vault on-chain address / leader |
+| `vaults[*].tvl` | decimal string | NAV proxy (high-water mark, USD cents) |
+| `vaults[*].follower_count` | uint64 | Number of share holders |
+| `vaults[*].kind` | `"user" \| "metaliquidity"` | Vault kind |
+
+State source: `Exchange.user_vaults`.
+
+> **FLAGGED.** `tvl` uses the high-water mark as the NAV proxy; full NAV needs the match-engine + oracle.
+
+### `user_vault_equities`
+
+Vaults a user has deposited into + share / equity. Required: `address` (0x hex).
+
+```json
+{ "type": "user_vault_equities", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "user_vault_equities",
+  "data": {
+    "address": "0x<addr>",
+    "equities": [ { "vault_id": 7, "vault_address": "0x<vault>", "shares": "1000000000000000000", "equity": "5000000000" } ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `equities[*].vault_id` | uint64 | Vault id |
+| `equities[*].vault_address` | hex address | Vault address |
+| `equities[*].shares` | decimal string | Caller's share count (18-dec) |
+| `equities[*].equity` | decimal string | `shares × share_price(high_water_mark)`, truncated |
+
+State source: `user_vaults[*].follower_shares[addr]` (keyed per vault).
+
+### `leading_vaults`
+
+Vaults led by the user. Required: `address` (0x hex). Returns the same row shape as `vault_summaries`.
+
+```json
+{ "type": "leading_vaults", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{ "type": "leading_vaults", "data": { "address": "0x<addr>", "vaults": [ /* <vault_summaries row> */ ] } }
+```
+
+State source: `Exchange.user_vaults` filtered by `leader == addr`.
+
+### `user_rate_limit`
+
+A user's action stats / rate-limit budget. Required: `address` (0x hex).
+
+```json
+{ "type": "user_rate_limit", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "user_rate_limit",
+  "data": { "address": "0x<addr>", "last_nonce": 9, "pending_count": 2, "lifetime_count": 123 }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `last_nonce` | uint64 | Last accepted action nonce |
+| `pending_count` | uint32 | Pending (in-flight) action count |
+| `lifetime_count` | uint64 | Lifetime actions submitted |
+
+State source: `locus.user_action_registry[addr]` (`UserActionStats`); absent account → zeroed.
+
+### `spot_deploy_state`
+
+MIP-1 spot-pair-deploy gas-auction state. No parameters.
+
+```json
+{ "type": "spot_deploy_state" }
+```
+
+Response:
+
+```json
+{
+  "type": "spot_deploy_state",
+  "data": {
+    "auction_round": 3, "current_bid": "999", "current_winner": "0x<bidder>",
+    "auction_end_ms": 0, "started_at_ms": 0, "total_burned": "4200", "deposit": "0"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `auction_round` | uint64 | Current round |
+| `current_bid` | decimal string | Leading bid |
+| `current_winner` | hex address \| null | Current high bidder |
+| `auction_end_ms` / `started_at_ms` | uint64 | Auction window (consensus ms) |
+| `total_burned` | decimal string | Cumulative burned winning-bid notional |
+| `deposit` | decimal string | Total escrowed deposit (base units) |
+
+State source: `Exchange.spot_pair_deploy_gas_auction`.
+
+### `delegator_summary`
+
+Staking summary for an address. Required: `address` (0x hex).
+
+```json
+{ "type": "delegator_summary", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "delegator_summary",
+  "data": {
+    "address": "0x<addr>", "total_delegated": "500", "pending_withdrawal": "50",
+    "claimable_rewards": "7", "n_delegations": 2
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_delegated` | decimal string | Sum of active delegations |
+| `pending_withdrawal` | decimal string | Sum of pending undelegations |
+| `claimable_rewards` | decimal string | Accumulated delegator rewards |
+| `n_delegations` | uint64 | Number of active delegations |
+
+State source: `c_staking.{delegations, pending_undelegations, delegator_rewards}`.
+
+### `max_builder_fee`
+
+Approved builder-fee ceiling for `(address, builder)`. Required: `address` (0x hex) + `builder` (0x hex).
+
+```json
+{ "type": "max_builder_fee", "address": "0x<addr>", "builder": "0x<builder>" }
+```
+
+Response:
+
+```json
+{
+  "type": "max_builder_fee",
+  "data": { "address": "0x<addr>", "builder": "0x<builder>", "max_fee_bps": 8, "approved": true }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `max_fee_bps` | uint32 | Approved bps ceiling; `0` if not approved |
+| `approved` | bool | Whether `(address, builder)` is an approved pair |
+
+State source: `locus.fee_tracker.approved_builders[addr][builder]` (keyed).
+
+### `user_to_multi_sig_signers`
+
+Multisig config for an address. Required: `address` (0x hex).
+
+```json
+{ "type": "user_to_multi_sig_signers", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "user_to_multi_sig_signers",
+  "data": { "address": "0x<addr>", "is_multi_sig": true, "threshold": 2, "signers": ["0x…", "0x…"] }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `is_multi_sig` | bool | Whether the account is multisig |
+| `threshold` | uint32 | M-of-N threshold; `0` if not multisig |
+| `signers` | hex address[] | Signer set; empty if not multisig |
+
+State source: `multi_sig_tracker.configs[addr]` (`MultiSigConfig`).
+
+### `user_role`
+
+Derived account role. Required: `address` (0x hex).
+
+```json
+{ "type": "user_role", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{ "type": "user_role", "data": { "address": "0x<addr>", "role": "user" } }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `role` | `"missing" \| "user" \| "agent" \| "vault" \| "sub_account"` | Derived role |
+
+Precedence: `vault` (a `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (an approved agent of some master) → `user` (has a user-state / config / spot entry) → `missing`.
+
+### `perps_at_open_interest_cap`
+
+Assets whose open interest is at/over the cap. No parameters.
+
+```json
+{ "type": "perps_at_open_interest_cap" }
+```
+
+Response:
+
+```json
+{ "type": "perps_at_open_interest_cap", "data": { "assets": [0] } }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `assets` | uint32[] | Asset ids at/over their `oi_cap`, ascending |
+
+State source: per-book `open_interest` vs `PerpAnnotation.oi_cap` (books with no positive cap are skipped).
+
+### `validator_l1_votes`
+
+Current validator L1 votes. No parameters.
+
+```json
+{ "type": "validator_l1_votes" }
+```
+
+Response:
+
+```json
+{
+  "type": "validator_l1_votes",
+  "data": {
+    "latest_round": 5,
+    "votes": [ { "round": 5, "validator": "0x<validator>", "submitted_at_ms": 1700000000000 } ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `latest_round` | uint64 | Latest accepted vote round |
+| `votes[*].round` | uint64 | Vote round |
+| `votes[*].validator` | hex address | Casting validator |
+| `votes[*].submitted_at_ms` | uint64 | Submission timestamp (consensus ms) |
+
+State source: `validator_l1_vote_tracker.round_to_votes`. The vote payload is opaque oracle bytes (decoded by Module H) — the read surface reports metadata, not the raw payload.
+
+### `margin_table`
+
+The margin-tier table (leverage → maint / init ratios). No parameters.
+
+```json
+{ "type": "margin_table" }
+```
+
+Response:
+
+```json
+{
+  "type": "margin_table",
+  "data": { "tiers": [ { "asset_id": 0, "max_leverage": 50, "maint_margin_ratio": "300", "init_margin_ratio": "200" } ] }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tiers[*].asset_id` | uint32 | Asset id |
+| `tiers[*].max_leverage` | uint8 | Effective max leverage (override else static) |
+| `tiers[*].maint_margin_ratio` | bps string | Maintenance margin ratio (override else 3% static floor) |
+| `tiers[*].init_margin_ratio` | bps string | `1 / max_leverage` |
+
+State source: `dynamic_risk_overrides[asset]` else the static baseline.
+
+> **FLAGGED.** Committed state stores a single effective risk tier per market (override or static), not the multi-row leverage ladder HL serves. The proxy is one tier per market — the row the engine enforces today.
+
+### `perp_dexs`
+
+List the perp DEX(es). No parameters.
+
+```json
+{ "type": "perp_dexs" }
+```
+
+Response:
+
+```json
+{ "type": "perp_dexs", "data": { "dexs": [ { "index": 0, "n_assets": 1, "assets": [0] } ] } }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dexs[*].index` | uint64 | DEX index in `Exchange.perp_dexs` |
+| `dexs[*].n_assets` | uint64 | Number of asset books in the DEX |
+| `dexs[*].assets` | uint32[] | Asset ids in the DEX |
+
+State source: `Exchange.perp_dexs`.
+
+### `validator_summaries`
+
+Per-validator snapshot (HL `validatorSummaries`). No parameters. Lists every validator in committed `c_staking.validators` (a small, bounded set) in committed `BTreeMap` order.
+
+```json
+{ "type": "validator_summaries" }
+```
+
+Response:
+
+```json
+{
+  "type": "validator_summaries",
+  "data": {
+    "epoch": 3,
+    "total_stake": "1400",
+    "n_active": 1,
+    "validators": [
+      {
+        "validator": "0x1111…", "signer": "0xa1a1…", "validator_index": 0,
+        "stake": "1000", "self_stake": "100", "commission_bps": 500,
+        "is_active": true, "is_jailed": false, "jailed_at_ms": null,
+        "unjail_at_ms": null, "first_active_epoch": 2
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `epoch` | uint64 | Current staking epoch (`c_staking.current_epoch`) |
+| `total_stake` | decimal string | Σ stake across all validators |
+| `n_active` | uint64 | Size of the active set |
+| `validators[*].validator` | 0x address | Validator primary address |
+| `validators[*].signer` | 0x address | Operational signer (hot key) |
+| `validators[*].validator_index` | uint32 | Consensus index |
+| `validators[*].stake` | decimal string | Total delegated stake |
+| `validators[*].self_stake` | decimal string | Validator's own contribution |
+| `validators[*].commission_bps` | uint32 | Commission (basis points) |
+| `validators[*].is_active` | bool | In the active set this epoch |
+| `validators[*].is_jailed` | bool | Currently jailed |
+| `validators[*].jailed_at_ms` | uint64 \| null | Jail start ts (null if not jailed) |
+| `validators[*].unjail_at_ms` | uint64 \| null | Earliest unjail ts (null if not jailed) |
+| `validators[*].first_active_epoch` | uint64 | First epoch the validator was active |
+
+State source: `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` are not tracked on-chain — omitted rather than fabricated.
+
+### `gossip_root_ips`
+
+Configured gossip root/seed peer endpoints (HL `gossipRootIps`). No parameters. Network topology, **not** committed state: the runtime publishes this node's `network.peers[].gossip` endpoints to the read layer at startup. A solo node has no peers → honest-empty.
+
+```json
+{ "type": "gossip_root_ips" }
+```
+
+Response:
+
+```json
+{ "type": "gossip_root_ips", "data": { "root_ips": ["mtf-node-2:4001", "mtf-node-3:4001"] } }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `root_ips` | string[] | Configured gossip peer endpoints (`host:port`); empty on a solo node |
+
+State source: node config `network.peers[].gossip` (published to `NodeReadState` at startup; NOT committed state, NOT folded into AppHash).
+
+### `web_data2`
+
+Composite "everything for the frontend" snapshot for an address. Required: `address` (0x hex). Composed from the other readers so shapes never drift.
+
+```json
+{ "type": "web_data2", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "web_data2",
+  "data": {
+    "address": "0x<addr>",
+    "clearinghouse": {
+      "account_value": "1000000", "margin_used": "100000",
+      "positions": [ { "asset": 0, "size": "50", "entry_notional": "2500", "margin_mode": "cross", "leverage": 10 } ]
+    },
+    "spot_balances": [ /* <spot_clearinghouse_state.balances> */ ],
+    "open_orders": [ /* <frontend_open_orders.orders> */ ],
+    "vault_equities": [ /* <user_vault_equities.equities> */ ],
+    "exchange_status": { /* <exchange_status.data> */ }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `clearinghouse.account_value` | decimal string | Cross account value |
+| `clearinghouse.margin_used` | decimal string | Σ per-asset margin used |
+| `clearinghouse.positions` | object[] | Per-asset open positions |
+| `spot_balances` | object[] | Reuses `spot_clearinghouse_state.balances` |
+| `open_orders` | object[] | Reuses `frontend_open_orders.orders` |
+| `vault_equities` | object[] | Reuses `user_vault_equities.equities` |
+| `exchange_status` | object | Reuses `exchange_status.data` |
+
+State source: composite over the readers above.
+
+## HL node info type → MTF-native type (parity table)
+
+The Hyperliquid NODE info-server (`github.com/hyperliquid-dex/node`, `--serve-info`) serves the snapshot query set below. The middle column is the served MTF-native equivalent; ✅ = served, ⚠️ = served with a flagged proxy (no exact backing in committed state).
+
+| HL node info type | MTF-native type | Status | Notes |
+|----------------------------|------------------------------|--------|-------|
+| `meta` | `markets` | ✅ | already served (S6) |
+| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` |
+| `clearinghouseState` | `account_state` | ✅ | already served (S6) |
+| `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | keyed by `(owner, asset)` |
+| `exchangeStatus` | `exchange_status` | ✅ | scalar flags |
+| `openOrders` | `open_orders` | ✅ | already served (S6) |
+| `frontendOpenOrders` | `frontend_open_orders` | ✅ | + trigger / tif / cloid |
+| `liquidatable` | `liquidatable` | ✅ | BOLE index (⚠️ empty until first BOLE pass) |
+| `activeAssetData` | `active_asset_data` | ✅ | position / config / market |
+| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | OI cap as size ceiling proxy |
+| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = high-water-mark NAV proxy |
+| `userVaultEquities` | `user_vault_equities` | ✅ | keyed per vault |
+| `leadingVaults` | `leading_vaults` | ✅ | filtered by leader |
+| `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
+| `spotDeployState` | `spot_deploy_state` | ✅ | spot gas auction |
+| `delegatorSummary` | `delegator_summary` | ✅ | staking aggregate |
+| `maxBuilderFee` | `max_builder_fee` | ✅ | `approved_builders` |
+| `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
+| `userRole` | `user_role` | ✅ | derived from registries |
+| `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | OI vs `oi_cap` |
+| `validatorL1Votes` | `validator_l1_votes` | ✅ | metadata (opaque payload) |
+| `validatorSummaries` | `validator_summaries` | ✅ | stake / commission / active+jailed flags |
+| `gossipRootIps` | `gossip_root_ips` | ✅ | configured peer endpoints (empty on solo) |
+| `marginTable` | `margin_table` | ⚠️ | one effective tier per market (no multi-row ladder) |
+| `perpDexs` | `perp_dexs` | ✅ | index + asset count |
+| `webData2` | `web_data2` | ✅ | composite |
+| `userFees` | `fee_schedule` | ✅ | already served (S6) |
+| `delegations` | `staking_state` | ✅ | already served (S6) |
+| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | already served (S6) |
+| `subAccounts` | `sub_accounts` | ✅ | already served (S6) |
+
 ## Errors
 
 | HTTP | Body | Cause |
