@@ -42,6 +42,12 @@ rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
 *downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
+The raw curls below use the **HL-compat** shape on the **gateway** (camelCase
+types like `clearinghouseState` / `openOrders`, msgpack-signed envelopes) — handy
+if you already have an HL client. The `@metaflux/sdk` examples instead speak
+MTF-native against the **node** (`api.devnet.mtf.exchange`). Pick one lane; they
+hit different origins.
+
 ```bash
 curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
@@ -59,7 +65,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://gateway.devnet.mtf.exchange',
+  baseUrl:    'https://api.devnet.mtf.exchange',   // MTF-native node API (:8080) — NOT the gateway
   chainId:    31337,
 });
 

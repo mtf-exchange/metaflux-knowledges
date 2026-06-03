@@ -15,7 +15,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const c = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://gateway.devnet.mtf.exchange',
+  baseUrl:    'https://api.devnet.mtf.exchange',   // MTF-native node API (:8080)
   chainId:    31337,
 });
 
@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex string OR `Uint8Array` | yes (unless `signer` set) | 32-byte secp256k1 private key |
 | `signer` | `Signer` | yes (unless `privateKey` set) | Custom signer (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex address | optional | If set, used as `sender`; signer's address used as the recovered signer. For [agent-wallet pattern](./agent-wallets-howto.md). |
-| `baseUrl` | string | yes | Gateway URL |
+| `baseUrl` | string | yes | MTF-native **node** API URL (`https://api.<net>.mtf.exchange`, local `http://localhost:8080`). The SDK speaks MTF-native only and talks to the node directly — NOT the HL-compat gateway (ADR-019). See [networks](../networks.md). |
 | `chainId` | number | yes | Per network — see [networks](../networks.md) |
 | `timeoutMs` | number | optional (default 5000) | HTTP timeout |
 | `nonceFn` | `() => number` | optional (default `Date.now`) | Custom nonce generator |
@@ -160,7 +160,7 @@ class HsmSigner implements Signer {
 
 const c = new MetaFluxClient({
   signer:      new HsmSigner(),
-  baseUrl:     'https://gateway',
+  baseUrl:     'https://api.devnet.mtf.exchange',
   chainId:     31337,
 });
 ```
@@ -175,7 +175,7 @@ For the [agent-wallets pattern](./agent-wallets-howto.md):
 const agent = new MetaFluxClient({
   privateKey:    agentPrivKey,
   senderAddress: masterAddress,  // ← master is the sender
-  baseUrl:       'https://gateway',
+  baseUrl:       'https://api.devnet.mtf.exchange',
   chainId:       31337,
 });
 

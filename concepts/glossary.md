@@ -34,9 +34,9 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **CCTP — Cross-Chain Transfer Protocol.** Circle's official USDC bridge primitive. Used for all USDC bridging in/out of MetaFlux. See [bridge](../bridge/).
 
-**chainId.** EIP-712 domain field selecting the network. `31337` on devnet; production values TBD. See [networks](../networks.md).
+**chainId.** EIP-712 domain field selecting the network. `31337` devnet, `114514` testnet, `8964` mainnet. See [networks](../networks.md).
 
-**Cloid — Client Order ID.** 16-byte identifier set by the client; enables `CancelByCloid` and order idempotency. See [exchange.md `Order`](../api/rest/exchange.md#order).
+**Cloid — Client Order ID.** 16-byte identifier set by the client; enables `CancelByCloid` and order idempotency. See [exchange.md `submit_order`](../api/rest/exchange.md#submit_order).
 
 **Clearing price (FBA).** The single uniform price at which an FBA batch settles. See [FBA](./fba.md).
 

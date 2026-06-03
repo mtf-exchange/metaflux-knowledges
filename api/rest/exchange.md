@@ -538,7 +538,7 @@ child orders spaced `delay_ms` apart.
 | `delay_ms` | uint64 | Inter-slice delay in ms |
 | `reduce_only` | bool | — |
 
-Admission returns the assigned `twap_id` (a uint64). Slice events stream on the [`twapEvents` WS channel](../ws/subscriptions.md#twapevents).
+Admission returns the assigned `twap_id` (a uint64). Slice events ride the [`userEvents` WS channel](../ws/subscriptions.md#userevents) (a dedicated `twap*` stream is roadmap).
 
 ---
 
@@ -1242,7 +1242,7 @@ client                gateway                 node                  consensus
 ## See also
 
 - [`POST /info`](./info.md) — read path (MTF-native)
-- [HL-compat `/exchange`](./hl-compat.md#exchange) — alternative wire shape for HL clients
+- [HL-compat `/exchange`](./hl-compat.md) — alternative wire shape for HL clients
 - [Agent wallets](../../concepts/agent-wallets.md)
 - [Signing walkthrough](../../integration/signing.md)
 - [Order types](../../concepts/order-types.md)

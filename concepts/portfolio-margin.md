@@ -168,23 +168,30 @@ A more balanced book where no single asset exceeds 50 % of net value pays **no**
 ## Querying
 
 ```bash
-curl -X POST https://gateway/info \
+curl -X POST http://<node>:8080/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<addr>"}'
+  -d '{"type":"account_state","address":"0x<addr>"}'
 ```
 
-The response includes both classical and PM-derived maintenance when PM is enabled, plus the scenario that produced the PM number (which shock combination drove it):
+The native [`account_state`](../api/rest/info.md#account_state) read exposes
+`pm_enabled` (whether PM is active for the account) alongside `maint_margin`,
+`init_margin`, `health`, and `tier`. When PM is enabled, `maint_margin` already
+reflects the PM-derived maintenance:
 
 ```json
 {
-  "marginSummary": {
-    "totalMarginUsed_classical": "20.0",
-    "totalMarginUsed_pm":        "8.5",
-    "pm_worst_scenario": { "price_shocks": {"BTC": -10, "ETH": +10}, "vol_shocks": {"BTC":+50,"ETH":+50} },
-    "concentration_penalty":     "0.5"
-  }
+  "pm_enabled":   true,
+  "maint_margin": "8",
+  "init_margin":  "12",
+  "health":       "...",
+  "tier":         "Safe"
 }
 ```
+
+> **Planned read.** The classical-vs-PM side-by-side and the worst-case scenario
+> breakdown (which price/vol shock combination drove the PM number) are **not yet
+> broken out** as `/info` fields — the PM scenario engine computes them internally
+> but only the resulting `maint_margin` is surfaced today.
 
 ## Edge cases
 

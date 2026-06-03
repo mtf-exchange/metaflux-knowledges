@@ -11,7 +11,7 @@ Maker / taker per-fill fees with volume-tiered rebates. Builder rebate routes a 
 ## Tier table (default — see live values)
 
 ```bash
-curl -X POST https://gateway/info -d '{"type":"fee_schedule"}'
+curl -X POST http://<node>:8080/info -d '{"type":"fee_schedule"}'
 ```
 
 | 30-day volume | Maker | Taker |
@@ -102,17 +102,17 @@ Use cases:
 - A market-data API that bundles execution.
 - An automated risk service that placed protective braces.
 
-The builder must be a registered address (see [`RegisterReferrer`](../api/rest/exchange.md#registerreferrer); builder registration uses the same primitive). Unregistered builders are silently dropped.
+The builder must be a registered address (see [`approve_builder_fee`](../api/rest/exchange.md#approve_builder_fee); the referrer primitive is [`set_referrer`](../api/rest/exchange.md#set_referrer)). Unregistered builders are silently dropped.
 
 ## Burn (buyback-and-burn)
 
 **80 %** of protocol revenue (`burn_bps = 8_000`) goes to buyback-and-burn — accrued USDC market-buys MTF, which is then burned. (ADR-012 revision 2026-05-28; the earlier `0.30` ratio is obsolete.) The acquired-and-burned MTF exits circulation permanently.
 
-The cumulative amounts (`burned` USDC pool, `burned_mtf`, `treasury`, validator pool) are published via:
+The cumulative amounts (`burned` USDC pool, `burned_mtf`, `treasury`, validator pool) are tracked in committed state.
 
-```bash
-curl -X POST https://gateway/info -d '{"type":"protocol_metrics"}'
-```
+> **Planned read.** A `protocol_metrics` `/info` query type is **not yet wired**
+> into the node dispatch — the burn/treasury accumulators live in committed state
+> but aren't exposed on the read path today.
 
 ## Referrer share
 
@@ -140,11 +140,12 @@ The intended model: liquidation fills charge a liquidation fee on top of the sta
 ## Querying
 
 ```bash
-# tier overview
-curl -X POST https://gateway/info -d '{"type":"fee_schedule"}'
+# tier overview (MTF-native, node)
+curl -X POST http://<node>:8080/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume
-curl -X POST https://gateway/info \
+# your personal tier and recent volume — HL-compat shape on the GATEWAY
+# (no native per-user fee read on the node yet; see content-gap note)
+curl -X POST https://gateway.devnet.mtf.exchange/info \
   -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 

@@ -159,7 +159,7 @@ The vault address is on-chain forever; even an empty vault sticks around (gas-pa
 ### Querying
 
 ```bash
-curl -X POST https://gateway/info \
+curl -X POST http://<node>:8080/info \
   -d '{"type":"vault_state","vault":"0x<vault>"}'
 ```
 
@@ -233,7 +233,7 @@ T+5    user A withdraws all (1000 shares)
 - [Tiered liquidation](./tiered-liquidation.md) — T3 backstop, insurance pool
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
 - [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
-- [`vaultEvents` WS](../api/ws/subscriptions.md#vaultevents)
+- [`userEvents` WS](../api/ws/subscriptions.md#userevents) — vault deposit / withdraw / fee events ride this channel
 - [Staking](./staking.md) — separate from vaults
 
 ## FAQ

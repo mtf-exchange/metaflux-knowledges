@@ -126,7 +126,7 @@ For multi-strategy isolation, [sub-accounts](./sub-accounts.md) are usually a be
 
 ## Transitions
 
-Switching modes is a `UpdateMarginMode` action and is allowed only when:
+Switching modes uses the [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) action (the `is_isolated` flag — there is no separate margin-mode action) and is allowed only when:
 
 | From → To | Allowed when |
 |-----------|--------------|
@@ -192,8 +192,7 @@ client                                node
 - [Portfolio margin](./portfolio-margin.md) — PM-vs-classical math
 - [Tiered liquidation](./tiered-liquidation.md) — per-scope ladders
 - [Sub-accounts](./sub-accounts.md) — full account-level isolation
-- [`UpdateMarginMode`](../api/rest/exchange.md#updatemarginmode)
-- [`UpdateIsolatedMargin`](../api/rest/exchange.md#updateisolatedmargin)
+- [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) — margin mode is the `is_isolated` flag here; there is no separate margin-mode action
 
 ## FAQ
 

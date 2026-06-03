@@ -51,7 +51,7 @@ Quotes are visible to the taker only (not on the public book). Other participant
 
 ### Taker — request an RFQ
 
-`RfqRequest` (action variant; mirrors [`Order`](../api/rest/exchange.md#order) shape):
+`RfqRequest` (action variant; mirrors [`submit_order`](../api/rest/exchange.md#submit_order) shape):
 
 ```json
 {
@@ -79,7 +79,7 @@ Response:
 { "accepted": true, "rfq_id": "0x<16 bytes>" }
 ```
 
-The RFQ is broadcast to opted-in makers via [`rfqEvents` WS channel](../api/ws/subscriptions.md#rfqevents).
+The RFQ is broadcast to opted-in makers via the [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) (a dedicated `rfq*` event stream is roadmap).
 
 ### Maker — submit a quote
 
@@ -162,8 +162,17 @@ Registered makers receive RFQ broadcasts on `rfqEvents`. They are NOT obligated 
 
 ## Querying open RFQs
 
+{% hint style="warning" %}
+**Planned.** The RFQ *action* surface (`RfqRequest` / `RfqQuote` / `RfqAccept`)
+is live on `/exchange`, but the `/info` **read** query types below
+(`rfq_open` / `rfq_user`) are **not yet wired** into the node's `/info`
+dispatch — the RFQ engine state exists in `core-state` but isn't exposed on the
+read path. Track live RFQs via the `rfq*` WS events meanwhile.
+{% endhint %}
+
 ```bash
-curl -X POST https://gateway/info \
+# planned — not yet served by /info
+curl -X POST http://<node>:8080/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open","asset":0}'
 ```
@@ -173,7 +182,8 @@ Returns active RFQs (anonymised — taker address not exposed during the open wi
 For your own RFQs:
 
 ```bash
-curl -X POST https://gateway/info \
+# planned — not yet served by /info
+curl -X POST http://<node>:8080/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","user":"0x..."}'
 ```
@@ -207,9 +217,8 @@ T = 1.1s   commit RfqAccept; settle 10000000000 @ 10048
 ## See also
 
 - [Order types](./order-types.md) — public-book alternatives
-- [`POST /exchange RfqQuote`](../api/rest/exchange.md#rfqquote)
-- [`POST /exchange RfqAccept`](../api/rest/exchange.md#rfqaccept)
-- [`rfqEvents` WS](../api/ws/subscriptions.md#rfqevents)
+- [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `RfqQuote` / `RfqAccept` (currently recognized-but-unmapped stubs)
+- [`userEvents` WS](../api/ws/subscriptions.md#userevents) — RFQ events ride this channel
 - [Fees](./fees.md) — RFQ fills are taxed at the standard tier
 
 ## FAQ

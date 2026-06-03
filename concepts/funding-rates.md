@@ -146,18 +146,28 @@ Per-account history via [`POST /info userFills`](../api/rest/info.md) or [HL-com
 Per-market history:
 
 ```bash
-curl -X POST https://gateway/info \
+curl -X POST http://<node>:8080/info \
   -H 'content-type: application/json' \
-  -d '{"type":"funding_history","asset_id":0,"since_ts":1735000000000,"limit":1000}'
+  -d '{"type":"funding_history","market_id":0}'
 ```
 
-Returns array of:
+Returns the ordered ring of `(ts_ms, premium)` samples (see
+[`funding_history`](../api/rest/info.md#funding_history)):
 
 ```json
-{ "asset": 0, "ts": 1735689600000, "rate": "5000", "premium": "5000000" }
+{
+  "type": "funding_history",
+  "data": {
+    "market_id": 0,
+    "samples": [
+      { "ts_ms": 1700000000000, "premium": "0.0015" },
+      { "ts_ms": 1700000008000, "premium": "-0.0007" }
+    ]
+  }
+}
 ```
 
-Live updates stream on [`fundingTicks` WS channel](../api/ws/subscriptions.md#fundingticks).
+A dedicated `fundingTicks` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available); poll [`funding_history`](../api/rest/info.md#funding_history) meanwhile.
 
 ## What funding doesn't do
 
@@ -176,7 +186,7 @@ Live updates stream on [`fundingTicks` WS channel](../api/ws/subscriptions.md#fu
 
 - [Mark prices](./mark-prices.md) — how `oracle` is derived
 - [Tiered liquidation](./tiered-liquidation.md) — funding payments adjust `account_value`, which moves `health`
-- [`fundingTicks` WS channel](../api/ws/subscriptions.md#fundingticks)
+- [`fundingTicks` WS channel (roadmap)](../api/ws/subscriptions.md#roadmap--not-yet-available)
 - [Fees](./fees.md) — separate from funding
 
 ## FAQ
