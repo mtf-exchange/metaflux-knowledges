@@ -24,19 +24,24 @@ A new market mode and protocol layer that:
 
 For aggregator markets the `execution_mode` field is required; for the canonical Continuous/FBA markets it is ignored.
 
-## Two-tier execution — internalize first, route residual
+## Two execution tiers — Batch vs Fast
 
-Incoming flow follows a two-tier path:
+Both tiers execute against the aggregator's **own** book; the user picks the tier per order via the `execution_mode` field. Internalization is what happens *inside* the aggregator's book when the two tiers cross.
 
 ```
-order ─► aggregator book (internalize)
-              │
-              ├─ matched internally ──► fill at internalized price
-              │
-              └─ residual (book too thin) ──► route out to canonical on-chain CLOB
+        ┌─ execution_mode = Batch ─► per-window queue ─┐
+order ─►│                                              ├─► aggregator book
+        └─ execution_mode = Fast  ─► continuous match ─┘   (batch×fast cross =
+                                                            internalized spread)
 ```
 
-The first tier always tries to internalize against the aggregator's own book. Only the **residual** — the portion the aggregator's book cannot absorb — routes out to the canonical CLOB (and, in a later phase, to external venues once MetaBridge matures). External-venue fallback is a V3+ upgrade; the V2 routing target is the on-chain CLOB only.
+- **Batch** — orders pool into a per-window queue and clear at a single uniform price every `batch_window_ms` (default 200–300 ms), FBA-style.
+- **Fast** — orders match continuously against the aggregator's resting book at top of book.
+- **Internalization** — when batch flow crosses fast flow (or two batch orders cross), the aggregator sits in the middle and captures the spread. This is the revenue driver.
+
+### Residual routing (later phases)
+
+When the aggregator's own book is too thin to absorb an order, the **residual** routes out — first to the canonical on-chain CLOB (the MIP-3 markets), and, in a later phase, to external venues once MetaBridge matures. External-venue fallback is a **V3+** upgrade; the V2 routing target is the on-chain CLOB only. The structure leaves room for it but V2 does not ship it.
 
 ## MetaFlux-operated, not builder-deployed
 
@@ -69,10 +74,15 @@ On the retail side, the builder-code fee (capped at 8 bps) is the natural econom
 
 ## Outcomes → MIP-6, deferred to V3
 
-The number "MIP-4" previously sketched **Outcomes / prediction markets**. That mechanism has been **renumbered to MIP-6** and deferred to **V3**. MIP-4 now means the aggregator and only the aggregator; do not reuse MIP-4 for Outcomes.
+The number "MIP-4" previously sketched **Outcomes / prediction markets**. That mechanism has been **renumbered to [MIP-6](./mip-6.md)** and deferred to **V3**. MIP-4 now means the aggregator and only the aggregator; do not reuse MIP-4 for Outcomes.
+
+## Governing reference
+
+- ADR-022 — MIP-4 redefined to the Perps Liquidity Aggregator / Internalizer; supersedes the Outcomes framing of ADR-004 and pushes Outcomes to MIP-6 / V3.
 
 ## See also
 
-- [MIP-3 — permissionless market deploy](./mip-3.md) — the complementary, pro-flow / price-discovery side
+- [MIP-3 — permissionless perp market deploy](./mip-3.md) — the complementary, pro-flow / price-discovery side
+- [MIP-6 — Outcomes / prediction markets](./mip-6.md) — the renumbered Outcomes proposal, deferred to V3
 - [Fees](../concepts/fees.md) — the shared fee waterfall internalization revenue feeds into
 - [FBA](../concepts/fba.md) — batch-clearing mechanics the Batch tier builds on

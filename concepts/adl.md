@@ -26,55 +26,69 @@ if shortfall > 0:
 
 Insurance pool drawdown is itself rate-limited — see [tiered liquidation](./tiered-liquidation.md#t3-backstop).
 
-## Allocation: who gets the haircut
+## How ADL is computed
 
-The classical ADL ranking (used by HL and most CEXes) ranks counter-party accounts by:
+> Sourced from `ADR-016` (`docs/adr/ADR-016-adl-online-learning.md`), `crates/liquidation/src/adl.rs` (`AdlController`), and the read-side EVM precompile `crates/evm-integration/src/precompiles_derivatives/adl_pro_rata_price.rs`. The paper is "Autodeleveraging as Online Learning" (arXiv:2602.15182).
 
-```
-classical_score = unrealised_pnl_pct  *  leverage
-```
+MTF does **not** use a single ranking score. ADR-016 splits ADL into two independent sub-problems: a 1-D **severity** decision (how much to haircut this round) learned online, and a deterministic **pro-rata allocation** (who, by PnL capacity).
 
-Highest score is haircut first; allocation walks down the list until the shortfall is covered. The reasoning: profitable, highly-leveraged accounts have the most "free" PnL to give up.
+> ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected (alternative E in ADR-016: "二维 OGD — dimension blow-up, rejected"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
 
-MetaFlux uses a refinement — an **online-learning ranking** that observes haircut outcomes over time and re-weights the ranking inputs to minimise excess haircut.
+### 1. Severity — 1-D online gradient descent on θ
 
-```
-score_t  =  α_t * unrealised_pnl_pct  +  β_t * leverage  +  γ_t * position_age_blocks
-```
-
-`(α, β, γ)` are tuned online with the explicit objective:
+Each round picks a scalar `θ_t ∈ [0,1]` = the fraction of this round's deficit to haircut:
 
 ```
-minimise  Σ (haircut_applied - haircut_needed)²   subject to  Σ haircut_applied ≥ shortfall
+B_t          = θ_t · D_t                                  # budget for this round
+θ_needed_t   = clamp(B̂_needed / D_t, 0, 1)                 # ex-ante estimate of what's actually needed
+grad         = D_t · sign(θ_t − θ_needed_t)
+θ_{t+1}      = clamp(θ_t − η · grad, 0, 1)                 # projected OGD step
 ```
 
-i.e. give as little haircut beyond the deficit as possible. The math is the same Hessian-free gradient-descent used for online portfolio selection; weights converge over weeks of observed ADL events. Until convergence (the first dozens of ADL fires after launch), the protocol pins weights to the classical `score = unrealised_pnl_pct * leverage`.
+`D_t` = round deficit, `B̂_needed` = the execution-price estimator's guess of the true need.
 
-## Pro-rata haircut within a rank tier
+**Step size η** (`AdlController::current_eta`):
+- Default mode is **Adaptive** (paper Cor. 1): `η* = sqrt( (1 + 2·P_T^θ) / Σ D_t² )`, recomputed each round from running telemetry (`path_variation`, `cumulative_squared_deficit`).
+- On the first round (`Σ D_t² == 0`) it falls back to the governance-tunable `η₀ = 0.01` (`default_eta`).
+- A `Fixed(c)` mode pins `η = c` (governance kill-switch / reproducibility).
 
-For accounts at the same rank score, haircut is **pro-rata** to position size on the same instrument:
-
-```
-haircut_account_i  =  remaining_shortfall  *  (size_i / Σ size_j_at_same_rank)
-```
-
-The walk:
+The controller carries a **dynamic-regret bound** (Prop 1):
 
 ```
-sort counter-party accounts by score desc
-remaining = shortfall
-for tier in tiers_of_equal_score:
-    if remaining <= 0: break
-    tier_capacity = Σ unrealised_pnl(account)  for account in tier
-    if tier_capacity <= remaining:
-        haircut entire tier        # everyone in this tier surrenders all unrealised PnL
-        remaining -= tier_capacity
-    else:
-        # pro-rata partial
-        for account in tier:
-            haircut_account = remaining * pnl(account) / tier_capacity
-        remaining = 0
+Reg_T^dyn  ≤  sqrt( (1 + 2·P_T^θ) · Σ D_t² )
 ```
+
+exposed as `analytical_bound()`; `check_bound(slack)` asserts empirical regret ≤ `slack · bound` (default slack 4) in the chaos tests.
+
+All fractional fields (`θ`, `η`, `path_variation`, …) are `rust_decimal::Decimal`; `sqrt` is an integer-Newton `Decimal` sqrt (no `f64`); every accumulator uses `saturating_*` (a `Decimal::from(u128 > MAX)` would otherwise panic and halt the kernel). State persists in BOLE accumulator **slot 5**.
+
+### 2. Allocation — deterministic capacity pro-rata
+
+Given budget `B_t`, distribute across the profitable counter-parties `W_t` (each with haircut capacity `u_i` = haircut-able unrealised PnL, `u128`):
+
+```
+total_u = Σ u_i
+x_i     = floor( u_i · B_t / total_u )      capped at u_i        # 128-bit mul then 128-bit div
+```
+
+Integer-division **dust** `B_t − Σ x_i` is redistributed one unit at a time in **ascending AccountId order** to any winner with remaining capacity (`BTreeMap` iterates in key order → byte-identical across nodes). If `B_t > total_u` the round is capacity-bound and `Σ x_i = total_u`.
+
+Source: `adl.rs::pro_rata_allocate`. This replaces ADR-016's rejected vector-mirror-descent and ILP (alternatives B/C: the ILP is optimal but a non-deterministic solver — can't go on-chain).
+
+**Why pro-rata** (ADR-016, HL Oct-10 2025 replay):
+
+| Algorithm | Oct-10 total objective (lower = better) |
+|-----------|-----------------------------------------|
+| HL production (ROE heuristic) | ~$45M overshoot |
+| **MTF pro-rata** | **$3.40M** (~13× better) |
+| Vector mirror descent | $4.41M |
+| Min-max ILP (optimal, off-chain only) | $106k |
+
+Pro-rata also gives **0 %** monotonicity violations (vs HL's 11.4 %) and rank stability ≈ 1.0 (vs HL's 0.34).
+
+### Quoting ADL price (read side)
+
+The EVM precompile `0x0902 adl_pro_rata_price` lets a Solidity helper *quote* the VWAP fill an ADL of size N would clear at, walking the queue in side-appropriate priority (long ADL: highest price first; short ADL: lowest first) — **all prices on the 1e8 fixed-point plane** (`price_e8`, `capacity_e8`). It is pro-rata-only; the severity OGD lives in core-state, not the stateless precompile (severity is one decision per round; price quoting is many calls/sec).
 
 ## What "haircut" means mechanically
 
@@ -143,19 +157,21 @@ This is an estimate — actual ranking happens at the moment of ADL trigger agai
 ```
 block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
            insurance pool on asset 42 = 60 USDC
-           shortfall = 40 USDC
-           ADL fires:
-             rank counter-parties on asset 42 by score
-             top account A: pnl = 30, size = 1, score = highest
-             top account B: pnl = 50, size = 2, score = next
-           walk:
-             remaining = 40
-             tier 1: { A }, capacity = 30 → consume all; remaining = 10
-             tier 2: { B }, capacity = 50, pro-rata 10/50 = 20% haircut
+           D_t (deficit) = 40 USDC
+           severity controller: θ_t resolves to 1.0 (full deficit needed)
+           B_t = θ_t · D_t = 40                  # budget this round
+           winners W_t on asset 42 (by haircut capacity u_i):
+             A: u_A = 30
+             B: u_B = 50    →    total_u = 80
+           pro-rata: x_i = floor(u_i · B_t / total_u)
+             x_A = floor(30·40/80) = 15
+             x_B = floor(50·40/80) = 25          # Σ = 40, no dust
            result:
-             A's position closed entirely on asset 42, +30 USDC realised
-             B's position closed by 20%, +10 USDC realised, 80% kept
+             A's position haircut by 15 USDC of PnL realised, 15 kept
+             B's position haircut by 25 USDC of PnL realised, 25 kept
 ```
+
+(Allocation is **capacity-pro-rata**, not a score-ranked walk: every winner gives up the same *fraction* of capacity — here 50 % — which is exactly the min-max fairness property pro-rata buys. Compare this to the old "rank by score, drain top tier first" model, which is not what the code does.)
 
 ## See also
 
@@ -169,11 +185,11 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 **Q: Can I opt out of ADL?**
 A: No. ADL is a protocol-level loss-mutualisation mechanism; opting out would just push the loss onto someone else. The minimisation-of-excess-haircut objective is the protection.
 
-**Q: Why allocate by PnL × leverage instead of by size?**
-A: Size-based allocation punishes liquidity providers. PnL × leverage targets the accounts that have the most "free" headroom to absorb the haircut without becoming distressed themselves.
+**Q: Why allocate pro-rata by PnL capacity instead of a score-ranked queue?**
+A: Pro-rata haircuts every winner by the same *fraction* of their haircut-able PnL — built-in min-max fairness, no monotonicity violations (two accounts with the same capacity get the same fate), and rank stability ≈ 1.0. ADR-016 measured it ~13× better than HL's ROE-heuristic queue on the Oct-10 2025 replay and within ~30 % of an off-chain ILP optimum, while staying fully deterministic and on-chain. The *severity* (how much total to haircut) is the part that's learned online; *who pays* is plain pro-rata.
 
 **Q: Does ADL respect Strict-Iso?**
 A: Yes. ADL is per-asset by construction; Strict-Iso positions are counter-party candidates if and only if they hold the same asset.
 
 **Q: Is the ranking deterministic across validators?**
-A: Yes — all inputs (PnL, leverage, position age) are read from the committed state at the ADL block. The score function and online-weight tuple are also part of consensus state.
+A: Yes — all inputs (each winner's PnL capacity `u_i`, the round deficit `D_t`) are read from committed state, and the severity controller's state (`θ`, `path_variation`, `Σ D_t²`, `η`) lives in BOLE accumulator slot 5, folded into the LtHash so every node verifies byte-identical. Pro-rata uses 128-bit integer mul/div with ascending-AccountId dust handling — no float, no `HashMap`.

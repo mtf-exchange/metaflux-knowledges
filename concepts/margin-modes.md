@@ -18,6 +18,45 @@ Three modes per-asset: **Cross**, **Isolated**, **Strict-Iso**. Cross pools coll
 
 In Cross, profitable positions can carry less-healthy ones — your free balance is fungible across the account. In Isolated, blowing up one asset is contained to that asset's bucket.
 
+## How margin is computed
+
+> Sourced from `crates/core-state/src/actions/margin_gate.rs` (initial-margin gate), `crates/liquidation/src/bole.rs` (health → tier), and `RFC-003 §F` (`docs/rfc/RFC-003-liquidation-risk.md`). All amounts are on the **whole-USDC `Decimal` plane** (notional, collateral, margin), not the 1e8 book plane — see [mark prices: two price planes](./mark-prices.md#two-price-planes-read-this-before-reading-any-number).
+
+### Initial margin (pre-trade gate)
+
+An order opening new exposure must post initial margin:
+
+```
+notional        = |px × size|                         # raw integer product, Decimal scale-0
+effective_lev   = dynamic_risk_override.max_leverage   # if set, else position cap, else MAX_LEVERAGE_CAP (50)
+required_init    = ceil( notional / effective_lev )    # rounded UP — conservative
+free_collateral  = cross_account_value − Σ held_initial_margin
+reject  iff  required_init > free_collateral            # InsufficientMargin
+```
+
+So `init_margin = notional / max_leverage` — the classic `1 / max_leverage` ratio. `effective_lev` is `max(1, …)`; the global cap is `MAX_LEVERAGE_CAP = 50` (`crates/core-state/src/state/mip3_deploy.rs`), with a hard `UpdateLeverage` ceiling of **100×** and per-asset dynamic-risk overrides that can tighten it. Rounding is **up** (`Decimal::ceil`) so a remainder always tightens the gate. `reduce_only` orders bypass the gate (they only shrink exposure).
+
+`held_initial_margin` sums `ceil(|entry_notional| / effective_lev(asset))` over every **cross** open position (isolated positions are excluded — their collateral is the separately-posted bucket).
+
+### Maintenance margin & health
+
+```
+health = account_value / maint_margin          # bole.rs::decide
+```
+
+- `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed `i128`.
+- `maint_margin` = `Σ asset_to_margin_used` per asset (classical) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`).
+
+The per-asset maintenance ratio default is **500 bps = 5 %** (RFC-003 §E `DynamicRiskParams.maintenance_margin_ratio_bps`). RFC-003 §F gives the relationship to initial margin:
+
+```
+maintenance = position_value × (1/max_leverage − maintenance_deduction)
+```
+
+i.e. maintenance sits below initial by a `maintenance_deduction`, so a position can be opened and then ride down to the maintenance floor before liquidation. Health < 1.0 enters the [liquidation ladder](./tiered-liquidation.md); the tier bands (1.1 / 1.0 / 0.8 / 0.667) are in `bole.rs`.
+
+> The arithmetic uses `Decimal` / `i128` throughout (no floats); `bole.rs::decide` even right-shifts both operands by a common amount before the `Decimal` division when an account value would exceed `Decimal::MAX`, preserving the health ratio so the tier decision is unaffected.
+
 ## Cross — the default
 
 ```
@@ -34,6 +73,8 @@ health        = account_value / maint_margin
 Implication: a 10% adverse move on BTC reduces account-wide health, even if your ETH position is fine. You can prop up the BTC position by closing the ETH winner.
 
 ## Isolated
+
+> **Implementation status:** the pre-trade margin gate (`margin_gate.rs`) currently implements the **CROSS / pooled-collateral path only**. The position `margin_mode` field (0 = cross, 1 = isolated) is already read to *exclude* isolated positions from the cross held-margin sum, but a dedicated isolated-margin pre-trade gate (check the order's own posted `isolated_margin` against its notional) is a documented seam — the current trading path opens every position cross. The conceptual model below is the target behaviour.
 
 When you toggle `is_isolated: true` for an asset, the protocol moves `isolated_amount` USDC from cross balance into a per-position bucket. That position's gain/loss settles into the bucket only:
 

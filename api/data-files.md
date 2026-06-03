@@ -6,7 +6,14 @@ icon: file-lines
 # Node data files
 
 {% hint style="warning" %}
-**Status.** `l4_book_diffs.jsonl` (raw L4 book diffs) is **live** today. The hourly-rotated `node_fills` / `node_trades` / `node_order_statuses` streams are 🚧 **in progress** — the schema is pinned here so the downstream indexer and SDK consumers can build against a stable contract while the writers land.
+**Status — schema preview, writers not yet on the node.** All four streams below
+(`l4_book_diffs.jsonl`, `node_fills`, `node_trades`, `node_order_statuses`) are
+🚧 **in progress** — the node does not record any of them yet (there is no
+`[persistence] record_l4` / `write_*` config or recorder module in the current
+build). The schemas are pinned here so the downstream indexer, the L4 book
+server, and SDK consumers can build against a stable contract while the writers
+land. Treat every record shape below as the **target contract**, not a feature
+you can enable today.
 {% endhint %}
 
 ## TL;DR
@@ -33,7 +40,7 @@ In the node's TOML, under `[persistence]`:
 data_dir = "/var/lib/mtf"        # all streams land under here
 
 [persistence]
-record_l4 = true                 # LIVE — enables l4_book_diffs.jsonl
+record_l4 = true                 # 🚧 (target) enables l4_book_diffs.jsonl
 # write_fills          = true    # 🚧 hourly node_fills
 # write_trades         = true    # 🚧 hourly node_trades
 # write_order_statuses = true    # 🚧 hourly node_order_statuses
@@ -41,18 +48,19 @@ record_l4 = true                 # LIVE — enables l4_book_diffs.jsonl
 
 | Flag | Default | Stream | Status |
 |------|---------|--------|--------|
-| `record_l4` | `false` | `l4_book_diffs.jsonl` | **live** |
+| `record_l4` | `false` | `l4_book_diffs.jsonl` | 🚧 in progress (config + writer not yet in the node) |
 | `write_fills` | `false` | `node_fills/hourly/{date}/{hour}` | 🚧 in progress |
 | `write_trades` | `false` | `node_trades/hourly/{date}/{hour}` | 🚧 in progress |
 | `write_order_statuses` | `false` | `node_order_statuses/hourly/{date}/{hour}` | 🚧 in progress |
 
-All are independent — enable any subset.
+All are independent — enable any subset (once the writers land; the flags are the
+target config, not yet honored by the current build).
 
 ## Paths & rotation
 
 ```
 <data_dir>/
-├── l4_book_diffs.jsonl                       # single append-only file (live)
+├── l4_book_diffs.jsonl                       # single append-only file (🚧)
 ├── node_fills/hourly/{date}/{hour}           # 🚧 e.g. node_fills/hourly/2026-05-31/14
 ├── node_trades/hourly/{date}/{hour}          # 🚧
 └── node_order_statuses/hourly/{date}/{hour}  # 🚧
@@ -189,9 +197,9 @@ One record per print (NOT per party — a single trade, not two fills). This is 
 
 ---
 
-## `l4_book_diffs.jsonl` — raw L4 book diffs (live)
+## `l4_book_diffs.jsonl` — raw L4 book diffs 🚧
 
-The one stream **implemented today**. Mirrors HL's `--write-raw-book-diffs`: per committed block, emit the per-order CHANGES to the de-anonymized resting book (added / resized / removed), plus a full **snapshot** every `snapshot_interval` blocks (and on the first non-empty book) so a downstream L4 order-book server can bootstrap, then apply diffs. It is consumed by the [L4 book server](#references) (a separate GPL-3.0 repo with zero node-code dependency).
+Mirrors HL's `--write-raw-book-diffs`: per committed block, emit the per-order CHANGES to the de-anonymized resting book (added / resized / removed), plus a full **snapshot** every `snapshot_interval` blocks (and on the first non-empty book) so a downstream L4 order-book server can bootstrap, then apply diffs. It is consumed by the [L4 book server](#references) (a separate GPL-3.0 repo with zero node-code dependency). 🚧 The writer is not yet in the node build; the schema below is the target contract.
 
 Two record kinds share the file, discriminated by `kind`:
 

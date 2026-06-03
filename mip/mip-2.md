@@ -42,6 +42,14 @@ anyone.
 ## Status & history
 
 Metaliquidity supplies the native order-book liquidity that a protocol-owned
-provider is meant to bootstrap. It was previously deferred post-launch in favour
-of external market makers, and pulled forward because native resting liquidity is
-needed earlier than that plan assumed.
+provider is meant to bootstrap. The HLP-equivalent protocol vault was originally
+deferred post-launch (to V2) in favour of external market makers; it has been
+pulled forward into this sprint because native resting liquidity is needed
+earlier than that plan assumed. The on-chain vault is landing now; the off-chain
+strategy and provider whitelist seed in alongside it.
+
+## Governing reference
+
+- ADR-017 — MFlux Vault deferred to V2 (the deferral that MIP-2 partially reverses).
+- ADR-024 *(pending)* — will formalize the MIP-2 Metaliquidity vault design once
+  the implementation lands.

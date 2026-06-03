@@ -1,194 +1,237 @@
 # WebSocket API
 
 {% hint style="info" %}
-**Status.** **planned** for V1 launch. The protocol shape below is committed; channel coverage rolls out incrementally.
+**Status.** Live on the node today for `l2Book` and `bbo` (book/top-of-book), plus `post` (request/response over WS) and `ping`/`pong`. Other channels (`trades`, `fills`, `candles`, `userEvents`) accept a subscription but currently only emit an empty initial snapshot — they have no live event source yet. See [subscriptions](./subscriptions.md) for the per-channel status.
 {% endhint %}
 
 ## TL;DR
 
-A single WS connection multiplexes subscriptions to many channels. Each message carries a per-channel `seq` number; reconnect with a `resume_token` to resume the stream without gaps. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
+A single WS connection multiplexes subscriptions to many channels. The wire protocol is HL-native: you send `{"method":"subscribe","subscription":{"type":...}}`, the server replies with a `subscriptionResponse` ack followed by an initial snapshot, and then pushes `{"channel":...,"data":...}` frames as state commits. Book channels (`l2Book`, `bbo`) are **per-market** and require a `coin`. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
 
 ## URL
 
 ```
-wss://<gateway>/ws
+ws://<node>:8080/ws
 ```
 
-Devnet defaults to port `8443/ws`. Bare node exposes a smaller MTF-native WS at `:8080/ws` for trusted operators; do not connect public clients there.
+The node binds plain `ws://` on `:8080/ws`. In production the gateway / load-balancer terminates TLS in front of it (`wss://`), but the node itself speaks plain WS and the frame protocol is identical either way.
 
 ## Connection lifecycle
 
 ```
-client                              gateway
+client                              node
   │                                   │
   │ WS upgrade /ws                    │
   ├──────────────────────────────────►│
   │ 101 Switching Protocols           │
   │◄──────────────────────────────────┤
   │                                   │
-  │ {"op":"subscribe","ch":"l2Book","args":{"coin":"BTC"}}
+  │ {"method":"subscribe","subscription":{"type":"l2Book","coin":"BTC"}}
   ├──────────────────────────────────►│
-  │ {"op":"subscribed","ch":"l2Book","sub_id":1,"args":{...}}
-  │◄──────────────────────────────────┤
+  │ {"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"l2Book","coin":"BTC"}}}
+  │◄──────────────────────────────────┤   ◄── ack
+  │ {"channel":"l2Book","data":{"coin":"BTC","levels":[[...],[...]],"time":...}}
+  │◄──────────────────────────────────┤   ◄── initial snapshot
   │                                   │
-  │ {"ch":"l2Book","seq":1,"data":{...}}     ◄── push
-  │ {"ch":"l2Book","seq":2,"data":{...}}     ◄── push
+  │ {"channel":"l2Book","data":{...}}        ◄── push (per commit)
+  │ {"channel":"l2Book","data":{...}}        ◄── push
   │ ...                               │
   │                                   │
-  │ {"op":"ping","ts":1735689600000}  │
+  │ {"method":"ping"}                 │
   ├──────────────────────────────────►│
-  │ {"op":"pong","ts":1735689600000}  │
+  │ {"channel":"pong"}                │
   │◄──────────────────────────────────┤
   │                                   │
-  │ {"op":"unsubscribe","sub_id":1}   │
+  │ {"method":"unsubscribe","subscription":{"type":"l2Book","coin":"BTC"}}
   ├──────────────────────────────────►│
-  │ {"op":"unsubscribed","sub_id":1}  │
+  │ {"channel":"subscriptionResponse","data":{"method":"unsubscribe","subscription":{"type":"l2Book","coin":"BTC"}}}
   │◄──────────────────────────────────┤
 ```
 
 ## Frames
 
-All frames are JSON. Text frames (no binary).
+All frames are JSON **text** frames. Binary frames are rejected with an error frame (the connection stays open). Inbound frames are keyed by `method`; outbound frames are keyed by `channel`.
 
 ### `subscribe`
 
 ```json
 {
-  "op": "subscribe",
-  "ch": "<channel>",
-  "args": { /* channel-specific */ },
-  "auth": { /* optional, for private channels */ }
+  "method": "subscribe",
+  "subscription": { "type": "<channel>", "coin": "<coin>" }
 }
 ```
 
-Response:
+- `subscription.type` (required) — the channel name. Unknown names produce an error frame.
+- `subscription.coin` (required for per-market channels `l2Book` / `bbo`; omitted for `userEvents`) — see [Coin parameter](#coin-parameter).
+
+The server replies with **two** frames, in order:
+
+1. The ack:
 
 ```json
-{ "op": "subscribed", "ch": "<channel>", "sub_id": 1, "args": {...} }
+{
+  "channel": "subscriptionResponse",
+  "data": { "method": "subscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
+}
 ```
 
-Or, on rejection:
+2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2Book` / `bbo` this is a real snapshot of the latest committed book; for channels with no live source yet it is an empty-but-valid body.
 
-```json
-{ "op": "error", "code": 400, "error": "<reason>", "ch": "<channel>" }
-```
+A duplicate subscribe to the same `(type, coin)` is **silently ignored** (no second ack, no error) — matching HL behavior.
 
 ### `unsubscribe`
 
 ```json
-{ "op": "unsubscribe", "sub_id": 1 }
+{ "method": "unsubscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
 ```
 
+Ack (mirrors the subscribe ack with `method: "unsubscribe"`):
+
 ```json
-{ "op": "unsubscribed", "sub_id": 1 }
+{
+  "channel": "subscriptionResponse",
+  "data": { "method": "unsubscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
+}
 ```
+
+After the ack no more frames arrive on that `(type, coin)` until you re-subscribe. Unsubscribing a `(type, coin)` you never subscribed to is a no-op (you still get the ack).
 
 ### `ping` / `pong`
 
 ```json
-{ "op": "ping", "ts": 1735689600000 }
-{ "op": "pong", "ts": 1735689600000 }
+{ "method": "ping" }
 ```
 
-Send `ping` every 15 s. The server closes idle connections after 60 s without a frame in either direction.
+```json
+{ "channel": "pong" }
+```
+
+A bare `{"method":"ping"}` (no `subscription`) is the application-level heartbeat; the server replies `{"channel":"pong"}`. The node also answers low-level WebSocket control-frame pings (RFC 6455 `Ping`) with a `Pong` automatically, so either heartbeat mechanism works.
+
+### Error frame
+
+Any malformed or unrecognized inbound frame produces an error frame **without closing the connection**:
+
+```json
+{ "channel": "error", "data": { "error": "<reason>" } }
+```
+
+Causes include: malformed JSON, missing `method`, missing `subscription` / `subscription.type`, an unknown channel name (`"unknown channel: <name>"`), a binary frame, or an unknown method. The client can correct and retry on the same socket.
 
 ### Push messages
 
+Live data frames share one envelope:
+
+```json
+{ "channel": "<channel>", "data": { /* channel-specific */ } }
+```
+
+There is **no** `seq`, `ts`, or `sub_id` field on the frame. Demultiplex on `channel` (and, for per-market channels, the `coin` inside `data`). Updates are emitted **per committed block**: after each commit the node publishes a fresh frame for every market that has at least one live subscriber (see [Per-subscriber push](#per-subscriber-push)).
+
+### `post` (request/response over WS)
+
+A `post` lets you issue a one-shot request/response call over the same socket instead of opening a REST connection. The `request` body is the same `{type, payload}` envelope the REST routes accept and is dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature verification on actions included.
+
+Request:
+
 ```json
 {
-  "ch":   "l2Book",
-  "seq":  1234,
-  "ts":   1735689600123,
-  "data": { /* channel-specific */ }
+  "method": "post",
+  "id": 42,
+  "request": { "type": "info", "payload": { "type": "node_info" } }
 }
 ```
 
-`seq` is monotonic per `(connection, channel, args)` tuple — i.e. per subscription. Gaps signal data loss; reconnect or resync.
-
-### Resume
+Response (correlate on `id`):
 
 ```json
 {
-  "op": "subscribe",
-  "ch": "l2Book",
-  "args": { "coin": "BTC" },
-  "resume": { "seq": 1234, "token": "<resume_token>" }
-}
-```
-
-If the server still has the buffer (default retention: 30 s of messages per sub), it replays from `seq=1235` and continues. If not, it responds `{"op":"resync"}` and the client must re-subscribe from scratch.
-
-`resume_token` is opaque — present in every push as the closing-bracket `_token` field of the most recent message (channels that support resume document this).
-
-## Authentication
-
-Private channels (anything containing the user's account-specific data) require auth at subscribe time:
-
-```json
-{
-  "op": "subscribe",
-  "ch": "userEvents",
-  "args": { "user": "0x<addr>" },
-  "auth": {
-    "sender":    "0x<addr>",
-    "nonce":     1735689600000,
-    "signature": "0x..."
+  "channel": "post",
+  "data": {
+    "id": 42,
+    "response": { "type": "info", "payload": { /* same body as POST /info */ } }
   }
 }
 ```
 
-Auth is an EIP-712 signature over `{ "op": "ws_auth", "nonce": <n>, "expires_at_ms": <n+60000> }` with the same domain separator as [`/exchange`](../rest/exchange.md). One auth per subscribe; the server re-validates on the subscription, not per-message.
+- `request.type` is `"info"` or `"action"`.
+- For `"action"`, `payload` must be a full signed-exchange envelope (`signature` / `nonce` / `action`), identical to [`POST /exchange`](../rest/exchange.md). The action is signed over the **compact `serde_json` serialization of the `action` object** — the deterministic canonical form the SDK pins.
+- Errors are returned as a normal `post` frame with `response.type: "error"` and a string `payload` (never a connection close):
 
-Authenticated subs survive for `expires_at_ms - now` only; after that the server unsubscribes you with `{"op":"error","code":401,"error":"auth expired"}` and you re-auth + re-subscribe.
+```json
+{ "channel": "post", "data": { "id": 42, "response": { "type": "error", "payload": "<message>" } } }
+```
+
+A failed-but-well-formed action (e.g. bad signature) comes back as a normal `action` response with `payload.accepted: false` and an `error` string, not an `error`-type response.
+
+## Coin parameter
+
+The fanout hub is keyed by `(channel, coin)`. For the per-market channels `l2Book` and `bbo` this means:
+
+- **`coin` is required.** Without it you land on the coinless `(channel, None)` bucket, which the per-market book publisher never writes to — you would receive only the initial empty snapshot and no live updates.
+- **A `BTC` subscriber only receives `BTC` frames.** ETH commits never reach a BTC subscription, and vice-versa.
+
+`coin` is canonicalized to an **asset-id string** before keying, so two forms resolve to the same bucket:
+
+- A **numeric asset id** — e.g. `"0"`, `"7"` — maps directly to that market (the MTF-native canonical key).
+- A **symbol** — e.g. `"BTC"` — is resolved against the committed universe (`mip3_market_specs`, matching on `symbol` or `asset_name`) to its asset id.
+
+A subscriber keyed by `"BTC"` and one keyed by the numeric id `"0"` (if BTC is asset 0) therefore share the **same** routing bucket as the per-commit publish. A coin that is neither numeric nor a known universe symbol is kept verbatim as its own bucket — you get the ack + empty snapshot but never live frames (honest "unknown market" rather than a fabricated mapping).
+
+## Per-subscriber push
+
+Pushes are **subscriber-gated and per-market**. After each committed block the node, for each market, checks `has_receivers(channel, coin)` — an O(1) lookup — and only then aggregates and broadcasts that market's book. Consequences:
+
+- A market nobody is watching costs only the O(1) check; no book is built.
+- A `BTC` subscriber never triggers an `ETH` book build.
+- Frames are delivered to **every** current subscriber of that `(channel, coin)` bucket.
+
+## Backpressure & lag
+
+Each subscription is backed by a bounded broadcast ring buffer (capacity **256** frames). A consumer that falls more than 256 frames behind is **dropped**: the server sends a final error frame describing the lag and then stops forwarding on that subscription.
+
+```json
+{ "channel": "error", "data": { "error": "lagged behind broadcast by <n> messages" } }
+```
+
+On this signal, re-subscribe (you will get a fresh snapshot). The node does **not** silently skip ahead — for a derivatives chain a gap in book state is worse than an explicit drop.
+
+## Authentication
+
+Public market channels (`l2Book`, `bbo`, and the planned `trades` / `candles`) require **no auth**.
+
+Authenticated per-user channels are **not yet wired** on the node WS surface. `userEvents` accepts a subscription but currently has no live event source and no auth gate. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). The dedicated auth-at-subscribe envelope is roadmap — see [subscriptions](./subscriptions.md).
 
 ## Multiplexing
 
-A single connection can hold up to **256 subscriptions** by default. Pushes are interleaved across subs; the `sub_id` and `ch` fields demultiplex.
+A single connection can hold many subscriptions; each is demuxed by its `(channel, coin)`. Each subscription owns its own broadcast receiver and forwarder task; the connection interleaves their frames onto the one socket. Route inbound frames by `channel` plus the `coin` inside `data`.
 
 ```
-sub_id=1  l2Book BTC
-sub_id=2  l2Book ETH
-sub_id=3  userFills 0xabc...
-sub_id=4  fundingTicks BTC
+l2Book  coin "0" (BTC)
+l2Book  coin "1" (ETH)
+bbo     coin "0" (BTC)
 ```
 
-All four channels are pushed on the same connection; client routes by `sub_id`.
+## Close behavior
 
-## Ordering guarantees
+- A client `close` frame (or EOF) tears down the connection and aborts every forwarder task.
+- A read error logs and closes.
+- A lagging subscription is dropped individually (error frame), but the **connection stays open** — other subscriptions on it keep flowing.
 
-Per subscription, messages are strictly ordered by `seq` and arrive in commit order from the chain. Across subscriptions, there is **no** ordering guarantee — a fill on `userFills` for an order may arrive after the corresponding `orderEvents` push for the same fill. Match by `order_id` / `action_hash`, not by frame arrival order.
-
-Channels documented as `commit-derived` are guaranteed to fire at most once per chain commit. Channels documented as `pre-commit` may fire at admit time and the action could be evicted later (rare); for those, treat the event as a hint and confirm via the commit-derived channel.
-
-## Close codes
-
-| Code | Reason |
-|------|--------|
-| `1000` | Normal close (client issued `close` frame) |
-| `1006` | Abnormal close (network) — reconnect with backoff |
-| `1011` | Server error — backoff and reconnect |
-| `4000` | Rate-limit ban (too many subscribes / unsubscribes) |
-| `4001` | Auth failed at upgrade |
-| `4002` | Too many subscriptions (>256) |
-| `4003` | Subscription buffer exhausted (resume token stale) |
+There is no custom close-code table today; standard WebSocket close codes apply.
 
 ## Reconnect strategy
 
-1. Track the highest `seq` seen per subscription.
-2. On disconnect, reconnect with exponential backoff (base 200 ms, max 30 s, jitter ±20%).
-3. On reconnect, attempt `resume` per subscription with the stored `seq`.
-4. If `{"op":"resync"}` arrives, re-subscribe without resume and discard local state for that sub (refresh from a snapshot if needed).
+1. On disconnect, reconnect with exponential backoff (suggested: base 200 ms, max 30 s, jitter ±20%).
+2. Re-subscribe each `(type, coin)` from scratch. The first frame after each subscribe is a fresh snapshot, so there is no resume token to manage — discard local book state and rebuild from the snapshot.
+3. On a `lagged` error frame, treat it the same as a disconnect for that subscription and re-subscribe.
 
-## Channel categories
-
-- **Public market data** — no auth. Examples: `l2Book`, `trades`, `mark`, `fundingTicks`, `meta`.
-- **Per-user data** — auth required. Examples: `userEvents`, `userFills`, `orderEvents`, `marginEvents`.
-- **Operator / validator** — restricted. Out of scope for public docs.
-
-Full catalog: [subscriptions](./subscriptions.md).
+{% hint style="warning" %}
+There is **no** `seq` / `resume` / `resume_token` mechanism today. Every (re)subscribe starts from a fresh snapshot. Resume buffers are roadmap, not implemented.
+{% endhint %}
 
 ## See also
 
 - [WS subscriptions catalog](./subscriptions.md)
-- [Rate limits](../rate-limits.md) — WS budget shares the gateway pool
-- [Signing walkthrough](../../integration/signing.md) — same envelope used for `auth`
+- [`POST /exchange`](../rest/exchange.md) — same EIP-712 envelope used by the `post` action path
+- [`POST /info`](../rest/info.md) — REST equivalents for one-shot reads (also reachable via `post`)

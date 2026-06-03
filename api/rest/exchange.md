@@ -6,7 +6,21 @@
 
 ## TL;DR
 
-Every state-mutating user action — place order, cancel, transfer, vault deposit, agent approval, etc. — is a single EIP-712-signed JSON envelope sent to `POST /exchange`. The action variant is selected by the `type` field. `202 Accepted` means admitted to the mempool; commit confirmation comes through the [WS feed](../ws/subscriptions.md) or by polling.
+Every state-mutating **user** action — place order, cancel, vault deposit, agent
+approval, staking, etc. — is a single EIP-712-signed JSON envelope sent to `POST
+/exchange`. The action variant is selected by the `type` field. An **order**
+returns `200 OK` with the synchronous assigned `oid` (the handler waits for
+commit); every **other** action returns `202 Accepted` on admission, with commit
+confirmation arriving through the [WS feed](../ws/subscriptions.md) or by polling.
+
+{% hint style="warning" %}
+**User actions only.** `/exchange` is the public **user** write path. Privileged
+/ system writes — oracle price submission, faucet credits, `SystemUserModify`,
+`SystemSpotSend`, validator votes — are **never** on `/exchange`. They inject via
+node-local queues gated by validator authority (see the
+[non-bridged table](#non-bridged-actions) and the [faucet](./faucet.md#why-this-is-not-on-exchange)).
+Posting a system action's native tag returns `400 unsupported action`.
+{% endhint %}
 
 ## URL
 
@@ -94,10 +108,15 @@ cross-implementation KAT in the node + Rust SDK pins this digest.
 | Network | `chainId` |
 |---------|-----------|
 | Devnet (default) | `31337` |
-| Testnet | TBD |
-| Mainnet | TBD pre-launch |
+| Testnet | `114514` |
+| Mainnet | `8964` |
 
-See [networks](../../networks.md) for endpoints. Signing against the wrong `chainId` returns `401` because the recovered address differs from the action's `owner` (or, for sender-authorized actions, recovers a phantom address that passes no authorization check).
+The signing-domain `chainId` **must equal the node's consensus `chain_id`** —
+query it via [`/info` `node_info`](./info.md#node_info) (`data.chain_id`) and use
+that exact value. Signing against the wrong `chainId` returns `401` because the
+recovered address differs from the action's `owner` (or, for sender-authorized
+actions, recovers a phantom address that passes no authorization check). See
+[networks](../../networks.md) for endpoints.
 
 ## Numeric conventions
 
@@ -283,12 +302,14 @@ approved agent). To place many orders under one signature, use
 
 **Common errors**: `px` not tick-aligned, `size` below market minimum, `reduce_only` would grow position, `stp` rejected via STP, account in T1+ liquidation tier.
 
-**Response status entries** (per order, in order):
+**Response status entries** (per order, in order — see the full union under
+[Response → 200 OK](#200-ok--order-path-synchronous-oid)):
 
 ```json
-{"resting": {"oid": 12345, "cloid": "0x..."}}      // posted to book
-{"filled":  {"total_sz": "100000000", "avg_px": "10050000000", "oid": 12345}}
-{"error":   "<reason>"}                             // admission rejected this entry only
+{"resting": {"oid": 12345, "cloid": "0x..."}}                       // posted to book
+{"filled":  {"oid": 12345, "total_sz": "100000000", "avg_px": "10050000000"}}
+{"error":   "<reason>"}                                             // commit/admission rejected this entry
+{"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
 
 ---
@@ -1060,7 +1081,41 @@ here only to redirect integrators to the supported path.
 
 ## Response
 
-### `202 Accepted` — admitted
+The response shape depends on the action class:
+
+- **Order-type actions** (`submit_order`) → `200 OK` with a `statuses` array (the
+  handler **waits** for commit + dispatch and returns the real assigned `oid`).
+- **All other actions** → `202 Accepted` with the admission envelope.
+- **Any admission-time rejection** → the rejection envelope (`accepted:false`),
+  with the documented HTTP status.
+
+### `200 OK` — order path (synchronous oid)
+
+`submit_order` blocks up to the node's order-wait window (default ~5 s; devnet
+commits in ~250 ms) so the response carries the real `oid` + resting/filled
+status. On timeout it returns a `pending` entry — **never a fabricated oid**.
+
+```json
+{ "statuses": [ { "resting": { "oid": 12345, "cloid": "0x..." } } ] }
+```
+
+Per-order status union (one entry, in order):
+
+```json
+{ "resting": { "oid": 12345, "cloid": "0x..." } }                       // posted to book (cloid echoed only here, only if sent)
+{ "filled":  { "oid": 12345, "total_sz": "100000000", "avg_px": "10050000000" } }  // matched
+{ "error":   "<reason>" }                                               // commit/admission rejected this entry
+{ "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
+```
+
+A `pending` entry means the action was admitted and may still commit later —
+track it via the [WS feed](../ws/subscriptions.md) or by polling `/info` with the
+returned `action_hash`.
+
+### `202 Accepted` — non-order admission
+
+Every non-order action (cancel, margin, vault, staking, governance, …) returns
+the admission envelope:
 
 ```json
 {
@@ -1073,26 +1128,42 @@ here only to redirect integrators to the supported path.
 
 `mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier (`0x` + keccak256 of the exact signed `action` JSON bytes) you can match against commit events.
 
+### Rejection envelope
+
+Every admission-time rejection (4xx) carries the same flat body — `accepted:false`,
+the `error` reason, and the `mempool_depth` at the time:
+
+```json
+{ "accepted": false, "error": "signature: expected 130 hex chars, got 4", "mempool_depth": 0 }
+```
+
 ### `400 Bad Request` — malformed
 
 | `error` value | Cause | Remediation |
 |---------------|-------|-------------|
+| `signature: expected 130 hex chars, got N` | Wrong signature length / forgot the recovery byte (`v`) | Send 65 bytes `r‖s‖v` |
 | `owner: expected 40 hex chars, got N` | In-action `owner` length wrong | Drop `0x`, count hex chars |
-| `signature: expected 130 hex chars, got N` | Forgot the recovery byte (`v`) | Append `v` (27/28 or 0/1) |
-| `action: <parse error>` | `action` not valid JSON / unknown `type` | Check the catalog above; send valid JSON |
-| `missing field: <X>` | Required field omitted | Check the variant's table |
-| `unsupported action: <reason>` | Action variant recognised but not yet bridged | See the catalog for supported variants |
-| `nonce must increase` | Reused or out-of-order nonce | Use `Date.now()` or a monotonic counter |
-| `duplicate cloid` | `submit_order` / `batch_order` reused a client order id | Use a fresh `cloid` |
+| `action: <parse error>` | `action` not valid JSON / unknown `type` (parse happens **after** signature recovery — a bad sig 401s first) | Check the catalog above; send valid JSON |
+| `unsupported action: <Variant>` | Action variant recognised but not bridged on `/exchange` | See the [non-bridged table](#non-bridged-actions) |
+| `unsupported time-in-force` / `unsupported stp_mode` / `unsupported order kind` | Order carried `aon` / `reject` / a trigger kind | Use a supported value |
+| `action carries no owner` | An owner-less action that is not sender-authorized | Use a supported action |
+| `duplicate cloid` | `submit_order` reused a client order id on the same account | Use a fresh `cloid` |
 
-### `401 Unauthorized` — signature failed
+### `401 Unauthorized` — signature / authorization failed
 
 | `error` value | Cause |
 |---------------|-------|
-| `signer is not the sender and not an approved agent` | Recovered address ≠ sender AND not in sender's agent set |
-| `agent expired` | Recovered address is an agent of sender, but `expires_at_ms` has passed |
-| `unknown chainId` | Domain separator built with the wrong chainId — recovers a phantom address |
-| `agent not yet effective` | `ApproveAgent` is still in propagation (wait one block) |
+| `recover: <detail>` | Signature could not be recovered (malformed bytes, bad recovery id `v`, wrong `chainId` → phantom address) |
+| `signer is neither the owner nor an approved agent` | Recovered address ≠ the action's `owner` AND not an active approved agent of it |
+
+{% hint style="info" %}
+**Recovery runs first.** The handler recovers the signer over the raw `action`
+bytes **before** parsing the typed action. So a request with both a bad signature
+and an unknown action type returns the `401 recover:` error, not a `400`.
+Anti-replay (nonce uniqueness) is enforced in **committed state** (a 64-wide
+per-account sliding window), not at admission — a reused nonce is admitted at the
+HTTP edge and dropped at commit, so there is no synchronous `nonce` rejection here.
+{% endhint %}
 
 ### `429 Too Many Requests` — rate-limited
 

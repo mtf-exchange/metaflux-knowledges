@@ -47,31 +47,47 @@ Classical's $10 simply has no view on correlation. PM does.
 
 ## How PM works
 
-Under PM the maintenance number comes from a **scenario engine**:
+> Sourced from `crates/liquidation/src/portfolio_margin.rs` (`PortfolioMarginEngine::compute`) and PLAN §C.2 / `RFC-003` (`docs/rfc/RFC-003-liquidation-risk.md`). The engine works in **USD cents** internally (whole-USDC `Decimal` plane × 100). The PM number **replaces** the classical per-asset maintenance sum, it doesn't add to it. There is also a read-side EVM precompile (`portfolio_margin_eval`) for off-chain quoting.
+
+Under PM the maintenance number comes from a **SPAN-style scenario engine** that sweeps a deterministic `(price-shock, vol-shock)` grid over the portfolio:
 
 ```
-scenarios   = { (price_shock, vol_shock) : (ps, vs) in calibrated_grid }
-losses[s]   = simulate_portfolio_pnl_under(s)
-pm_margin   = max(losses) + concentration_penalty(portfolio)
+for each (δp, δσ) in price_shocks × vol_shocks:
+    scenario_total = Σ_i ( delta_pnl_i + gamma_pnl_i )
+        delta_pnl_i = size_i · mark_i · δp                       # linear
+        gamma_pnl_i = 0.5 · |size_i| · mark_i · iv_i · δσ · δp²   # convex (Black-Scholes-flavoured)
+worst        = min( scenario_total over the grid )              # most negative
+pm_margin    = max(0, −worst) + concentration_penalty
 ```
 
-The calibrated grid is a finite set of `(price, vol)` shocks per asset:
+The grid + concentration coefficients are the engine defaults (`PortfolioMarginEngine::default`):
 
-| Asset class | Price shocks | Vol shocks |
-|-------------|--------------|------------|
-| BTC, ETH | ±5%, ±10%, ±20% | ±20%, ±50% |
-| Major alts | ±10%, ±20%, ±35% | ±30%, ±60% |
-| Long-tail / MIP-3 listings | ±20%, ±40%, ±70% | ±50%, ±100% |
+| Parameter | Default (code) |
+|-----------|----------------|
+| Price shocks | **±5 %, ±10 %, ±20 %** (`default_price_shocks` — 6 values) |
+| Vol shocks | **±20 %, ±50 %** (`default_vol_shocks` — 4 values) |
+| Grid size | **6 × 4 = 24 scenarios** |
+| Implied vol fallback | `0.50` (50 % annualised) when the oracle gives no `iv` |
+| Concentration threshold | **50 %** of net value (`default_concentration_threshold`) |
+| Concentration penalty | **1 000 bps = 10 %** (`DEFAULT_CONCENTRATION_PENALTY_BPS`) |
+| Min enroll equity | `10_000_000` cents = **100 000 USDC** |
 
-Scenarios are applied **simultaneously** across the whole portfolio under a correlation matrix. Negative correlation across pairs creates netting credit.
+> ⚠️ **Corrections vs. prior text.** The implemented engine: (1) includes a **gamma/convexity term** driven by per-position implied vol — the prior doc modelled scenarios as pure linear PnL; (2) uses a single **24-scenario grid (±5/10/20 × ±20/50)** with no per-asset-class table — the "BTC/alts/long-tail" tiered grid in the old doc is not in the code (the grid is one engine-wide default, tunable via dynamic risk); (3) concentration threshold is **50 %**, not 60 %; (4) concentration penalty is **10 %** (1000 bps), not 5 %.
 
-`concentration_penalty` adds back margin for portfolios where a single asset dominates exposure:
+Scenarios are applied **simultaneously** across the whole portfolio. Netting falls out naturally: a hedged book's `delta_pnl_i` legs cancel in `scenario_total`, so `worst` is small. (Note: the current engine applies each `δp` uniformly across all positions — an explicit per-pair correlation matrix is a documented extension, not yet a field on the engine.)
+
+`concentration_penalty` adds back margin when a single asset dominates:
 
 ```
-concentration_penalty = max(0, single_asset_notional - concentration_threshold * total_notional) * penalty_rate
+max_abs = max over positions of |notional_i|        # cents
+if max_abs / net_value > 0.50:
+    over    = max_abs − 0.50 · net_value
+    penalty = trunc( over · 1000 / 10000 )           # 10% of the over-concentrated portion
+else:
+    penalty = 0
 ```
 
-Default `concentration_threshold = 60%`, `penalty_rate = 5%`. A book that's 80% BTC pays a penalty on the 20% above threshold.
+(Skipped when `net_value ≤ 0` — the BOLE negative-equity path catches that account instead.)
 
 ## Enrollment
 
@@ -127,27 +143,27 @@ after: long 0.5 + short 12.5 ETH, PM maint = $10, account_value = $13, health = 
 
 PM is more capital-efficient for users, which is precisely why it's risky for the protocol — a scenario miss-spec can let an account take on more risk than the chain can liquidate cleanly. MetaFlux mitigates with:
 
-- Scenario set conservatism (always include tail shocks ≥ historical 99.9% VaR).
-- `concentration_penalty` to defang single-asset PM gaming.
-- Dynamic scenario calibration that tightens shocks as volatility regimes shift.
-- Per-account PM cap (`pm_max_account_notional`, default 100M USDC).
-- Mandatory classical fallback if scenario engine fails (e.g. oracle outage).
+- `concentration_penalty` (50 % threshold / 10 % rate) to defang single-asset PM gaming — **implemented** in the engine.
+- The `min_enroll_account_value_cents` floor (100K USDC) — **implemented** (`meets_enrollment_floor`; negative net value always fails).
+- Scenario-set conservatism, dynamic calibration as vol regimes shift, a per-account PM cap (`pm_max_account_notional`, design value 100M USDC), and a mandatory classical fallback on scenario-engine failure — **design intent / not yet fields on `PortfolioMarginEngine`**; the engine today carries the grid, concentration params, and enroll floor only.
 
-Scenario set, shock magnitudes, and concentration coefficients are governance parameters. Subscribe to parameter updates if you operate near the margin limits.
+Scenario set, shock magnitudes, and concentration coefficients are governance parameters (dynamic risk). Subscribe to parameter updates if you operate near the margin limits.
 
 ## Worked example — concentration penalty
 
-Account: long 4 BTC at $100 = $400 notional, long 0.1 ETH at $1000 = $100 notional. Total $500.
+The penalty compares the **largest single-asset absolute notional** against the account's **net value** (`cash + Σ size × mark`), with the code defaults: threshold **50 %**, rate **10 %**.
 
-- BTC share: 80% > 60% threshold.
-- Excess: 80% − 60% = 20% of total = $100.
-- Penalty: $100 × 5% = $5.
+Account: net value `$1000`, largest position `|notional_BTC| = $700`.
 
-PM scenario engine computes (say) $25 worst-case loss → maint = $25 + $5 penalty = $30.
+```
+frac    = 700 / 1000 = 0.70  > 0.50 threshold
+over    = 700 − 0.50 × 1000 = 700 − 500 = $200
+penalty = trunc( 200 × 1000 / 10000 ) = $20      # 10% of the over-concentrated portion
+```
 
-A more balanced version (long $300 BTC + long $200 ETH = 60/40 split): no penalty; maint depends on the scenario engine alone, often closer to $20.
+If the PM scenario sweep computes (say) `$25` worst-case loss, `pm_margin = max(0, −worst) + penalty = $25 + $20 = $45`.
 
-The penalty subtly encourages diversification within PM; classical doesn't differentiate.
+A more balanced book where no single asset exceeds 50 % of net value pays **no** penalty — `pm_margin` is the scenario worst-case alone. The penalty discourages single-asset concentration within PM; classical margin doesn't differentiate.
 
 ## Querying
 

@@ -49,7 +49,7 @@ This is the master map. **Translation** is always: snake_case → camelCase, int
 | `subAccounts` | **wired** | [`sub_accounts`](./info.md#sub_accounts) | maps node `{index,address}` → `{subAccountUser,name,master}`; `clearinghouseState` omitted (no per-sub join on the node read) |
 | `referral` | stub | — | referrer is `Action::setReferrer`-set, immutable; returns `referredBy:null` |
 | `spotClearinghouseState` | **wired** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | node `{asset,name,balance}` → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (no hold/cost-basis on the node read) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info.md#spot_meta) | node `pairs` → `universe`; `tokens` registry derived from distinct base/quote ids (name `asset:<id>`, decimals 0 — no node token-name read); spot AssetCtx px/volume zeroed (no node spot-ctx read) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info.md#spot_meta) | node `pairs` → `universe`; `tokens` registry from node's real per-token `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); spot AssetCtx px/volume zeroed (no node spot-ctx read) |
 | `predictedFundings` | stub | — | returns `[]` |
 | `orderStatus` | stub | — | resolves to `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **wired** | [`max_builder_fee`](./info.md#max_builder_fee) | projects node `max_fee_bps` as the bare HL number; unapproved pair → `0` |
@@ -181,12 +181,12 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 ```
 
 ```json
-{ "balances": [ { "coin": "PURR", "token": 1, "total": "42", "hold": "0", "entryNtl": null } ] }
+{ "balances": [ { "coin": "MTF", "token": 104, "total": "10", "hold": "0", "entryNtl": null } ] }
 ```
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**Wired** to node [`spot_meta`](./info.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is **derived** from the distinct base/quote asset ids the pairs reference — the node has no token-name table, so each token's `name` is `asset:<id>` and decimals are `0` (wire-shape-complete; the human token registry awaits a node `spot_token` read). `spotMetaAndAssetCtxs` returns `[spotMeta, [spotAssetCtx]]`; each `spotAssetCtx` carries the pair `coin` with zeroed `markPx`/`midPx`/volume (no node spot-ctx read yet).
+**Wired** to node [`spot_meta`](./info.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is built from the node's real per-token registry: each entry's `name` / `sz_decimals` / `wei_decimals` map straight onto HL `name` / `szDecimals` / `weiDecimals`; `index` is the token asset id, `tokenId` is the 32-byte hex of the id, and USDC is flagged `isCanonical`. `spotMetaAndAssetCtxs` returns `[spotMeta, [spotAssetCtx]]`; each `spotAssetCtx` carries the pair `coin` with zeroed `markPx`/`midPx`/volume (no node spot-ctx read yet).
 
 ```json
 {"type":"spotMeta"}
@@ -194,10 +194,13 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 
 ```json
 {
-  "tokens":   [ { "name": "asset:0", "szDecimals": 0, "weiDecimals": 0, "index": 0, "tokenId": "0x...", "isCanonical": false } ],
-  "universe": [ { "name": "PURR/USDC", "tokens": [1, 0], "index": 0, "isCanonical": true } ]
+  "tokens":   [ { "name": "USDC", "szDecimals": 2, "weiDecimals": 6, "index": 100, "tokenId": "0x...", "isCanonical": true },
+                { "name": "MTF",  "szDecimals": 2, "weiDecimals": 8, "index": 104, "tokenId": "0x...", "isCanonical": false } ],
+  "universe": [ { "name": "MTF/USDC", "tokens": [104, 100], "index": 113, "isCanonical": true } ]
 }
 ```
+
+The node's token ids start at `100` (USDC) — see [`spot_meta`](./info.md#spot_meta) for the full registry — so `index` reflects those ids, not HL's `0`-based scheme.
 
 #### `maxBuilderFee`
 
@@ -364,7 +367,7 @@ HL's `/info` uses standard HTTP status codes with `{"error":...}` (unlike `/exch
 | `signature` | RSV object — three hex strings + uint `v` (27/28 or 0/1) |
 | `vaultAddress` | `null` for own account; `"0x<vault>"` to act as a vault manager |
 
-Signature is over the EIP-712 envelope (see [signing walkthrough](../../integration/signing.md)) using the **MetaFlux** domain (`chainId = 31337` on devnet; TBD per network — see [networks](../../networks.md)).
+Signature is over the EIP-712 envelope (see [signing walkthrough](../../integration/signing.md)) using the **MetaFlux** domain (`chainId = 31337` devnet / `114514` testnet / `8964` mainnet — see [networks](../../networks.md)). The `chainId` must equal the node's consensus `chain_id` (query [`/info` `node_info`](./info.md#node_info)).
 
 ### Response envelope
 
@@ -459,7 +462,7 @@ Response: `{"status":"ok","response":{"type":"cancel","data":{"statuses":["succe
 
 See [migrating from HL](../../integration/migrating-from-hl.md) for the full reference. Quick highlights:
 
-- **`chainId`** in the signing domain is MetaFlux's (`31337` devnet / TBD prod), NOT HL's.
+- **`chainId`** in the signing domain is MetaFlux's (`31337` devnet / `114514` testnet / `8964` mainnet), NOT HL's (`998`/`999`).
 - **Asset IDs are not numerically the same** as HL's. Look up via `info { "type": "meta" }` once that read is wired; never hard-code.
 - **T0 yellow card** liquidation tier exists on MTF (between healthy and HL's "Partial Liquidation"). Bots that watch liquidation events see one more event type.
 - **HL action types beyond `order` / `cancel`** return `err` during rollout. Use MTF-native [`POST /exchange`](./exchange.md), or wait.
