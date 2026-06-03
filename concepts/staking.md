@@ -176,29 +176,45 @@ Pick by:
 
 ## APR estimation
 
-> **Planned read.** A dedicated `staking_apr` `/info` query type is **not yet
-> wired** into the node dispatch. Until it ships, derive APR client-side from
-> `validator_summaries` (`total_stake`, per-validator `commission_bps`) plus the
-> emission schedule. The intended shape:
+The [`staking_apr`](../api/rest/info.md#staking_apr) `/info` query type is **live** —
+it returns the effective emission APR the begin-block reward effect actually
+applies, plus its committed inputs:
+
+```bash
+curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
+```
 
 ```json
 {
   "type": "staking_apr",
   "data": {
-    "total_active_stake":  "100000000000000",
-    "emission_per_block":  "100000000",
-    "fee_revenue_30d":     "1000000000",
-    "implied_apr_pct":        18.5
+    "total_stake":             "1000000",
+    "effective_apr":           "0.08",
+    "effective_apr_bps":       "800",
+    "governance_rate_bps":     800,
+    "emission_floor_stake":    "50000000",
+    "n_active_validators":     1,
+    "current_epoch":           2,
+    "is_gross_pre_commission": true
   }
 }
 ```
 
-APR depends on total active stake (more stake = lower per-staker share of fixed emissions) and on fee revenue (more trading = more for stakers).
+`effective_apr` is derived from the **stake curve**, not from the governance rate:
+
+```text
+effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
+```
+
+i.e. a flat **8%** at/below 50M MTF staked, decaying ∝ 1/√stake above it (more
+stake = lower per-staker share). `governance_rate_bps` is committed but **NOT
+consumed** by the reward effect — both are surfaced so the divergence is
+observable. APR is **gross**, pre per-validator commission (`is_gross_pre_commission: true`).
 
 Net APR for a delegator:
 
 ```
-net_apr  =  implied_apr_pct  *  (1 - validator_commission_pct/100)
+net_apr  =  effective_apr  ×  (1 - validator_commission_bps/10_000)
 ```
 
 ## Edge cases
@@ -235,6 +251,8 @@ T+37 days
 
 - [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (in catalog as supported action variants once live)
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
+- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective emission APR + committed inputs
+- [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)
 - [HL-compat `delegations`](../api/rest/hl-compat.md#delegations)
 - [Fees](./fees.md) — fee revenue is one of the staking reward sources
 
