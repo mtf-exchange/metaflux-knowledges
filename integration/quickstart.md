@@ -27,10 +27,14 @@ See [networks](../networks.md) for the full list including testnet and (post-lau
 
 ```bash
 curl -X POST https://faucet.devnet.mtf.exchange/usdc \
-  -d 'address=0x<YOUR_ADDRESS>&amount=10000'
+  -H 'content-type: application/json' \
+  -d '{"address":"0x<YOUR_ADDRESS>","amount":10000}'
+# -> {"address":"0x…","amount":10000,"status":"queued"}
 ```
 
-The faucet drips 10 000 USDC per request, rate-limited at 1 / hour / address. Confirm the balance:
+The faucet drips up to 10 000 USDC per request (`amount` optional), rate-limited
+at 1 / hour / address + 1 / minute / IP. The grant is `"queued"` — it lands in the
+next block, so wait ~1 block before confirming the balance:
 
 ```bash
 curl -X POST https://gateway.devnet.mtf.exchange/info \
