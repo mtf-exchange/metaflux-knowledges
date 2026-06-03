@@ -46,14 +46,14 @@ This is the master map. **Translation** is always: snake_case → camelCase, int
 | `openOrders` | stub | [`open_orders`](./info.md#open_orders) | node read exists; gateway translation not yet wired — returns `[]` |
 | `frontendOpenOrders` | stub | [`open_orders`](./info.md#open_orders) | `openOrders` + UI hints; returns `[]` |
 | `vaultDetails` | stub | [`vault_state`](./info.md#vault_state) | needs a leader-address → `vault_id` registry (node keys by `vault_id`); echoes request `user`, zeroed financials |
-| `subAccounts` | stub | [`sub_accounts`](./info.md#sub_accounts) | node read exists; translation not yet wired — returns `[]` |
+| `subAccounts` | **wired** | [`sub_accounts`](./info.md#sub_accounts) | maps node `{index,address}` → `{subAccountUser,name,master}`; `clearinghouseState` omitted (no per-sub join on the node read) |
 | `referral` | stub | — | referrer is `Action::setReferrer`-set, immutable; returns `referredBy:null` |
-| `spotClearinghouseState` | stub | — | no spot universe on the node yet; returns `{balances:[]}` |
-| `spotMeta` / `spotMetaAndAssetCtxs` | stub | — | no spot universe; returns `{tokens:[],universe:[]}` |
+| `spotClearinghouseState` | **wired** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | node `{asset,name,balance}` → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (no hold/cost-basis on the node read) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info.md#spot_meta) | node `pairs` → `universe`; `tokens` registry derived from distinct base/quote ids (name `asset:<id>`, decimals 0 — no node token-name read); spot AssetCtx px/volume zeroed (no node spot-ctx read) |
 | `predictedFundings` | stub | — | returns `[]` |
 | `orderStatus` | stub | — | resolves to `{status:"unknownOid",order:null}` |
-| `maxBuilderFee` | stub | — | returns `0` until `approveBuilderFee` lands (cap 8 bps, PLAN §L.5.2) |
-| `userRateLimit` | stub | — | budget snapshot |
+| `maxBuilderFee` | **wired** | [`max_builder_fee`](./info.md#max_builder_fee) | projects node `max_fee_bps` as the bare HL number; unapproved pair → `0` |
+| `userRateLimit` | **wired** | [`user_rate_limit`](./info.md#user_rate_limit) | node `lifetime_count` → `nRequestsUsed`, baseline `nRequestsCap`; `cumVlm:"0.0"` (no node volume on this read) |
 | `userNonFundingLedgerUpdates` | stub | — | returns `[]` |
 | `userFunding` / `userFundings` | 🚧 indexer | — | per-user funding-payment history — fed by [indexer](../data-files.md) |
 | `fundingHistory` | 🚧 indexer | [`funding_history`](./info.md#funding_history) (live samples) | per-coin historical rates over a window — archived by the indexer |
@@ -158,9 +158,66 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 ]
 ```
 
+#### `subAccounts`
+
+**Wired** to node [`sub_accounts`](./info.md#sub_accounts). Each node `{index, address}` maps to `{"subAccountUser","name","master"}` — `subAccountUser` is the node sub-account address, `master` is the queried owner, `name` is a `sub-<index>` label (no on-chain sub-account label). `clearinghouseState` is omitted: the node read carries no per-sub account-state join.
+
+```json
+{"type":"subAccounts","user":"0x..."}
+```
+
+```json
+[
+  { "subAccountUser": "0x...", "name": "sub-0", "master": "0x..." }
+]
+```
+
+#### `spotClearinghouseState`
+
+**Wired** to node [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) (by 0x `address`). Node `{asset, name, balance}` → HL `{coin, token, total, hold, entryNtl}`: `coin` from node `name`, `token` from node `asset` id, `total` from node `balance`. `hold` is `"0"` and `entryNtl` is `null` — the node read has no per-balance hold or cost basis.
+
+```json
+{"type":"spotClearinghouseState","user":"0x..."}
+```
+
+```json
+{ "balances": [ { "coin": "PURR", "token": 1, "total": "42", "hold": "0", "entryNtl": null } ] }
+```
+
+#### `spotMeta` / `spotMetaAndAssetCtxs`
+
+**Wired** to node [`spot_meta`](./info.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is **derived** from the distinct base/quote asset ids the pairs reference — the node has no token-name table, so each token's `name` is `asset:<id>` and decimals are `0` (wire-shape-complete; the human token registry awaits a node `spot_token` read). `spotMetaAndAssetCtxs` returns `[spotMeta, [spotAssetCtx]]`; each `spotAssetCtx` carries the pair `coin` with zeroed `markPx`/`midPx`/volume (no node spot-ctx read yet).
+
+```json
+{"type":"spotMeta"}
+```
+
+```json
+{
+  "tokens":   [ { "name": "asset:0", "szDecimals": 0, "weiDecimals": 0, "index": 0, "tokenId": "0x...", "isCanonical": false } ],
+  "universe": [ { "name": "PURR/USDC", "tokens": [1, 0], "index": 0, "isCanonical": true } ]
+}
+```
+
+#### `maxBuilderFee`
+
+**Wired** to node [`max_builder_fee`](./info.md#max_builder_fee) (0x `address` + `builder`). Returns the node `max_fee_bps` as the bare HL number (HL emits the integer, not an object); an unapproved `(user, builder)` pair → `0`.
+
+```json
+{"type":"maxBuilderFee","user":"0x...","builder":"0x..."}
+```
+
+#### `userRateLimit`
+
+**Wired** to node [`user_rate_limit`](./info.md#user_rate_limit) (by 0x `address`). The node `lifetime_count` maps onto `nRequestsUsed`; `nRequestsCap` is the HL baseline (1200). `cumVlm` stays `"0.0"` — the node's rate-limit read is action-stat-based, not volume-based (awaiting a node volume read).
+
+```json
+{ "cumVlm": "0.0", "nRequestsUsed": 123, "nRequestsCap": 1200 }
+```
+
 ### Stub types (HL-correct empty shape)
 
-These return HL's exact shape with zeroed/empty contents. The node read exists for several (`l2Book`, `openOrders`, `subAccounts`, `vaultDetails`) — only the gateway *translation* is pending; for the rest the node backing itself is pending.
+These return HL's exact shape with zeroed/empty contents. The node read exists for several (`l2Book`, `openOrders`, `vaultDetails`) — only the gateway *translation* is pending; for the rest the node backing itself is pending.
 
 #### `l2Book`
 
@@ -232,22 +289,6 @@ Array of `{"coin","side","limitPx","sz","oid","timestamp","origSz","reduceOnly",
 
 MetaFlux vaults are not HL vaults — same query shape, different entities (see [vaults](../../concepts/vaults.md), [MIP-2](../../mip/mip-2.md)). Backs onto node [`vault_state`](./info.md#vault_state) once the leader→`vault_id` registry is wired. `managementFeeBps` / `withdrawalLockMs` are bounded JSON numbers (HL keeps numbers for parameters, strings for monetary quantities).
 
-#### `subAccounts`
-
-Array of `{"subAccountUser","name","master","clearinghouseState"}`. Backs onto node [`sub_accounts`](./info.md#sub_accounts). Stub: `[]`.
-
-#### `spotClearinghouseState`
-
-```json
-{"type":"spotClearinghouseState","user":"0x..."}
-```
-
-`{"balances":[]}`; each balance `{coin, token, hold, total, entryNtl}`. No spot universe on the node yet.
-
-#### `spotMeta` / `spotMetaAndAssetCtxs`
-
-`{"tokens":[],"universe":[]}` (and `[spotMeta, []]` for the AssetCtxs tuple variant). No spot universe yet.
-
 #### `referral`
 
 ```json
@@ -271,8 +312,6 @@ Array of `{"subAccountUser","name","master","clearinghouseState"}`. Backs onto n
 |------|---------------|
 | `predictedFundings` | `[]` |
 | `orderStatus` | `{"status":"unknownOid","order":null}` |
-| `maxBuilderFee` | bare number `0` (HL emits the integer, not an object) |
-| `userRateLimit` | per-address weight-budget snapshot |
 | `userNonFundingLedgerUpdates` | `[]` |
 
 ### 🚧 Indexer-backed types

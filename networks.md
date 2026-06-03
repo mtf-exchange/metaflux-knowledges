@@ -1,7 +1,7 @@
 # Networks
 
 {% hint style="info" %}
-**Status.** **devnet stable**. Testnet and mainnet endpoints + chainIds published pre-launch.
+**Status.** **devnet stable**. Testnet (`chainId 114514`) and mainnet (`chainId 8964`) chainIds are assigned; their endpoints are published pre-launch.
 {% endhint %}
 
 ## Summary
@@ -9,8 +9,8 @@
 | Network | Status | `chainId` | Stable wire? |
 |---------|--------|-----------|:------------:|
 | Devnet | open for integration | `31337` | yes |
-| Testnet | preview before mainnet | TBD | yes |
-| Mainnet | not launched | TBD | yes |
+| Testnet | preview before mainnet | `114514` | yes |
+| Mainnet | not launched | `8964` | yes |
 
 ## Devnet
 
@@ -59,7 +59,7 @@ Pre-mainnet rehearsal network with stability guarantees.
 | Faucet | TBD (rate-limited) |
 | Explorer | TBD |
 
-Testnet `chainId`: TBD; will be assigned by the protocol team before launch.
+Testnet `chainId`: `114514` (`0x1bf52`). (Never 998 — that is Hyperliquid's testnet id; MetaFlux is an independent network.)
 
 Testnet differences from mainnet:
 - USDC is sandbox CCTP (not real USDC).
@@ -78,7 +78,7 @@ Production network. Real USDC, real value, real validators.
 | Gateway WS | TBD |
 | Explorer | TBD |
 
-Mainnet `chainId`: TBD; published pre-launch.
+Mainnet `chainId`: `8964` (`0x2304`).
 
 Mainnet differences from devnet/testnet:
 - USDC is production CCTP (real USDC).
