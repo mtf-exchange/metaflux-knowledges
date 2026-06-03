@@ -24,29 +24,53 @@ POST  https://<node-or-gateway>/exchange
 
 ```json
 {
-  "sender":    "0x1234567890abcdef1234567890abcdef12345678",
   "signature": "0xabcd...1b",
-  "action":    { /* one of the variants below */ },
-  "nonce":     1735689600001
+  "nonce":     1735689600001,
+  "action": {
+    "type": "submit_order",
+    "order": { /* one of the variants below */ }
+  }
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `sender` | hex string, 20 bytes (40 hex chars; `0x` prefix optional) | yes | The EVM-shape address whose state mutates. Not necessarily the signer — see [agent wallets](../../concepts/agent-wallets.md). |
-| `signature` | hex string, 65 bytes (130 hex chars) | yes | secp256k1 ECDSA over the EIP-712 envelope. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
-| `action` | object | yes | A tagged variant. See [Action catalog](#action-catalog) below. |
-| `nonce` | uint64 | yes | Strictly-monotonic per `sender`. Conventionally `Date.now()`. See [idempotency](../../integration/idempotency.md). |
+| `signature` | hex string, 65 bytes (130 hex chars; `0x` optional) | yes | secp256k1 ECDSA over the EIP-712 digest of the **exact `action` bytes** + `nonce`. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
+| `nonce` | uint64 | yes | Strictly-monotonic per actor. Conventionally `Date.now()`. Bound into the signed digest. See [idempotency](../../integration/idempotency.md). |
+| `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. |
+
+{% hint style="info" %}
+**No top-level `sender`.** The envelope carries no `sender` field. The account
+whose state mutates is determined per action:
+- **Owner-claiming actions** (`submit_order`, `cancel_order`) carry the owner
+  *inside* the action body — `action.order.owner` / `action.cancel.owner`. The
+  server recovers the signer from the signature and requires it to equal that
+  `owner` **or** an approved [agent](../../concepts/agent-wallets.md) of it.
+- **Sender-authorized actions** (governance, margin, vault-leader, staking, …)
+  carry **no** owner field at all: the recovered signer *is* the actor, and
+  action-level authorization (validator membership, vault-leader, etc.) runs at
+  dispatch.
+{% endhint %}
+
+The `action` is verified over the **exact bytes sent** — the server never
+re-serializes it. Send the `action` field byte-for-byte as it was signed (do not
+reorder keys or change whitespace after signing), or recovery yields a different
+signer and the request is rejected `401`.
 
 ## Signing
 
-The 32-byte digest committed to is:
+The signature is a secp256k1 ECDSA recovery over a standard EIP-712 digest whose
+**struct hash** binds the raw JSON `action` bytes and the `nonce`:
 
 ```
-signed_hash = keccak256( 0x1901 ‖ domain_separator ‖ keccak256( msgpack(action_with_nonce) ) )
+type_hash   = keccak256("MetaFluxAction(string action,uint64 nonce)")
+struct_hash = keccak256( type_hash ‖ keccak256(action_json) ‖ uint256_be(nonce) )
+signed_hash = keccak256( 0x1901 ‖ domain_separator ‖ struct_hash )
 ```
 
-where `action_with_nonce` is the canonical action object with `nonce` folded in (the SDK handles this), and:
+where `action_json` is the **exact UTF-8 bytes of the `action` object** the
+client signs and sends (the server hashes the raw received bytes, not a
+re-serialization), and:
 
 ```
 domain_separator = keccak256(
@@ -58,7 +82,12 @@ domain_separator = keccak256(
 )
 ```
 
-There is **no per-action `typeHash` step** — the digest goes from the msgpack payload straight through the EIP-712 envelope. See [signing walkthrough](../../integration/signing.md) for a working example.
+The `action` body is treated as a single EIP-712 `string` field — there is **no
+per-action `typeHash`**. One canonical encoder (`MetaFluxAction(string
+action,uint64 nonce)`) covers the whole action surface, so adding a new action
+variant never adds a signing primitive. See [signing
+walkthrough](../../integration/signing.md) for a working example; the
+cross-implementation KAT in the node + Rust SDK pins this digest.
 
 ### Chain IDs
 
@@ -68,7 +97,7 @@ There is **no per-action `typeHash` step** — the digest goes from the msgpack 
 | Testnet | TBD |
 | Mainnet | TBD pre-launch |
 
-See [networks](../../networks.md) for endpoints. Signing against the wrong `chainId` returns `401` because the recovered address differs from the claimed sender.
+See [networks](../../networks.md) for endpoints. Signing against the wrong `chainId` returns `401` because the recovered address differs from the action's `owner` (or, for sender-authorized actions, recovers a phantom address that passes no authorization check).
 
 ## Numeric conventions
 
@@ -750,21 +779,21 @@ Validator-only. Used in the consensus voting layer. Ordinary clients never emit 
   "accepted":      true,
   "mempool_depth": 3,
   "nonce":         1735689600001,
-  "action_hash":   "0x<keccak256_of_msgpack_action>"
+  "action_hash":   "0x<keccak256_of_action_json>"
 }
 ```
 
-`mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier you can match against commit events.
+`mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier (`0x` + keccak256 of the exact signed `action` JSON bytes) you can match against commit events.
 
 ### `400 Bad Request` — malformed
 
 | `error` value | Cause | Remediation |
 |---------------|-------|-------------|
-| `sender: expected 40 hex chars, got N` | Address length wrong | Drop `0x`, count hex chars |
+| `owner: expected 40 hex chars, got N` | In-action `owner` length wrong | Drop `0x`, count hex chars |
 | `signature: expected 130 hex chars, got N` | Forgot the recovery byte (`v`) | Append `v` (27/28 or 0/1) |
-| `unknown action variant: <X>` | Misspelled `type` | Check the catalog above |
-| `missing field: params.<X>` | Required field omitted | Check the variant's table |
-| `invalid msgpack` | Action serialisation error | Use a standards-compliant msgpack lib with default options |
+| `action: <parse error>` | `action` not valid JSON / unknown `type` | Check the catalog above; send valid JSON |
+| `missing field: <X>` | Required field omitted | Check the variant's table |
+| `unsupported action: <reason>` | Action variant recognised but not yet bridged | See the catalog for supported variants |
 | `nonce must increase` | Reused or out-of-order nonce | Use `Date.now()` or a monotonic counter |
 | `duplicate cloid` | `Order`/`ModifyOrder` reused a client order id | Use a fresh `cloid` |
 
@@ -862,8 +891,8 @@ client                gateway                 node                  consensus
 
 ## FAQ
 
-**Q: Why msgpack instead of EIP-712 typed-data for the inner action?**
-A: EIP-712 typed-data needs one `typeHash` per action variant. With ~30 action types and a growing surface, that's a maintenance burden on every SDK. msgpack gives one canonical encoder for the whole surface; the EIP-712 envelope (domain + 0x1901 + payload-hash) is preserved so wallet integrations (MetaMask, Rabby, Ledger) still see a clean signed-data prompt.
+**Q: Why hash the raw JSON `action` instead of EIP-712 typed-data per variant?**
+A: Per-variant EIP-712 typed-data needs one `typeHash` per action type. With ~30 action types and a growing surface, that's a maintenance burden on every SDK. Instead the action body is signed as a single EIP-712 `string` field under one frozen encoder — `MetaFluxAction(string action,uint64 nonce)` — so the whole surface shares one signing primitive. The server hashes the **exact received `action` bytes** (never a re-serialization), which also closes the signature-substitution trap: a body that recovers a valid signer cannot decode to a different action. The EIP-712 envelope (domain + `0x1901` + struct hash) is preserved so wallet integrations (MetaMask, Rabby, Ledger) still see a clean signed-data prompt.
 
 **Q: Can I batch unrelated actions in one request?**
 A: No. Each request is one `action`. For multi-order batching use `Order` with `orders: []`, for multi-cancel use `Cancel` with `cancels: []`, and so on. Use `MultiSig` only for the threshold-signing case.
