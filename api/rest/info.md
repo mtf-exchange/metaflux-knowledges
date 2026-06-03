@@ -206,6 +206,15 @@ keeps those two scale planes distinct, and only the human-facing reads (`market_
 the record are in the [`markets`](#markets) table below.
 {% endhint %}
 
+{% hint style="info" %}
+**Price precision vs `sz_decimals`.** `mark_px` and `oracle_px` are **snapped to
+the market's price tick** (`tick_size`, truncated toward zero) so a read never
+shows sub-tick noise — at a `$0.01` tick (`tick_size: "1000000"` in the 1e8 plane)
+`66735.255` is reported as `"66735.25"`. Note `sz_decimals` is **SIZE** precision
+(order quantity granularity — `5` ⇒ `0.00001` units), it does **not** govern price
+decimals; the price tick does. The two are independent axes (same split HL uses).
+{% endhint %}
+
 ### `markets`
 
 Every registered MIP-3 perp market, in one call. No parameters.
