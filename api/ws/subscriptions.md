@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book` and `bbo` are live and stream real committed book data per market. `trades`, `fills`, `candles`, and `user_events` are recognized channel names — you can subscribe and you get an ack + an empty initial snapshot — but they have **no live event source yet** and never push. Everything else listed under [Roadmap](#roadmap--not-yet-available) is not wired at all. The connection lifecycle and frame format are in the [WS README](./README.md).
+**Status.** `l2_book`, `bbo`, `trades`, `all_mids`, `fills`, and `user_events` are live and push real committed data per block. `candles` is a recognized name that acks + returns an empty snapshot but has no live source yet (needs a rolling OHLCV store). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`) require a `coin`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -18,14 +18,15 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 
 ## Channel status at a glance
 
-| Channel | Status | `coin`? | Live source |
+| Channel | Status | key | Live source |
 |---------|--------|:-------:|-------------|
-| `l2_book` | **live** | required | committed book, per commit |
-| `bbo` | **live** | required | committed book, per commit |
-| `trades` | stub (ack + empty snapshot, no pushes) | optional | none yet |
-| `fills` | stub (ack + empty snapshot, no pushes) | optional | none yet |
-| `candles` | stub (ack + empty snapshot, no pushes) | optional | none yet |
-| `user_events` | stub (ack + empty snapshot, no pushes) | none | none yet |
+| `l2_book` | **live** | `coin` (required) | committed book, per commit |
+| `bbo` | **live** | `coin` (required) | committed book, per commit |
+| `trades` | **live** | `coin` (required) | committed-block fills, per commit |
+| `all_mids` | **live** | none | per-market mark, per commit |
+| `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
+| `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
+| `candles` | stub (ack + empty snapshot, no pushes) | `coin` | none yet (needs a rolling OHLCV store) |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -95,45 +96,61 @@ Frequency: one frame per committed block in which this market has a live subscri
 
 ---
 
-## Stub channels (subscribe works, no live data yet)
-
-These channels are recognized so SDKs can wire them ahead of the data source. A subscribe succeeds and returns an ack plus an **empty initial snapshot**, but no live frames are pushed yet. Do not rely on them for data until promoted to "live".
-
 ### `trades`
 
-Public trade tape for one market. Empty snapshot is `[]`.
+Public trade tape for one market — one record per fill on that market each commit. `px`/`sz` are raw **1e8-plane** integer strings; `side` is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms); `tid` is a deterministic trade id; `users` is `[taker, maker]` (taker first, the aggressor).
 
 ```json
 { "method": "subscribe", "subscription": { "type": "trades", "coin": "BTC" } }
 ```
 
 ```json
-{ "channel": "trades", "data": [] }
+{ "channel": "trades", "data": { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker", "0x..maker"] } }
 ```
 
-There is no committed trade event log to read yet, so this stays honest-empty. (`coin` is accepted but, until a source is wired, all subscriptions share the empty path.)
+### `all_mids`
 
-### `fills`
-
-Per-account fill stream. Empty snapshot is `[]`. No live source yet.
+Global mid map — every market's mark price, pushed each commit. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info.md#markets) read reports. No `coin` parameter.
 
 ```json
-{ "channel": "fills", "data": [] }
+{ "method": "subscribe", "subscription": { "type": "all_mids" } }
 ```
 
-### `candles`
+```json
+{ "channel": "all_mids", "data": { "mids": { "BTC": "66703.35", "ETH": "1856.49", "SOL": "73.95", "MTF": "5" } } }
+```
 
-OHLCV bar updates. Empty snapshot is `[]`. No live source yet.
+### `fills` <a id="fills"></a>
+
+Per-account fill stream. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Each fill delivers a record to BOTH parties: the taker's record carries its `oid` + `cloid` + `crossed: true`; the maker's carries `maker_oid`, the opposite side, `cloid: null`, `crossed: false`. `px`/`sz` are 1e8-plane strings.
 
 ```json
-{ "channel": "candles", "data": [] }
+{ "method": "subscribe", "subscription": { "type": "fills", "user": "0x<address>" } }
+```
+
+```json
+{ "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] }
 ```
 
 ### `user_events` <a id="userevents"></a>
 
-Per-account order-lifecycle / liquidation / funding event firehose. Carries **no `coin`** (it is a coinless `(channel, None)` subscription). Empty snapshot is `[]`. No live source and no auth gate yet.
+Per-account event feed. Requires `user` (the 0x address) — NOT a `coin`. Today it tags `fills`; liquidation / funding event kinds will land as sibling keys.
+
+```json
+{ "channel": "user_events", "data": { "fills": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] } }
+```
 
 The native channel name is `user_events` (snake_case); on the gateway's `/hl/ws` (HL-compat) the equivalent is HL's `userEvents`.
+
+## Stub channel
+
+### `candles`
+
+OHLCV bar updates. Recognized so SDKs can wire it ahead of the source, but it acks + returns an empty snapshot (`[]`) and pushes nothing — it needs a rolling OHLCV store keyed by `(coin, interval)` that doesn't exist yet.
+
+```json
+{ "channel": "candles", "data": [] }
+```
 
 ```json
 { "method": "subscribe", "subscription": { "type": "user_events" } }

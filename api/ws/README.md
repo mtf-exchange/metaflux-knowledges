@@ -1,7 +1,7 @@
 # WebSocket API
 
 {% hint style="info" %}
-**Status.** Live on the node today for `l2_book` and `bbo` (book/top-of-book), plus `post` (request/response over WS) and `ping`/`pong`. Other channels (`trades`, `fills`, `candles`, `user_events`) accept a subscription but currently only emit an empty initial snapshot — they have no live event source yet. See [subscriptions](./subscriptions.md) for the per-channel status.
+**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `all_mids`, `fills`, `user_events` (all push real committed data per block), plus `post` (request/response over WS) and `ping`/`pong`. Only `candles` is still a stub (acks + empty snapshot, no live source yet). See [subscriptions](./subscriptions.md) for the per-channel shapes.
 {% endhint %}
 
 {% hint style="info" %}
@@ -202,9 +202,9 @@ On this signal, re-subscribe (you will get a fresh snapshot). The node does **no
 
 ## Authentication
 
-Public market channels (`l2_book`, `bbo`, and the planned `trades` / `candles`) require **no auth**.
+Public market channels (`l2_book`, `bbo`, `trades`, `all_mids`) require **no auth**.
 
-Authenticated per-user channels are **not yet wired** on the node WS surface. `user_events` accepts a subscription but currently has no live event source and no auth gate. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). The dedicated auth-at-subscribe envelope is roadmap — see [subscriptions](./subscriptions.md).
+Per-account channels (`fills`, `user_events`) are live and route per 0x `user` address, but there is **no auth gate yet** — any connection can subscribe to any address's feed (the data is the same public committed fills, keyed by account). A dedicated auth-at-subscribe envelope (so a connection only sees its own account) is roadmap. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). See [subscriptions](./subscriptions.md).
 
 ## Multiplexing
 
