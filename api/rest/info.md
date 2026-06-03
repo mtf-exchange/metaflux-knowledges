@@ -713,6 +713,237 @@ Response:
 | `bids[*].submitted_at_ms` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
 
+## Differentiator query types (RFQ / FBA / portfolio margin)
+
+These read the live state behind the MTF differentiator engines — they complement
+the `market_info.fba_enabled` / `account_state.pm_enabled` flags with the engine
+state itself. Same `{type, data}` envelope and MTF-native conventions. **Price
+plane:** RFQ + FBA prices / sizes are raw **1e8 fixed-point** integer strings (the
+book / order plane, identical to [`open_orders`](#open_orders) / [`l2_book`](#l2_book)),
+**not** whole-USDC; portfolio-margin magnitudes are **USD cents** integer strings.
+
+### `rfq_open`
+
+Every open RFQ request plus its maker quotes. No parameters. See the [RFQ concept](../../concepts/rfq.md).
+
+```json
+{ "type": "rfq_open" }
+```
+
+Response:
+
+```json
+{
+  "type": "rfq_open",
+  "data": {
+    "rfqs": [
+      {
+        "rfq_id":              1,
+        "market_id":           7,
+        "side":                "bid",
+        "size":                "1000",
+        "requester":           "0x<addr>",
+        "requester_stp_group": 42,
+        "expiry_ms":           5000,
+        "limit_px":            "105",
+        "created_at_ms":       10,
+        "quotes": [
+          {
+            "maker":           "0x<addr>",
+            "maker_stp_group": null,
+            "price":           "104",
+            "max_size":        "800",
+            "valid_until_ms":  4000,
+            "submitted_at_ms": 20
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`rfqs` iterates deterministically by `rfq_id`. An empty engine returns `"rfqs": []`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rfqs[*].rfq_id` | uint64 | RFQ request id |
+| `rfqs[*].market_id` | uint32 | Asset / market id the RFQ is for |
+| `rfqs[*].side` | `"bid"` / `"ask"` | Side the requester wants to take |
+| `rfqs[*].size` | u128 string | Requested size, 1e8 fixed-point |
+| `rfqs[*].requester` | hex address | Requesting account |
+| `rfqs[*].requester_stp_group` | uint \| null | Requester self-trade-prevention group; `null` when unset |
+| `rfqs[*].expiry_ms` | uint64 | RFQ expiry timestamp (consensus ms) |
+| `rfqs[*].limit_px` | i128 string \| null | Requester limit price, 1e8 fixed-point; `null` when unset |
+| `rfqs[*].created_at_ms` | uint64 | Creation timestamp (consensus ms) |
+| `rfqs[*].quotes[*].maker` | hex address | Quoting maker |
+| `rfqs[*].quotes[*].maker_stp_group` | uint \| null | Maker STP group; `null` when unset |
+| `rfqs[*].quotes[*].price` | i128 string | Quote price, 1e8 fixed-point |
+| `rfqs[*].quotes[*].max_size` | u128 string | Max size the maker will fill, 1e8 fixed-point |
+| `rfqs[*].quotes[*].valid_until_ms` | uint64 | Quote validity deadline (consensus ms) |
+| `rfqs[*].quotes[*].submitted_at_ms` | uint64 | Quote submission timestamp (consensus ms) |
+
+### `rfq_user`
+
+RFQs an account is party to — split into those it opened and those it quoted on. See the [RFQ concept](../../concepts/rfq.md).
+
+```json
+{ "type": "rfq_user", "account_id": 42 }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `account_id` | uint64 | one of `account_id` / `address` |
+| `address` | hex address | one of `account_id` / `address` |
+
+Either `account_id` (u64) or `address` (0x hex) identifies the account; when the
+request supplies `account_id` it is echoed back in `data.account_id`. Neither
+present → `400`; malformed `address` → `400 {"error":"invalid hex"}`.
+
+Response:
+
+```json
+{
+  "type": "rfq_user",
+  "data": {
+    "address":    "0x<addr>",
+    "account_id": 42,
+    "requested": [ /* <rfq>, same per-RFQ shape as rfq_open */ ],
+    "quoted":    [ /* <rfq> */ ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | hex address | Resolved account address |
+| `account_id` | uint64 | Echoed only when the request used `account_id` |
+| `requested` | array&lt;rfq&gt; | RFQs this account opened (requester); same per-RFQ shape as [`rfq_open`](#rfq_open) |
+| `quoted` | array&lt;rfq&gt; | RFQs this account quoted on (appears as a `maker`); same per-RFQ shape |
+
+Each list iterates deterministically by `rfq_id`. An account party to nothing
+returns a **200** with both lists empty (the established zeroed idiom).
+
+### `fba_batch_state`
+
+Live FBA pool plus the indicative clearing for one market. See the [FBA concept](../../concepts/fba.md).
+
+```json
+{ "type": "fba_batch_state", "market_id": 3 }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `market_id` | uint32 | yes |
+
+Missing `market_id` → `400`. There is **no 404** for an unregistered market: FBA
+is per-market opt-in, so a market with no pool returns a **200** with zeroed
+fields (`enabled:false`, `period_ms:0`, empty `orders`, `indicative:null`).
+
+Response:
+
+```json
+{
+  "type": "fba_batch_state",
+  "data": {
+    "market_id":      3,
+    "enabled":        true,
+    "period_ms":      200,
+    "min_lot":        "1",
+    "last_settle_ms": 500,
+    "next_settle_ms": 700,
+    "order_count":    2,
+    "bid_count":      1,
+    "ask_count":      1,
+    "bid_size":       "10",
+    "ask_size":       "6",
+    "orders": [
+      {
+        "oid":             1,
+        "owner":           "0x<addr>",
+        "side":            "bid",
+        "price":           "105",
+        "size":            "10",
+        "stp_group":       null,
+        "submitted_at_ms": 1
+      }
+    ],
+    "indicative": { "clearing_px": "100", "matched_size": "6" }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `market_id` | uint32 | Echoed market id |
+| `enabled` | bool | Whether FBA is on for this market |
+| `period_ms` | uint32 | Batch period |
+| `min_lot` | u128 string | Minimum lot size, 1e8 fixed-point |
+| `last_settle_ms` | uint64 | Last batch-settle timestamp (consensus ms) |
+| `next_settle_ms` | uint64 | **Derived** `last_settle_ms + period_ms` — the next due boundary the begin-block `is_due` check uses (not stored explicitly); `0` when `period_ms == 0` |
+| `order_count` | uint64 | Orders in the current window |
+| `bid_count` / `ask_count` | uint64 | Per-side order counts in the window |
+| `bid_size` / `ask_size` | u128 string | Per-side summed size, 1e8 fixed-point |
+| `orders[*].oid` | uint64 | Server order id |
+| `orders[*].owner` | hex address | Order owner |
+| `orders[*].side` | `"bid"` / `"ask"` | Order side |
+| `orders[*].price` | i128 string | Order price, 1e8 fixed-point |
+| `orders[*].size` | u128 string | Order size, 1e8 fixed-point |
+| `orders[*].stp_group` | uint \| null | Self-trade-prevention group; `null` when unset |
+| `orders[*].submitted_at_ms` | uint64 | Order submission timestamp (consensus ms) |
+| `indicative` | object \| null | The volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, **not yet settled / committed**. `null` when there is no cross (one-sided or empty window) |
+| `indicative.clearing_px` | i128 string | Indicative uniform clearing price, 1e8 fixed-point |
+| `indicative.matched_size` | u128 string | Size that would clear at `clearing_px`, 1e8 fixed-point |
+
+### `pm_summary`
+
+Portfolio-margin enrollment + last-computed scenario figures for an account. See [Portfolio margin](../../concepts/portfolio-margin.md).
+
+```json
+{ "type": "pm_summary", "account_id": 42 }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `account_id` | uint64 | one of `account_id` / `address` |
+| `address` | hex address | one of `account_id` / `address` |
+
+Either `account_id` (u64) or `address` (0x hex); neither present → `400`. A
+non-enrolled account returns a **200** with `enrolled:false` and zeroed figures.
+
+Response:
+
+```json
+{
+  "type": "pm_summary",
+  "data": {
+    "address":                     "0x<addr>",
+    "account_id":                  42,
+    "enrolled":                    true,
+    "enrolled_at_ms":              1000,
+    "last_computed_block":         77,
+    "pm_maint_margin_cents":       "250000",
+    "net_value_cents":             "9000000",
+    "concentration_penalty_cents": "1500"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | hex address | Resolved account address |
+| `account_id` | uint64 | Echoed only when the request used `account_id` |
+| `enrolled` | bool | Whether the account is enrolled in portfolio margin |
+| `enrolled_at_ms` | uint64 | Enrollment timestamp (consensus ms); `0` when not enrolled |
+| `last_computed_block` | uint64 | Block height of the last PM scenario computation |
+| `pm_maint_margin_cents` | u128 string | Last-computed PM maintenance requirement, **USD cents** |
+| `net_value_cents` | i128 string | Last-computed account net value, **USD cents** |
+| `concentration_penalty_cents` | u128 string | Last-computed concentration penalty, **USD cents** |
+
+The worst-case scenario loss is intentionally **omitted**: it is not persisted in
+committed state, and recomputing it would require re-running the scenario sweep,
+which is not a read-only operation.
+
 ## HL-node parity query types
 
 The following query types bring the node `/info` surface to parity with the Hyperliquid NODE info-server (`--serve-info`) snapshot set. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index).

@@ -1,12 +1,16 @@
 # WebSocket API
 
 {% hint style="info" %}
-**Status.** Live on the node today for `l2Book` and `bbo` (book/top-of-book), plus `post` (request/response over WS) and `ping`/`pong`. Other channels (`trades`, `fills`, `candles`, `userEvents`) accept a subscription but currently only emit an empty initial snapshot — they have no live event source yet. See [subscriptions](./subscriptions.md) for the per-channel status.
+**Status.** Live on the node today for `l2_book` and `bbo` (book/top-of-book), plus `post` (request/response over WS) and `ping`/`pong`. Other channels (`trades`, `fills`, `candles`, `user_events`) accept a subscription but currently only emit an empty initial snapshot — they have no live event source yet. See [subscriptions](./subscriptions.md) for the per-channel status.
+{% endhint %}
+
+{% hint style="info" %}
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `fills`, `candles`, `user_events`. Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to the native snake_case underneath. Per the unified-gateway routing: `gateway.<net>.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
 {% endhint %}
 
 ## TL;DR
 
-A single WS connection multiplexes subscriptions to many channels. The wire protocol is HL-native: you send `{"method":"subscribe","subscription":{"type":...}}`, the server replies with a `subscriptionResponse` ack followed by an initial snapshot, and then pushes `{"channel":...,"data":...}` frames as state commits. Book channels (`l2Book`, `bbo`) are **per-market** and require a `coin`. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
+A single WS connection multiplexes subscriptions to many channels. The frame protocol mirrors HL's (`{"method":"subscribe","subscription":{"type":...}}`), but the **channel names are MTF-native snake_case** (`l2_book`, `user_events`, …): you send a subscribe, the server replies with a `subscriptionResponse` ack followed by an initial snapshot, and then pushes `{"channel":...,"data":...}` frames as state commits. Book channels (`l2_book`, `bbo`) are **per-market** and require a `coin`. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
 
 ## URL
 
@@ -14,7 +18,7 @@ A single WS connection multiplexes subscriptions to many channels. The wire prot
 wss://gateway.<net>.mtf.exchange/ws
 ```
 
-MTF-native WS is the gateway's default at `/ws`; HL-compat WS is under `/hl/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
+MTF-native WS (snake_case channels) is the gateway's default at `/ws`; HL-compat WS (camelCase channels) is under `/hl/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
 
 ## Connection lifecycle
 
@@ -26,15 +30,15 @@ client                              node
   │ 101 Switching Protocols           │
   │◄──────────────────────────────────┤
   │                                   │
-  │ {"method":"subscribe","subscription":{"type":"l2Book","coin":"BTC"}}
+  │ {"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}
   ├──────────────────────────────────►│
-  │ {"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"l2Book","coin":"BTC"}}}
+  │ {"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}}
   │◄──────────────────────────────────┤   ◄── ack
-  │ {"channel":"l2Book","data":{"coin":"BTC","levels":[[...],[...]],"time":...}}
+  │ {"channel":"l2_book","data":{"coin":"BTC","levels":[[...],[...]],"time":...}}
   │◄──────────────────────────────────┤   ◄── initial snapshot
   │                                   │
-  │ {"channel":"l2Book","data":{...}}        ◄── push (per commit)
-  │ {"channel":"l2Book","data":{...}}        ◄── push
+  │ {"channel":"l2_book","data":{...}}       ◄── push (per commit)
+  │ {"channel":"l2_book","data":{...}}       ◄── push
   │ ...                               │
   │                                   │
   │ {"method":"ping"}                 │
@@ -42,9 +46,9 @@ client                              node
   │ {"channel":"pong"}                │
   │◄──────────────────────────────────┤
   │                                   │
-  │ {"method":"unsubscribe","subscription":{"type":"l2Book","coin":"BTC"}}
+  │ {"method":"unsubscribe","subscription":{"type":"l2_book","coin":"BTC"}}
   ├──────────────────────────────────►│
-  │ {"channel":"subscriptionResponse","data":{"method":"unsubscribe","subscription":{"type":"l2Book","coin":"BTC"}}}
+  │ {"channel":"subscriptionResponse","data":{"method":"unsubscribe","subscription":{"type":"l2_book","coin":"BTC"}}}
   │◄──────────────────────────────────┤
 ```
 
@@ -61,8 +65,8 @@ All frames are JSON **text** frames. Binary frames are rejected with an error fr
 }
 ```
 
-- `subscription.type` (required) — the channel name. Unknown names produce an error frame.
-- `subscription.coin` (required for per-market channels `l2Book` / `bbo`; omitted for `userEvents`) — see [Coin parameter](#coin-parameter).
+- `subscription.type` (required) — the channel name (snake_case, e.g. `l2_book`). Unknown names produce an error frame.
+- `subscription.coin` (required for per-market channels `l2_book` / `bbo`; omitted for `user_events`) — see [Coin parameter](#coin-parameter).
 
 The server replies with **two** frames, in order:
 
@@ -71,18 +75,18 @@ The server replies with **two** frames, in order:
 ```json
 {
   "channel": "subscriptionResponse",
-  "data": { "method": "subscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
+  "data": { "method": "subscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }
 }
 ```
 
-2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2Book` / `bbo` this is a real snapshot of the latest committed book; for channels with no live source yet it is an empty-but-valid body.
+2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2_book` / `bbo` this is a real snapshot of the latest committed book; for channels with no live source yet it is an empty-but-valid body.
 
 A duplicate subscribe to the same `(type, coin)` is **silently ignored** (no second ack, no error) — matching HL behavior.
 
 ### `unsubscribe`
 
 ```json
-{ "method": "unsubscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
+{ "method": "unsubscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }
 ```
 
 Ack (mirrors the subscribe ack with `method: "unsubscribe"`):
@@ -90,7 +94,7 @@ Ack (mirrors the subscribe ack with `method: "unsubscribe"`):
 ```json
 {
   "channel": "subscriptionResponse",
-  "data": { "method": "unsubscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
+  "data": { "method": "unsubscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }
 }
 ```
 
@@ -166,7 +170,7 @@ A failed-but-well-formed action (e.g. bad signature) comes back as a normal `act
 
 ## Coin parameter
 
-The fanout hub is keyed by `(channel, coin)`. For the per-market channels `l2Book` and `bbo` this means:
+The fanout hub is keyed by `(channel, coin)`. For the per-market channels `l2_book` and `bbo` this means:
 
 - **`coin` is required.** Without it you land on the coinless `(channel, None)` bucket, which the per-market book publisher never writes to — you would receive only the initial empty snapshot and no live updates.
 - **A `BTC` subscriber only receives `BTC` frames.** ETH commits never reach a BTC subscription, and vice-versa.
@@ -198,18 +202,18 @@ On this signal, re-subscribe (you will get a fresh snapshot). The node does **no
 
 ## Authentication
 
-Public market channels (`l2Book`, `bbo`, and the planned `trades` / `candles`) require **no auth**.
+Public market channels (`l2_book`, `bbo`, and the planned `trades` / `candles`) require **no auth**.
 
-Authenticated per-user channels are **not yet wired** on the node WS surface. `userEvents` accepts a subscription but currently has no live event source and no auth gate. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). The dedicated auth-at-subscribe envelope is roadmap — see [subscriptions](./subscriptions.md).
+Authenticated per-user channels are **not yet wired** on the node WS surface. `user_events` accepts a subscription but currently has no live event source and no auth gate. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). The dedicated auth-at-subscribe envelope is roadmap — see [subscriptions](./subscriptions.md).
 
 ## Multiplexing
 
 A single connection can hold many subscriptions; each is demuxed by its `(channel, coin)`. Each subscription owns its own broadcast receiver and forwarder task; the connection interleaves their frames onto the one socket. Route inbound frames by `channel` plus the `coin` inside `data`.
 
 ```
-l2Book  coin "0" (BTC)
-l2Book  coin "1" (ETH)
-bbo     coin "0" (BTC)
+l2_book  coin "0" (BTC)
+l2_book  coin "1" (ETH)
+bbo      coin "0" (BTC)
 ```
 
 ## Close behavior

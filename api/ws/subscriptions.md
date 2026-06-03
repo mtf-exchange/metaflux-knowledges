@@ -1,27 +1,31 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2Book` and `bbo` are live and stream real committed book data per market. `trades`, `fills`, `candles`, and `userEvents` are recognized channel names — you can subscribe and you get an ack + an empty initial snapshot — but they have **no live event source yet** and never push. Everything else listed under [Roadmap](#roadmap--not-yet-available) is not wired at all. The connection lifecycle and frame format are in the [WS README](./README.md).
+**Status.** `l2_book` and `bbo` are live and stream real committed book data per market. `trades`, `fills`, `candles`, and `user_events` are recognized channel names — you can subscribe and you get an ack + an empty initial snapshot — but they have **no live event source yet** and never push. Everything else listed under [Roadmap](#roadmap--not-yet-available) is not wired at all. The connection lifecycle and frame format are in the [WS README](./README.md).
 {% endhint %}
 
-The wire protocol is HL-native. You subscribe with:
+{% hint style="info" %}
+**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to these native snake_case channels underneath. Per the unified-gateway routing: `gateway.<net>.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
+{% endhint %}
+
+The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**. You subscribe with:
 
 ```json
 { "method": "subscribe", "subscription": { "type": "<channel>", "coin": "<coin>" } }
 ```
 
-and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"channel":...,"data":...}` pushes. `coin` is **required** for the per-market channels (`l2Book`, `bbo`); see [Coin parameter](./README.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
+and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"channel":...,"data":...}` pushes. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./README.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
 
 ## Channel status at a glance
 
 | Channel | Status | `coin`? | Live source |
 |---------|--------|:-------:|-------------|
-| `l2Book` | **live** | required | committed book, per commit |
+| `l2_book` | **live** | required | committed book, per commit |
 | `bbo` | **live** | required | committed book, per commit |
 | `trades` | stub (ack + empty snapshot, no pushes) | optional | none yet |
 | `fills` | stub (ack + empty snapshot, no pushes) | optional | none yet |
 | `candles` | stub (ack + empty snapshot, no pushes) | optional | none yet |
-| `userEvents` | stub (ack + empty snapshot, no pushes) | none | none yet |
+| `user_events` | stub (ack + empty snapshot, no pushes) | none | none yet |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -29,19 +33,19 @@ Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unk
 
 ## Live channels
 
-### `l2Book`
+### `l2_book`
 
 Aggregated L2 order book for one market. **Requires `coin`.**
 
 ```json
-{ "method": "subscribe", "subscription": { "type": "l2Book", "coin": "BTC" } }
+{ "method": "subscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }
 ```
 
 Initial snapshot and every push share this shape:
 
 ```json
 {
-  "channel": "l2Book",
+  "channel": "l2_book",
   "data": {
     "coin": "BTC",
     "levels": [
@@ -64,7 +68,7 @@ Frequency: one frame per committed block in which this market has a live subscri
 
 ### `bbo`
 
-Top-of-book best bid / offer for one market. A thinner `l2Book`. **Requires `coin`.**
+Top-of-book best bid / offer for one market. A thinner `l2_book`. **Requires `coin`.**
 
 ```json
 { "method": "subscribe", "subscription": { "type": "bbo", "coin": "BTC" } }
@@ -85,7 +89,7 @@ Top-of-book best bid / offer for one market. A thinner `l2Book`. **Requires `coi
 ```
 
 - `bbo` is `[best_bid, best_ask]`. Each entry is a `{ px, sz, n }` level, or `null` when that side is empty.
-- `time` is `last_trade_ms`, same as `l2Book`.
+- `time` is `last_trade_ms`, same as `l2_book`.
 
 Frequency: one frame per committed block in which this market has a live subscriber.
 
@@ -125,20 +129,22 @@ OHLCV bar updates. Empty snapshot is `[]`. No live source yet.
 { "channel": "candles", "data": [] }
 ```
 
-### `userEvents`
+### `user_events` <a id="userevents"></a>
 
 Per-account order-lifecycle / liquidation / funding event firehose. Carries **no `coin`** (it is a coinless `(channel, None)` subscription). Empty snapshot is `[]`. No live source and no auth gate yet.
 
+The native channel name is `user_events` (snake_case); on the gateway's `/hl/ws` (HL-compat) the equivalent is HL's `userEvents`.
+
 ```json
-{ "method": "subscribe", "subscription": { "type": "userEvents" } }
+{ "method": "subscribe", "subscription": { "type": "user_events" } }
 ```
 
 ```json
-{ "channel": "userEvents", "data": [] }
+{ "channel": "user_events", "data": [] }
 ```
 
 {% hint style="warning" %}
-`userEvents` is per-account data but currently has **no authentication** — it accepts any subscribe and emits an empty snapshot. Do not treat it as a private channel until the auth gate and event source land.
+`user_events` is per-account data but currently has **no authentication** — it accepts any subscribe and emits an empty snapshot. Do not treat it as a private channel until the auth gate and event source land.
 {% endhint %}
 
 ---
@@ -164,7 +170,7 @@ The following channels appeared in earlier drafts but are **not implemented** on
 
 Also not implemented today:
 
-- **Diff-based `l2Book`** (`is_snapshot` / `updates` frames) — current `l2Book` always sends full top-20 snapshots.
+- **Diff-based `l2_book`** (`is_snapshot` / `updates` frames) — current `l2_book` always sends full top-20 snapshots.
 - **`seq` / `resume` / resume tokens** — every (re)subscribe starts from a fresh snapshot.
 - **Auth-at-subscribe envelope** for private channels — use `post` with a signed action for authenticated operations.
 

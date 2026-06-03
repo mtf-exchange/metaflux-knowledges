@@ -162,33 +162,32 @@ Registered makers receive RFQ broadcasts on `rfqEvents`. They are NOT obligated 
 
 ## Querying open RFQs
 
-{% hint style="warning" %}
-**Planned.** The RFQ *action* surface (`RfqRequest` / `RfqQuote` / `RfqAccept`)
-is live on `/exchange`, but the `/info` **read** query types below
-(`rfq_open` / `rfq_user`) are **not yet wired** into the node's `/info`
-dispatch — the RFQ engine state exists in `core-state` but isn't exposed on the
-read path. Track live RFQs via the `rfq*` WS events meanwhile.
-{% endhint %}
+The RFQ engine state is exposed on the node `/info` read path via two query
+types — see [`rfq_open`](../api/rest/info.md#rfq_open) and
+[`rfq_user`](../api/rest/info.md#rfq_user) for the full response shapes and field
+tables. `size` / `price` / `max_size` / `limit_px` are raw **1e8 fixed-point**
+integer strings (the book / order plane).
+
+`rfq_open` takes **no parameters** and returns every open RFQ request joined to
+its maker quotes:
 
 ```bash
-# planned — not yet served by /info
 curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"rfq_open","asset":0}'
+  -d '{"type":"rfq_open"}'
 ```
 
-Returns active RFQs (anonymised — taker address not exposed during the open window).
-
-For your own RFQs:
+For RFQs a specific account is party to, `rfq_user` takes `account_id` (u64) or
+`address` (0x hex) and splits the result into `requested` (RFQs the account
+opened) and `quoted` (RFQs it quoted on):
 
 ```bash
-# planned — not yet served by /info
 curl -X POST https://gateway.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"rfq_user","user":"0x..."}'
+  -d '{"type":"rfq_user","address":"0x..."}'
 ```
 
-Returns RFQs you've submitted (open + recent history).
+An account party to nothing returns a 200 with both lists empty.
 
 ## Edge cases
 
