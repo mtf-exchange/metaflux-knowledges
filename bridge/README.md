@@ -78,13 +78,16 @@ Base:
 
 | Network | Contract | Address |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` | [`0x8FA28b0D3327e7671c93085F1c21652d398a33e6`](https://sepolia.basescan.org/address/0x8FA28b0D3327e7671c93085F1c21652d398a33e6) |
+| Base **Sepolia** | `MetaBridgeUSDC` | [`0x95e36Ef0442c02293d9553Fb77b15f23f2101473`](https://sepolia.basescan.org/address/0x95e36Ef0442c02293d9553Fb77b15f23f2101473) |
 | Base mainnet | — | (pre-audit) |
 
-Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); `usdcAssetId 0`, ⅔ quorum,
-300 s dispute window. Contracts + deploy runbook live in the
+Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **5-validator ⅔ set, no
+admin** (all privileged ops are validator-cosigned), 300 s dispute window. Hardened
+after two independent security audits — domain-separated + epoch-bound signatures.
+Contracts + deploy runbook live in the
 [`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts)
-repo (the L1-side co-signature / credit logic stays in the node repo's `crates/bridge`).
+repo; the L1-side co-signature / credit logic stays on the node. Pre-audit testnet —
+not for value-bearing use.
 
 ## Roadmap
 
