@@ -1,7 +1,7 @@
 # WebSocket API
 
 {% hint style="info" %}
-**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `fills`, `user_events` (all push real committed data per block), plus `post` (request/response over WS) and `ping`/`pong`. Only `candles` is still a stub (acks + empty snapshot, no live source yet). See [subscriptions](./subscriptions.md) for the per-channel shapes.
+**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `fills`, `user_events`, and `candles` (rolling OHLCV bars, per `(coin, interval)`) — all push real committed data per block — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md) for the per-channel shapes.
 {% endhint %}
 
 {% hint style="info" %}
