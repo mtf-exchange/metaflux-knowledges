@@ -9,9 +9,13 @@ Three protocol families, deliberately separate so the choice of client wire shap
 
 | Family | Where | Use when |
 |--------|-------|----------|
-| **MTF-native** | Gateway `/exchange`, `/info`, `/native/*` | New clients. Compact snake_case shape. Exposes everything, including MTF differentiation features (RFQ, FBA, PM enrollment, cross-chain). |
-| **HL-compat** | Gateway `/exchange`, `/info` (default routing) | Bringing an existing Hyperliquid client over. URL + JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
-| **CCXT-compat** | Gateway `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
+| **MTF-native** | **Node directly** (`:8080`) `/exchange`, `/info`, `/ws`, `/faucet` | New clients. Compact snake_case shape. Exposes everything, including MTF differentiation features (RFQ, FBA, PM enrollment, cross-chain). |
+| **HL-compat** | Gateway (`:8443`) `/exchange`, `/info`, `/ws` | Bringing an existing Hyperliquid client over. URL + JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
+| **CCXT-compat** | Gateway (`:8443`) `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
+
+> MTF-native clients talk to the **node** directly. The gateway is the HL-compat +
+> CCXT translation layer only — it does **not** expose a `/native/*` passthrough
+> (ADR-019: native clients use the node; HL/CCXT clients use the gateway).
 
 ## REST
 
