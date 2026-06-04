@@ -140,9 +140,9 @@ A positioned account adds entries under `positions`:
 | `margin_mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` (derived from the account's open positions) |
 | `pm_enabled` | bool | Portfolio margin opt-in state |
 | `positions[*].asset` | uint32 | Asset id |
-| `positions[*].size` | i128 string | Signed position size, **1e8 fixed-point plane** |
-| `positions[*].entry_px` | Decimal string | `\|entry_notional\| / \|size\|` (whole-USDC plane) |
-| `positions[*].unrealised_pnl` | Decimal string | Mark-to-market PnL, whole-USDC plane (signed) |
+| `positions[*].size` | i128 string | Signed position size in **raw lots** — `size / 10^sz_decimals` = whole units (`sz_decimals` is the market's size precision, e.g. 5 for BTC). This is the SIZE plane, orthogonal to the 1e8 price plane. |
+| `positions[*].entry_px` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
+| `positions[*].unrealised_pnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
 | `positions[*].isolated` | bool | `true` unless the position is cross-margined |
 | `positions[*].leverage` | uint8 | Position max leverage |
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
