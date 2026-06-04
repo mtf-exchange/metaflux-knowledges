@@ -2,10 +2,11 @@
 
 {% hint style="info" %}
 **Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet,
-`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)).
-Both directions implemented end-to-end on the L1 side: deposit (watcher → cosign →
-auto-registered cosigner → ⅔-quorum credit) and withdraw (L1 cosign → relay loop →
-on-chain `batchWithdraw`). v3 hardenings: gas-amortized `batchWithdraw`/`batchClaim`,
+`MetaBridgeUSDC` [`0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72`](https://sepolia.basescan.org/address/0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72)).
+Both directions are verified end-to-end on Base Sepolia: a real deposit
+(watcher → cosign → auto-registered cosigner → ⅔-quorum credit) and a full
+withdrawal round-trip (L1 cosign → relay loop → on-chain `batchWithdraw` →
+dispute window → `claim`). v3 hardenings: gas-amortized `batchWithdraw`/`batchClaim`,
 partial-success batches, a dual time+block dispute window, hot/cold validator key
 separation, and two-phase validator rotation. Multi-chain (Arbitrum/Solana) rollout
 + a pre-mainnet audit remain. Governed by ADR-024 (supersedes the CCTP-hybrid plan).
@@ -90,12 +91,12 @@ Base (two-phase: request → claim):
 
 | Network | Contract | Address |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` | [`0x95e36Ef0442c02293d9553Fb77b15f23f2101473`](https://sepolia.basescan.org/address/0x95e36Ef0442c02293d9553Fb77b15f23f2101473) |
+| Base **Sepolia** | `MetaBridgeUSDC` | [`0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72`](https://sepolia.basescan.org/address/0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72) |
 | Base mainnet | — | (pre-audit) |
 
-Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **5-validator ⅔ set, no
-admin** (all privileged ops are validator-cosigned), 300 s dispute window. Hardened
-after two independent security audits — domain-separated + epoch-bound signatures.
+Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
+validator set, no admin** (all privileged ops are validator-cosigned), 300 s +
+150-block dual dispute window. Domain-separated + epoch-bound signatures.
 Contracts + deploy runbook live in the
 [`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts)
 repo; the L1-side co-signature / credit logic stays on the node. Pre-audit testnet —
