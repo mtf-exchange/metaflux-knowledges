@@ -1,9 +1,14 @@
 # Bridge
 
 {% hint style="info" %}
-**Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet); L1
-deposit→credit + withdraw co-signing implemented; relayer + multi-chain rollout in
-progress. Governed by ADR-024 (supersedes the earlier CCTP-hybrid plan).
+**Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet,
+`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)).
+Both directions implemented end-to-end on the L1 side: deposit (watcher → cosign →
+auto-registered cosigner → ⅔-quorum credit) and withdraw (L1 cosign → relay loop →
+on-chain `batchWithdraw`). v3 hardenings: gas-amortized `batchWithdraw`/`batchClaim`,
+partial-success batches, a dual time+block dispute window, hot/cold validator key
+separation, and two-phase validator rotation. Multi-chain (Arbitrum/Solana) rollout
++ a pre-mainnet audit remain. Governed by ADR-024 (supersedes the CCTP-hybrid plan).
 {% endhint %}
 
 MetaFlux bridges **all assets — including USDC — through MetaBridge**, a
@@ -52,13 +57,20 @@ amount ‖ dst ‖ nonce)`.
 ```
 MetaFlux:
   1. user submits a withdraw action (Outbound MetaBridgeMsg)
-  2. validators co-sign it to ⅔ quorum; the L1 retains the signature set
+  2. validators co-sign it to ⅔ quorum; the L1 retains the signature set in
+     meta_bridge.mb_outbox + finalized_cosignatures
 
-Base:
-  3. a relayer calls bridge.withdraw(user, amount, dst, nonce, sigs…)
-     — the contract recovers signers, sums their stake, requires ≥⅔, queues it
-  4. after the dispute window, bridge.claim(id) releases USDC to the user
-     (bridge.dispute(id) is the admin challenge hook that cancels a queued one)
+Base (two-phase: request → claim):
+  3. each validator's RELAY LOOP polls the committed L1 state and submits a
+     batchWithdraw(...) tx — signed with the validator's OWN key, gas paid by the
+     validator's EVM address (no separate relayer key). The contract recovers
+     each entry's signers, sums HOT-set stake, requires ≥⅔, and QUEUES it into
+     the dispute window. A bad/raced entry in the batch is skipped (FailedWithdrawal
+     event), not reverted.
+  4. after BOTH the dispute window (seconds) AND a minimum block count elapse,
+     claim(id) / batchClaim(ids) releases USDC to the user. Any single validator
+     can dispute(id) a queued withdrawal, or the COLD ⅔-quorum can
+     invalidateWithdrawal(id), as an emergency revoke during the window.
 ```
 
 ## Security model
