@@ -114,7 +114,7 @@ USDC (and other assets) bridge via the **MetaBridge custody bridge** — validat
 
 | Chain | Status |
 |-------|--------|
-| Base | **live on Base Sepolia** (`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)); mainnet pre-audit |
+| Base | **live on Base Sepolia** (`MetaBridgeUSDC` [`0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72`](https://sepolia.basescan.org/address/0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72)); mainnet pre-audit |
 | Arbitrum | planned |
 | Solana | planned |
 
