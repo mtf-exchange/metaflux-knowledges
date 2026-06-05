@@ -41,8 +41,7 @@ A node not following these rules is not a valid validator; consensus rejects it.
 | Layer | Trust assumption |
 |-------|------------------|
 | Oracle composition | Trust the validator-published oracle within the documented composition |
-| CCTP | Trust Circle's attestation service for USDC bridging |
-| MetaBridge | Trust the MetaFlux validator set's M-of-N signature on non-USDC bridge transfers (same set as consensus; see [bridge](./bridge/)) |
+| MetaBridge | Trust the MetaFlux validator set's ⅔ stake-weighted co-signature on ALL bridge transfers — USDC included — behind a withdrawal dispute window (same keys as consensus; no third-party attestation service; see [bridge](./bridge/)) |
 | Governance | Parameter changes are governance-controlled; trust governance to act in the protocol's interest |
 
 The principle: trust is minimised, not eliminated. Where shared trust is unavoidable (oracles, attestation services), the trust surface is documented and bounded.
@@ -67,7 +66,7 @@ These are not security issues. They are operational risk users carry.
 - Replay of valid signatures across networks (chainId domain isolation bypass).
 - Privilege escalation (agent gains withdrawal authority; non-master triggers master-only action).
 - Loss of funds outside the documented liquidation / ADL / fee mechanics.
-- Bridge integration flaws (incorrect CCTP attestation verification).
+- Bridge integration flaws (MetaBridge cosignature / ⅔-quorum verification, message-id replay, dispute-window bypass).
 - WS auth bypass (subscribe to private channels without auth).
 - DoS that prevents valid actions from being admitted at documented rate limits.
 - Documented invariants that don't hold (e.g. nonce monotonicity bypass).
@@ -142,7 +141,7 @@ If a node sees consensus halt, switch to another node / gateway (the validator s
 
 ## See also
 
-- [Bridge](./bridge/) — CCTP trust surface
+- [Bridge](./bridge/) — MetaBridge custody trust surface
 - [Versioning](./versioning.md) — change policy
 - [Networks](./networks.md) — operational endpoints
 - [Multi-sig](./concepts/multi-sig.md) — institutional custody
