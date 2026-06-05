@@ -32,7 +32,7 @@ Insurance pool drawdown is itself rate-limited — see [tiered liquidation](./ti
 
 MTF does **not** use a single ranking score. ADR-016 splits ADL into two independent sub-problems: a 1-D **severity** decision (how much to haircut this round) learned online, and a deterministic **pro-rata allocation** (who, by PnL capacity).
 
-> ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected (alternative E in ADR-016: "二维 OGD — dimension blow-up, rejected"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
+> ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected (alternative E in ADR-016: "2D OGD — dimension blow-up, rejected"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
 
 ### 1. Severity — 1-D online gradient descent on θ
 

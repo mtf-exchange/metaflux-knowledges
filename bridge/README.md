@@ -49,9 +49,8 @@ MetaFlux:
      EXACTLY ONCE (idempotent by message id)
 ```
 
-The `Deposit` event is byte-compatible with the L1 deterministic `message_id`
-(`crates/bridge/meta_bridge.rs`): `keccak256(chain ‖ direction ‖ user ‖ asset ‖
-amount ‖ dst ‖ nonce)`.
+The `Deposit` event is byte-compatible with the L1 deterministic `message_id`:
+`keccak256(chain ‖ direction ‖ user ‖ asset ‖ amount ‖ dst ‖ nonce)`.
 
 ### Withdraw (MetaFlux → source chain)
 
