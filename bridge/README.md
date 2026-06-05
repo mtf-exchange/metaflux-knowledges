@@ -2,14 +2,17 @@
 
 {% hint style="info" %}
 **Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet,
-`MetaBridgeUSDC` [`0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72`](https://sepolia.basescan.org/address/0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72)).
-Both directions are verified end-to-end on Base Sepolia: a real deposit
+`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)),
+and a Solana custody program live on **devnet** under the same model. Both
+directions are verified end-to-end on Base Sepolia: a real deposit
 (watcher → cosign → auto-registered cosigner → ⅔-quorum credit) and a full
 withdrawal round-trip (L1 cosign → relay loop → on-chain `batchWithdraw` →
-dispute window → `claim`). v3 hardenings: gas-amortized `batchWithdraw`/`batchClaim`,
+dispute window → `claim`). Hardenings: gas-amortized `batchWithdraw`/`batchClaim`,
 partial-success batches, a dual time+block dispute window, hot/cold validator key
-separation, and two-phase validator rotation. Multi-chain (Arbitrum/Solana) rollout
-+ a pre-mainnet audit remain. Governed by ADR-024 (supersedes the CCTP-hybrid plan).
+separation, two-phase validator rotation with a single-hot-validator **cancel**
+veto during the window, and domain- + epoch-bound signatures pinned byte-for-byte
+across the EVM contract, the Solana program, and the L1 (cross-language
+known-answer vectors). Arbitrum rollout + a pre-mainnet audit remain.
 {% endhint %}
 
 MetaFlux bridges **all assets — including USDC — through MetaBridge**, a
@@ -79,19 +82,31 @@ Base (two-phase: request → claim):
   keys that secure consensus; quorum `6700` bps). The validator multisig + the
   withdrawal dispute window are load-bearing: bridge-key compromise = fund loss, so
   the contracts get the consensus/signing review tier and a pre-mainnet audit.
-- **Replay** — each `message_id` is honored once, on both the L1 (finalized set) and
-  the contract (`withdrawalSeen`).
+- **Replay** — each `message_id` is honored once, keyed on the chain/source-nonce
+  economic identity so a credit lands exactly once even across a validator-set
+  rotation; enforced on both the L1 and the contract (`withdrawalSeen` / a permanent
+  Solana spent-marker). Signatures are domain- and epoch-bound, so a cosignature
+  can't be replayed across a different deployment, chain, or validator-set epoch.
+- **Governance & rotation** — no admin account; every privileged op is
+  validator-cosigned. Validator-set rotation is two-phase (request → finalize behind
+  a dispute window); during that window any **single** hot validator can `pause`
+  (bounded by a per-validator cooldown) or **cancel** the pending rotation outright,
+  so a compromised governance quorum cannot silently swap the set. On Solana the same
+  set carries a single-validator `pause`/`dispute` and a quorum `unpause` /
+  `invalidateWithdrawal` emergency surface.
 - **Off `/exchange`** — deposit credits inject via the validator system path and are
-  structurally unreachable from the public user `/exchange` surface.
-- **Custody caveat** — USDC on MetaFlux is a bridged claim backed by the Base
+  structurally unreachable from the public user `/exchange` surface, tallied over the
+  active validator set only.
+- **Custody caveat** — USDC on MetaFlux is a bridged claim backed by the source
   contract's balance, not Circle-canonical on MetaFlux (same as the HL model).
 
 ## Deployments
 
 | Network | Contract | Address |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` | [`0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72`](https://sepolia.basescan.org/address/0xf265041BdB47B5d7ec08366Ca76A815e7d5CAb72) |
-| Base mainnet | — | (pre-audit) |
+| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
+| Solana **devnet** | `metabridge-solana` | `Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB` |
+| Base / Solana mainnet | — | (pre-audit) |
 
 Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
 validator set, no admin** (all privileged ops are validator-cosigned), 300 s +
@@ -104,8 +119,10 @@ not for value-bearing use.
 ## Roadmap
 
 - Real Base deposit-watcher + withdrawal relayer (the deterministic L1 core +
-  the Base contract are done; the off-chain observers are being wired).
-- Multi-chain rollout: Arbitrum + Solana custody contracts under the same model.
+  the Base contract are done; the off-chain observers are wired and use the
+  chain's `finalized` block tag to guard against reorgs).
+- Multi-chain rollout: Solana custody program is live on devnet under the same
+  model; Arbitrum is next.
 - Security audit before any value-bearing (mainnet) deployment.
 - Cross-chain composability (calling other-chain contracts from MTF) — V2.
 
