@@ -43,7 +43,7 @@ EVM RPC at `http://localhost:8545`. Those are the self-hosted ports, not public 
 | EIP-712 domain `version` | `"1"` |
 | EIP-712 domain `verifyingContract` | `0x0000000000000000000000000000000000000000` |
 
-USDC bridging: via the **MetaBridge custody bridge** ([bridge](./bridge/)), not Circle CCTP (ADR-024). Testnet deposits use the Base Sepolia `MetaBridgeUSDC` deployment + Circle's Base Sepolia test USDC.
+USDC bridging: via the **MetaBridge custody bridge** ([bridge](./bridge/)), not Circle CCTP. Testnet deposits use the Base Sepolia `MetaBridgeUSDC` deployment + Circle's Base Sepolia test USDC.
 
 ### Faucet
 
@@ -110,7 +110,7 @@ Mainnet differences from devnet/testnet:
 ## Bridge corridors
 
 USDC (and other assets) bridge via the **MetaBridge custody bridge** — validator
-⅔ stake-weighted co-signing, no Circle CCTP dependency (ADR-024). Source chains:
+⅔ stake-weighted co-signing, no Circle CCTP dependency. Source chains:
 
 | Chain | Status |
 |-------|--------|

@@ -87,10 +87,6 @@ Builders typically bootstrap depth by combining an MIP-3 deploy with a liquidity
 
 See [MIP-4 — perps liquidity aggregator / internalizer](mip-4.md) for the MetaFlux-operated aggregator that complements permissionless deploy.
 
-## Governing reference
-
-- ADR-004 — MIP-3 = MTF core feature (permissionless deploy + gas auction + builder governance).
-
 ## See also
 
 - [MIP-1 — spot token standard + market deployment](./mip-1.md) — the spot sibling of permissionless deploy

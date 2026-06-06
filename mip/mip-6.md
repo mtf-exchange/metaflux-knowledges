@@ -12,7 +12,7 @@ on-chain venues). It is a future differentiation axis, deferred to **V3**.
 ## Why this exists as a separate number
 
 Outcomes was **originally numbered MIP-4**. When the project repurposed MIP-4 into
-the [Perps Liquidity Aggregator / Internalizer](./mip-4.md) (ADR-022), the
+the [Perps Liquidity Aggregator / Internalizer](./mip-4.md), the
 Outcomes concept was renumbered to **MIP-6** and pushed from V2 to the V3 backlog.
 Giving it a fresh number avoids the confusion of reusing MIP-4 for two unrelated
 mechanisms. Do not refer to Outcomes as "MIP-4".
@@ -29,11 +29,6 @@ mechanisms. Do not refer to Outcomes as "MIP-4".
 
 When Outcomes ships, it ships as MIP-6 with its own resolution / oracle / dispute
 design — none of which is reserved eagerly today.
-
-## Governing reference
-
-- ADR-022 — redefined MIP-4 to the aggregator and pushed Outcomes to MIP-6 / V3.
-- ADR-004 — the original framing (MIP-4 = Outcomes), now superseded by ADR-022.
 
 ## See also
 

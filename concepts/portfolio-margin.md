@@ -47,7 +47,7 @@ Classical's $10 simply has no view on correlation. PM does.
 
 ## How PM works
 
-> Sourced from `crates/liquidation/src/portfolio_margin.rs` (`PortfolioMarginEngine::compute`) and PLAN §C.2 / `RFC-003` (`docs/rfc/RFC-003-liquidation-risk.md`). The engine works in **USD cents** internally (whole-USDC `Decimal` plane × 100). The PM number **replaces** the classical per-asset maintenance sum, it doesn't add to it. There is also a read-side EVM precompile (`portfolio_margin_eval`) for off-chain quoting.
+> The portfolio-margin engine works in **USD cents** internally (whole-USDC `Decimal` plane × 100). The PM number **replaces** the classical per-asset maintenance sum, it doesn't add to it. There is also a read-side EVM precompile (`portfolio_margin_eval`) for off-chain quoting.
 
 Under PM the maintenance number comes from a **SPAN-style scenario engine** that sweeps a deterministic `(price-shock, vol-shock)` grid over the portfolio:
 

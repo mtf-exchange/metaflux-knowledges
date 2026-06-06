@@ -48,7 +48,7 @@ record_l4 = true                 # 🚧 (target) enables l4_book_diffs.jsonl
 
 | Flag | Default | Stream | Status |
 |------|---------|--------|--------|
-| `record_l4` | `false` | `l4_book_diffs.jsonl` | 🚧 in progress (config + writer not yet in the node) |
+| `record_l4` | `false` | `l4_book_diffs.jsonl` | 🚧 in progress (config + writer not yet shipped) |
 | `write_fills` | `false` | `node_fills/hourly/{date}/{hour}` | 🚧 in progress |
 | `write_trades` | `false` | `node_trades/hourly/{date}/{hour}` | 🚧 in progress |
 | `write_order_statuses` | `false` | `node_order_statuses/hourly/{date}/{hour}` | 🚧 in progress |
@@ -199,7 +199,7 @@ One record per print (NOT per party — a single trade, not two fills). This is 
 
 ## `l4_book_diffs.jsonl` — raw L4 book diffs 🚧
 
-Mirrors HL's `--write-raw-book-diffs`: per committed block, emit the per-order CHANGES to the de-anonymized resting book (added / resized / removed), plus a full **snapshot** every `snapshot_interval` blocks (and on the first non-empty book) so a downstream L4 order-book server can bootstrap, then apply diffs. It is consumed by the [L4 book server](#references) (a separate GPL-3.0 repo with zero node-code dependency). 🚧 The writer is not yet in the node build; the schema below is the target contract.
+Mirrors HL's `--write-raw-book-diffs`: per committed block, emit the per-order CHANGES to the de-anonymized resting book (added / resized / removed), plus a full **snapshot** every `snapshot_interval` blocks (and on the first non-empty book) so a downstream L4 order-book server can bootstrap, then apply diffs. It is consumed by the [L4 book server](#references) (a separate GPL-3.0 project). 🚧 The writer is not yet shipped; the schema below is the target contract.
 
 Two record kinds share the file, discriminated by `kind`:
 
@@ -238,7 +238,7 @@ Notes:
 - `px` / `sz` are **raw fixed-point integers** rendered as strings (e.g. `"100500"`), not human decimals — this stream is for a low-level book server that owns the scaling, unlike the human-decimal `node_fills`/`node_trades` streams.
 - The diff base holds the previous block's resting set in raw form: an unchanged order is a cheap value compare and is never re-stringified. Per-block alloc cost is O(activity), not O(book).
 - The schema is additive: the consumer ignores unknown fields, so new fields can be added without breaking it.
-- `snapshot_interval` reuses the `[persistence].snapshot_interval` value (default per RFC-009); first non-empty book always emits a bootstrap snapshot.
+- `snapshot_interval` reuses the `[persistence].snapshot_interval` value; first non-empty book always emits a bootstrap snapshot.
 
 ---
 
@@ -262,8 +262,8 @@ The node and gateway serve only **live, committed-state** reads; everything time
 
 ## References
 
-- HL node data formats — `replica_cmds` NDJSON, `node_fills_by_block/hourly`, ABCI `.rmp` snapshots: the [protocol study](rest/info.md) §D.6 (18-field fill hash) / §D.7 (Fill 9-field, `OrderStatus` 5-variant).
-- The L4 order-book server is a separate open-source (GPL-3.0) repo consuming `l4_book_diffs.jsonl`; it has zero node-code dependency and is never co-located with the gateway.
+- HL node data formats — `replica_cmds` NDJSON, `node_fills_by_block/hourly`, ABCI `.rmp` snapshots: see the [protocol study](rest/info.md) (18-field fill hash; Fill 9-field, `OrderStatus` 5-variant).
+- The L4 order-book server is a separate open-source (GPL-3.0) project consuming `l4_book_diffs.jsonl`; it is never co-located with the gateway.
 
 ## See also
 

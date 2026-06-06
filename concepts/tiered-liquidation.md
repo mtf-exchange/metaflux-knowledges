@@ -21,7 +21,7 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 
 ## How tiers are computed
 
-> Sourced from `crates/liquidation/src/bole.rs` (`BoleEngine::decide`) and the begin-block driver `crates/core-state/src/effects/handlers.rs::apply_bole_liquidations`. `RFC-003` (`docs/rfc/RFC-003-liquidation-risk.md`) is the design freeze. The bands below are the **literal code constants**, not approximations.
+The bands below are the **literal code constants**, not approximations.
 
 `BoleEngine::decide(account, account_value: i128, maintenance_margin: u128, ts_ms)` is a **pure function** — it reads cooldown state but never mutates — returning one `BoleDecision`:
 
@@ -40,8 +40,8 @@ if partial_cooldown_active(account)                   → FullMarket { size_to_c
 else                                                  → PartialMarket50 { size_to_close = maintenance_margin / 2 }
 ```
 
-| Constant | Value | `bole.rs` symbol |
-|----------|-------|------------------|
+| Constant | Value | Symbol |
+|----------|-------|--------|
 | Yellow-card threshold (T0 top) | `1.1` | `default_yellow_card_threshold` |
 | Partial threshold (T1 top) | `0.8` | `default_partial_threshold` |
 | Full-market floor (T3 entry) | `0.667` (≈ 2/3) | `full_market_floor` |

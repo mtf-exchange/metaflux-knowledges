@@ -26,7 +26,7 @@ is an independent L1; being added as a CCTP domain is a Circle business decision
 don't control. A deposit path that needs a third party's blessing to exist isn't a
 foundation to build on, so MetaFlux runs its own custody bridge under the **same
 validator-set trust assumption as the chain itself** — no external committee,
-guardian network, or gatekeeper. (ADR-024.)
+guardian network, or gatekeeper.
 
 ## Model
 
@@ -168,4 +168,3 @@ Solana uses ONE validator set (no hot/cold split) and has no `setDisputeWindow` 
 ## See also
 
 - [Networks](../networks.md) — per-network endpoints + chain IDs
-- ADR-024 (custody bridge, drop CCTP) + ADR-021 (MetaBridge co-signature core) in the node repo

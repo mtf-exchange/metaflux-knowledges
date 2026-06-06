@@ -27,7 +27,7 @@ Bps = basis points (1 bps = 0.01%). Negative maker = maker rebate.
 
 Volume is measured in USDC notional, summed across all markets, across all your sub-accounts. Volume rolls forward on a 30-day window.
 
-> **What's live vs. this table:** the settlement path (`settlement.rs::fee_bps`) currently charges the **flat global tier** — `default_taker_bps = 5`, `default_maker_bps = 1` (`GlobalFeeSchedule::default`). Per-user 30-day-volume tiering exists as `FeeTracker` accumulators but is not yet wired into the charge. The bottom (`< 100k`) row above shows taker 5 / maker 2; the implemented flat maker is **1 bps**. Treat the tiered ladder as the target schedule.
+> **What's live vs. this table:** the settlement path currently charges the **flat global tier** — `default_taker_bps = 5`, `default_maker_bps = 1` (`GlobalFeeSchedule::default`). Per-user 30-day-volume tiering exists as `FeeTracker` accumulators but is not yet wired into the charge. The bottom (`< 100k`) row above shows taker 5 / maker 2; the implemented flat maker is **1 bps**. Treat the tiered ladder as the target schedule.
 
 ## Where fees go
 
@@ -47,7 +47,7 @@ Volume is measured in USDC notional, summed across all markets, across all your 
 
 ## How fees are computed
 
-> Sourced from `crates/core-state/src/actions/settlement.rs` (`charge_fees`, `fee_amount`, `distribute_taker_fee`, `distribute_protocol_fee`), `crates/core-state/src/state/locus.rs` (`GlobalFeeSchedule`), `crates/core-state/src/actions/account.rs` (`BUILDER_FEE_MAX_BPS`), and `ADR-012` (`docs/adr/ADR-012-fee-economics.md`). Fees settle on the **whole-USDC `Decimal` plane** (notional = raw `px × size` integer product), truncated toward zero.
+> Fees settle on the **whole-USDC `Decimal` plane** (notional = raw `px × size` integer product), truncated toward zero.
 
 ### Per fill
 
@@ -58,7 +58,7 @@ maker_fee   = trunc( notional × maker_bps / 10_000 )
 builder_fee = trunc( notional × builder_bps / 10_000 )    # ADDITIVE, taker-only, ≤ 8 bps
 ```
 
-Defaults (`GlobalFeeSchedule::default`, `locus.rs`): `default_taker_bps = 5`, `default_maker_bps = 1`. (Per-user 30-day volume tiering exists as trackers but the settlement path currently charges the flat global tier — the tier table below is the *target* schedule.)
+Defaults (`GlobalFeeSchedule::default`): `default_taker_bps = 5`, `default_maker_bps = 1`. (Per-user 30-day volume tiering exists as trackers but the settlement path currently charges the flat global tier — the tier table below is the *target* schedule.)
 
 ### Distribution of the base fee
 
@@ -72,26 +72,26 @@ protocol_fee   = taker_fee − referrer_share
 burn      = trunc( protocol_fee × 8_000 / 10_000 )     # 80%  → buyback-and-burn
 validator = trunc( protocol_fee × 1_000 / 10_000 )     # 10%  → validators (stake-weighted)
 treasury  = protocol_fee − burn − validator            # 10%  → foundation/treasury (absorbs truncation dust, leak-free)
-# mflux_vault share = 0 (ADR-012 revision 2026-05-28)
+# mflux_vault share = 0 (revised 2026-05-28)
 ```
 
-| Symbol | Default | Source |
-|--------|---------|--------|
+| Symbol | Default | Notes |
+|--------|---------|-------|
 | `default_taker_bps` | `5` (5 bps) | `GlobalFeeSchedule` |
 | `default_maker_bps` | `1` (1 bps) | `GlobalFeeSchedule` |
-| referrer share | **10 % of the taker fee** (`REFERRER_BPS = 1000`) | `settlement.rs` |
-| `burn_bps` | `8_000` (80 %) | ADR-012 §L.2 (revised) |
+| referrer share | **10 % of the taker fee** (`REFERRER_BPS = 1000`) | — |
+| `burn_bps` | `8_000` (80 %) | revised |
 | `validator_bps` | `1_000` (10 %) | — |
 | `treasury_bps` | `1_000` (10 %) | — |
-| `mflux_vault_bps` | `0` | ADR-012 (vault fee share zeroed) |
-| `BUILDER_FEE_MAX_BPS` | `8` | `account.rs` (vs HL's 10) |
-| deployer fee cap | `5` default (`MAX_DEPLOYER_FEE_CAP_BPS = 20`) | `mip3_deploy.rs` |
+| `mflux_vault_bps` | `0` | vault fee share zeroed |
+| `BUILDER_FEE_MAX_BPS` | `8` | vs HL's 10 |
+| deployer fee cap | `5` default (`MAX_DEPLOYER_FEE_CAP_BPS = 20`) | — |
 
 > ⚠️ **Corrections vs. prior text.** (1) The referrer share is **10 % of the taker fee** (`REFERRER_BPS = 1000` bps-of-fee), **not** `1 bps × notional`. (2) The protocol split is **80 / 10 / 10** (burn / validator / treasury), **not** `burn_ratio = 0.30` on a generic "protocol" pool, and **not** the historical `50/25/15/10`. The 80 % is a **buyback-and-burn** (accrued USDC market-buys MTF then burns it — buy pressure + deflation), not a direct USDC burn. (3) MFlux-vault fee share is **0**. (4) Default taker/maker is `5 / 1` bps at the flat tier.
 
 ### Burn = buyback-and-burn
 
-The 80 % "burn" share accrues as USDC; a periodic buyback executor (`crates/core-state/src/effects_buyback.rs`) drains the pool, market-buys MTF at the deterministic mark, and burns the acquired MTF (`fee_distribution.burned` USDC pool → `burned_mtf`). It is **not** a direct USDC burn or abstract supply reduction.
+The 80 % "burn" share accrues as USDC; a periodic buyback executor drains the pool, market-buys MTF at the deterministic mark, and burns the acquired MTF (`fee_distribution.burned` USDC pool → `burned_mtf`). It is **not** a direct USDC burn or abstract supply reduction.
 
 ## Builder rebate
 
@@ -106,7 +106,7 @@ The builder must be a registered address (see [`approve_builder_fee`](../api/res
 
 ## Burn (buyback-and-burn)
 
-**80 %** of protocol revenue (`burn_bps = 8_000`) goes to buyback-and-burn — accrued USDC market-buys MTF, which is then burned. (ADR-012 revision 2026-05-28; the earlier `0.30` ratio is obsolete.) The acquired-and-burned MTF exits circulation permanently.
+**80 %** of protocol revenue (`burn_bps = 8_000`) goes to buyback-and-burn — accrued USDC market-buys MTF, which is then burned. (The earlier `0.30` ratio is obsolete.) The acquired-and-burned MTF exits circulation permanently.
 
 The cumulative amounts (`burned` USDC pool, `burned_mtf`, `treasury`, validator pool) are tracked in committed state and exposed on the read path via [`protocol_metrics`](../api/rest/info.md#protocol_metrics) (`fee_pools.{burned, burned_mtf, treasury, validator_pool, mflux_vault}`):
 
@@ -123,7 +123,7 @@ referrer_share = trunc( taker_fee × 1000 / 10000 )   # 10% of the taker FEE, no
 protocol_fee   = taker_fee − referrer_share          # then splits 80/10/10
 ```
 
-Single-level (no multi-level referral — anti-Ponzi, ADR-012). Set once with `SetReferrer`; immutable thereafter (`setReferrer(self)` is rejected). The maker fee carries **no** referrer carve.
+Single-level (no multi-level referral — anti-Ponzi). Set once with `SetReferrer`; immutable thereafter (`setReferrer(self)` is rejected). The maker fee carries **no** referrer carve.
 
 ## Spot vs perp fees
 
@@ -133,7 +133,7 @@ Spot fees are debited from the **quote** balance (the asset on the right of the 
 
 ## Fees on liquidation fills
 
-> **Implementation pending / unverified.** A discrete **liquidation fee** (the `100 bps`, insurance/treasury split, `is_liquidation` flag described below) was **not found** in the settlement code (`settlement.rs`) or in ADR-012 / RFC-003 as of this writing. Liquidation closes (T1/T2) currently route through the same `charge_fees` taker path as ordinary fills. Treat the section below as a **design intent**, not a verified parameter — confirm against code before quoting a number.
+> **Implementation pending / unverified.** A discrete **liquidation fee** (the `100 bps`, insurance/treasury split, `is_liquidation` flag described below) is **not** currently implemented. Liquidation closes (T1/T2) currently route through the same `charge_fees` taker path as ordinary fills. Treat the section below as a **design intent**, not a verified parameter — confirm against the live behaviour before quoting a number.
 
 The intended model: liquidation fills charge a liquidation fee on top of the standard taker fee, split between the insurance pool and treasury, to keep insurance solvent and compensate makers who absorb forced flow. Liquidated accounts would pay it as part of the loss settled at T1/T2, surfaced in [`userFills`](../api/rest/info.md#user_fills) with `is_liquidation: true`.
 

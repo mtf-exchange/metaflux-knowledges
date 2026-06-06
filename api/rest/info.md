@@ -779,10 +779,10 @@ Response:
 | `counters.total_vault_transfers` | uint64 | Lifetime vault deposit/withdraw transfers |
 | `counters.total_sub_account_transfers` | uint64 | Lifetime sub-account transfers |
 | `fee_pools.burned` | Decimal string | Cumulative USDC routed to buyback-and-burn (whole-USDC) |
-| `fee_pools.mflux_vault` | Decimal string | Cumulative MFlux-vault fee accrual (`"0"` — vault share zeroed, ADR-012) |
+| `fee_pools.mflux_vault` | Decimal string | Cumulative MFlux-vault fee accrual (`"0"` — vault share zeroed) |
 | `fee_pools.validator_pool` | Decimal string | Cumulative validator-pool fee accrual (whole-USDC) |
 | `fee_pools.treasury` | Decimal string | Cumulative treasury fee accrual (whole-USDC) |
-| `fee_pools.burned_mtf` | Decimal string | Cumulative MTF retired by the ADR-012 buyback executor |
+| `fee_pools.burned_mtf` | Decimal string | Cumulative MTF retired by the buyback executor |
 | `insurance_fund_total` | Decimal string | Σ per-asset `bole_pool.insurance_fund` reserves (whole-USDC) |
 | `treasury_backstop_total` | Decimal string | Σ per-asset `bole_pool.treasury_backstop` reserves (whole-USDC) |
 | `bole_pool.total_deposits` | Decimal string | BOLE lending-pool total deposits (whole-USDC) |
@@ -982,7 +982,7 @@ Response:
 {% hint style="warning" %}
 **Only the numeric bitmask is on-chain — venue NAMES and WEIGHTS are NOT
 committed** (`weights_committed: false`). The 10 source identities are
-protocol-fixed off-chain (ADR-018 / PLAN §H.1) and their weights are
+protocol-fixed off-chain and their weights are
 protocol-fixed, so committed state carries only the subset bitmask. This read
 surfaces `enabled_sources` as **bit indices**, not named venues, and emits no
 per-venue weight list rather than fabricating one.

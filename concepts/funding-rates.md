@@ -14,7 +14,7 @@ Perps have no expiry, so there's no arbitrage force to peg them to the underlyin
 
 ## Formula
 
-> The TL;DR above is the conceptual model. The numbers below are the **implemented** values — sourced from `ADR-014` (`docs/adr/ADR-014-funding-ema-decay.md`), `RFC-003 §G` (`docs/rfc/RFC-003-liquidation-risk.md`), and the on-chain effect handlers. Where the prose and the code differ, the code wins; the differences are flagged inline.
+> The TL;DR above is the conceptual model. The numbers below are the **implemented** values. Where the prose and the code differ, the code wins; the differences are flagged inline.
 
 ### How it's computed
 
@@ -25,11 +25,9 @@ Two begin-block effects run the cycle, each behind an 8000 ms `BucketGuard`:
 - **effect 4 `update_funding_rates`** — folds the latest premium sample into the per-asset EMA, then clamps.
 - **effect 2 `distribute_funding`** — settles each open position against the cumulative funding index.
 
-Source: `crates/core-state/src/effects/handlers.rs` (`update_funding_rates`, `distribute_funding`), `crates/core-state/src/primitives.rs` (`DeterministicEma`).
-
 #### 1. Premium EMA (per market)
 
-The EMA accumulator stores a fixed-point fraction `(num, denom)` — no floats, exact `rust_decimal::Decimal` arithmetic so node-to-node state is bit-identical (CLAUDE rule #2). Each sample folds in as:
+The EMA accumulator stores a fixed-point fraction `(num, denom)` — no floats, exact `rust_decimal::Decimal` arithmetic so node-to-node state is bit-identical. Each sample folds in as:
 
 ```
 num'   = num   * decay + sample
@@ -37,18 +35,18 @@ denom' = denom * decay + 1
 value  = num / denom
 ```
 
-- `sample` = latest premium for the asset × the per-asset `funding_rate_multiplier` (default `1.0`; auto-driven by the S15 dynamic-risk engine, RFC-003 §E).
-- `decay = 0.5` (ADR-014 proposed default → ≈ 7 s half-life at the 5 s sample cadence). Clamped to `[0, 1]` at update time.
+- `sample` = latest premium for the asset × the per-asset `funding_rate_multiplier` (default `1.0`; auto-driven by the dynamic-risk engine).
+- `decay = 0.5` (proposed default → ≈ 7 s half-life at the 5 s sample cadence). Clamped to `[0, 1]` at update time.
 - Sample cadence: **5 s**; EMA fold + settle cadence: **8000 ms** (`funding_update_guard` / `funding_distribute_guard`).
 
-> **Status:** the per-tick premium *driver* (`crates/oracle/src/funding.rs`) is a stub pending S8 — it documents the 5 s sample / 8000 ms settle wiring but does not yet feed live samples. The EMA accumulator, the cap, and the settle arithmetic are implemented and determinism-locked today.
+> **Status:** the per-tick premium *driver* is not yet feeding live samples. The EMA accumulator, the cap, and the settle arithmetic are implemented and determinism-locked today.
 
 #### 2. Cap (clamp)
 
 After the EMA update, the absolute value is clamped to the per-hour cap by truncating the running numerator (preserves `denom > 0`):
 
 ```
-cap_per_hour = 0.04          # 4 %/h default, per PLAN §H.3 / RFC-003 §G
+cap_per_hour = 0.04          # 4 %/h default
 if |value| > cap_per_hour:
     num = sign(value) * cap_per_hour * denom
 ```
@@ -64,20 +62,20 @@ payment = size_signed * oracle_px * (cum_global - funding_entry) * funding_rate_
 funding_entry := cum_global      # roll forward
 ```
 
-(`crates/core-state/src/effects/handlers.rs::distribute_funding` — the arithmetic is wired and determinism-locked; the actual balance transfer lands with full BOLE settlement, PLAN §C.3.)
+(The arithmetic is wired and determinism-locked; the actual balance transfer lands with full BOLE settlement.)
 
 | Symbol | Meaning / plane |
 |--------|-----------------|
 | `size_signed` | Signed position size; `i128`. Long > 0, short < 0. |
 | `oracle_px` | Composed oracle price — whole-USDC `Decimal` plane (see [mark prices](./mark-prices.md)). |
 | `cum_global − funding_entry` | Cumulative funding accrued for this market since the position last settled. |
-| `decay` | EMA decay 0.5 (ADR-014). |
+| `decay` | EMA decay 0.5. |
 | `cap_per_hour` | Default `0.04` (4 %/h); per-market override via dynamic risk. |
-| `funding_rate_multiplier` | Per-asset multiplier, default `1.0`, auto-driven by dynamic risk (RFC-003 §E). |
+| `funding_rate_multiplier` | Per-asset multiplier, default `1.0`, auto-driven by dynamic risk. |
 
 `funding_rate` (the EMA value) is signed: positive → longs pay shorts; negative → shorts pay longs.
 
-**Base interest:** `0.0000125/h` (= `0.01%/8h`), per RFC-003 §G — the baseline carry the premium EMA is added to.
+**Base interest:** `0.0000125/h` (= `0.01%/8h`) — the baseline carry the premium EMA is added to.
 
 > ⚠️ **Correction vs. prior text.** The older prose said "every hour", "60-minute EMA window", and "cap 0.05 %/hour". The implementation settles every **8 s**, the EMA `decay` is **0.5** (≈ 7 s half-life), and the cap is **4 %/hour**. The hourly mental model is fine for back-of-envelope carry math, but the on-chain cadence and cap are as above.
 
@@ -126,18 +124,16 @@ short 0.5 BTC:
 
 ## Funding caps & dynamic limits
 
-Sourced from `crates/core-state/src/effects/handlers.rs::update_funding_rates`, `primitives.rs::DeterministicEma`, ADR-014, RFC-003 §G.
-
 | Parameter | Default | Source / override |
 |-----------|---------|-------------------|
-| funding cap (per hour) | `0.04` (`4 %/h`) | `dynamic_risk_overrides[asset].funding_rate_cap` (RFC-003 §E, governance vote) |
-| EMA `decay` | `0.5` (≈ 7 s half-life) | ADR-014 (Proposed; S8 calibration may retune to 0.3/0.7) |
-| sample cadence | `5 s` | PLAN §H.3 / RFC-003 §G |
+| funding cap (per hour) | `0.04` (`4 %/h`) | `dynamic_risk_overrides[asset].funding_rate_cap` (governance vote) |
+| EMA `decay` | `0.5` (≈ 7 s half-life) | Proposed; calibration may retune to 0.3/0.7 |
+| sample cadence | `5 s` | protocol-fixed |
 | settle / update interval | `8000 ms` | `funding_distribute_guard` / `funding_update_guard` BucketGuards |
-| base interest | `0.0000125/h` (`0.01 %/8h`) | RFC-003 §G |
-| `funding_rate_multiplier` | `1.0` | per-asset, auto-driven by dynamic risk (RFC-003 §E) |
+| base interest | `0.0000125/h` (`0.01 %/8h`) | protocol-fixed |
+| `funding_rate_multiplier` | `1.0` | per-asset, auto-driven by dynamic risk |
 
-The per-asset `funding_rate_multiplier` is MTF's differentiation over HL's governance-static value: it's auto-driven from 30-day realized volatility by the dynamic-risk engine (RFC-003 §E), scaling the premium sample before it enters the EMA.
+The per-asset `funding_rate_multiplier` is MTF's differentiation over HL's governance-static value: it's auto-driven from 30-day realized volatility by the dynamic-risk engine, scaling the premium sample before it enters the EMA.
 
 ## Funding history
 

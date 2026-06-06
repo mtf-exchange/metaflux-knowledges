@@ -8,7 +8,7 @@
 
 The gateway exposes URLs and request/response shapes identical to Hyperliquid's. HL bots point at MetaFlux with [zero code change](../../integration/migrating-from-hl.md) for the covered surface. The wire format — HL's `{"error":...}` 400 envelope, camelCase fields, `[bids, asks]` tuples, decimal-string monetary magnitudes — is preserved exactly.
 
-**The gateway is the ONLY place HL/camelCase shapes live (ADR-010).** The node is MTF-native end to end (snake_case, integer/`u32` ids — see [`/info`](./info.md)). Every HL response here is a *translation* of a node MTF-native read; the node never speaks HL.
+**The gateway is the ONLY place HL/camelCase shapes live.** The node is MTF-native end to end (snake_case, integer/`u32` ids — see [`/info`](./info.md)). Every HL response here is a *translation* of a node MTF-native read; the node never speaks HL.
 
 ## URL
 
@@ -310,7 +310,7 @@ MetaFlux vaults are not HL vaults — same query shape, different entities (see 
 }
 ```
 
-`referredBy` is `null` (not `{}`) — HL clients distinguish "no referrer ever set" from "set but inactive". Referrer is `setReferrer`-immutable (PLAN §L.5.1).
+`referredBy` is `null` (not `{}`) — HL clients distinguish "no referrer ever set" from "set but inactive". Referrer is `setReferrer`-immutable.
 
 #### Other stubs
 
