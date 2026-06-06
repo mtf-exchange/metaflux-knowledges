@@ -8,23 +8,6 @@
 * [Security model](security.md)
 * [Versioning & deprecation](versioning.md)
 
-## API reference
-
-* [Overview](api/README.md)
-* REST
-  * [POST /exchange](api/rest/exchange.md)
-  * [POST /info](api/rest/info.md)
-  * [POST /faucet](api/rest/faucet.md)
-  * [HL-compat](api/rest/hl-compat.md)
-  * [CCXT-compat](api/rest/ccxt-compat.md)
-* WebSocket
-  * [Overview](api/ws/README.md)
-  * [Subscriptions](api/ws/subscriptions.md)
-* Reference
-  * [Node data files](api/data-files.md)
-  * [Errors](api/errors.md)
-  * [Rate limits](api/rate-limits.md)
-
 ## Concepts
 
 * [Overview](concepts/README.md)
@@ -48,25 +31,11 @@
   * [Vaults](concepts/vaults.md)
 * [Glossary](concepts/glossary.md)
 
-## Integration
-
-* [Overview](integration/README.md)
-* [Quickstart](integration/quickstart.md)
-* [Signing walkthrough](integration/signing.md)
-* [Agent wallets how-to](integration/agent-wallets-howto.md)
-* [Idempotency](integration/idempotency.md)
-* [Error handling](integration/error-handling.md)
-* [Risk-watcher pattern](integration/risk-watcher.md)
-* [Migrating from Hyperliquid](integration/migrating-from-hl.md)
-* SDKs
-  * [TypeScript SDK](integration/typescript-sdk.md)
-  * [Rust SDK](integration/rust-sdk.md)
-
 ## Bridge
 
 * [Overview](bridge/README.md)
 
-## MIP — Improvement proposals
+## Improvement proposals
 
 * [Overview](mip/README.md)
 * [MIP-1 — Spot token standard + market deploy](mip/mip-1.md)
@@ -75,3 +44,33 @@
 * [MIP-4 — Perps liquidity aggregator / internalizer](mip/mip-4.md)
 * [MIP-5 — Reserved](mip/mip-5.md)
 * [MIP-6 — Outcomes / prediction markets (deferred V3)](mip/mip-6.md)
+
+## For developers
+
+* [API](api/README.md)
+  * REST
+    * [POST /exchange](api/rest/exchange.md)
+    * [POST /info](api/rest/info.md)
+    * [POST /faucet](api/rest/faucet.md)
+    * [HL-compat](api/rest/hl-compat.md)
+    * [CCXT-compat](api/rest/ccxt-compat.md)
+  * WebSocket
+    * [Overview](api/ws/README.md)
+    * [Subscriptions](api/ws/subscriptions.md)
+  * Reference
+    * [Node data files](api/data-files.md)
+    * [Errors](api/errors.md)
+    * [Rate limits](api/rate-limits.md)
+* [EVM](evm/README.md)
+  * [Interacting with Core](evm/interacting-with-core.md)
+* [Integration](integration/README.md)
+  * [Quickstart](integration/quickstart.md)
+  * [Signing walkthrough](integration/signing.md)
+  * [Agent wallets how-to](integration/agent-wallets-howto.md)
+  * [Idempotency](integration/idempotency.md)
+  * [Error handling](integration/error-handling.md)
+  * [Risk-watcher pattern](integration/risk-watcher.md)
+  * [Migrating from Hyperliquid](integration/migrating-from-hl.md)
+  * SDKs
+    * [TypeScript SDK](integration/typescript-sdk.md)
+    * [Rust SDK](integration/rust-sdk.md)
