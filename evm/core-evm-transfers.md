@@ -41,11 +41,10 @@ Ordering + throughput:
 
 - Queued by **L1 round**, drained in ascending round order, FIFO within a round —
   so two validators materialize the same ops in the same order (determinism).
-- Each op is billed a fixed **system-gas** cost and drained against a per-block
-  system-gas budget. The budget is **conservative by default (≈ one system op per
-  block)** and tunable; leftover ops carry to the next block. Expect Core→EVM
-  credits to land within a small number of Small blocks, not instantly in the same
-  block they were triggered.
+- Each op is billed a **system-gas** cost and drained against an **elastic
+  per-block system-gas slice** (it scales with the block gas budget); leftover ops
+  carry to the next block. Expect Core→EVM credits to land within a small number of
+  blocks, not instantly in the same block they were triggered.
 
 ## Cross-chain (a different surface)
 

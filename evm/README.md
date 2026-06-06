@@ -15,10 +15,10 @@ of HyperEVM ↔ HyperCore.
 
 ## What's different from a vanilla EVM
 
-- **Dual-block architecture** — a fast **Small** block (~1 s) for trading /
-  transfers / CoreWriter calls, and a slow **Large** block (~60 s) for contract
-  deployment + heavy compute, on one linear block sequence. See
-  [Dual-block architecture](dual-block-architecture.md).
+- **Unified block, parallel strata** — one block per consensus round (sub-second);
+  its transactions are partitioned into parallel conflict-strata, so throughput
+  scales with cores and even contract deployments confirm in the next block (no
+  60-second heavy-block lane). See [Execution model](execution-model.md).
 - **Core access built in** — contracts read Core via **system precompiles** and
   write to Core via the **CoreWriter** system contract. See
   [Interacting with Core](interacting-with-core.md).
@@ -30,7 +30,7 @@ of HyperEVM ↔ HyperCore.
 
 | Page | What |
 |------|------|
-| [Dual-block architecture](dual-block-architecture.md) | Small vs Large blocks, cadence, gas, chain id |
+| [Execution model](execution-model.md) | Unified block, parallel conflict-strata, gas/fees, MEV-resistant trading |
 | [Interacting with Core](interacting-with-core.md) | CoreWriter write path (the 20 actions) + the read precompiles |
 | [Core ↔ EVM transfers](core-evm-transfers.md) | Moving value between Core and the EVM (and cross-chain) |
 | [Interaction timings](interaction-timings.md) | When a CoreWriter action / a Core→EVM credit actually lands |
