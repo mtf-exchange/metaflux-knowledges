@@ -15,20 +15,8 @@ MetaFlux follows a numbered improvement-proposal model (analogous to the improve
 | [MIP-5](./mip-5.md) | *(reserved — undefined)* | Reserved |
 | [MIP-6](./mip-6.md) | Outcomes / prediction markets | Deferred (V3) |
 
-The deployment proposals split spot from perp the same way established venues do: **MIP-1** is permissionless spot token + market deploy (the `spotDeploy` action family), **MIP-3** is permissionless builder-deployed perp markets (the `perpDeploy` action family + `SetGlobal` governance). Both ride the same three gas-auction streams. (The current implementation still bundles both action families in one module and labels the spot path "MIP-3"; this is being realigned — behaviour unchanged.) **MIP-2 (Metaliquidity)** is the protocol-owned native-liquidity vault. **MIP-4** is a MetaFlux-operated aggregator carrying retail flow, complementary to the permissionless markets. **MIP-6** (Outcomes) was previously numbered MIP-4 and renumbered when MIP-4 was redefined as the aggregator (ADR-022). **MIP-5** is an explicitly reserved, not-yet-specified slot.
+The deployment proposals split spot from perp the same way established venues do: **MIP-1** is permissionless spot token + market deploy (the `spotDeploy` action family), **MIP-3** is permissionless builder-deployed perp markets (the `perpDeploy` action family + `SetGlobal` governance). Both ride the same three gas-auction streams. (The current implementation still bundles both action families in one module and labels the spot path "MIP-3"; this is being realigned — behaviour unchanged.) **MIP-2 (Metaliquidity)** is the protocol-owned native-liquidity vault. **MIP-4** is a MetaFlux-operated aggregator carrying retail flow, complementary to the permissionless markets. **MIP-6** (Outcomes) was previously numbered MIP-4 and renumbered when MIP-4 was redefined as the aggregator. **MIP-5** is an explicitly reserved, not-yet-specified slot.
 
 ## V1 scope
 
 V1 covers MIP-1, MIP-2, and MIP-3. MIP-4 (aggregator) is targeted for V2; MIP-6 (Outcomes) is deferred to V3. MIP-5 is reserved and unspecified.
-
-## Governing ADRs
-
-Each MIP traces back to an architecture decision record in the engineering repo:
-
-| MIP | Governing ADR |
-|-----|---------------|
-| MIP-1 | ADR-004 (spot/perp deploy infrastructure) |
-| MIP-2 | ADR-017 (vault deferral, now partially reversed); ADR-024 *(pending)* |
-| MIP-3 | ADR-004 (MIP-3 = core feature) |
-| MIP-4 | ADR-022 (redefined to aggregator / internalizer) |
-| MIP-6 | ADR-022 (Outcomes renumbered + deferred to V3); ADR-004 (original framing) |

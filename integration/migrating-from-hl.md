@@ -171,7 +171,7 @@ Funding cadence is similar (HL is hourly; MTF is hourly by default but configura
   const rate = funding[0].fundingRate;
 ```
 
-MTF's oracle composition is governed per-market (committed `SetOracleWeights`, ADR-018) — if your arb depends on specific oracle providers, verify the weighted source list matches your expectation. See [mark prices](../concepts/mark-prices.md).
+MTF's oracle composition is governed per-market (committed `SetOracleWeights`) — if your arb depends on specific oracle providers, verify the weighted source list matches your expectation. See [mark prices](../concepts/mark-prices.md).
 
 ### 4. Multi-account / institutional setup
 

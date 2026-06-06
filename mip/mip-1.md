@@ -43,8 +43,3 @@ the `perpDeploy` actions and were historically labelled "MIP-3". Per the
 [MIP registry](./README.md) spot deployment is properly **MIP-1** and perp
 deployment is **MIP-3** (mirroring the spot-vs-perp split on established venues).
 The behaviour is unchanged; only the label is being realigned.
-
-## Governing reference
-
-- ADR-004 — MIP-3 core feature / spot-and-perp deploy infrastructure (the
-  registry tracks the spot-vs-perp realignment of the original ADR-004 framing).

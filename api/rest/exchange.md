@@ -103,8 +103,8 @@ The `action` body is treated as a single EIP-712 `string` field — there is **n
 per-action `typeHash`**. One canonical encoder (`MetaFluxAction(string
 action,uint64 nonce)`) covers the whole action surface, so adding a new action
 variant never adds a signing primitive. See [signing
-walkthrough](../../integration/signing.md) for a working example; the
-cross-implementation KAT in the node + Rust SDK pins this digest.
+walkthrough](../../integration/signing.md) for a working example; a
+cross-implementation known-answer test pins this digest.
 
 ### Chain IDs
 

@@ -64,7 +64,7 @@ The aggregator does not cannibalize MIP-3: pro traders keep trading the MIP-3 bo
 
 ## Fee economics
 
-Internalization revenue feeds the **same fee-distribution waterfall as MIP-3** — there is no separate MIP-4 economics. Per [the fee model](../concepts/fees.md) (ADR-012), aggregator revenue flows:
+Internalization revenue feeds the **same fee-distribution waterfall as MIP-3** — there is no separate MIP-4 economics. Per [the fee model](../concepts/fees.md), aggregator revenue flows:
 
 - **80%** — buyback-and-burn (reduces effective supply)
 - **10%** — validators
@@ -75,10 +75,6 @@ On the retail side, the builder-code fee (capped at 8 bps) is the natural econom
 ## Outcomes → MIP-6, deferred to V3
 
 The number "MIP-4" previously sketched **Outcomes / prediction markets**. That mechanism has been **renumbered to [MIP-6](./mip-6.md)** and deferred to **V3**. MIP-4 now means the aggregator and only the aggregator; do not reuse MIP-4 for Outcomes.
-
-## Governing reference
-
-- ADR-022 — MIP-4 redefined to the Perps Liquidity Aggregator / Internalizer; supersedes the Outcomes framing of ADR-004 and pushes Outcomes to MIP-6 / V3.
 
 ## See also
 

@@ -28,11 +28,11 @@ Insurance pool drawdown is itself rate-limited — see [tiered liquidation](./ti
 
 ## How ADL is computed
 
-> Sourced from `ADR-016` (`docs/adr/ADR-016-adl-online-learning.md`), `crates/liquidation/src/adl.rs` (`AdlController`), and the read-side EVM precompile `crates/evm-integration/src/precompiles_derivatives/adl_pro_rata_price.rs`. The paper is "Autodeleveraging as Online Learning" (arXiv:2602.15182).
+> **Further reading:** "Autodeleveraging as Online Learning" (arXiv:2602.15182).
 
-MTF does **not** use a single ranking score. ADR-016 splits ADL into two independent sub-problems: a 1-D **severity** decision (how much to haircut this round) learned online, and a deterministic **pro-rata allocation** (who, by PnL capacity).
+MTF does **not** use a single ranking score. ADL splits into two independent sub-problems: a 1-D **severity** decision (how much to haircut this round) learned online, and a deterministic **pro-rata allocation** (who, by PnL capacity).
 
-> ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected (alternative E in ADR-016: "2D OGD — dimension blow-up, rejected"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
+> ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected ("2D OGD — dimension blow-up"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
 
 ### 1. Severity — 1-D online gradient descent on θ
 
@@ -73,9 +73,9 @@ x_i     = floor( u_i · B_t / total_u )      capped at u_i        # 128-bit mul 
 
 Integer-division **dust** `B_t − Σ x_i` is redistributed one unit at a time in **ascending AccountId order** to any winner with remaining capacity (`BTreeMap` iterates in key order → byte-identical across nodes). If `B_t > total_u` the round is capacity-bound and `Σ x_i = total_u`.
 
-Source: `adl.rs::pro_rata_allocate`. This replaces ADR-016's rejected vector-mirror-descent and ILP (alternatives B/C: the ILP is optimal but a non-deterministic solver — can't go on-chain).
+This replaces the rejected vector-mirror-descent and ILP allocators (the ILP is optimal but a non-deterministic solver — can't go on-chain).
 
-**Why pro-rata** (ADR-016, HL Oct-10 2025 replay):
+**Why pro-rata** (HL Oct-10 2025 replay):
 
 | Algorithm | Oct-10 total objective (lower = better) |
 |-----------|-----------------------------------------|
@@ -186,7 +186,7 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 A: No. ADL is a protocol-level loss-mutualisation mechanism; opting out would just push the loss onto someone else. The minimisation-of-excess-haircut objective is the protection.
 
 **Q: Why allocate pro-rata by PnL capacity instead of a score-ranked queue?**
-A: Pro-rata haircuts every winner by the same *fraction* of their haircut-able PnL — built-in min-max fairness, no monotonicity violations (two accounts with the same capacity get the same fate), and rank stability ≈ 1.0. ADR-016 measured it ~13× better than HL's ROE-heuristic queue on the Oct-10 2025 replay and within ~30 % of an off-chain ILP optimum, while staying fully deterministic and on-chain. The *severity* (how much total to haircut) is the part that's learned online; *who pays* is plain pro-rata.
+A: Pro-rata haircuts every winner by the same *fraction* of their haircut-able PnL — built-in min-max fairness, no monotonicity violations (two accounts with the same capacity get the same fate), and rank stability ≈ 1.0. It measured ~13× better than HL's ROE-heuristic queue on the Oct-10 2025 replay and within ~30 % of an off-chain ILP optimum, while staying fully deterministic and on-chain. The *severity* (how much total to haircut) is the part that's learned online; *who pays* is plain pro-rata.
 
 **Q: Does ADL respect Strict-Iso?**
 A: Yes. ADL is per-asset by construction; Strict-Iso positions are counter-party candidates if and only if they hold the same asset.
