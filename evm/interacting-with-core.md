@@ -1,0 +1,121 @@
+# Interacting with Core
+
+{% hint style="warning" %}
+**Preview — design-stable, not yet live on devnet.** The addresses, ABIs, and
+encodings on this page are fixed and safe to build against, but the end-to-end
+EVM↔Core path is still being wired: live Core-state precompile reads and
+CoreWriter action application are not yet executable on devnet. The bridge
+([Bridge](../bridge/)) is live; this surface is not yet. Treat this as a
+pre-integration reference.
+{% endhint %}
+
+A contract on the MetaFlux EVM talks to **Core** (the L1 perps clearinghouse +
+on-chain CLOB) in two directions:
+
+- **Read** — `staticcall` a system **precompile** to get a Core-derived value.
+- **Write** — call the **CoreWriter** system contract to submit an L1 action.
+
+This mirrors the Hyperliquid HyperCore interaction model, so HL-oriented tooling
+and encoders largely carry over.
+
+## Writing to Core — CoreWriter
+
+Submit an L1 action by calling **CoreWriter** at
+`0x3333333333333333333333333333333333333333`:
+
+```solidity
+interface ICoreWriter {
+    /// Emitted on every successful call; the L1 scanner consumes this log.
+    event RawAction(address indexed user, bytes data);
+
+    /// selector = keccak256("sendRawAction(bytes)")[0..4] = 0x17938e13
+    function sendRawAction(bytes calldata data) external;
+}
+```
+
+`data` is a version- and id-prefixed payload:
+
+```
+data = abi.encodePacked(
+    uint8(1),            // version (currently 1)
+    uint24(actionId),    // action id, big-endian (1..=20)
+    abi.encode(params)   // the action's ABI-encoded parameters
+);
+```
+
+The acting account is `msg.sender` (the calling contract). After a short
+action-delay the L1 dispatches the decoded action.
+
+{% hint style="info" %}
+**Atomicity.** A `sendRawAction` call only burns gas and emits `RawAction`. Any
+L1-side failure **after** that is silent — there is **no EVM revert**. A contract
+must self-recover and treat the `RawAction` event as the only causal link between
+the EVM call and the L1 outcome.
+{% endhint %}
+
+### Actions
+
+Ids 1–15 mirror the Hyperliquid CoreWriter action set; 16–20 are MetaFlux
+additions.
+
+| id | Action | Purpose |
+|---:|--------|---------|
+| 1 | `LimitOrder` | Place a limit order on a perp / spot market |
+| 2 | `VaultTransfer` | Deposit to / withdraw from a vault |
+| 3 | `TokenDelegate` | Delegate stake to a validator |
+| 4 | `StakingDeposit` | Move tokens into the staking balance |
+| 5 | `StakingWithdraw` | Move tokens out of the staking balance |
+| 6 | `SpotSend` | Transfer a spot token to another account |
+| 7 | `UsdClassTransfer` | Move USDC between the perp and spot class accounts |
+| 8 | `FinalizeEvmContract` | Link an EVM contract to its Core token / contract id |
+| 9 | `AddApiWallet` | Authorise a sub-key (agent wallet) for trading |
+| 10 | `CancelByOid` | Cancel an order by server order id |
+| 11 | `CancelByCloid` | Cancel an order by client order id |
+| 12 | `ApproveBuilderFee` | Authorise a builder to charge a (capped) fee |
+| 13 | `SendAsset` | Generic asset transfer (perp / spot / vault) |
+| 14 | `ReflectEvmSupplyChange` | Sync an EVM-side ERC-20 supply change to Core |
+| 15 | `BorrowLend` | Open / close a borrow-lend position |
+| 16 | `PortfolioMarginEnroll` | Opt the sender in / out of cross-asset portfolio margin |
+| 17 | `RfqSubmit` | Submit an RFQ quote (id, market, side, size, limit price) |
+| 18 | `FbaConfigure` | Per-market frequent-batch-auction config |
+| 19 | `CrossChainSend` | Chain-agnostic cross-chain transfer (queues into [MetaBridge](../bridge/)) |
+| 20 | `EncryptedOrderSubmit` | Threshold-encrypted order (commitment + ciphertext) |
+
+The typed parameter structs and a ready-to-use Solidity caller live in the public
+[`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo;
+the on-chain CoreWriter at `0x3333…` is the production target (in tests a
+deterministic Solidity stand-in emits the same `RawAction` payload).
+
+## Reading Core — precompiles
+
+Each precompile is a `staticcall` to a fixed address with a hand-rolled,
+big-endian **packed** input (not Solidity ABI). Sizes and prices are on the
+**1e8 fixed-point** plane (`px_e8`, `size_e8`); USDC margins are **1e6**.
+
+| Address | Precompile | Returns |
+|---------|------------|---------|
+| `0x0900` | `portfolio_margin_eval` | SPAN-like required maintenance margin, worst-case scenario index, concentration penalty |
+| `0x0901` | `vault_nav` | Vault total NAV, total shares, NAV-per-share, unrealised PnL |
+| `0x0902` | `adl_pro_rata_price` | VWAP an ADL of a given size clears at, walking the queue in side priority |
+| `0x0903` | `mark_settle` | Per-position PnL delta, new accumulated funding, unrealised PnL at a mark |
+| `0x0904` | `rfq_book_depth` | RFQ book depth (filtered by side, capped depth) |
+
+These are **stateless quoting** precompiles today: the caller passes the inputs
+(positions, queue levels, quotes, …) and the precompile returns the computed
+result, so a contract can reproduce a Core calculation off the chain's own
+formulas. **Live Core-state-backed reads** (querying the chain's own positions /
+book directly) are upcoming.
+
+## Core ↔ EVM value transfers
+
+- **Into Core** from an EVM contract: `SpotSend` / `SendAsset` / `UsdClassTransfer`
+  / `VaultTransfer` via CoreWriter (above).
+- **Across chains**: `CrossChainSend` queues into the
+  [MetaBridge custody bridge](../bridge/), which releases on the destination chain
+  on a ⅔ validator co-signature.
+
+## See also
+
+- [Bridge](../bridge/) — cross-chain custody (the `CrossChainSend` destination)
+- [Mark prices](../concepts/mark-prices.md) — the 1e8 fixed-point price plane the precompiles use
+- [Portfolio margin](../concepts/portfolio-margin.md) / [ADL](../concepts/adl.md) — the Core math the `0x0900` / `0x0902` precompiles quote
