@@ -99,6 +99,9 @@ big-endian **packed** input (not Solidity ABI). Sizes and prices are on the
 | `0x0902` | `adl_pro_rata_price` | VWAP an ADL of a given size clears at, walking the queue in side priority |
 | `0x0903` | `mark_settle` | Per-position PnL delta, new accumulated funding, unrealised PnL at a mark |
 | `0x0904` | `rfq_book_depth` | RFQ book depth (filtered by side, capped depth) |
+| `0x0906` | `clob_bbo` | Best bid / best ask price + size (top of book) |
+| `0x0907` | `clob_l2_depth` | Top-N aggregated `(price, size)` levels per side |
+| `0x0908` | `inventory_risk` | Net / gross notional, concentration, risk-cap gate |
 
 These are **stateless quoting** precompiles today: the caller passes the inputs
 (positions, queue levels, quotes, …) and the precompile returns the computed
