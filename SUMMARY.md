@@ -62,7 +62,7 @@
     * [Errors](api/errors.md)
     * [Rate limits](api/rate-limits.md)
 * [EVM](evm/README.md)
-  * [Dual-block architecture](evm/dual-block-architecture.md)
+  * [Execution model](evm/execution-model.md)
   * [Interacting with Core](evm/interacting-with-core.md)
   * [Core ↔ EVM transfers](evm/core-evm-transfers.md)
   * [Interaction timings](evm/interaction-timings.md)
