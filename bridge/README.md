@@ -105,7 +105,7 @@ Base (two-phase: request → claim):
 | Network | Contract | Address |
 |---------|----------|---------|
 | Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
-| Solana **devnet** | `metabridge-solana` | `Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB` |
+| Solana **devnet** | `metabridge-solana` | [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet) |
 | Base / Solana mainnet | — | (pre-audit) |
 
 Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
@@ -115,6 +115,45 @@ Contracts + deploy runbook live in the
 [`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts)
 repo; the L1-side co-signature / credit logic stays on the node. Pre-audit testnet —
 not for value-bearing use.
+
+## Contract methods
+
+### Base — `MetaBridgeUSDC` (EVM)
+
+| Method | Authorization | Purpose |
+|--------|---------------|---------|
+| `deposit(mtfDest, amount)` | anyone (depositor) | Pull USDC into custody, emit `Deposit` for validators to attest |
+| `withdraw(...)` / `batchWithdraw(reqs)` | anyone relaying a **HOT ⅔** co-signature set | Verify quorum + queue the withdrawal(s) into the dispute window |
+| `claim(mid)` / `batchClaim(mids)` | anyone | Release matured USDC after the dual time + block window (not pausable) |
+| `dispute(mid)` | any single **HOT** validator | Cancel a queued withdrawal inside its dispute window |
+| `cancelValidatorSetUpdate()` | any single **HOT** validator | Veto a pending validator-set rotation inside its window |
+| `pause()` | any single **HOT** validator | Freeze new deposits + withdrawal-queueing (per-validator cooldown) |
+| `unpause(...)` | **COLD ⅔** | Lift the pause |
+| `invalidateWithdrawal(mid, ...)` | **COLD ⅔** | Revoke a queued, unclaimed fraudulent withdrawal |
+| `requestValidatorSetUpdate(p, newEpoch, ...)` | **COLD ⅔** | File a two-phase hot+cold validator-set rotation |
+| `finalizeValidatorSetUpdate()` | anyone (permissionless) | Apply the filed rotation after its dispute window |
+| `setDisputeWindow(...)` / `setMinDisputeBlocks(...)` | **COLD ⅔** | Adjust the dispute window (bounded min/max) |
+| `computeMessageId(...)` / `computeGovDigest(...)` | view | Reproduce the exact bytes a validator co-signs |
+| `hot*/cold*` getters | view | Validator stake, members, count, total, quorum bps / needed |
+
+All co-signed calls take `(uint8[] sigV, bytes32[] sigR, bytes32[] sigS)` ordered by ascending signer, low-S, `v ∈ {27,28}`.
+
+### Solana — `metabridge-solana`
+
+| Instruction | Authorization | Purpose |
+|-------------|---------------|---------|
+| `initialize(params)` | deployer (one-time) | Pin the USDC mint, validator set, quorum, dual dispute window |
+| `deposit(mtf_dest, amount)` | depositor (signer) | Pull SPL USDC into custody, emit `DepositEvent` |
+| `withdraw(mid, user, amount, dst, nonce, cosigs)` | anyone relaying a **⅔** co-signature set | Verify quorum + create the `PendingWithdrawal` PDA (+ permanent spent marker) |
+| `claim(message_id)` | anyone | Release custody USDC after the dual time + slot window |
+| `dispute(mid, cosig)` | any single validator (1 co-sig) | Cancel a queued withdrawal inside its window |
+| `pause(cosig)` | any single validator (1 co-sig) | Freeze deposit / withdraw / rotation-finalize |
+| `unpause(gov_nonce, cosigs)` | **⅔** co-signature | Lift the pause |
+| `invalidate_withdrawal(mid, gov_nonce, cosigs)` | **⅔** co-signature | Revoke a queued withdrawal |
+| `request_validator_set_update(...)` | **⅔** co-signature | File a validator-set rotation |
+| `finalize_validator_set_update()` | anyone (permissionless) | Apply the filed rotation after its window |
+
+Solana uses ONE validator set (no hot/cold split) and has no `setDisputeWindow` / batch entrypoints; the recovery-id is the raw secp256k1 `{0,1}` (vs EVM `{27,28}`). Both chains reject high-S signatures and bind the program/contract id + epoch into every co-signed digest.
 
 ## Roadmap
 
