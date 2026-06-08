@@ -20,9 +20,13 @@
   * [Mark prices](concepts/mark-prices.md)
 * Margin & risk
   * [Margin modes](concepts/margin-modes.md)
+  * [Hedge mode (two-way positions)](concepts/hedge-mode.md)
   * [Portfolio margin](concepts/portfolio-margin.md)
   * [Tiered liquidation](concepts/tiered-liquidation.md)
   * [ADL — auto-deleveraging](concepts/adl.md)
+* Spot & earn
+  * [Spot margin](concepts/spot-margin.md)
+  * [Earn](concepts/earn.md)
 * Account & access
   * [Sub-accounts](concepts/sub-accounts.md)
   * [Agent wallets](concepts/agent-wallets.md)
