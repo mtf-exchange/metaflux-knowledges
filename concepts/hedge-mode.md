@@ -1,14 +1,25 @@
 # Hedge mode (two-way positions)
 
 {% hint style="info" %}
-**Upcoming.** Opt-in two-way positions. The default and current behaviour is one-way (single net position per market).
+**Foundation implemented; full availability pending.** The opt-in toggle and
+explicit per-side order routing are **live**: an account can switch to hedge
+mode (while flat) and route each order to an explicit leg via `position_side`.
+Independent per-leg **margin / liquidation** and **dual-leg position reporting**
+are still landing — until they ship, hold both legs only on a market where you
+do not rely on leg-isolated margining. The default and recommended behaviour
+remains one-way (single net position per market).
 {% endhint %}
 
 ## TL;DR
 
-By default an account holds **one net position per market** (one-way): buying while short reduces, then flips, the same position. **Hedge mode** lets an account hold a **long leg and a short leg in the same market at the same time**, tracked separately with their own entry price, margin and liquidation price.
+By default an account holds **one net position per market** (one-way): buying
+while short reduces, then flips, the same position. **Hedge mode** lets an
+account hold a **long leg and a short leg in the same market at the same time**,
+tracked separately.
 
-Hedge mode is **opt-in per account** with **no balance threshold** — any account can enable it. It can only be toggled while the account is **flat on every market**.
+Hedge mode is **opt-in per account** with **no balance threshold** — any account
+can enable it. It can only be toggled while the account is **flat on every
+market**.
 
 ## One-way vs hedge
 
@@ -17,83 +28,126 @@ Hedge mode is **opt-in per account** with **no balance threshold** — any accou
 | Positions per market | 1 net (signed) | up to 2 (a Long leg + a Short leg) |
 | "Buy while short" | reduces, then flips the net position | reduces the **Short** leg only (or opens/extends the **Long** leg — you choose) |
 | Order side selection | inferred from buy/sell | **explicit** `position_side` (`long` / `short`) required |
-| Margin | one net requirement | each leg margined independently |
-| Liquidation | one liquidation price | each leg has its own liquidation price |
-| Funding | on the net position | per leg |
+| Margin | one net requirement | *(target)* each leg margined independently |
+| Liquidation | one liquidation price | *(target)* each leg has its own liquidation price |
+| Reporting | one net position object | *(target)* one object per non-zero leg |
+
+The rows marked *(target)* describe the end state. Today the toggle and
+per-side routing are live; independent per-leg margin/liquidation and dual-leg
+reporting are still being rolled out (see the status note above).
 
 ## Enabling it
 
+Switching the position mode is a signed action; it is only legal when the
+account is **flat on every market**.
+
 ```json
 // enable hedge mode (only legal when flat on ALL markets)
-{ "type": "set_position_mode", "params": { "mode": "hedge" } }
+{ "type": "set_position_mode", "params": { "hedge": true } }
 ```
 
 ```json
 // back to one-way (also only when flat)
-{ "type": "set_position_mode", "params": { "mode": "one_way" } }
+{ "type": "set_position_mode", "params": { "hedge": false } }
 ```
 
-The **flat-on-all-markets** precondition is a safety rule: switching while holding an open position is rejected as a no-op, so a net position can never be silently re-interpreted as a stranded leg.
+`hedge` is a boolean: `true` = hedge (two-way), `false` = one-way (the default).
+The **flat-on-all-markets** precondition is a safety rule — switching while
+holding any open position is rejected (a clean no-op that mutates nothing), so a
+net position can never be silently re-interpreted as a stranded leg. Setting the
+mode to the value it already has, while flat, is a no-op success.
+
+See [`set_position_mode`](../api/rest/exchange.md#set_position_mode) in the
+`/exchange` reference for the request/response detail.
 
 ## Placing orders in hedge mode
 
-In hedge mode every order **must carry an explicit `position_side`**:
+In hedge mode every order **must carry an explicit `position_side`** (`long` /
+`short`). A one-way account must **not** send `position_side`; a hedge account
+must. The field is on the `submit_order` order body alongside `side`,
+`reduce_only`, etc.
 
 ```json
-{ "type": "order", "params": {
-  "asset": 0, "is_buy": true, "size": "...", "limit_px": "...",
-  "position_side": "long",            // open / extend the LONG leg
-  "reduce_only": false
-}}
+{
+  "type": "submit_order",
+  "order": {
+    "owner": "0x...aa", "market": 0, "side": "bid",
+    "kind": "limit", "size": 100000000, "limit_px": 5000000000,
+    "tif": "gtc", "stp_mode": "cancel_oldest",
+    "reduce_only": false,
+    "position_side": "long"
+  }
+}
 ```
 
-| Intent | `is_buy` | `position_side` | `reduce_only` |
+| Intent | `side` | `position_side` | `reduce_only` |
 |---|---|---|---|
-| Open / add to long | true | `long` | false |
-| Reduce / close long | false | `long` | true |
-| Open / add to short | false | `short` | false |
-| Reduce / close short | true | `short` | true |
+| Open / add to long | `bid` | `long` | false |
+| Reduce / close long | `ask` | `long` | true |
+| Open / add to short | `ask` | `short` | false |
+| Reduce / close short | `bid` | `short` | true |
 
-`position_side` is **explicit, never inferred** — otherwise a buy meant to *reduce a short* could mistakenly open or grow a long. A one-way account that sends `position_side` is rejected; a hedge account that omits it is rejected.
+`position_side` is **explicit, never inferred** — otherwise a buy meant to
+*reduce a short* could mistakenly open or grow a long. `reduce_only` is
+evaluated **against the named leg only**: a `reduce_only` order on the `short`
+leg can never touch the `long` leg.
 
-There is **no "flip"** in hedge mode. Closing the long leg never opens a short — that is a separate order against the short leg.
+There is **no "flip"** in hedge mode. Closing the long leg never opens a short —
+that is a separate order against the short leg.
 
 ## Margin
 
-Each leg is margined **independently** — the long leg and the short leg each post their own initial and maintenance margin, summed into the account requirement:
+*(Target behaviour — rolling out.)* Each leg is margined **independently** — the
+long leg and the short leg each post their own initial and maintenance margin,
+summed into the account requirement:
 
 ```
 required_margin = init_margin(long_leg) + init_margin(short_leg)
 ```
 
-This is intentionally conservative: a long+short in one market is delta-neutral in price terms, but each leg still ties up margin. (A future upgrade may offer netting credit for offsetting legs under [portfolio margin](./portfolio-margin.md); until then, hold both legs only if you want genuinely separate exposures, e.g. different entry prices you intend to manage independently.)
+This is intentionally conservative: a long+short in one market is delta-neutral
+in price terms, but each leg still ties up margin. (A future upgrade may offer
+netting credit for offsetting legs under [portfolio margin](./portfolio-margin.md);
+until then, hold both legs only if you want genuinely separate exposures, e.g.
+different entry prices you intend to manage independently.)
 
-Each leg keeps its own [margin mode](./margin-modes.md) — you may, for example, run the long leg isolated and the short leg cross.
+Each leg keeps its own [margin mode](./margin-modes.md) — you may, for example,
+run the long leg isolated and the short leg cross.
 
 ## Liquidation
 
-Each leg liquidates on its **own** liquidation price through the standard [tiered liquidation](./tiered-liquidation.md) ladder. Liquidating one leg does not touch the other.
+*(Target behaviour — rolling out.)* Each leg liquidates on its **own**
+liquidation price through the standard [tiered liquidation](./tiered-liquidation.md)
+ladder. Liquidating one leg does not touch the other.
 
 ## Reporting
 
-When hedge mode is on, the account state and `/info` position reads return **two position objects** for a market that has both legs (one `long`, one `short`). A one-way account returns a single net position, exactly as today. Market-level open interest stays a single net figure.
+*(Target behaviour — rolling out.)* When hedge mode is on, the account state and
+`/info` position reads return **one position object per non-zero leg** for a
+market that has both legs (one `long`, one `short`). A one-way account returns a
+single net position, exactly as today. Market-level open interest stays a single
+net figure.
 
 ## See also
 
 - [Margin modes](./margin-modes.md) — cross / isolated / strict-iso, applied per leg
 - [Portfolio margin](./portfolio-margin.md) — where future leg-netting credit would live
 - [Tiered liquidation](./tiered-liquidation.md) — per-leg ladders
+- [`/exchange` reference](../api/rest/exchange.md#set_position_mode) — the action wire format
 
 ## FAQ
 
 **Q: Do I have to use hedge mode?**
-A: No. One-way (net) is the default and behaves exactly as before; hedge mode is purely opt-in.
+A: No. One-way (net) is the default and behaves exactly as before; hedge mode is
+purely opt-in.
 
 **Q: Is there a minimum balance to enable it?**
 A: No threshold — any account can switch on hedge mode while flat.
 
 **Q: Why can't I toggle while I have an open position?**
-A: To prevent an existing net position from becoming an ambiguous, stranded leg. Close out, then switch.
+A: To prevent an existing net position from becoming an ambiguous, stranded leg.
+Close out, then switch.
 
 **Q: Does a long + short of equal size cost double margin?**
-A: In the first release, yes — legs are margined independently. Netting credit for offsetting legs is a later enhancement.
+A: That is the target: legs are margined independently. Per-leg margining is
+still rolling out; netting credit for offsetting legs is a later enhancement.
