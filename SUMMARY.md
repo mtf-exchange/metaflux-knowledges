@@ -4,6 +4,7 @@
 
 ## Getting started
 
+* [MetaFlux 101 — Start here](start-here.md)
 * [Networks & chain IDs](networks.md)
 * [Security model](security.md)
 * [Versioning & deprecation](versioning.md)
