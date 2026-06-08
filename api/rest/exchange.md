@@ -202,6 +202,7 @@ from the HL-compat path (decimal strings). Addresses are `0x`-hex (40 chars);
 | [`set_referrer`](#set_referrer) | Bind to a referrer address | sender / agent |
 | [`approve_builder_fee`](#approve_builder_fee) | Approve a builder fee ceiling | sender / agent |
 | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Lift account to multi-sig | sender / agent |
+| [`set_position_mode`](#set_position_mode) | Toggle one-way / hedge position mode | sender / agent |
 
 ### Staking & abstraction
 
@@ -282,7 +283,8 @@ approved agent). To place many orders under one signature, use
     "stp_mode":     "cancel_oldest",
     "reduce_only":  false,
     "cloid":        "0xabababababababababababababababab",
-    "builder":      { "fee": 5, "user": "0x00000000000000000000000000000000000000ff" }
+    "builder":      { "fee": 5, "user": "0x00000000000000000000000000000000000000ff" },
+    "position_side": "long"
   }
 }
 ```
@@ -300,6 +302,7 @@ approved agent). To place many orders under one signature, use
 | `reduce_only` | bool | — | If true, rejected at commit if it would grow position |
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client order id; enables `cancel_by_cloid` and dedup |
 | `builder` | object \| null | — | Optional builder-fee carve: `{ "fee": <bps u16>, "user": <0x-hex address> }` |
+| `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only.** Target leg for the order. **Omit on a one-way account** (the default) and **send it on a hedge account** — a one-way account that sends it, or a hedge account that omits it, is rejected. `reduce_only` is evaluated against the named leg only. See [hedge mode](#position_side-hedge-mode) below |
 
 **Idempotency**: a duplicate `cloid` on the same account is rejected at admission with `error: "duplicate cloid"`. Use `cloid` as your client-side dedup key.
 
@@ -314,6 +317,32 @@ approved agent). To place many orders under one signature, use
 {"error":   "<reason>"}                                             // commit/admission rejected this entry
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
+
+#### `position_side` (hedge mode)
+
+The optional `position_side` field on the order body selects which leg an order
+applies to when the account is in [hedge mode](../../concepts/hedge-mode.md).
+
+- **One-way account (default):** **omit** `position_side`. Sending it on a
+  one-way account is rejected.
+- **Hedge account:** `position_side` is **required** on every order (`"long"`
+  or `"short"`). Omitting it on a hedge account is rejected.
+
+The leg is chosen explicitly — it is **never inferred** from `side` — so a `bid`
+meant to *reduce a short* can never accidentally open or grow a long. When
+`reduce_only` is set, it is evaluated **against the named leg only**: a
+`reduce_only` order on `short` can never touch the `long` leg, and vice-versa.
+There is no implicit flip — closing the long leg never opens a short.
+
+| `side` | `position_side` | `reduce_only` | Effect (hedge account) |
+|--------|-----------------|---------------|------------------------|
+| `bid` | `long` | false | Open / add to the long leg |
+| `ask` | `long` | true | Reduce / close the long leg |
+| `ask` | `short` | false | Open / add to the short leg |
+| `bid` | `short` | true | Reduce / close the short leg |
+
+Switch an account into hedge mode (while flat) with
+[`set_position_mode`](#set_position_mode).
 
 ---
 
@@ -741,6 +770,44 @@ Convert the account to a multi-sig roster. **Irreversible**.
 | `threshold` | uint32 | M-of-N threshold (validated by the core handler) |
 
 See [multi-sig](../../concepts/multi-sig.md).
+
+---
+
+### `set_position_mode`
+
+Toggle the sender's account between one-way (single net position per market) and
+[hedge mode](../../concepts/hedge-mode.md) (a separate long leg and short leg per
+market). This is a **sender-authorized** action — no `owner` field; the recovered
+signer is the actor.
+
+```json
+{
+  "type": "set_position_mode",
+  "params": { "hedge": true }
+}
+```
+
+| Field | Type | Values | Description |
+|-------|------|--------|-------------|
+| `hedge` | bool | `true` / `false` | `true` = hedge (two-way), `false` = one-way (the default) |
+
+**Precondition — flat on all markets.** The toggle is only legal when the sender
+holds **no open position on any market** (every leg flat). If any position is
+open, the action is rejected as a **clean no-op** (state is left byte-identical):
+this prevents an existing net position from being silently re-interpreted as a
+stranded leg. Setting the mode to the value it already has, while flat, is a
+no-op success.
+
+**Common errors**: `precondition failed: cannot change position mode with an
+open position` (the account is not flat).
+
+{% hint style="info" %}
+Once an account is in hedge mode, **every order must carry an explicit
+`position_side`** (`"long"` / `"short"`) — see
+[`position_side` on `submit_order`](#position_side-hedge-mode). Per-leg margin /
+liquidation and dual-leg position reporting are still rolling out; see
+[hedge mode](../../concepts/hedge-mode.md) for the current availability.
+{% endhint %}
 
 ---
 
