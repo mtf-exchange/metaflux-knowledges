@@ -145,6 +145,7 @@ A positioned account adds entries under `positions`:
 | `positions[*].unrealised_pnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
 | `positions[*].isolated` | bool | `true` unless the position is cross-margined |
 | `positions[*].leverage` | uint8 | Position max leverage |
+| `positions[*].position_side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
 | `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); empty if none |
 

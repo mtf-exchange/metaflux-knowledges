@@ -1,13 +1,13 @@
 # Hedge mode (two-way positions)
 
 {% hint style="info" %}
-**Foundation implemented; full availability pending.** The opt-in toggle and
-explicit per-side order routing are **live**: an account can switch to hedge
-mode (while flat) and route each order to an explicit leg via `position_side`.
-Independent per-leg **margin / liquidation** and **dual-leg position reporting**
-are still landing — until they ship, hold both legs only on a market where you
-do not rely on leg-isolated margining. The default and recommended behaviour
-remains one-way (single net position per market).
+**Live.** The opt-in toggle, explicit per-side order routing, **independent
+per-leg margin**, and **dual-leg position reporting** are all shipped: an account
+can switch to hedge mode (while flat), route each order to an explicit leg via
+`position_side`, and each leg posts its own margin and reports as its own
+position object. Still landing: **per-leg liquidation** (each leg liquidating on
+its own price). The default and recommended behaviour remains one-way (single net
+position per market).
 {% endhint %}
 
 ## TL;DR
@@ -28,13 +28,13 @@ market**.
 | Positions per market | 1 net (signed) | up to 2 (a Long leg + a Short leg) |
 | "Buy while short" | reduces, then flips the net position | reduces the **Short** leg only (or opens/extends the **Long** leg — you choose) |
 | Order side selection | inferred from buy/sell | **explicit** `position_side` (`long` / `short`) required |
-| Margin | one net requirement | *(target)* each leg margined independently |
+| Margin | one net requirement | each leg margined independently |
 | Liquidation | one liquidation price | *(target)* each leg has its own liquidation price |
-| Reporting | one net position object | *(target)* one object per non-zero leg |
+| Reporting | one net position object | one object per non-zero leg (each labelled `position_side`) |
 
-The rows marked *(target)* describe the end state. Today the toggle and
-per-side routing are live; independent per-leg margin/liquidation and dual-leg
-reporting are still being rolled out (see the status note above).
+The row marked *(target)* describes the end state. Today the toggle, per-side
+routing, independent per-leg margin, and dual-leg reporting are live; per-leg
+liquidation is still being rolled out (see the status note above).
 
 ## Enabling it
 
@@ -97,9 +97,9 @@ that is a separate order against the short leg.
 
 ## Margin
 
-*(Target behaviour — rolling out.)* Each leg is margined **independently** — the
-long leg and the short leg each post their own initial and maintenance margin,
-summed into the account requirement:
+Each leg is margined **independently** — the long leg and the short leg each
+post their own initial and maintenance margin, summed into the account
+requirement:
 
 ```
 required_margin = init_margin(long_leg) + init_margin(short_leg)
@@ -122,11 +122,12 @@ ladder. Liquidating one leg does not touch the other.
 
 ## Reporting
 
-*(Target behaviour — rolling out.)* When hedge mode is on, the account state and
-`/info` position reads return **one position object per non-zero leg** for a
-market that has both legs (one `long`, one `short`). A one-way account returns a
-single net position, exactly as today. Market-level open interest stays a single
-net figure.
+When hedge mode is on, the account state and `/info` position reads return **one
+position object per non-zero leg** for a market that has both legs, each labelled
+with its `position_side` (`"long"` / `"short"`). A one-way account returns a
+single *net* position with **no** `position_side` field, exactly as today.
+Market-level open interest stays a single net figure. See
+[`account_state` positions](../api/rest/info.md#account_state).
 
 ## See also
 
@@ -149,5 +150,6 @@ A: To prevent an existing net position from becoming an ambiguous, stranded leg.
 Close out, then switch.
 
 **Q: Does a long + short of equal size cost double margin?**
-A: That is the target: legs are margined independently. Per-leg margining is
-still rolling out; netting credit for offsetting legs is a later enhancement.
+A: Yes — legs are margined independently, so an offsetting long+short ties up
+both legs' margin. Netting credit for offsetting legs is a later enhancement
+(under [portfolio margin](./portfolio-margin.md)).
