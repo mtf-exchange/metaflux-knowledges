@@ -249,6 +249,17 @@ full conceptual model.
 | [`REDACTED`](#REDACTED) | MLP whitelist vote | validator key |
 | [`REDACTED`](#REDACTED) | Register / revoke a strategy operator | vault leader |
 
+### Bridge withdrawals
+
+External withdrawals leave the chain over [MetaBridge](../../bridge/README.md).
+The action is **sender-authorized**: the recovered signer is the account
+debited, so withdrawal authority is effectively **master-only** — an agent
+signature would act on the agent's own (separate) account, never the master's.
+
+| `type` | Purpose | Signed-by |
+|--------|---------|-----------|
+| [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | sender (master) |
+
 ### Not on the public `/exchange` path
 
 These action names appear in earlier drafts (and some in the HL-compat surface),
@@ -266,7 +277,8 @@ disposition of each.
 | `CreateSubAccount` / `SubAccountTransfer` / `SubAccountSpotTransfer` | — | Sub-account flows not bridged |
 | `MultiSig` | — | Multi-sig wrapper not bridged (the account is converted via `convert_to_multi_sig_user`) |
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
-| `UsdcTransfer` / `SpotTransfer` / `WithdrawUsdc` | — | Transfers / withdrawals are not on the public user `/exchange` path |
+| `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
+| `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |
 | `BorrowLend` | — | Not bridged |
 | `REDACTED` | — | Validator/system action; goes via the consensus path, never `/exchange` |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` |
@@ -534,7 +546,24 @@ Apply N `modify`s under one signature. Each entry has the same shape as
 }
 ```
 
-Per-entry statuses are returned in input order (each modify independently applies or errors).
+| Field | Type | Description |
+|-------|------|-------------|
+| `modifications[*]` | modify | Each entry has the full [`modify`](#modify) params shape (`market`, `oid`, optional `new_px` / `new_size`) |
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission):
+
+```json
+{ "accepted": true, "mempool_depth": 3, "nonce": 1735689600001, "action_hash": "0x..." }
+```
+
+**At commit** the entries are applied **in input order** and are **not
+all-or-nothing**: each modify independently applies or errors with a reason
+(the commit outcome carries one status per entry, in input order, plus the
+applied count). The HTTP response carries no per-entry statuses — track the
+commit via the returned `action_hash`. An empty `modifications` array is
+rejected (`empty batch`); more than **1000** entries is rejected (throttled);
+an entry with both `new_px` and `new_size` null errors (`nothing to modify`).
 
 ---
 
@@ -584,7 +613,19 @@ child orders spaced `delay_ms` apart.
 | `delay_ms` | uint64 | Inter-slice delay in ms |
 | `reduce_only` | bool | — |
 
-Admission returns the assigned `twap_id` (a uint64). Slice events ride the [`userEvents` WS channel](../ws/subscriptions.md#userevents) (a dedicated `twap*` stream is roadmap).
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission):
+
+```json
+{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+```
+
+The parent `twap_id` (uint64) is assigned **at commit** from a deterministic
+per-chain counter and carried in the commit outcome — it is **not** in the HTTP
+response. Track the commit via the returned `action_hash`. A zero `total_size`
+or a zero `slice_count` errors at commit. Slice events ride the
+[`user_events` WS channel](../ws/subscriptions.md) (a dedicated `twap*` stream
+is roadmap).
 
 ---
 
@@ -788,6 +829,20 @@ Approve an agent wallet to sign on the account's behalf. See [agent wallets](../
 | `agent` | hex address | 20-byte address of the agent's signing key |
 | `name` | string \| null | Optional bookkeeping label |
 | `expires_at_ms` | uint64 \| null | Unix-ms expiry; `null` = never expires |
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission):
+
+```json
+{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+```
+
+There is no synchronous approval confirmation in the HTTP body — track the
+commit via the returned `action_hash`.
+
+**Common errors** (at commit): `cannot approve self` (the agent address equals
+the sender), `zero address`. Re-approving an already-approved agent
+**overwrites** its entry (`name` + `expires_at_ms`) rather than erroring.
 
 Becomes effective **one block after commit**. Submitting an agent-signed action before then returns `401`.
 
@@ -1050,6 +1105,10 @@ Pay a priority fee (bps) to push the sender's flow toward the front of the next 
 
 ### `submit_encrypted_order`
 
+**Status: available on devnet (preview).** The action is accepted and the
+pending-pool mechanics below apply, but the threshold-encrypted order pipeline
+is still a preview surface — expect changes before it is production-grade.
+
 Post a threshold-encrypted order ciphertext into the pending pool. The plaintext
 is hidden until `target_block` and a threshold of decryption shares.
 
@@ -1074,7 +1133,11 @@ is hidden until `target_block` and a threshold of decryption shares.
 | `target_block` | uint64 | Block at/after which decryption may proceed |
 | `reveal_deadline_ms` | uint64 | Consensus-time (ms) after which reveal is barred |
 
-Returns the pending-pool depth after the push.
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission). The
+pending-pool depth after the push is carried in the **commit outcome**, not the
+HTTP body. An empty or over-sized ciphertext, a zero `threshold`, or a full
+pending pool errors at commit.
 
 ---
 
@@ -1222,6 +1285,79 @@ the operator must be in the MLP whitelist.
 
 ---
 
+### `mb_withdraw`
+
+External withdrawal over [MetaBridge](../../bridge/README.md): debits the
+sender's USDC cross-collateral and queues an **Outbound** bridge message for
+validator co-signing (⅔ of active stake), after which the funds are released to
+`dst_addr` on the destination chain. **Sender-authorized** — no `owner` field;
+the recovered signer is the account debited. An agent signature therefore acts
+on the **agent's own** account, never the master's, so withdrawal authority is
+effectively master-only (consistent with the
+[signed-by table](#signed-by-semantics)).
+
+```json
+{
+  "type": "mb_withdraw",
+  "params": {
+    "chain":    "Base",
+    "asset":    0,
+    "amount":   1000000,
+    "dst_addr": "0xabababababababababababababababababababab"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `chain` | enum | `"Base"`, `"Arbitrum"`, `"Solana"` | Destination chain. Must have a registered MetaBridge contract and not be paused, or the action errors at commit |
+| `asset` | uint32 | `0` | MetaFlux asset id. Only `0` (USDC cross-collateral) is bridgeable today; any other id errors at commit (`only USDC cross-collateral is bridgeable`) |
+| `amount` | uint64 | `> 0` | Amount in 6-decimal USDC base units (`1000000` = 1 USDC); widened to `u128` internally |
+| `dst_addr` | hex string | 40 or 64 hex chars (`0x` optional) | Destination: a 20-byte EVM address for Base / Arbitrum (left-padded internally to 32 bytes), or a full 32-byte recipient for Solana. Any other length is rejected at admission (`400`) |
+
+**Funding check.** The withdrawal is gated on **free collateral** (equity minus
+margin held by open positions), not raw equity — collateral backing open
+positions is not withdrawable, mirroring the pre-trade gate. An underfunded
+withdrawal errors at commit (`insufficient free collateral for withdrawal`).
+
+**What commit does.** The debit and the queueing are atomic at commit: the
+amount leaves the cross-collateral balance, a pending-withdrawal entry is
+recorded (the commit outcome carries its `withdrawal_id`, a per-account
+counter), and an Outbound MetaBridge message is queued for validator
+co-signing. Once ⅔ of active stake has co-signed, a relayer submits the release
+on the destination chain — see [the bridge page](../../bridge/README.md) for
+the release pipeline and its dispute window.
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission):
+
+```json
+{ "accepted": true, "mempool_depth": 2, "nonce": 1735689600001, "action_hash": "0x..." }
+```
+
+The HTTP response does **not** carry the `withdrawal_id`; track the commit via
+the returned `action_hash`. The destination-chain release is asynchronous
+(cross-chain): the L1 debit is immediate at commit, the payout follows
+co-signing, relay submission, and the on-chain dispute window.
+
+**Common errors** (at commit): `amount must be positive`, `chain paused
+(per-chain or global)`, `chain not deployed (no registered MetaBridge
+contract)`, `only USDC cross-collateral is bridgeable`, `insufficient free
+collateral for withdrawal`.
+
+**Gotchas.**
+- `dst_addr` is validated for **length only** — there is no checksum or
+  ownership check. Funds released to a wrong-but-well-formed address are
+  unrecoverable; double-check the destination, especially the 32-byte Solana
+  form.
+- Send the EVM form (40 hex chars) for Base / Arbitrum and the 32-byte form
+  (64 hex chars) for Solana. The server cannot tell a mistyped 64-char EVM
+  padding from a real Solana key.
+- A duplicate submission is a **second withdrawal**, not a retry — idempotency
+  is per-nonce, and each committed `mb_withdraw` debits again.
+
+---
+
 <a id="non-bridged-actions"></a>
 
 ### Non-bridged actions
@@ -1240,7 +1376,8 @@ here only to redirect integrators to the supported path.
 | `CreateSubAccount` / `SubAccountTransfer` / `SubAccountSpotTransfer` | — | Sub-account flows not bridged | — |
 | `MultiSig` | — | Wrapper not bridged | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) converts the account |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |
-| `UsdcTransfer` / `SpotTransfer` / `WithdrawUsdc` | — | Transfers / withdrawals are **never** on the public user `/exchange` path | — |
+| `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
+| `WithdrawUsdc` | — | Draft name; not a native tag | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
 | `BorrowLend` | — | Not bridged | — |
 | `REDACTED` | — | Validator/system action; consensus path only | — |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` | — |
