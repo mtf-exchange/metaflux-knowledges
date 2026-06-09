@@ -1,20 +1,47 @@
-# MIP-5 — Reserved
+# MIP-5 — Earn
 
-{% hint style="warning" %}
-**Reserved — undefined.** No specification exists yet. This slot is held open intentionally.
+{% hint style="info" %}
+**Planned.** MIP-5 assigns the previously-reserved slot to **Earn** — a lending
+pool where depositors supply assets and earn yield from the interest paid by
+spot-margin borrowers. Specification and rollout follow the spot-margin work it
+builds on.
 {% endhint %}
 
-MIP-5 is an explicitly **reserved** number with no assigned proposal. It is held
-open rather than silently skipped so the numbering gap is visible and
-intentional. A proposal must be specified — and an owner decision made — before
-MIP-5 is assigned to anything.
+## What Earn is
 
-## Why it's reserved, not skipped
+Earn is the **supply side of MetaFlux's spot lending market**. A depositor lends
+an asset (e.g. USDC) into a per-asset pool and receives **shares** priced off the
+pool's net asset value (NAV) — the same NAV/share accounting as the
+[Metaliquidity vault](./mip-2.md). Spot-margin traders borrow from the pool and
+pay interest; that interest accrues into the pool's NAV, so every share
+appreciates. A depositor's yield is:
 
-The MIP numbering deliberately mirrors the established on-chain perp
-improvement-proposal scheme for the analogous primitives, plus MetaFlux-specific
-entries. Leaving MIP-5 as a documented reservation keeps the registry honest:
-the gap is on purpose, not an oversight.
+```
+your_yield = shares × (share_price_now − share_price_at_deposit)
+```
+
+The borrow rate is a deterministic function of **utilisation** (borrowed ÷
+supplied). Supply APY tracks it:
+
+```
+supply_APY ≈ borrow_APR × utilisation × (1 − reserve_factor)
+```
+
+## Two sides of one market
+
+Earn (supply) and spot margin (demand) are the two sides of a single lending
+market: the interest borrowers pay **is** the yield lenders earn.
+
+- **Reuses [MIP-2](./mip-2.md)** NAV/share accounting for deposits and
+  withdrawals (deposit mints shares at the current share price; withdraw redeems
+  at NAV).
+- Adds what a vault does not have: a utilisation→APR interest-rate curve and
+  continuous (per-block) interest accrual.
+
+## Status
+
+Planned. Depends on spot trading and spot margin landing first; not yet part of
+the V1 finished feature set.
 
 ## Governing reference
 
