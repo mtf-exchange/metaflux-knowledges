@@ -1,7 +1,9 @@
 # Staking
 
 {% hint style="info" %}
-**Preview.**
+**Live on devnet.** Delegation, undelegation, rewards claiming, and validator
+registration are active and verified end-to-end across consensus on the
+4-node devnet.
 {% endhint %}
 
 ## TL;DR
@@ -249,7 +251,7 @@ T+37 days
 
 ## See also
 
-- [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (in catalog as supported action variants once live)
+- [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (supported action variants on devnet)
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective emission APR + committed inputs
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)

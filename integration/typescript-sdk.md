@@ -82,6 +82,9 @@ c.exchange.updateLeverage(p: { asset: number; leverage: number }): Promise<void>
 c.exchange.updateIsolatedMargin(p: UpdateIsolatedMarginParams): Promise<void>;
 c.exchange.updateMarginMode(p: { asset: number; mode: MarginMode }): Promise<void>;
 c.exchange.userPortfolioMargin(p: { enabled: boolean }): Promise<void>;
+// Margin controls (updateLeverage / updateIsolatedMargin / updateMarginMode)
+// are perp-only. Spot positions do not support leverage or isolated margin in
+// V1 — spot uses the reserved-balance escrow model via the spot order path.
 
 c.exchange.approveAgent(p: ApproveAgentParams): Promise<{ actionHash: string }>;
 c.exchange.createSubAccount(p: { name: string; explicitIndex?: number }): Promise<SubAccountResult>;
@@ -96,6 +99,13 @@ c.exchange.rfqAccept(p: { rfqId: string; quoteId: string }): Promise<void>;
 
 c.exchange.fbaOrder(p: FbaOrderParams): Promise<OrderResult>;
 ```
+
+{% hint style="warning" %}
+**Margin controls are perp-only.** `updateLeverage`, `updateIsolatedMargin`, and
+`updateMarginMode` apply to perpetual positions only. Spot positions do not
+support leverage or isolated margin in V1 — spot trading uses the
+reserved-balance escrow model via the spot order path instead.
+{% endhint %}
 
 ### `ws`
 

@@ -95,7 +95,7 @@ Protocol improvement proposals:
 
 Asset bridging:
 
-- [USDC via Circle CCTP](./bridge/) — native, attestation-verified
+- [USDC via MetaBridge custody bridge](./bridge/) — validator-signed, not Circle CCTP
 - Other assets via [MetaBridge](./bridge/) — MetaFlux validator-signed bridge (Solana / Base / Arbitrum)
 
 ### Top-level

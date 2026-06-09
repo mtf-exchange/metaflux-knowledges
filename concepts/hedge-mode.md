@@ -2,12 +2,13 @@
 
 {% hint style="info" %}
 **Live.** The opt-in toggle, explicit per-side order routing, **independent
-per-leg margin**, and **dual-leg position reporting** are all shipped: an account
-can switch to hedge mode (while flat), route each order to an explicit leg via
-`position_side`, and each leg posts its own margin and reports as its own
-position object. Still landing: **per-leg liquidation** (each leg liquidating on
-its own price). The default and recommended behaviour remains one-way (single net
-position per market).
+per-leg margin**, **dual-leg position reporting**, and **per-leg liquidation**
+are all shipped: an account can switch to hedge mode (while flat), route each
+order to an explicit leg via `position_side`, each leg posts its own margin and
+reports as its own position object, and each leg is liquidated per its own
+maintenance contribution. Both legs are scanned per the standard selection
+(larger-maintenance leg first), deterministic across validators. The default and
+recommended behaviour remains one-way (single net position per market).
 {% endhint %}
 
 ## TL;DR
@@ -29,12 +30,11 @@ market**.
 | "Buy while short" | reduces, then flips the net position | reduces the **Short** leg only (or opens/extends the **Long** leg — you choose) |
 | Order side selection | inferred from buy/sell | **explicit** `position_side` (`long` / `short`) required |
 | Margin | one net requirement | each leg margined independently |
-| Liquidation | one liquidation price | *(target)* each leg has its own liquidation price |
+| Liquidation | one liquidation price | each leg liquidates per its own maintenance contribution |
 | Reporting | one net position object | one object per non-zero leg (each labelled `position_side`) |
 
-The row marked *(target)* describes the end state. Today the toggle, per-side
-routing, independent per-leg margin, and dual-leg reporting are live; per-leg
-liquidation is still being rolled out (see the status note above).
+The toggle, per-side routing, independent per-leg margin, dual-leg reporting, and
+per-leg liquidation are all live (see the status note above).
 
 ## Enabling it
 
@@ -116,9 +116,11 @@ run the long leg isolated and the short leg cross.
 
 ## Liquidation
 
-*(Target behaviour — rolling out.)* Each leg liquidates on its **own**
-liquidation price through the standard [tiered liquidation](./tiered-liquidation.md)
-ladder. Liquidating one leg does not touch the other.
+Each leg liquidates per its **own** maintenance contribution through the standard
+[tiered liquidation](./tiered-liquidation.md) ladder. When an account is in a
+liquidatable tier, both legs are scanned and the **larger-maintenance leg is
+selected first**, deterministic across validators; liquidating one leg does not
+touch the other.
 
 ## Reporting
 

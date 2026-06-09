@@ -32,7 +32,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## C
 
-**CCTP — Cross-Chain Transfer Protocol.** Circle's official USDC bridge primitive. Used for all USDC bridging in/out of MetaFlux. See [bridge](../bridge/).
+**CCTP — Cross-Chain Transfer Protocol.** Circle's Cross-Chain Transfer Protocol. MetaFlux does **not** use CCTP; instead USDC is bridged via [MetaBridge](../bridge/) (a validator-signed custody bridge).
 
 **chainId.** EIP-712 domain field selecting the network. `31337` devnet, `114514` testnet, `8964` mainnet. See [networks](../networks.md).
 
@@ -174,7 +174,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **Unrealised PnL.** Mark-to-market profit/loss on open positions. Not yet realised by closing.
 
-**USDC.** The quote currency for MetaFlux markets; bridged in/out via [CCTP](../bridge/).
+**USDC.** The quote currency for MetaFlux markets; bridged in/out via [MetaBridge](../bridge/).
 
 ## V
 

@@ -1,11 +1,10 @@
 # EVM
 
-{% hint style="warning" %}
-**Preview — design-stable, not yet live on devnet.** The addresses, ABIs,
-encodings, and architecture below are fixed and safe to build against, but the
-end-to-end EVM↔Core path is still being wired (live Core-state precompile reads and
-CoreWriter action application are not yet executable on devnet). The
-[bridge](../bridge/) is live; this surface is not yet.
+{% hint style="success" %}
+**Live on devnet.** EVM execution and CoreWriter actions are operational, as are
+the stateless MTF derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed
+read precompiles (querying the chain's own positions / book directly) and the
+cross-chain precompiles are upcoming. The [bridge](../bridge/) is live.
 {% endhint %}
 
 The MetaFlux EVM is a [revm](https://github.com/bluealloy/revm)-based **sidechain**
