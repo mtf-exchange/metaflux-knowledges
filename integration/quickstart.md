@@ -19,7 +19,7 @@ HL-compat lives under `/hl/*`.
 
 | Service | URL (devnet) |
 |---------|--------------|
-| Gateway front door | `https://gateway.devnet.mtf.exchange` |
+| Gateway front door | `https://devnet-gateway.mtf.exchange` |
 | MTF-native (default) | `POST /info` · `POST /exchange` · `GET /ws` |
 | HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
 | CCXT-compat | `/ccxt/*` |
@@ -37,7 +37,7 @@ See [networks](../networks.md) for the full list including testnet and (post-lau
 ## Step 1 — Get devnet USDC
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/faucet \
+curl -X POST https://devnet-gateway.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -56,7 +56,7 @@ instead speak MTF-native on the gateway's default path (`/info` · `/exchange`).
 Pick one lane; both go through the same front door, just different paths.
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
   -H 'content-type: application/json' \
   -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
 ```
@@ -72,7 +72,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://gateway.devnet.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -94,7 +94,7 @@ console.log('order id:', result.oid);
 Raw curl (HL-compat shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -132,7 +132,7 @@ spot orders back via [`POST /info`](../api/rest/info.md); cancel with
 ## Step 3 — Check the order is on the book
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
   -H 'content-type: application/json' \
   -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
 ```
@@ -156,7 +156,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://gateway.devnet.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
   -d @cancel.json
 ```
 

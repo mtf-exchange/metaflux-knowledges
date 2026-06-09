@@ -6,7 +6,7 @@ icon: terminal
 # API Reference
 
 Three protocol families, all served by the same gateway front door
-(`https://gateway.<net>.mtf.exchange`) — the choice of client wire shape is just a
+(`https://<net>-gateway.mtf.exchange`) — the choice of client wire shape is just a
 choice of path.
 
 | Family | Where | Use when |
