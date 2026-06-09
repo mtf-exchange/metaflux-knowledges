@@ -1,7 +1,9 @@
 # Vaults
 
 {% hint style="info" %}
-**Preview.**
+**Live on devnet.** The full vault lifecycle — creation, deposit, withdraw,
+transfer, distribute, modify — is implemented and exercised on devnet.
+End-to-end consensus tests are still being added.
 {% endhint %}
 
 ## TL;DR

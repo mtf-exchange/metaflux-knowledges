@@ -392,7 +392,7 @@ Writes use HL's `{"status":"ok"|"err","response":<...>}` convention (errors-are-
 | `scheduleCancel` | rolling out | dead-man's switch |
 | `updateLeverage` / `updateIsolatedMargin` | rolling out | — |
 | `usdSend` / `spotSend` / `usdClassTransfer` | rolling out | transfers |
-| `withdraw3` | rolling out | external withdraw (CCTP) |
+| `withdraw3` | rolling out | external withdraw (MetaBridge) |
 | `approveAgent` | rolling out | agent wallet approval |
 | `vaultTransfer` / `subAccountTransfer` | rolling out | fund movement |
 | `setReferrer` / `convertToMultiSigUser` | rolling out | — |

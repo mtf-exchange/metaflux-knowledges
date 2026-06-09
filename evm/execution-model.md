@@ -1,9 +1,9 @@
 # Execution model
 
-{% hint style="warning" %}
-**Preview — design-stable, not yet live on devnet.** The model below is the target
-EVM execution design; cadence and gas values may be tuned before launch. Build
-against the shape. The [bridge](../bridge/) is live; this surface is not yet.
+{% hint style="success" %}
+**Live on devnet.** The unified block model — one block per consensus round and
+parallel conflict-strata execution — is operational and tested. Cadence and gas
+values may still be tuned before launch. The [bridge](../bridge/) is live.
 {% endhint %}
 
 The MetaFlux EVM produces **one unified block per consensus round** — there are no

@@ -103,6 +103,9 @@ c.exchange.update_leverage(UpdateLeverageParams { .. }).await?;
 c.exchange.update_isolated_margin(UpdateIsolatedMarginParams { .. }).await?;
 c.exchange.update_margin_mode(UpdateMarginModeParams { .. }).await?;
 c.exchange.user_portfolio_margin(UserPortfolioMarginParams { .. }).await?;
+// Margin controls (update_leverage / update_isolated_margin / update_margin_mode)
+// apply to perpetual positions only. Spot trading uses the reserved-balance
+// escrow model and does not support leverage in V1.
 
 c.exchange.approve_agent(ApproveAgentParams { .. }).await?;
 c.exchange.create_sub_account(CreateSubAccountParams { .. }).await?;
@@ -117,6 +120,13 @@ c.exchange.rfq_accept(RfqAcceptParams { .. }).await?;
 
 c.exchange.fba_order(FbaOrderParams { .. }).await?;
 ```
+
+{% hint style="warning" %}
+**Margin controls are perp-only.** `update_leverage`, `update_isolated_margin`,
+and `update_margin_mode` apply to perpetual positions only. Spot positions do not
+support leverage or isolated margin in V1 — spot trading uses the
+reserved-balance escrow model via the spot order path instead.
+{% endhint %}
 
 ### `ws`
 

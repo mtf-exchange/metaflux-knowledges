@@ -5,15 +5,14 @@ icon: file-lines
 
 # Node data files
 
-{% hint style="warning" %}
-**Status — schema preview, writers not yet on the node.** All four streams below
+{% hint style="success" %}
+**Status — writers now shipped.** All four streams below
 (`l4_book_diffs.jsonl`, `node_fills`, `node_trades`, `node_order_statuses`) are
-🚧 **in progress** — the node does not record any of them yet (there is no
-`[persistence] record_l4` / `write_*` config or recorder module in the current
-build). The schemas are pinned here so the downstream indexer, the L4 book
-server, and SDK consumers can build against a stable contract while the writers
-land. Treat every record shape below as the **target contract**, not a feature
-you can enable today.
+implemented and can be enabled via the `[persistence]` section of the node
+config (with guards so recording runs only on non-validator nodes). Enable any
+subset via `record_l4 = true` / `write_fills = true` / `write_trades = true` /
+`write_order_statuses = true`. The schemas below are the live record contract
+that the downstream indexer, the L4 book server, and SDK consumers build against.
 {% endhint %}
 
 ## TL;DR
@@ -40,30 +39,30 @@ In the node's TOML, under `[persistence]`:
 data_dir = "/var/lib/mtf"        # all streams land under here
 
 [persistence]
-record_l4 = true                 # 🚧 (target) enables l4_book_diffs.jsonl
-# write_fills          = true    # 🚧 hourly node_fills
-# write_trades         = true    # 🚧 hourly node_trades
-# write_order_statuses = true    # 🚧 hourly node_order_statuses
+record_l4            = true       # enables l4_book_diffs.jsonl
+write_fills          = true       # hourly node_fills
+write_trades         = true       # hourly node_trades
+write_order_statuses = true       # hourly node_order_statuses
 ```
 
 | Flag | Default | Stream | Status |
 |------|---------|--------|--------|
-| `record_l4` | `false` | `l4_book_diffs.jsonl` | 🚧 in progress (config + writer not yet shipped) |
-| `write_fills` | `false` | `node_fills/hourly/{date}/{hour}` | 🚧 in progress |
-| `write_trades` | `false` | `node_trades/hourly/{date}/{hour}` | 🚧 in progress |
-| `write_order_statuses` | `false` | `node_order_statuses/hourly/{date}/{hour}` | 🚧 in progress |
+| `record_l4` | `false` | `l4_book_diffs.jsonl` | shipped |
+| `write_fills` | `false` | `node_fills/hourly/{date}/{hour}` | shipped |
+| `write_trades` | `false` | `node_trades/hourly/{date}/{hour}` | shipped |
+| `write_order_statuses` | `false` | `node_order_statuses/hourly/{date}/{hour}` | shipped |
 
-All are independent — enable any subset (once the writers land; the flags are the
-target config, not yet honored by the current build).
+All are independent — enable any subset in your node config (note: recording is
+not honored on validator nodes, only on dedicated recording / observer nodes).
 
 ## Paths & rotation
 
 ```
 <data_dir>/
-├── l4_book_diffs.jsonl                       # single append-only file (🚧)
-├── node_fills/hourly/{date}/{hour}           # 🚧 e.g. node_fills/hourly/2026-05-31/14
-├── node_trades/hourly/{date}/{hour}          # 🚧
-└── node_order_statuses/hourly/{date}/{hour}  # 🚧
+├── l4_book_diffs.jsonl                       # single append-only file
+├── node_fills/hourly/{date}/{hour}           # e.g. node_fills/hourly/2026-05-31/14
+├── node_trades/hourly/{date}/{hour}
+└── node_order_statuses/hourly/{date}/{hour}
 ```
 
 - The hourly streams rotate by **block time** (consensus-derived, not wall clock — see [determinism note](#determinism)). `{date}` is `YYYY-MM-DD`, `{hour}` is `00`..`23` of the block timestamp's UTC hour.
@@ -72,7 +71,7 @@ target config, not yet honored by the current build).
 
 ---
 
-## `node_fills` — per-fill records 🚧
+## `node_fills` — per-fill records
 
 One record per committed block; `events` is a list of `[address, fill]` pairs (HL's `node_fills_by_block` envelope). A fill is emitted once per filled party (taker and each maker each get a record).
 
@@ -124,7 +123,7 @@ One record per committed block; `events` is a list of `[address, fill]` pairs (H
 **vs HL's 18-field fill hash.** HL's consensus *fill-hash* payload has 18 fields (incl. `builderFee`, `liquidation`, `twapId`, `markPx`, `liquidatedUser`, …) — see the [protocol study](#references). The data-stream record is the operator-facing subset above. Liquidation / builder / TWAP fields are added to the record as the corresponding action surfaces land on the node ([`/exchange`](rest/exchange.md) action catalog). MTF designs its own field order — there is **no** mainnet-RespHash parity attempt.
 {% endhint %}
 
-## `node_order_statuses` — order lifecycle 🚧
+## `node_order_statuses` — order lifecycle
 
 One record per order status transition. Mirrors HL's `--write-order-statuses`; `status` follows HL's `OrderStatus` 5-variant vocabulary.
 
@@ -163,7 +162,7 @@ One record per order status transition. Mirrors HL's `--write-order-statuses`; `
 
 Base fields (`market`, `oid`, `cloid`, `side`, `limit_px`, `sz`, `orig_sz`, `tif`, `reduce_only`, `ts`) appear on every record. The terminal-state stream is what the indexer joins to serve `historicalOrders` ([HL-compat](rest/hl-compat.md)) / `fetchClosedOrders` ([CCXT](rest/ccxt-compat.md)).
 
-## `node_trades` — public trade tape 🚧
+## `node_trades` — public trade tape
 
 One record per print (NOT per party — a single trade, not two fills). This is the de-anonymized public tape; it feeds the WS [`trades`](ws/subscriptions.md) channel's history and CCXT [`fetchTrades`](rest/ccxt-compat.md).
 
@@ -197,9 +196,9 @@ One record per print (NOT per party — a single trade, not two fills). This is 
 
 ---
 
-## `l4_book_diffs.jsonl` — raw L4 book diffs 🚧
+## `l4_book_diffs.jsonl` — raw L4 book diffs
 
-Mirrors HL's `--write-raw-book-diffs`: per committed block, emit the per-order CHANGES to the de-anonymized resting book (added / resized / removed), plus a full **snapshot** every `snapshot_interval` blocks (and on the first non-empty book) so a downstream L4 order-book server can bootstrap, then apply diffs. It is consumed by the [L4 book server](#references) (a separate GPL-3.0 project). 🚧 The writer is not yet shipped; the schema below is the target contract.
+Mirrors HL's `--write-raw-book-diffs`: per committed block, emit the per-order CHANGES to the de-anonymized resting book (added / resized / removed), plus a full **snapshot** every `snapshot_interval` blocks (and on the first non-empty book) so a downstream L4 order-book server can bootstrap, then apply diffs. It is consumed by the [L4 book server](#references) (a separate GPL-3.0 project).
 
 Two record kinds share the file, discriminated by `kind`:
 

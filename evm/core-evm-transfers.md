@@ -1,9 +1,10 @@
 # Core ↔ EVM transfers
 
-{% hint style="warning" %}
-**Preview — not yet live on devnet.** Mechanisms and encodings are design-stable;
-the end-to-end path is being wired. The [bridge](../bridge/) (cross-chain custody)
-is live; the EVM↔Core legs below are not yet.
+{% hint style="success" %}
+**Live on devnet.** The EVM→Core value-transfer actions (`SpotSend`, `SendAsset`,
+`UsdClassTransfer`, `VaultTransfer` via CoreWriter) and Core→EVM credit
+materialization are operational and tested. The [bridge](../bridge/) (cross-chain
+custody) is live.
 {% endhint %}
 
 Value moves between **Core** (the L1 clearinghouse / spot ledger) and the **EVM**

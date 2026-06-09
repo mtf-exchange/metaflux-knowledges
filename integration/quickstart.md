@@ -9,7 +9,7 @@ Deposit, place an order, cancel, withdraw. By the end of this page your TypeScri
 ## Prerequisites
 
 - An EVM private key (any 32-byte hex; for devnet, generate fresh — don't reuse a mainnet key)
-- USDC on a CCTP-supported source chain (Arbitrum / Base / Ethereum / OP / Avalanche) — devnet allows the faucet route instead
+- USDC on a MetaBridge source chain (Base; Solana and Arbitrum rolling out) — devnet allows the faucet route instead
 - `curl` or any HTTP client
 
 ## Endpoints
@@ -65,7 +65,7 @@ You should see `marginSummary.accountValue: "3000.0"`.
 
 ## Step 2 — Place a limit order
 
-The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux/sdk` — coming).
+The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux/sdk` — ships before mainnet; see [TypeScript SDK](./typescript-sdk.md)).
 
 ```typescript
 import { MetaFluxClient } from '@metaflux/sdk';
@@ -142,12 +142,12 @@ await client.exchange.withdrawUsdc({
 });
 ```
 
-This emits a CCTP burn on MetaFlux. After CCTP attestation (~13 finality blocks on the destination) you can claim on the destination chain via Circle's standard flow (see [bridge](../bridge/)).
+This queues a MetaBridge withdrawal. After the MetaFlux validator set co-signs it to a ⅔ stake-weighted quorum and the dispute window elapses (a few minutes), you can `claim` on the destination chain (see [bridge](../bridge/)).
 
 ## What just happened
 
 ```
-client                  gateway              node                  consensus           CCTP
+client                  gateway              node                  consensus         MetaBridge
   │                       │                    │                      │                  │
   │  deposit USDC         │                    │                      │                  │
   │  (faucet)             │                    │                      │                  │
@@ -163,9 +163,11 @@ client                  gateway              node                  consensus    
   │ 202                   │                    │                      │                  │
   │                       │                    │                      │                  │
   │ POST /exchange Withdraw                    │                      │                  │
-  ├──────────────────────►│ ─────────────────► │   burn event         │                  │
-  │ 202                   │                    ├─────────────────────►│  CCTP attest ──► │
-  │                       │                    │                      │                  ├─► dest chain
+  ├──────────────────────►│ ─────────────────► │   withdraw action    │                  │
+  │ 202                   │                    ├─────────────────────►│ ⅔ co-sign ──►    │
+  │                       │                    │                      │                  │ batchWithdraw
+  │                       │                    │                      │                  │ + dispute window
+  │                       │                    │                      │                  ├─► claim on dest chain
 ```
 
 ## Next steps
@@ -185,7 +187,7 @@ client                  gateway              node                  consensus    
 | `400 invalid msgpack` | Encoder reorders map keys | Use a standards-compliant msgpack lib |
 | `404 unknown user` on info | Address has no on-chain state yet | Deposit first (faucet) |
 | `429 rate limit` | Too many requests | See [rate limits](../api/rate-limits.md); back off |
-| Withdrawal stuck on destination | CCTP attestation pending | Wait ~5–10 min; query Circle's attestation API |
+| Withdrawal stuck on destination | MetaBridge withdrawal pending (dispute window) | Wait for the ⅔ co-signature + dispute window; then `claim` on the destination chain (see [bridge](../bridge/)) |
 
 ## See also
 

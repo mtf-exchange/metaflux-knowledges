@@ -1,8 +1,9 @@
 # Interaction timings
 
-{% hint style="warning" %}
-**Preview — not yet live on devnet.** Cadence and budgets are the target design and
-may be tuned before launch.
+{% hint style="success" %}
+**Live on devnet.** Block cadence and interaction timings — CoreWriter action
+delays and Core→EVM credit materialization — are operational as described.
+Cadence and budgets may still be tuned before launch.
 {% endhint %}
 
 How long each EVM↔Core interaction takes, so a bot can reason about confirmation

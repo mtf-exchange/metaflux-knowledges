@@ -1,7 +1,11 @@
 # Portfolio margin
 
 {% hint style="info" %}
-**Preview.** Action surface is stable; the SPAN-style scenario engine ships in phases before mainnet.
+**Live on devnet.** The scenario engine is fully operational: users enroll via the
+`UserPortfolioMargin` action (equity-gated, default ≥ 100 K USDC), and the
+SPAN-style scenario grid (±5/10/20 % price × ±20/50 % vol) computes maintenance in
+real time. Both the action surface and the scenario engine are shipped and tested
+on a 4-node consensus run.
 {% endhint %}
 
 ## TL;DR

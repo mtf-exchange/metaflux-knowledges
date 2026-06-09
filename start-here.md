@@ -33,14 +33,16 @@ no account application, no gatekeeper.
   go up or down, with optional leverage, without ever holding the asset itself.
   (More on what "perpetual" means below.)
 - **Trade spot.** Buy and sell the assets themselves, settled against your
-  balance.
+  balance (balance-only — no leverage yet).
+- **Hold two-way (hedge) positions** — keep a long and a short position open in
+  the same market at the same time. See [hedge mode](concepts/hedge-mode.md).
 
 And coming soon:
 
-- **Hold two-way (hedge) positions** — keep a long and a short position open in
-  the same market at the same time. See [hedge mode](concepts/hedge-mode.md).
 - **Earn yield on idle USDC** through [Earn](concepts/earn.md), a lending pool
-  that pays interest, arriving alongside leveraged spot trading.
+  that pays interest.
+- **Leveraged spot trading** (spot margin), arriving alongside Earn. See
+  [spot margin](concepts/spot-margin.md).
 
 ## The handful of concepts to know
 

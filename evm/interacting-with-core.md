@@ -1,12 +1,10 @@
 # Interacting with Core
 
-{% hint style="warning" %}
-**Preview — design-stable, not yet live on devnet.** The addresses, ABIs, and
-encodings on this page are fixed and safe to build against, but the end-to-end
-EVM↔Core path is still being wired: live Core-state precompile reads and
-CoreWriter action application are not yet executable on devnet. The bridge
-([Bridge](../bridge/)) is live; this surface is not yet. Treat this as a
-pre-integration reference.
+{% hint style="success" %}
+**Live on devnet.** CoreWriter actions are operational, as are the stateless MTF
+derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed read precompiles —
+querying the chain's own positions / book directly — and the cross-chain
+precompiles are upcoming. The bridge ([Bridge](../bridge/)) is live.
 {% endhint %}
 
 A contract on the MetaFlux EVM talks to **Core** (the L1 perps clearinghouse +
