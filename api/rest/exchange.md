@@ -655,11 +655,13 @@ some first). Recognized market-maker accounts are exempt. When spot is halted by
 governance, new orders are rejected (`spot trading disabled`) — but you can still
 [`spot_cancel`](#spot_cancel) and reclaim escrow.
 
-**Response.** Unlike the perp [`submit_order`](#submit_order), a `spot_order` is
-**admitted asynchronously** (`202 Accepted` with the admission envelope); the
-commit outcome — the assigned `oid`, whether it rested or filled, and the escrow
-lock — is observed via [`/info`](./info.md) (open orders + spot balances) or the
-WebSocket feed. It does **not** return a synchronous `oid`.
+**Response.** Like the perp [`submit_order`](#submit_order), a `spot_order`
+returns a **synchronous** per-order status once the order commits — the real
+assigned `oid` with a `resting` or `filled` entry (or `error`), or `pending` if
+no commit lands within the order-wait window. The status union is the same as
+[`submit_order`](#200-ok--order-path-synchronous-oid). Spot balances / open
+orders are also queryable via [`/info`](./info.md); spot fills are not yet pushed
+to the WebSocket trades / candles feeds.
 
 ---
 
