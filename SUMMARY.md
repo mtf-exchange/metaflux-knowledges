@@ -47,7 +47,7 @@
 * [MIP-2 — Metaliquidity](mip/mip-2.md)
 * [MIP-3 — Permissionless perp market deploy](mip/mip-3.md)
 * [MIP-4 — Perps liquidity aggregator / internalizer](mip/mip-4.md)
-* [MIP-5 — Reserved](mip/mip-5.md)
+* [MIP-5 — Earn (lending pool)](mip/mip-5.md)
 * [MIP-6 — Outcomes / prediction markets (deferred V3)](mip/mip-6.md)
 
 ## For developers
