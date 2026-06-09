@@ -61,6 +61,8 @@ Response:
     "protocol_version":  "1.0.0",
     "validator_index":   null,
     "build_commit":      "unknown",
+    "version":           "0.0.1",
+    "freeze_halt_supported": true,
     "uptime_seconds":    0
   }
 }
@@ -73,6 +75,8 @@ Response:
 | `protocol_version` | semver string | Wire-protocol version |
 | `validator_index` | uint32 \| null | This node's index in the active validator set; **FLAGGED:** `null` until the runtime calls `set_validator_index` |
 | `build_commit` | hex string | Operator-published build identifier; **FLAGGED:** `"unknown"` until published |
+| `version` | semver string | Node software release version, baked in at build time. A release shares one `version` across its binaries — `build_commit` is the per-build distinguisher |
+| `freeze_halt_supported` | bool | Always `true` for this binary — capability flag: the node honors [`exchange_status.scheduled_freeze_height`](#exchange_status), halting cleanly with exit code `77` once the freeze height commits so a node supervisor can swap in the next release |
 | `uptime_seconds` | uint64 | Process uptime; **FLAGGED:** `0` until the runtime calls `set_uptime_seconds` |
 
 These are **per-node** fields (node identity / runtime), NOT consensus state, so they legitimately differ across nodes.

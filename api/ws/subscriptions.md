@@ -142,7 +142,7 @@ from `market_info`.
 ```
 
 - `mark_px` / `oracle_px` — whole-USDC, tick-snapped (`"0"` when unset). Same plane as `market_info`, NOT the 1e8 book plane.
-- `funding` — `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block.
+- `funding` — `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block (`null` for an unknown market — see below). `rate_per_hr` is the latest hourly funding-rate sample (pre-cap) and `cap_per_hr` the per-market rate cap, both **bps strings** truncated toward zero (e.g. `"400"` = 0.04/hr); `interval_ms` is the funding cadence (`3600000` = 1h); `next_payment_ts` is epoch-ms, `0` until the market has its first funding sample.
 - `open_interest` — current open interest, fixed-point string (`"0"` when no book).
 
 Frequency: one frame per committed block in which this market has a live subscriber.
@@ -169,11 +169,18 @@ Global mid map — every market's mark price, pushed each commit. Keyed by coin;
 
 ### `fills` <a id="fills"></a>
 
-Per-account fill stream. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Each fill delivers a record to BOTH parties: the taker's record carries its `oid` + `cloid` + `crossed: true`; the maker's carries `maker_oid`, the opposite side, `cloid: null`, `crossed: false`. `px`/`sz` are 1e8-plane strings.
+Per-account fill stream. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Each executed match delivers a record to BOTH parties, each from its own perspective, with the same field set `{coin, side, px, sz, time, oid, cloid, tid, crossed}`:
+
+- the **taker** record — the taker's own `oid`, its `cloid` (or `null`), the taker's side, `crossed: true`;
+- the **maker** record — the maker's own `oid`, `cloid: null` (no cloid is captured for the resting side), the **opposite** side, `crossed: false`.
+
+Both legs of one match share the same `tid` (the same value the public `trades` print carries). `px`/`sz` are 1e8-plane strings. Per-account fill records carry **no `users` array** — counterparty addresses appear only on the public [`trades`](#trades) tape, never on the account-scoped feed.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "fills", "user": "0x<address>" } }
 ```
+
+The initial snapshot is the empty array `[]`; each push is an array holding one fill record:
 
 ```json
 { "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] }
