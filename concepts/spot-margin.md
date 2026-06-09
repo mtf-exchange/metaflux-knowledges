@@ -35,7 +35,15 @@ health           = equity / maint_required
 
 An open is rejected if it would leave `equity < init_required`. The position liquidates when `health < 1` (equity falls to the maintenance floor).
 
-The spot **maintenance ratio is set conservatively higher than perps** (a typical default of **5%**, vs the perp baseline of 0.625%) because long-tail spot books are thinner — this damps liquidation cascades.
+The spot **maintenance ratio is a per-pair parameter, set conservatively** — and
+generally higher than a comparably-liquid perp. The reason is mechanical: a
+spot-margin liquidation **sells the base into the spot book**, so the maintenance
+buffer has to cover the realized **slippage** of unwinding the position at the
+threshold, or the lending pool absorbs the shortfall. Thinner (long-tail) books
+eat more slippage and so carry a higher ratio. The exact value per pair is
+**calibrated from that pair's book depth and volatility against a target
+liquidation-slippage bound** — it is a governance-set risk parameter, not a fixed
+constant, and a pair does not enable spot margin until its ratio is calibrated.
 
 ### Interest
 
