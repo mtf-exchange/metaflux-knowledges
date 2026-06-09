@@ -2,13 +2,14 @@
 
 {% hint style="info" %}
 **Live.** The opt-in toggle, explicit per-side order routing, **independent
-per-leg margin**, **dual-leg position reporting**, and **per-leg liquidation**
-are all shipped: an account can switch to hedge mode (while flat), route each
-order to an explicit leg via `position_side`, each leg posts its own margin and
-reports as its own position object, and each leg is liquidated per its own
-maintenance contribution. Both legs are scanned per the standard selection
-(larger-maintenance leg first), deterministic across validators. The default and
-recommended behaviour remains one-way (single net position per market).
+per-leg margin**, and **dual-leg position reporting** are shipped: an account can
+switch to hedge mode (while flat), route each order to an explicit leg via
+`position_side`, and each leg posts its own margin and reports as its own position
+object. **Per-leg liquidation** is partly in place: when an account is flagged for
+a forced close, both legs are scanned and scored, and the deterministic close
+ordering (larger-maintenance leg first) is computed identically across validators
+— the actual per-leg close emission against the book is still rolling out. The
+default and recommended behaviour remains one-way (single net position per market).
 {% endhint %}
 
 ## TL;DR
@@ -30,11 +31,12 @@ market**.
 | "Buy while short" | reduces, then flips the net position | reduces the **Short** leg only (or opens/extends the **Long** leg — you choose) |
 | Order side selection | inferred from buy/sell | **explicit** `position_side` (`long` / `short`) required |
 | Margin | one net requirement | each leg margined independently |
-| Liquidation | one liquidation price | each leg liquidates per its own maintenance contribution |
+| Liquidation | one liquidation price | each leg scored on its own maintenance; deterministic close ordering in place, per-leg close emission rolling out |
 | Reporting | one net position object | one object per non-zero leg (each labelled `position_side`) |
 
-The toggle, per-side routing, independent per-leg margin, dual-leg reporting, and
-per-leg liquidation are all live (see the status note above).
+The toggle, per-side routing, independent per-leg margin, and dual-leg reporting
+are live; per-leg liquidation selection is in place, with per-leg close emission
+still rolling out (see the status note above).
 
 ## Enabling it
 
@@ -116,11 +118,12 @@ run the long leg isolated and the short leg cross.
 
 ## Liquidation
 
-Each leg liquidates per its **own** maintenance contribution through the standard
-[tiered liquidation](./tiered-liquidation.md) ladder. When an account is in a
-liquidatable tier, both legs are scanned and the **larger-maintenance leg is
-selected first**, deterministic across validators; liquidating one leg does not
-touch the other.
+When an account is flagged for a forced close, both legs are scanned and scored by
+their own maintenance contribution, and the deterministic close ordering — the
+**larger-maintenance leg first** (ties: long before short), identical across
+validators — is computed through the standard [tiered liquidation](./tiered-liquidation.md)
+ladder. The actual per-leg close emission against the book is still rolling out;
+when it lands, liquidating one leg will not touch the other.
 
 ## Reporting
 
