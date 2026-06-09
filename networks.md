@@ -22,13 +22,13 @@ The gateway is the single public front door. MTF-native is the default path
 
 | Service | Endpoint |
 |---------|----------|
-| Gateway front door | `https://gateway.devnet.mtf.exchange` |
+| Gateway front door | `https://devnet-gateway.mtf.exchange` |
 | MTF-native (default) | `POST /info` · `POST /exchange` · `GET /ws` |
 | HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
 | CCXT-compat | `/ccxt/*` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet/testnet) | `POST /faucet` |
-| Gateway WS (native) | `wss://gateway.devnet.mtf.exchange/ws` |
+| Gateway WS (native) | `wss://devnet-gateway.mtf.exchange/ws` |
 | Explorer | `https://devnet.mtf.exchange/explorer` |
 | Status | `https://status.mtf.exchange/devnet` |
 
@@ -53,7 +53,7 @@ The grant is **`"queued"`** — staged for the next block, so the balance update
 after ~1 block, not synchronously. Full contract: [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/faucet \
+curl -X POST https://devnet-gateway.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}

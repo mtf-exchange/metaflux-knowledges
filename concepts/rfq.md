@@ -172,7 +172,7 @@ integer strings (the book / order plane).
 its maker quotes:
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open"}'
 ```
@@ -182,7 +182,7 @@ For RFQs a specific account is party to, `rfq_user` takes `account_id` (u64) or
 opened) and `quoted` (RFQs it quoted on):
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","address":"0x..."}'
 ```

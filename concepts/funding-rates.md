@@ -142,7 +142,7 @@ Per-account history via [`POST /info userFills`](../api/rest/info.md) or [HL-com
 Per-market history:
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"funding_history","market_id":0}'
 ```

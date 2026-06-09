@@ -5,7 +5,7 @@
 {% endhint %}
 
 {% hint style="info" %}
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to the native snake_case underneath. Per the unified-gateway routing: `gateway.<net>.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to the native snake_case underneath. Per the unified-gateway routing: `<net>-gateway.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
 {% endhint %}
 
 ## TL;DR
@@ -15,7 +15,7 @@ A single WS connection multiplexes subscriptions to many channels. The frame pro
 ## URL
 
 ```
-wss://gateway.<net>.mtf.exchange/ws
+wss://<net>-gateway.mtf.exchange/ws
 ```
 
 MTF-native WS (snake_case channels) is the gateway's default at `/ws`; HL-compat WS (camelCase channels) is under `/hl/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.

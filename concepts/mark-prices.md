@@ -138,7 +138,7 @@ Consumers that use **last trade** instead of mark:
 ## Querying
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```

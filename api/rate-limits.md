@@ -27,7 +27,7 @@ path (the gateway also exposes the same data as HL-compat `userRateLimit` under
 `/hl`):
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```

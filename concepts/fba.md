@@ -168,7 +168,7 @@ per-market opt-in, so an unregistered market is **not a 404** — it returns a 2
 with zeroed fields (`enabled:false`, empty `orders`, `indicative:null`).
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"fba_batch_state","market_id":42}'
 ```

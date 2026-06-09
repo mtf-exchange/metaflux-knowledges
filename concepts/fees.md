@@ -19,7 +19,7 @@ charge. Treat the ladder as the roadmap, not the current rate.
 {% endhint %}
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
 ```
 
 | 30-day volume | Maker | Taker |
@@ -117,7 +117,7 @@ The builder must be a registered address (see [`approve_builder_fee`](../api/res
 The cumulative amounts (`burned` USDC pool, `burned_mtf`, `treasury`, validator pool) are tracked in committed state and exposed on the read path via [`protocol_metrics`](../api/rest/info.md#protocol_metrics) (`fee_pools.{burned, burned_mtf, treasury, validator_pool, mflux_vault}`):
 
 ```bash
-curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metrics"}'
 ```
 
 ## Referrer share
@@ -157,14 +157,14 @@ The intended model: liquidation fills charge a liquidation fee on top of the sta
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your personal tier and recent volume — MTF-native (gateway default path)
-curl -X POST https://gateway.devnet.mtf.exchange/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 
 # or the HL-compat shape under /hl on the gateway
-curl -X POST https://gateway.devnet.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
   -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 
