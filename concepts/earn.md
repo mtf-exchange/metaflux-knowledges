@@ -59,6 +59,13 @@ Example: a 12% borrow APR at 50% utilisation, no protocol fee → depositor APY 
 
 ## Deposit / withdraw
 
+{% hint style="info" %}
+**Reference only.** The actions below describe the planned Earn surface; they are
+**not yet wired on the public [`/exchange`](../api/rest/exchange.md) path**. Earn
+ships alongside [spot-margin](./spot-margin.md) — the borrowers whose interest is
+the pool's yield.
+{% endhint %}
+
 ```json
 // deposit 1,000 USDC into Earn
 { "type": "earn_deposit", "params": { "amount": "1000000000" } }

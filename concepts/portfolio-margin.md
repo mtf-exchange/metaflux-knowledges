@@ -194,8 +194,11 @@ reflects the PM-derived maintenance:
 
 > **Planned read.** The classical-vs-PM side-by-side and the worst-case scenario
 > breakdown (which price/vol shock combination drove the PM number) are **not yet
-> broken out** as `/info` fields — the PM scenario engine computes them internally
-> but only the resulting `maint_margin` is surfaced today.
+> broken out** as separate fields in the
+> [`account_state`](../api/rest/info.md#account_state) response — the PM scenario
+> engine computes them internally, but only the final `maint_margin` is surfaced
+> today. A future read (a per-scenario PM-details field on `account_state`) will
+> expose the breakdown.
 
 ## Edge cases
 

@@ -1,7 +1,9 @@
 # Spot margin
 
 {% hint style="info" %}
-**Upcoming.** Leveraged spot trading funded by the [Earn](./earn.md) lending pool. Spot today is balance-only (no leverage).
+**Upcoming.** Leveraged spot trading funded by the [Earn](./earn.md) lending
+pool. [Plain spot](./spot-trading.md) is **live today** and balance-only (no
+leverage); spot margin is the planned overlay that adds borrow + leverage on top.
 {% endhint %}
 
 ## TL;DR

@@ -26,6 +26,7 @@
   * [Tiered liquidation](concepts/tiered-liquidation.md)
   * [ADL — auto-deleveraging](concepts/adl.md)
 * Spot & earn
+  * [Spot trading](concepts/spot-trading.md)
   * [Spot margin](concepts/spot-margin.md)
   * [Earn](concepts/earn.md)
 * Account & access
@@ -82,3 +83,7 @@
   * SDKs
     * [TypeScript SDK](integration/typescript-sdk.md)
     * [Rust SDK](integration/rust-sdk.md)
+
+## Meta
+
+* [GitBook configuration](meta/THEMING.md)

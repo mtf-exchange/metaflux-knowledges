@@ -101,6 +101,34 @@ curl -X POST https://gateway.devnet.mtf.exchange/hl/exchange \
 
 where `order.json` is the HL-shape envelope you assembled.
 
+### Spot trading example
+
+[Spot](../concepts/spot-trading.md) is a token-for-token CLOB, separate from
+perps — no leverage, no positions. Place a spot order with the native
+[`spot_order`](../api/rest/exchange.md#spot_order) action: it takes a **spot pair
+id** (not a perp `market`), a `side`, a `limit_px`, a `size`, and a `tif`. A
+resting `gtc`/`alo` order locks reserved-balance escrow; `ioc` never rests.
+
+```jsonc
+// the `action` you sign and POST to /exchange (sender-authorized, no `owner`)
+{
+  "type": "spot_order",
+  "order": {
+    "pair":     200,           // spot pair id from /info, not a perp market id
+    "side":     "bid",         // bid = buy base (pays quote); ask = sell base
+    "size":     100000000,
+    "limit_px": 200000000,     // a limit is required — market spot is not yet supported
+    "tif":      "gtc",
+    "stp_mode": "cancel_oldest"
+  }
+}
+```
+
+The synchronous response carries the assigned `oid` with a `resting` or `filled`
+entry (the same status union as a perp order). Read your spot balances and open
+spot orders back via [`POST /info`](../api/rest/info.md); cancel with
+[`spot_cancel`](../api/rest/exchange.md#spot_cancel), which refunds the escrow.
+
 ## Step 3 — Check the order is on the book
 
 ```bash

@@ -19,6 +19,12 @@ Plain-language explanations of MetaFlux's core mechanisms — what they do, how 
 8. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
 9. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
 
+## Spot & earn
+
+- [Spot trading](./spot-trading.md) — **live**: token-for-token CLOB, reserved-balance escrow, no leverage
+- [Spot margin](./spot-margin.md) — **planned**: leveraged spot funded by the Earn pool
+- [Earn](./earn.md) — **planned**: USDC lending pool that funds spot-margin borrows
+
 ## Advanced
 
 - [ADL](./adl.md) — T4 auto-deleverage math

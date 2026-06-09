@@ -187,8 +187,13 @@ from the HL-compat path (decimal strings). Addresses are `0x`-hex (40 chars);
 ### Spot trading
 
 Spot is a token-for-token CLOB (no leverage, no positions) — separate books and
-balances from perps. Both actions are **sender-authorized** (the signer is the
-trader; there is no `owner`).
+balances from perps. A resting spot order locks the funds it would owe on fill
+into a **reserved balance**: a `bid` reserves **quote** (its notional at the
+limit price), an `ask` reserves the **base** it offers. Order size is **clamped
+at admission** to what your balance funds, and fees are taken from the leg each
+side receives. Both actions are **sender-authorized** (the signer is the trader;
+there is no `owner`). See [spot trading](../../concepts/spot-trading.md) for the
+full conceptual model.
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
