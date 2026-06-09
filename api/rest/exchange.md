@@ -184,6 +184,17 @@ from the HL-compat path (decimal strings). Addresses are `0x`-hex (40 chars);
 | [`twap_order`](#twap_order) | Schedule a sliced (TWAP) order | sender / agent | by `twap_id` |
 | [`twap_cancel`](#twap_cancel) | Cancel a running TWAP parent | sender / agent | yes |
 
+### Spot trading
+
+Spot is a token-for-token CLOB (no leverage, no positions) — separate books and
+balances from perps. Both actions are **sender-authorized** (the signer is the
+trader; there is no `owner`).
+
+| `type` | Purpose | Signed-by | Idempotent |
+|--------|---------|-----------|-----------|
+| [`spot_order`](#spot_order) | Place one spot order | sender / agent | by `cloid` |
+| [`spot_cancel`](#spot_cancel) | Cancel a resting spot order by `oid` | sender / agent | yes |
+
 ### Margin & risk
 
 | `type` | Purpose | Signed-by |
@@ -586,6 +597,91 @@ Cancel a running TWAP parent. Already-filled slices stay filled; future slices s
 | Field | Type | Description |
 |-------|------|-------------|
 | `twap_id` | uint64 | The TWAP parent id returned by `twap_order` |
+
+---
+
+### `spot_order`
+
+Place a single order on a **spot** market. Spot trades are a token-for-token
+swap with no leverage and no positions; books and balances are entirely separate
+from perps. The order body is carried under `action.order`. Spot orders are
+**sender-authorized** — the recovered signer is the trader, so there is **no
+`owner` field**. `pair` is the **spot pair id** (`SpotPairSpec.pair_id`), which
+is distinct from a perp `market` id and from a token id.
+
+```json
+{
+  "type": "spot_order",
+  "order": {
+    "pair":      200,
+    "side":      "bid",
+    "size":      100000000,
+    "limit_px":  200000000,
+    "tif":       "gtc",
+    "stp_mode":  "cancel_oldest",
+    "cloid":     "0xabababababababababababababababab"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | an active spot pair | Spot pair id (`SpotPairSpec.pair_id`) — **not** a token id |
+| `side` | enum | `"bid"` / `"ask"` | `bid` buys base (pays quote); `ask` sells base (receives quote) |
+| `size` | uint64 | `> 0` | Base-asset size in raw lots (`10^sz_decimals` per whole unit); widened to `u128` |
+| `limit_px` | uint64 | `> 0` | Limit price in the `1e8` plane. A market order (`0`) is **not supported yet** — always send a limit |
+| `tif` | enum | `"gtc"`, `"ioc"`, `"alo"` | `gtc` / `alo` residuals **rest** (escrow-backed); `ioc` never rests. `"aon"` is rejected |
+| `stp_mode` | enum | `"cancel_oldest"`, `"cancel_newest"`, `"cancel_both"` | Self-trade prevention. `"reject"` is rejected (no core equivalent) |
+| `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client order id |
+
+**Escrow.** A resting spot order (a `gtc` / `alo` residual) locks the funds it
+would owe on fill into a reserved balance: a `bid` reserves **quote** (its
+notional at the limit price), an `ask` reserves the **base** it offers. Reserved
+funds are not spendable; they are paid to the counterparty on fill, or refunded
+to you on cancel, self-trade-prevention, or market deactivation. Per-token
+balances are conserved exactly.
+
+**Affordability.** The order size is clamped at admission to what you can fund
+(a buy by `quote_balance ÷ limit_px`; a sell by the base you own). An entirely
+unaffordable order is an accepted no-op (no fill, nothing rests).
+
+**Fees & settlement.** A fill swaps base for quote at the **maker's** resting
+price. The taker fee is taken from the leg the taker receives; the maker fee from
+the leg the maker receives. Fees accrue to the spot fee account.
+
+**Limits.** Each account may rest up to **1000** orders per spot pair; a new
+resting order past that cap is rejected (`spot resting-order cap reached` — cancel
+some first). Recognized market-maker accounts are exempt. When spot is halted by
+governance, new orders are rejected (`spot trading disabled`) — but you can still
+[`spot_cancel`](#spot_cancel) and reclaim escrow.
+
+**Response.** Unlike the perp [`submit_order`](#submit_order), a `spot_order` is
+**admitted asynchronously** (`202 Accepted` with the admission envelope); the
+commit outcome — the assigned `oid`, whether it rested or filled, and the escrow
+lock — is observed via [`/info`](./info.md) (open orders + spot balances) or the
+WebSocket feed. It does **not** return a synchronous `oid`.
+
+---
+
+### `spot_cancel`
+
+Cancel one of **your** resting spot orders by `oid` on a pair, refunding the
+escrow it locked. Sender-authorized; **only the order's owner may cancel it** —
+a third party (or wrong owner) is rejected (`not the order owner`). An unknown or
+non-resting `oid` is a typed miss (`order not found`). Cancels are **not** gated
+by the spot halt, so you can always exit a resting order and reclaim escrow.
+
+```json
+{
+  "type": "spot_cancel",
+  "cancel": { "pair": 200, "oid": 12345 }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | an active spot pair | Spot pair id the order rests on |
+| `oid` | uint64 | a resting spot `oid` | Server order id to cancel (cancel-by-`cloid` is not yet mapped for spot) |
 
 ---
 
