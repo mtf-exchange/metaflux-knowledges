@@ -10,6 +10,14 @@ Maker / taker per-fill fees with volume-tiered rebates. Builder rebate routes a 
 
 ## Tier table (default — see live values)
 
+{% hint style="warning" %}
+**Target vs. live.** The tiered schedule below is the **target** design. The live
+settlement path currently charges a **flat global tier** — `default_taker_bps =
+5`, `default_maker_bps = 1` (`GlobalFeeSchedule::default`). Per-user 30-day-volume
+tiering exists as `FeeTracker` accumulators but is **not yet wired** into the
+charge. Treat the ladder as the roadmap, not the current rate.
+{% endhint %}
+
 ```bash
 curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 ```
@@ -26,8 +34,6 @@ curl -X POST https://gateway.devnet.mtf.exchange/info -d '{"type":"fee_schedule"
 Bps = basis points (1 bps = 0.01%). Negative maker = maker rebate.
 
 Volume is measured in USDC notional, summed across all markets, across all your sub-accounts. Volume rolls forward on a 30-day window.
-
-> **What's live vs. this table:** the settlement path currently charges the **flat global tier** — `default_taker_bps = 5`, `default_maker_bps = 1` (`GlobalFeeSchedule::default`). Per-user 30-day-volume tiering exists as `FeeTracker` accumulators but is not yet wired into the charge. The bottom (`< 100k`) row above shows taker 5 / maker 2; the implemented flat maker is **1 bps**. Treat the tiered ladder as the target schedule.
 
 ## Where fees go
 
@@ -125,11 +131,21 @@ protocol_fee   = taker_fee − referrer_share          # then splits 80/10/10
 
 Single-level (no multi-level referral — anti-Ponzi). Set once with `SetReferrer`; immutable thereafter (`setReferrer(self)` is rejected). The maker fee carries **no** referrer carve.
 
-## Spot vs perp fees
+## Spot fees
 
-Spot markets use a separate fee schedule, generally higher (default 5/15 bps maker/taker). See `fee_schedule.spot_tiers` in the `/info fee_schedule` response.
+The same maker/taker tier shape applies to spot fills, but spot fees are charged
+on a **separate fee account** from perps, and they are taken **from the leg each
+side receives** — not always from the quote balance:
 
-Spot fees are debited from the **quote** balance (the asset on the right of the symbol — typically USDC).
+- the **taker** fee is taken from the leg the taker receives,
+- the **maker** fee is taken from the leg the maker receives.
+
+So a spot **buyer** (receiving base) pays its fee in **base**, and a **seller**
+(receiving quote) pays its fee in **quote**. Each spot pair may set its own
+`taker_fee_bps` / `maker_fee_bps`; when a pair leaves them unset, the global spot
+default applies. See `fee_schedule.spot_tiers` in the `/info fee_schedule`
+response, and [spot trading](./spot-trading.md#matching-fills-and-fees) for the
+settlement model.
 
 ## Fees on liquidation fills
 

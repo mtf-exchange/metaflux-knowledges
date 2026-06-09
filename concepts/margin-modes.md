@@ -74,7 +74,15 @@ Implication: a 10% adverse move on BTC reduces account-wide health, even if your
 
 ## Isolated
 
-> **Implementation status:** the pre-trade margin gate currently implements the **CROSS / pooled-collateral path only**. The position `margin_mode` field (0 = cross, 1 = isolated) is already read to *exclude* isolated positions from the cross held-margin sum, but a dedicated isolated-margin pre-trade gate (check the order's own posted `isolated_margin` against its notional) is a documented seam — the current trading path opens every position cross. The conceptual model below is the target behaviour.
+{% hint style="warning" %}
+**Implementation gap.** The conceptual model below is the **target behaviour**.
+The pre-trade margin gate currently implements the **Cross / pooled-collateral
+path only** — the trading path opens every position cross. The position
+`margin_mode` field (0 = cross, 1 = isolated) is already read to *exclude*
+isolated positions from the cross held-margin sum, but a dedicated
+isolated-margin pre-trade gate (checking the order's own posted `isolated_margin`
+against its notional) is not yet wired.
+{% endhint %}
 
 When you toggle `is_isolated: true` for an asset, the protocol moves `isolated_amount` USDC from cross balance into a per-position bucket. That position's gain/loss settles into the bucket only:
 

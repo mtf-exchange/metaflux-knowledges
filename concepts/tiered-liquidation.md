@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier defines what the protocol does as health drops. The yellow card (T0) is MetaFlux's hysteresis grace period — one block of warning before any position is sold. T4 ADL is the last-resort loss mutualisation.
+A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier defines what the protocol does as health drops. The [yellow card](#why-a-yellow-card) (T0) is MetaFlux's hysteresis grace period — one block of warning before any position is sold. T4 [ADL](./adl.md) is the last-resort loss mutualisation.
 
 | Tier | Health band | Action | Position touched? |
 |------|-------------|--------|---|
