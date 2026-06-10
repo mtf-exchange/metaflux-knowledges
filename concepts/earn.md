@@ -1,7 +1,13 @@
 # Earn
 
 {% hint style="info" %}
-**Upcoming.** A USDC lending pool that earns yield from [spot-margin](./spot-margin.md) borrowers.
+**Available on devnet (preview).** A USDC lending pool that earns yield from
+[spot-margin](./spot-margin.md) borrowers. Supply, share-pricing, and
+idle-bounded redemption run end-to-end on **devnet today** (see the
+[action surface](#deposit--withdraw) below). Treat it as a **preview**: Earn is
+the supply side that funds spot-margin borrows, and spot-margin **forced-liquidation
+settlement is not yet wired** — so the shortfall path that can reduce share value
+is exercised only via voluntary closes today, not an automatic liquidator.
 {% endhint %}
 
 ## TL;DR
@@ -59,28 +65,48 @@ Example: a 12% borrow APR at 50% utilisation, no protocol fee → depositor APY 
 
 ## Deposit / withdraw
 
-{% hint style="info" %}
-**Reference only.** The actions below describe the planned Earn surface; they are
-**not yet wired on the public [`/exchange`](../api/rest/exchange.md) path**. Earn
-ships alongside [spot-margin](./spot-margin.md) — the borrowers whose interest is
-the pool's yield.
-{% endhint %}
+Both actions are sender-authorized on the public
+[`/exchange`](../api/rest/exchange.md#spot-margin--earn) path; `asset` is the
+**lendable quote asset id** (the pool key — the quote of a registered spot pair),
+and `amount` / `shares` are decimals sent as JSON strings. The pool
+**auto-creates on the first deposit** for any lendable asset. Confirm minted /
+remaining shares and pool totals via
+[`/info` `earn_state`](../api/rest/info.md#earn_state).
 
 ```json
-// deposit 1,000 USDC into Earn
-{ "type": "earn_deposit", "params": { "amount": "1000000000" } }
+// supply 5,000 USDC into the Earn pool for asset 100
+{ "type": "earn_deposit", "params": { "asset": 100, "amount": "5000" } }
 ```
 
 ```json
-// withdraw by burning shares (receive shares × share_price)
-{ "type": "earn_withdraw", "params": { "shares": "..." } }
+// redeem shares (receive shares × share_value), idle-bounded
+{ "type": "earn_withdraw", "params": { "asset": 100, "shares": "1234.5" } }
 ```
 
-A withdrawal lock period may apply (`earn_lock_period_ms`) so the pool cannot be drained faster than loans unwind.
+| Action | Effect |
+|---|---|
+| [`earn_deposit`](../api/rest/exchange.md#earn_deposit) | Supply quote → pool shares (1:1 on a fresh pool, else priced off NAV) |
+| [`earn_withdraw`](../api/rest/exchange.md#earn_withdraw) | Redeem shares → quote, **clamped to idle liquidity** |
+
+**Idle bound.** A withdrawal is instant but **bounded by idle liquidity**
+(`total_supplied − total_borrowed`): a redemption larger than idle pays exactly
+idle and burns proportionally fewer shares, and a pool with **zero idle** (fully
+lent out) rejects the withdrawal until borrowers repay. This guarantees a supplier
+can always exit up to what is not lent out, and never strands the borrow ledger
+under-collateralized.
 
 ## Risk
 
-Earn is **not risk-free**. If a [spot-margin](./spot-margin.md) borrower is liquidated at a loss that the position's collateral cannot cover, the shortfall is absorbed by the **insurance buffer first**; only an uncovered remainder beyond insurance would reduce `pool_value` (and therefore `share_price`). The conservative spot maintenance ratio and the dedicated spot-liquidator role exist to make this rare.
+Earn is **not risk-free**. If a [spot-margin](./spot-margin.md) position is closed
+at a loss that the borrower's collateral cannot cover, the **shortfall is socialized
+to suppliers**: the pool's `total_supplied` is reduced (floored at zero), which
+lowers `share_value`. In this devnet preview that shortfall path is reached only
+via a voluntary [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close) —
+an automatic liquidator and an insurance-buffer waterfall ahead of suppliers are
+**planned but not yet wired**. The conservative spot maintenance ratio (still being
+calibrated) and forced liquidation (planned, via the shared tiered-liquidation
+engine on the position's isolated margin) exist to make a shortfall rare. There is also **liquidity risk**: redemptions are bounded by idle liquidity,
+so a fully-utilised pool cannot be exited until borrowers repay.
 
 ## See also
 
@@ -97,7 +123,10 @@ A: No. Yield compounds into your share value continuously; you realise it on wit
 A: Only the lent (utilised) fraction of the pool earns interest. APY ≈ borrow rate × utilisation.
 
 **Q: Can I lose principal?**
-A: Only if a spot-margin loss exceeds both the position's collateral and the insurance buffer — designed to be rare. Earn is lower-risk than a trading [vault](./vaults.md) but not risk-free.
+A: Yes, if a spot-margin loss exceeds the borrower's collateral — the uncovered shortfall is socialized to suppliers and lowers share value (an insurance buffer ahead of suppliers is planned but not yet wired). Designed to be rare via the conservative maintenance ratio. Earn is lower-risk than a trading [vault](./vaults.md) but not risk-free.
+
+**Q: Why can't I withdraw my full balance right now?**
+A: Redemptions are bounded by **idle liquidity** (`supplied − borrowed`). If the pool is fully lent to spot-margin borrowers, you can only withdraw up to the idle amount; the rest unlocks as borrowers repay.
 
 **Q: How is Earn different from a Metaliquidity vault?**
 A: Earn is a passive USDC **lending** pool (yield = borrow interest). A [vault](./vaults.md) is **traded** LP capital (yield/loss = the strategy's PnL). Different risk profiles.
