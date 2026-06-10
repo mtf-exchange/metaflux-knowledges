@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, and `ledger_updates` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, and `active_asset_data` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -31,6 +31,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), per commit |
 | `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, per commit |
 | `ledger_updates` | **live** | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), per commit |
+| `active_asset_data` | **live** | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, per commit |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -290,6 +291,29 @@ Per-account money movement, attributed to its **cause** (read from the committed
 - `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `deposit` (`amount` may be `null` for an inbound CCTP credit), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver).
 - Amounts are whole-token decimal strings except `withdraw` via MetaBridge, which carries `amount_units` (raw base units). Inbound bridge credit amounts and CoreWriter-delayed actions (which dispatch in a later block) are not yet attributed.
 
+### `active_asset_data`
+
+Per-(user, coin) trading context — leverage, margin mode, and the current
+max-trade-size ceiling for one account on one market. Requires **both** `user`
+(0x) and `coin`. The initial snapshot is the live context (zeroed-config
+defaults when the account has no position), not an empty array; a push
+re-emits it each committed block.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "active_asset_data", "user": "0x<address>", "coin": "BTC" } }
+```
+
+```json
+{ "channel": "active_asset_data", "data": {
+  "address": "0x<addr>", "asset_id": 0, "leverage": 7, "margin_mode": "isolated",
+  "max_trade_size": "5000000000", "has_position": true } }
+```
+
+- `margin_mode` ∈ `cross` / `isolated` / `strict_iso`; `max_trade_size` is the
+  OI-cap-derived size ceiling (raw-lot string); fields are identical to the REST
+  [`active_asset_data`](../rest/info.md) read. On the gateway's `/hl/ws` the
+  equivalent channel name is HL's `activeAssetData`.
+
 ---
 
 ## `post` — request/response over WS
@@ -309,7 +333,7 @@ This is the supported path for authenticated reads and for submitting signed act
 The following channels appeared in earlier drafts but are **not implemented** on the node WS surface. They are not recognized channel names; subscribing returns an `unknown channel` error. Listed here so integrators are not misled by older SDK stubs.
 
 - **Public market data:** `meta` (universe metadata), `mark` (mark/oracle price), `fundingTicks` (funding-rate updates).
-- **Per-user (would require auth):** `userFundings` (funding payment history — blocked on funding settlement), `userTwapSliceFills` / `userTwapHistory` (TWAP execution feed), `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
+- **Per-user (would require auth):** `userFundings` (funding payment history — funding settlement is now live, so this feed is unblocked and pending wiring), `userTwapSliceFills` / `userTwapHistory` (TWAP execution feed — pending TWAP slice execution), `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
 
 Also not implemented today:
 

@@ -39,7 +39,7 @@ value  = num / denom
 - `decay = 0.5` (proposed default → ≈ 7 s half-life at the 5 s sample cadence). Clamped to `[0, 1]` at update time.
 - Sample cadence: **5 s**; EMA fold + settle cadence: **8000 ms** (`funding_update_guard` / `funding_distribute_guard`).
 
-> **Status:** the per-tick premium *driver* is not yet feeding live samples. The EMA accumulator, the cap, and the settle arithmetic are implemented and determinism-locked today.
+> **Status:** settlement is **live** — each 8 s period advances the per-asset cumulative funding index by the accrued rate and moves `size × Δindex` between position owners' balances (zero-sum: longs pay shorts or vice versa, no mint/burn; conservation- and determinism-fuzzed, 4-node e2e). The EMA accumulator + cap are implemented. The remaining gap is the per-tick premium **driver** feeding live samples into the EMA; until it streams real premium, the rate stays at its seeded value.
 
 #### 2. Cap (clamp)
 
