@@ -14,8 +14,8 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 | **T0** | `1.0 ≤ health < 1.1` | **Yellow card**: ALO orders force-cancelled, wallet notified | No |
 | **T1** | `0.8 ≤ health < 1.0` | Partial [floored-limit close](#how-a-forced-close-executes-the-price-floor) (50%) — full close if T1 fired within `cooldown_ms` | Yes (50%) or Yes (100%) |
 | **T2** | `0.667 ≤ health < 0.8` | Full [floored-limit close](#how-a-forced-close-executes-the-price-floor) | Yes (100%) |
-| **T3** | `health < 0.667` | Backstop: position seized by MFlux Vault; insurance covers shortfall. Un-fillable forced-close remainders from T1/T2 also escalate here | Position seized |
-| **T4** | shortfall after T3 | ADL: protocol claws back from profitable counter-parties | Winners' positions reduced |
+| **T3** | `health < 0.667` | [Netting at mark](#t3-backstop--netting-at-mark) against profitable counter-parties (un-fillable T1/T2 remainders escalate here too) | Yes — netted at mark |
+| **T4** | negative equity after T3 | [Deficit waterfall](#t4--the-deficit-waterfall): ADL haircut → insurance fund → treasury queue | Winners' realized gains haircut |
 
 `account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
 
@@ -107,17 +107,18 @@ capped per market) plus the 30 s cooldown between slices.
                                    └──────────┘                ▼
                                                           ┌──────────┐
                                                           │    T3    │
-                                                          │ backstop │
+                                                          │ net @mark│
                                                           └──────────┘
                                                                ▼
-                                                          insurance pool
-                                                          covers shortfall;
-                                                          if pool empty:
+                                                          negative equity?
+                                                          deficit waterfall:
                                                                 ▼
-                                                          ┌──────────┐
-                                                          │    T4    │
-                                                          │   ADL    │
-                                                          └──────────┘
+                                                          ┌──────────────┐
+                                                          │      T4      │
+                                                          │ ADL haircut →│
+                                                          │ insurance →  │
+                                                          │ treasury     │
+                                                          └──────────────┘
 ```
 
 `cooldown_ms` defaults to `30 s`. Within a cooldown window, a re-entry to T1 escalates to full close.
@@ -206,28 +207,45 @@ mark = 82    health = 0.95 again (still in T1, cooldown active)
               account closed cleanly with 3 USDC remaining; insurance untouched
 ```
 
-## T3 backstop
+## T3 backstop — netting at mark
 
-Below `health = 0.667` (≈2/3 of maintenance) the chain hands the position to the backstop.
+Below `health = 0.667` (≈2/3 of maintenance) the chain stops trying the book.
+The position — and any forced-close lots the book could not absorb inside the
+[price floor](#how-a-forced-close-executes-the-price-floor) — is **netted at
+the committed MARK** against the most-profitable opposite-side positions on
+the same instrument (highest unrealized PnL first, deterministic tiebreak):
 
 ```
-when account enters T3:
-   close position at MARK (not at book)         # avoid worsening cascade via book impact
-   compute realised_loss = (entry - mark) * size  [for a long]
-   pay realised_loss out of account's free balance + bucket
-   if shortfall = realised_loss - paid > 0:
-       insurance_pool -= shortfall
-       if insurance_pool < 0:
-           goto T4
+when account enters T3 (or parked un-fillable lots exist):
+   match its position lots against profitable opposite-side holders
+   close BOTH sides at MARK              # no book interaction, no price impact
+   both sides realise PnL at that mark   # value-neutral: equity unchanged
+                                         # by the netting itself
+   lots with no profitable counterparty stay parked for the next block
 ```
 
-The dying account's residual equity is **not** refunded. T3 is the "give up" point where the protocol takes over and the user gets nothing back from the maintenance margin.
+Counterparties drafted into the netting keep **every cent of PnL** (realized
+at mark) — they only lose the open position. No fee is charged on either side.
+A netting without a usable mark price, or without any profitable opposite
+side, simply waits — the chain never force-sells into an empty book.
 
-Insurance pool drawdown is rate-limited per block (`insurance_drawdown_cap_per_block`); shortfalls that exceed the cap queue and absorb over multiple blocks.
+## T4 — the deficit waterfall
 
-## T4 ADL
+If the account is flat everywhere and its equity is **negative**, that bad
+debt is socialized in a fixed order (ADL **before** the insurance fund — the
+deleveraged winners' realized gains absorb first, which keeps the fund for
+genuine tail events):
 
-Triggered when T3 fully drains the insurance pool with remaining shortfall. The remaining loss is allocated as position haircuts on profitable counter-parties of the **same instrument**. See [ADL](./adl.md) for the math.
+1. **ADL haircut** — an adaptive severity controller claws back up to the
+   gains the netting counterparties **just realized** (never more than they
+   received, and never unrealized paper PnL).
+2. **Insurance fund** — auto-absorbs the remainder (this is the pool the
+   [liquidation fee](#how-a-forced-close-executes-the-price-floor) feeds).
+3. **Treasury reserve** — whatever is left queues for a multisig-authorized
+   treasury draw (human-in-the-loop, last resort).
+
+The account's negative balance is then zeroed — the debt lives in the
+waterfall. See [ADL](./adl.md) for the controller math.
 
 ## Two-point margin check
 
