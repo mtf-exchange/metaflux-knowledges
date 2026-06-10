@@ -200,6 +200,23 @@ full conceptual model.
 | [`spot_order`](#spot_order) | Place one spot order | sender / agent | by `cloid` |
 | [`spot_cancel`](#spot_cancel) | Cancel a resting spot order by `oid` | sender / agent | yes |
 
+### Spot margin & Earn
+
+{% hint style="info" %}
+**Available on devnet (preview).** Leveraged spot ([spot margin](../../concepts/spot-margin.md)) and its lending supply side ([Earn](../../concepts/earn.md)) run end-to-end on **devnet today**: deposit collateral, borrow from the Earn pool, IOC-buy base on leverage, and close to repay. Treat it as a **preview** — forced-liquidation settlement is not yet wired (a forced close does not realize PnL or decrement open interest), and per-pair maintenance ratios are governance parameters still being calibrated. Do not assume production safety at scale.
+{% endhint %}
+
+A leveraged spot position is **isolated per `(account, pair)`**: posted quote collateral is a pure loss buffer, the buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All six actions are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info.md#spot_margin_state) and [`earn_state`](./info.md#earn_state).
+
+| `type` | Purpose | Signed-by | Idempotent |
+|--------|---------|-----------|-----------|
+| [`spot_margin_deposit`](#spot_margin_deposit) | Post quote collateral for a pair | sender / agent | no |
+| [`spot_margin_withdraw`](#spot_margin_withdraw) | Withdraw free collateral | sender / agent | no |
+| [`spot_margin_open`](#spot_margin_open) | Borrow + IOC-buy base on leverage | sender / agent | no |
+| [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | sender / agent | no |
+| [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | sender / agent | no |
+| [`earn_withdraw`](#earn_withdraw) | Redeem pool shares (idle-bounded) | sender / agent | no |
+
 ### Margin & risk
 
 | `type` | Purpose | Signed-by |
@@ -730,6 +747,168 @@ by the spot halt, so you can always exit a resting order and reclaim escrow.
 |-------|------|----------------|-------------|
 | `pair` | uint32 | an active spot pair | Spot pair id the order rests on |
 | `oid` | uint64 | a resting spot `oid` | Server order id to cancel (cancel-by-`cloid` is not yet mapped for spot) |
+
+---
+
+### `spot_margin_deposit`
+
+{% hint style="info" %}
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+{% endhint %}
+
+Post quote (USDC) collateral into your `(account, pair)` margin account, debited from your spendable spot balance. Collateral is a pure **loss buffer** — it does not fund the buy (the [`spot_margin_open`](#spot_margin_open) borrow does). Sender-authorized; the body is carried under `action.params`. `pair` is the **spot pair id**. The account is created on first deposit and accumulates on repeat deposits.
+
+```json
+{
+  "type": "spot_margin_deposit",
+  "params": { "pair": 200, "amount": "100" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | an active spot pair with margin enabled | Spot pair id (`SpotPairSpec.pair_id`) — **not** a token id |
+| `amount` | decimal string | `> 0` | Quote collateral to post (whole units), as a JSON string |
+
+**Gating.** Margin must be **enabled for the pair** — the pair needs per-pair risk parameters present, which are a governance setting still being calibrated. A deposit on a pair without them is rejected (`spot margin not enabled for pair`). An unknown pair, a non-positive `amount`, or an amount above your spendable quote balance are all rejected at admission.
+
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`). Confirm the credited collateral via [`/info` `spot_margin_state`](./info.md#spot_margin_state). See [spot margin](../../concepts/spot-margin.md).
+
+---
+
+### `spot_margin_withdraw`
+
+{% hint style="info" %}
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+{% endhint %}
+
+Move free collateral from your `(account, pair)` margin account back to your spendable quote balance. With **no open position** the full collateral is withdrawable (the drained account is pruned). With an **open position** the withdraw is gated at the initial-margin requirement against the held base marked at the pair's last spot trade price — if no mark exists the withdraw is rejected (a deterministic conservative rule). Sender-authorized; body under `action.params`.
+
+```json
+{
+  "type": "spot_margin_withdraw",
+  "params": { "pair": 200, "amount": "50" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | an active spot pair | Spot pair id the margin account is keyed on |
+| `amount` | decimal string | `> 0`, `≤` posted collateral | Quote collateral to withdraw (whole units), as a JSON string |
+
+**Gating.** Rejected if there is no margin account for the pair, if `amount` exceeds the posted collateral, or (with an open position) if the remaining collateral would fall below the initial-margin requirement, or if there is no mark price to value the held base.
+
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope. Confirm via [`/info` `spot_margin_state`](./info.md#spot_margin_state).
+
+---
+
+### `spot_margin_open`
+
+{% hint style="info" %}
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats. Leverage works end-to-end on devnet; **forced-liquidation settlement is not yet wired**.
+{% endhint %}
+
+Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC-buy** `size` base at up to `limit_px`. The buy is funded 100% by the borrow; your posted collateral is the loss buffer (leverage ≈ notional / collateral). The bought base is held **segregated** on the margin account — it is not credited to your spendable balances. Any **unspent borrow is repaid instantly** after the IOC settles, so the outstanding loan equals only what the buy actually spent. A zero-fill IOC is an accepted no-op (full refund, nothing borrowed, account left open). v1 allows **one open position per `(account, pair)`** — no add-on. Sender-authorized; body under `action.params`.
+
+```json
+{
+  "type": "spot_margin_open",
+  "params": { "pair": 200, "size": 200, "limit_px": 200000000, "borrow": "400" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | an active spot pair with margin enabled | Spot pair id (`SpotPairSpec.pair_id`) |
+| `size` | uint64 | `> 0` | Buy size in base raw lots (`10^sz_decimals` per whole unit); widened to `u128` |
+| `limit_px` | uint64 | `> 0` | Limit price in the `1e8` plane |
+| `borrow` | decimal string | `> 0` | Quote principal to draw from the Earn pool (whole units), as a JSON string |
+
+**Initial-margin gate.** The open is gated up front on the **worst-case cost** (`limit_px × size`): the open is rejected unless `collateral ≥ init_ratio × worst_cost`, where `init_ratio` is the pair's calibrated initial-margin parameter. Because the gate uses the worst case, a passing open never needs to unwind — the realized spend can only be lower (maker prices `≤ limit_px`, clamped size).
+
+**Gating.** Rejected if margin is not enabled for the pair, if there is no margin account (deposit collateral first), if a position is already open on the pair, if the Earn pool's idle liquidity is below `borrow`, if spot trading is halted, or on a zero `size` / non-positive `borrow`.
+
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid` — the inner IOC's fill is a committed effect). Observe the resulting `borrowed` / `base_held` via [`/info` `spot_margin_state`](./info.md#spot_margin_state); the Earn pool's `total_borrowed` moves on [`earn_state`](./info.md#earn_state). See [spot margin](../../concepts/spot-margin.md).
+
+---
+
+### `spot_margin_close`
+
+{% hint style="info" %}
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+{% endhint %}
+
+Close the position: **IOC-sell** the held base at no less than `limit_px`, repay the accrued debt (principal + interest) to the Earn pool, and return the remainder to you. On a **full unwind** the collateral joins the repay budget, any leftover stays with you, and the account is pruned. A **partial fill keeps the account open**: unsold base goes back into the segregated holding, only the realized proceeds repay (collateral untouched), and the outstanding principal drops accordingly. v1 is full-close intent only (no `size` argument — the whole holding is offered). Sender-authorized; body under `action.params`.
+
+```json
+{
+  "type": "spot_margin_close",
+  "params": { "pair": 200, "limit_px": 200000000 }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | an active spot pair | Spot pair id the position is on |
+| `limit_px` | uint64 | `> 0` | Floor price for the close sell, in the `1e8` plane |
+
+**Settlement.** Interest accrues `O(1)` off the pool's borrow index since the open. On a close where proceeds + collateral cannot cover the debt, the whole principal still leaves the pool's borrowed book and the **shortfall is socialized to suppliers** (the pool's supplied total is reduced, floored at zero). Forced/liquidation-driven settlement is **not yet wired** in this preview — a close is a voluntary user action.
+
+**Gating.** Rejected if there is no margin account, if there is no open position (nothing held), or if the position carries debt but the pair's Earn pool is missing.
+
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope. Confirm full vs partial close and the repaid amount via [`/info` `spot_margin_state`](./info.md#spot_margin_state) (a pruned account no longer appears); supplier-side effects show on [`earn_state`](./info.md#earn_state).
+
+---
+
+### `earn_deposit`
+
+{% hint style="info" %}
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+{% endhint %}
+
+Supply quote into a lending pool and receive **pool shares** priced off the pool's net asset value. The first supplier into a pool mints shares **1:1**; later deposits price off NAV, so once borrower interest has lifted the pool a same-size deposit mints proportionally **fewer** shares. The pool **auto-creates on first deposit** for any asset that is the quote of a registered spot pair. Sender-authorized; body under `action.params`. `asset` is the **lendable quote asset id** (the pool key), not a pair id.
+
+```json
+{
+  "type": "earn_deposit",
+  "params": { "asset": 100, "amount": "5000" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a registered spot pair's quote asset (or an existing pool) | Lendable asset id — the pool key |
+| `amount` | decimal string | `> 0` | Quote to supply (whole units), as a JSON string |
+
+**Gating.** Rejected on a non-positive `amount`, on a spendable balance below `amount`, or if `asset` is not lendable (not any pair's quote and has no existing pool). A deposit so small it would mint zero shares is rejected.
+
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope. Confirm minted shares / your stake via [`/info` `earn_state`](./info.md#earn_state) (pass `user` to include your `user_shares` / `user_value`). See [Earn](../../concepts/earn.md).
+
+---
+
+### `earn_withdraw`
+
+{% hint style="info" %}
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+{% endhint %}
+
+Redeem pool shares back to quote, paid to your spendable balance. The payout is **clamped to the pool's idle liquidity** (`total_supplied − total_borrowed`): a redemption larger than idle pays exactly idle and burns proportionally fewer shares, so a supplier can always exit up to what is not lent out and never strands the borrow ledger. There is **no claim step** — yield compounds into share value as borrower interest lifts NAV, and you realize it on withdrawal. Sender-authorized; body under `action.params`.
+
+```json
+{
+  "type": "earn_withdraw",
+  "params": { "asset": 100, "shares": "1234.5" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a pool you hold shares in | Lendable asset id — the pool key |
+| `shares` | decimal string | `> 0`, `≤` shares you own | Pool shares to redeem, as a JSON string |
+
+**Gating.** Rejected if the pool does not exist, on a non-positive `shares`, if `shares` exceeds what you own, if the pool is insolvent (zero NAV with shares outstanding), or if the pool has **zero idle liquidity** (everything is currently lent out — wait for borrowers to repay). A redemption that quantizes to zero is rejected.
+
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope; the burned-share count may be **less than requested** when the payout was idle-clamped. Confirm the remaining stake and pool totals via [`/info` `earn_state`](./info.md#earn_state). See [Earn](../../concepts/earn.md).
 
 ---
 

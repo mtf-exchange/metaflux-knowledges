@@ -1316,6 +1316,107 @@ Response:
 
 State source: `locus.spot_clearinghouse.balances` (keyed by `(owner, asset)`).
 
+### `spot_margin_state`
+
+{% hint style="info" %}
+**Available on devnet (preview).** Read surface for leveraged [spot margin](../../concepts/spot-margin.md); see the concept page for the preview caveats.
+{% endhint %}
+
+Every spot-margin position held by one account. Required: `user` (0x hex).
+
+```json
+{ "type": "spot_margin_state", "user": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "spot_margin_state",
+  "data": {
+    "user": "0x<addr>",
+    "accounts": [
+      {
+        "pair": 200,
+        "collateral": "5",
+        "borrowed": "20",
+        "borrow_index_snapshot": "1",
+        "base_held": "9.99",
+        "current_debt": "22",
+        "params": { "init_bps": 2000, "maint_bps": 1000 }
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `accounts[*].pair` | uint32 | Spot pair id the position is on |
+| `accounts[*].collateral` | decimal string | Posted quote collateral (loss buffer) |
+| `accounts[*].borrowed` | decimal string | Outstanding loan **principal** (at the snapshot index) |
+| `accounts[*].borrow_index_snapshot` | decimal string | Pool borrow index captured at open (debt-accrual basis) |
+| `accounts[*].base_held` | decimal string | Segregated base bought on leverage (not in spendable balances) |
+| `accounts[*].current_debt` | decimal string | Debt accrued to now: `borrowed × (pool_index / snapshot)` |
+| `accounts[*].params` | object \| null | Per-pair `{ init_bps, maint_bps }`; `null` = margin not enabled / uncalibrated for the pair |
+
+Positions are listed in pair-id order. An account with no positions returns an empty `accounts` array.
+
+### `earn_state`
+
+{% hint style="info" %}
+**Available on devnet (preview).** Read surface for the [Earn](../../concepts/earn.md) lending pools; see the concept page for the preview caveats.
+{% endhint %}
+
+Every Earn lending pool, plus one account's stake when `user` is supplied. Optional: `user` (0x hex).
+
+```json
+{ "type": "earn_state", "user": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "earn_state",
+  "data": {
+    "pools": [
+      {
+        "asset": 100,
+        "total_supplied": "1000",
+        "total_borrowed": "20",
+        "idle": "980",
+        "shares_total": "1000",
+        "share_value": "1",
+        "borrow_index": "1",
+        "reserve_factor_bps": 1000,
+        "borrow_rate_bps_annual": 0,
+        "reserve_accrued": "0",
+        "user_shares": "100",
+        "user_value": "100"
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pools[*].asset` | uint32 | Lendable quote asset id (the pool key) |
+| `pools[*].total_supplied` | decimal string | Pool NAV — supplied principal plus folded-in repaid interest |
+| `pools[*].total_borrowed` | decimal string | Quote currently lent to spot-margin borrowers |
+| `pools[*].idle` | decimal string | `total_supplied − total_borrowed` — the instantly-withdrawable bound |
+| `pools[*].shares_total` | decimal string | Total shares outstanding |
+| `pools[*].share_value` | decimal string | `total_supplied / shares_total` (`0` when no shares) |
+| `pools[*].borrow_index` | decimal string | Cumulative borrow index (debt-accrual basis) |
+| `pools[*].reserve_factor_bps` | uint16 | Protocol cut of borrow interest (bps) |
+| `pools[*].borrow_rate_bps_annual` | uint32 | Annualised borrow rate (bps) |
+| `pools[*].reserve_accrued` | decimal string | Protocol reserve accumulated from interest |
+| `pools[*].user_shares` | decimal string | **Only with `user`** — shares the account holds in the pool |
+| `pools[*].user_value` | decimal string | **Only with `user`** — `user_shares × share_value` |
+
+Pools are listed in asset-id order. Omitting `user` drops the `user_shares` / `user_value` fields.
+
 ### `exchange_status`
 
 Global trading status. No parameters.

@@ -1,9 +1,15 @@
 # Spot margin
 
 {% hint style="info" %}
-**Upcoming.** Leveraged spot trading funded by the [Earn](./earn.md) lending
-pool. [Plain spot](./spot-trading.md) is **live today** and balance-only (no
-leverage); spot margin is the planned overlay that adds borrow + leverage on top.
+**Available on devnet (preview).** Leveraged spot trading funded by the
+[Earn](./earn.md) lending pool. [Plain spot](./spot-trading.md) is balance-only
+(no leverage); spot margin is the overlay that adds borrow + leverage on top.
+The full deposit → borrow → leveraged-buy → close loop runs end-to-end on
+**devnet today** (see the [action surface](#action-surface) below). Treat it as a
+**preview**: forced-liquidation settlement is **not yet wired** (a forced close
+does not realize PnL or decrement open interest), and per-pair **maintenance
+ratios are governance parameters still being calibrated**. Leverage works on
+devnet; do not assume production safety at scale.
 {% endhint %}
 
 ## TL;DR
@@ -15,12 +21,35 @@ In the first release spot margin is **isolated per pair** — each leveraged spo
 ## How it works
 
 ```
-1. Post collateral (USDC) for the pair.
-2. Borrow quote from the Earn pool, up to the initial-margin limit.
-3. Buy the base asset on the spot book with (collateral + borrow).
+1. Post collateral (USDC) for the pair — a pure loss buffer.
+2. Borrow quote from the Earn pool; the borrow funds the buy 100%.
+3. IOC-buy the base asset on the spot book with the borrowed quote.
+   The bought base is held SEGREGATED on the margin account.
 4. Pay borrow interest continuously while the loan is open.
 5. Close: sell the base, repay borrow + accrued interest, keep the remainder.
 ```
+
+Collateral does **not** fund the buy — the borrow does. Collateral is the loss
+buffer that makes the position over-collateralizable, so leverage ≈
+`notional / collateral`. The bought base is held in a **segregated** holding on
+the margin account, never commingled with your spendable spot balances, so a
+close (or a later liquidation) touches exactly that position. The first release
+allows **one open position per `(account, pair)`** (no add-on); the open IOC
+**instantly repays any unspent borrow**, so the outstanding loan equals only what
+the buy actually spent.
+
+### Action surface
+
+The six [`/exchange`](../api/rest/exchange.md#spot-margin--earn) actions (all
+sender-authorized) drive the loop. Confirm committed state via
+[`/info` `spot_margin_state`](../api/rest/info.md#spot_margin_state).
+
+| Action | Effect |
+|---|---|
+| [`spot_margin_deposit`](../api/rest/exchange.md#spot_margin_deposit) | Post quote collateral for the pair (margin must be enabled) |
+| [`spot_margin_open`](../api/rest/exchange.md#spot_margin_open) | Borrow + IOC-buy base on leverage; gated by the initial-margin requirement |
+| [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close) | IOC-sell the held base, repay principal + interest, return the remainder |
+| [`spot_margin_withdraw`](../api/rest/exchange.md#spot_margin_withdraw) | Withdraw free collateral (full when flat; initial-margin-gated while open) |
 
 ### Margin
 
@@ -44,6 +73,9 @@ eat more slippage and so carry a higher ratio. The exact value per pair is
 **calibrated from that pair's book depth and volatility against a target
 liquidation-slippage bound** — it is a governance-set risk parameter, not a fixed
 constant, and a pair does not enable spot margin until its ratio is calibrated.
+**On devnet these per-pair ratios are still being calibrated** — a pair without
+calibrated risk parameters rejects every spot-margin action for it
+(`spot margin not enabled for pair`).
 
 ### Interest
 
@@ -51,7 +83,27 @@ Borrowed USDC accrues interest at a per-pair rate (`spot_borrow_rate_bps`, annua
 
 ### Liquidation
 
-Spot-margin positions are liquidated by a **dedicated spot-liquidator role**, separate from the perp liquidation engine, so a spot liquidation can never drain the perp liquidator credit line. The liquidator closes the position on the spot book; any uncovered shortfall is absorbed by the insurance buffer first, the same waterfall perps use.
+{% hint style="warning" %}
+**Not yet wired (preview).** On devnet a position is unwound only by the owner's
+voluntary [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close);
+**forced-liquidation settlement is not implemented** — a forced close does not yet
+realize PnL or decrement open interest. The maintenance ratio below is defined but
+not yet enforced by a liquidator. Do not rely on automatic liquidation in this
+preview.
+{% endhint %}
+
+The intended model: a spot-margin position is liquidated through the **same tiered
+liquidation engine the perps use**, applied to the position's **own isolated
+margin**, so a spot blow-up settles against its own collateral and the Earn pool
+and never reaches the perp cross account. The exact forced-close mechanism — how
+the held base is unwound and the debt settled — is still being finalized.
+
+**Shortfall handling (live on devnet today).** When a close cannot cover the debt
+(proceeds + collateral fall short), the whole loan principal still leaves the
+pool's borrowed book and the **shortfall is socialized to the Earn suppliers** —
+the pool's supplied total is reduced (floored at zero), which lowers share value.
+This is the conservative-ratio + (future) liquidator design's reason for existing:
+to make a shortfall rare.
 
 ## Collateral scope
 
