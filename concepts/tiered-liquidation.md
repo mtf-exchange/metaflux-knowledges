@@ -12,9 +12,9 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 |------|-------------|--------|---|
 | (safe) | `health ≥ 1.1` | Idle | — |
 | **T0** | `1.0 ≤ health < 1.1` | **Yellow card**: ALO orders force-cancelled, wallet notified | No |
-| **T1** | `0.8 ≤ health < 1.0` | Partial market close (50%) — full close if T1 fired within `cooldown_ms` | Yes (50%) or Yes (100%) |
-| **T2** | `0.667 ≤ health < 0.8` | Full market close | Yes (100%) |
-| **T3** | `health < 0.667` | Backstop: position seized by MFlux Vault; insurance covers shortfall | Position seized |
+| **T1** | `0.8 ≤ health < 1.0` | Partial [floored-limit close](#how-a-forced-close-executes-the-price-floor) (50%) — full close if T1 fired within `cooldown_ms` | Yes (50%) or Yes (100%) |
+| **T2** | `0.667 ≤ health < 0.8` | Full [floored-limit close](#how-a-forced-close-executes-the-price-floor) | Yes (100%) |
+| **T3** | `health < 0.667` | Backstop: position seized by MFlux Vault; insurance covers shortfall. Un-fillable forced-close remainders from T1/T2 also escalate here | Position seized |
 | **T4** | shortfall after T3 | ADL: protocol claws back from profitable counter-parties | Winners' positions reduced |
 
 `account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
@@ -51,6 +51,41 @@ else                                                  → PartialMarket50 { size
 - **Only `PartialMarket50` arms the cooldown** (`record_attempt`); a `FullMarket` or `Backstop` does not block subsequent partials. So the T1 partial→full escalation only fires when a *prior partial* is still inside its 30 s window.
 - `size_to_close` for a partial is `maintenance_margin / 2` (integer-truncated). The `deficit` for backstop is `maintenance_margin − account_value` when `account_value ≥ 0`, else `maintenance_margin + |account_value|`.
 - The driver evaluates an **incremental dirty set** each block (event-dirtied accounts + a rolling self-heal slice), not a full scan — proven equivalent to a from-scratch scan by fuzz test. T0 accounts get their resting ALO liquidity force-cancelled after classification.
+
+## How a forced close executes (the price floor)
+
+A T1/T2 forced close is **never a market sweep**. It executes as an IOC LIMIT
+order bounded off the committed mark:
+
+```
+sell (long leg):      limit = mark × (1 − liq_floor)
+buy-back (short leg): limit = mark × (1 + liq_floor)
+```
+
+- `liq_floor` is a per-market risk parameter; **by default it is half the
+  market's maintenance ratio** (a 5% maintenance market floors execution 2.5%
+  off mark). The maintenance ratio is calibrated to cover liquidation slippage
+  plus fees, so the floor guarantees a forced close can never realize more
+  slippage than the buffer was sized for.
+- The slice fills only at prices at-or-inside the floor. **Whatever cannot
+  fill above the floor is NOT sold into a thin book** — it escalates to the
+  T3 backstop queue immediately. This is the anti-cascade bound: a forced
+  close cannot depress the mark beyond the floor, so it cannot sweep other
+  accounts into liquidation.
+- Fills settle through the **same settlement path as a normal fill**: realized
+  PnL hits the account, open interest moves, the counterparty's maker side
+  settles normally.
+- A **liquidation fee** (default 50 bps of the closed notional, per-market
+  configurable) is charged from the account's remaining positive equity — it
+  never creates a deficit — and is credited to the insurance fund, which is
+  exactly the pool that absorbs backstop shortfalls.
+- The account's **own resting orders on the opposite side are cancelled, not
+  self-filled** (a self-fill would re-open what the close just closed).
+
+Partial (T1) sizing is 50% of the targeted leg on core markets;
+builder-deployed markets can configure a health-decayed ramp (close a small
+slice just under the maintenance line, larger slices only as health sinks,
+capped per market) plus the 30 s cooldown between slices.
 
 ## The full state machine
 
@@ -248,4 +283,4 @@ A: T0 fires at `1.0 ≤ health < 1.1`. If you re-enter Safe (`health ≥ 1.1`) b
 A: No. T1 always tries partial first. Submit a manual close at T0 if you want full unwind on your own terms.
 
 **Q: How is the closing price determined at T1/T2?**
-A: Market-style IOC at the prevailing book. Slippage past the mark eats into bucket equity; severe books worsen the T1→T2→T3 cascade.
+A: An IOC **limit** at the prevailing book, floored at `mark × (1 ∓ liq_floor)` — see [the price floor](#how-a-forced-close-executes-the-price-floor). Realized slippage is bounded by the floor (default: half the maintenance ratio); anything the book cannot absorb inside the floor escalates to the backstop instead of sweeping deeper levels.
