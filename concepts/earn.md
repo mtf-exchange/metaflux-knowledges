@@ -2,12 +2,11 @@
 
 {% hint style="info" %}
 **Available on devnet (preview).** A USDC lending pool that earns yield from
-[spot-margin](./spot-margin.md) borrowers. Supply, share-pricing, and
-idle-bounded redemption run end-to-end on **devnet today** (see the
-[action surface](#deposit--withdraw) below). Treat it as a **preview**: Earn is
-the supply side that funds spot-margin borrows, and spot-margin **forced-liquidation
-settlement is not yet wired** — so the shortfall path that can reduce share value
-is exercised only via voluntary closes today, not an automatic liquidator.
+[spot-margin](./spot-margin.md) borrowers. Supply, share-pricing, idle-bounded
+redemption AND the automatic spot-margin liquidator that protects the pool all
+run end-to-end on **devnet today** (see the
+[action surface](#deposit--withdraw) below). Treat it as a **preview**:
+per-pair maintenance ratios are still being calibrated.
 {% endhint %}
 
 ## TL;DR
@@ -100,12 +99,13 @@ under-collateralized.
 Earn is **not risk-free**. If a [spot-margin](./spot-margin.md) position is closed
 at a loss that the borrower's collateral cannot cover, the **shortfall is socialized
 to suppliers**: the pool's `total_supplied` is reduced (floored at zero), which
-lowers `share_value`. In this devnet preview that shortfall path is reached only
-via a voluntary [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close) —
-an automatic liquidator and an insurance-buffer waterfall ahead of suppliers are
-**planned but not yet wired**. The conservative spot maintenance ratio (still being
-calibrated) and forced liquidation (planned, via the shared tiered-liquidation
-engine on the position's isolated margin) exist to make a shortfall rare. There is also **liquidity risk**: redemptions are bounded by idle liquidity,
+lowers `share_value`. The pool's protection is the **automatic liquidator** (live
+on devnet): every block, underwater margin accounts are
+[forced-closed](./spot-margin.md#liquidation) at the maintenance floor, so a
+position is unwound while there is normally still enough value to repay the loan.
+The conservative per-pair maintenance ratio (still being calibrated) sizes that
+buffer; an insurance-buffer waterfall ahead of suppliers is planned but not yet
+wired. There is also **liquidity risk**: redemptions are bounded by idle liquidity,
 so a fully-utilised pool cannot be exited until borrowers repay.
 
 ## See also
@@ -123,7 +123,7 @@ A: No. Yield compounds into your share value continuously; you realise it on wit
 A: Only the lent (utilised) fraction of the pool earns interest. APY ≈ borrow rate × utilisation.
 
 **Q: Can I lose principal?**
-A: Yes, if a spot-margin loss exceeds the borrower's collateral — the uncovered shortfall is socialized to suppliers and lowers share value (an insurance buffer ahead of suppliers is planned but not yet wired). Designed to be rare via the conservative maintenance ratio. Earn is lower-risk than a trading [vault](./vaults.md) but not risk-free.
+A: Yes, if a spot-margin loss exceeds the borrower's collateral — the uncovered shortfall is socialized to suppliers and lowers share value (an insurance buffer ahead of suppliers is planned but not yet wired). Designed to be rare: the automatic liquidator forced-closes underwater positions at the maintenance floor, and the per-pair ratio is set conservatively. Earn is lower-risk than a trading [vault](./vaults.md) but not risk-free.
 
 **Q: Why can't I withdraw my full balance right now?**
 A: Redemptions are bounded by **idle liquidity** (`supplied − borrowed`). If the pool is fully lent to spot-margin borrowers, you can only withdraw up to the idle amount; the rest unlocks as borrowers repay.
