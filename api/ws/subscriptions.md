@@ -333,7 +333,7 @@ This is the supported path for authenticated reads and for submitting signed act
 The following channels appeared in earlier drafts but are **not implemented** on the node WS surface. They are not recognized channel names; subscribing returns an `unknown channel` error. Listed here so integrators are not misled by older SDK stubs.
 
 - **Public market data:** `meta` (universe metadata), `mark` (mark/oracle price), `fundingTicks` (funding-rate updates).
-- **Per-user (would require auth):** `userFundings` (funding payment history — funding settlement is now live, so this feed is unblocked and pending wiring), `userTwapSliceFills` / `userTwapHistory` (TWAP execution feed — pending TWAP slice execution), `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
+- **Per-user (would require auth):** `userFundings` (funding payment history — funding settlement is now live, so this feed is unblocked and pending wiring), `userTwapSliceFills` / `userTwapHistory` (TWAP slice execution is now live; these feeds await the begin-block fill-observation seam), `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
 
 Also not implemented today:
 
