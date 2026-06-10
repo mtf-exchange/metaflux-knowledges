@@ -114,11 +114,18 @@ Response (a faucet-funded account, no positions):
     "positions": [],
     "balances": {
       "usdc": "3000",
-      "spot": { "MTF": "10" }
+      "spot": { "MTF": { "spendable": "10", "hold": "0", "total": "10" } }
     }
   }
 }
 ```
+
+Each `balances.spot` token is a `{spendable, hold, total}` object: `hold` is
+the amount locked behind a resting spot order (escrow), `total = spendable +
+hold`. A token that is entirely held (zero spendable) still appears. For a
+**light** read of just the margin scalars (no `positions` walk, no balance
+scan — the right call for a liquidation-health poll), use
+[`margin_summary`](#margin_summary).
 
 A positioned account adds entries under `positions`:
 
@@ -151,7 +158,24 @@ A positioned account adds entries under `positions`:
 | `positions[*].leverage` | uint8 | Position max leverage |
 | `positions[*].position_side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
-| `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); empty if none |
+| `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); each value is a `{spendable, hold, total}` object (`hold` = escrow locked behind resting spot orders); empty if none |
+
+### `margin_summary`
+
+The **margin scalars only** — `account_state` minus the `positions[]` walk and
+the spot-balance scan. The right call for a frequent liquidation-health poll (a
+risk-watcher bot, an automated margin top-up) where the position/balance detail
+is not needed. Required: `address` (0x hex).
+
+```json
+{ "type": "margin_summary", "address": "0x<addr>" }
+```
+
+Response (`data`): `address`, `account_value`, `free_collateral`,
+`maint_margin`, `init_margin`, `health`, `tier`, `margin_mode`, `pm_enabled` —
+identical field semantics to the same-named fields on
+[`account_state`](#account_state) (computed by the shared helper, so the two
+never disagree).
 
 ### `market_info`
 
@@ -1303,7 +1327,7 @@ Response:
   "type": "spot_clearinghouse_state",
   "data": {
     "address": "0x<addr>",
-    "balances": [ { "asset": 104, "name": "MTF", "balance": "10" } ]
+    "balances": [ { "asset": 104, "name": "MTF", "spendable": "10", "hold": "0", "total": "10" } ]
   }
 }
 ```
@@ -1312,9 +1336,14 @@ Response:
 |-------|------|-------------|
 | `balances[*].asset` | uint32 | Spot asset id (`104` = MTF) |
 | `balances[*].name` | string | Token / pair name, else `asset:<id>` |
-| `balances[*].balance` | decimal string | Balance, truncated toward zero |
+| `balances[*].spendable` | decimal string | Free balance (not locked behind a resting order), truncated toward zero |
+| `balances[*].hold` | decimal string | Locked behind resting spot orders (escrow) |
+| `balances[*].total` | decimal string | `spendable + hold` |
 
-State source: `locus.spot_clearinghouse.balances` (keyed by `(owner, asset)`).
+Token set is the union of the account's balance and escrow (`reserved`) keys —
+a token that is entirely held with zero spendable still appears. Range-scanned
+per account (not a full-table walk). State source:
+`locus.spot_clearinghouse.{balances, reserved}` (both keyed by `(owner, asset)`).
 
 ### `spot_margin_state`
 
