@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, and `user_twap_slice_fills` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, and `user_twap_history` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -34,6 +34,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `active_asset_data` | **live** | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, per commit |
 | `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, per commit |
 | `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), per commit |
+| `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`: activated / finished / terminated), per commit |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -335,7 +336,7 @@ This is the supported path for authenticated reads and for submitting signed act
 The following channels appeared in earlier drafts but are **not implemented** on the node WS surface. They are not recognized channel names; subscribing returns an `unknown channel` error. Listed here so integrators are not misled by older SDK stubs.
 
 - **Public market data:** `meta` (universe metadata), `mark` (mark/oracle price), `fundingTicks` (funding-rate updates).
-- **Per-user (would require auth):** `userTwapHistory` (TWAP slice fills are now live via `user_twap_slice_fills`; the order-lifecycle history feed awaits a TWAP state-transition observation seam), `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
+- **Per-user (would require auth):** `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
 
 Also not implemented today:
 
