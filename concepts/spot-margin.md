@@ -4,12 +4,11 @@
 **Available on devnet (preview).** Leveraged spot trading funded by the
 [Earn](./earn.md) lending pool. [Plain spot](./spot-trading.md) is balance-only
 (no leverage); spot margin is the overlay that adds borrow + leverage on top.
-The full deposit → borrow → leveraged-buy → close loop runs end-to-end on
-**devnet today** (see the [action surface](#action-surface) below). Treat it as a
-**preview**: forced-liquidation settlement is **not yet wired** (a forced close
-does not realize PnL or decrement open interest), and per-pair **maintenance
-ratios are governance parameters still being calibrated**. Leverage works on
-devnet; do not assume production safety at scale.
+The full deposit → borrow → leveraged-buy → close loop AND automatic
+[forced liquidation](#liquidation) run end-to-end on **devnet today** (see the
+[action surface](#action-surface) below). Treat it as a **preview**: per-pair
+**maintenance ratios are governance parameters still being calibrated**.
+Leverage works on devnet; do not assume production safety at scale.
 {% endhint %}
 
 ## TL;DR
@@ -83,27 +82,36 @@ Borrowed USDC accrues interest at a per-pair rate (`spot_borrow_rate_bps`, annua
 
 ### Liquidation
 
-{% hint style="warning" %}
-**Not yet wired (preview).** On devnet a position is unwound only by the owner's
-voluntary [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close);
-**forced-liquidation settlement is not implemented** — a forced close does not yet
-realize PnL or decrement open interest. The maintenance ratio below is defined but
-not yet enforced by a liquidator. Do not rely on automatic liquidation in this
-preview.
-{% endhint %}
+**Live on devnet.** Every block the chain re-values each margin account at the
+pair's spot mark (the book's last trade price) and forced-closes any account
+whose equity has fallen through the maintenance floor:
 
-The intended model: a spot-margin position is liquidated through the **same tiered
-liquidation engine the perps use**, applied to the position's **own isolated
-margin**, so a spot blow-up settles against its own collateral and the Earn pool
-and never reaches the perp cross account. The exact forced-close mechanism — how
-the held base is unwound and the debt settled — is still being finalized.
+```
+liquidate when   collateral + base_held × mark − debt  <  base_held × mark × maint_bps / 10⁴
+```
 
-**Shortfall handling (live on devnet today).** When a close cannot cover the debt
-(proceeds + collateral fall short), the whole loan principal still leaves the
-pool's borrowed book and the **shortfall is socialized to the Earn suppliers** —
-the pool's supplied total is reduced (floored at zero), which lowers share value.
-This is the conservative-ratio + (future) liquidator design's reason for existing:
-to make a shortfall rare.
+The forced close runs through the **same settled path as a voluntary close**
+— the held base is IOC-sold on the spot book, the Earn pool is repaid
+principal + interest, the remainder (minus a small **liquidation fee**, which
+capitalizes the protocol's insurance fund) is returned, and the account closes.
+Two anti-cascade properties mirror the [perp forced close](./tiered-liquidation.md#how-a-forced-close-executes-the-price-floor):
+
+- **Price floor.** The forced sell is a LIMIT bounded at
+  `mark × (1 − floor)` (default: half the maintenance ratio, per-pair
+  configurable). A thin book is never swept — whatever cannot sell above the
+  floor stays held and re-evaluates next block.
+- **Partial fills keep the account open.** Realized proceeds repay debt
+  immediately; the unsold base is retried as liquidity returns.
+
+A blow-up settles against the position's **own isolated collateral** and the
+Earn pool — it never reaches your perp cross account.
+
+**Shortfall handling.** When a full unwind cannot cover the debt (proceeds +
+collateral fall short), the whole loan principal still leaves the pool's
+borrowed book and the **shortfall is socialized to the Earn suppliers** — the
+pool's supplied total is reduced (floored at zero), which lowers share value.
+The conservative per-pair maintenance ratio and the automatic liquidator exist
+to make that shortfall rare.
 
 ## Collateral scope
 
