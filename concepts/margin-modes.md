@@ -45,15 +45,11 @@ health = account_value / maint_margin
 ```
 
 - `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed `i128`.
-- `maint_margin` = `Σ asset_to_margin_used` per asset (classical) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`).
+- `maint_margin` = the sum over every held position leg of `|entry_notional| × maint_margin_ratio` (derived live from positions) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`).
 
-The per-asset maintenance ratio default is **500 bps = 5 %** (`DynamicRiskParams.maintenance_margin_ratio_bps`). The relationship to initial margin:
+The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol baseline of **300 bps = 3 %**. The derived forced-close slippage floor is half the effective ratio (1.5 % for a baseline market) unless explicitly overridden.
 
-```
-maintenance = position_value × (1/max_leverage − maintenance_deduction)
-```
-
-i.e. maintenance sits below initial by a `maintenance_deduction`, so a position can be opened and then ride down to the maintenance floor before liquidation. Health < 1.0 enters the [liquidation ladder](./tiered-liquidation.md) at the tier bands (1.1 / 1.0 / 0.8 / 0.667).
+Maintenance sits below the initial requirement (`notional / max_leverage`), so a position can be opened and then ride down to the maintenance floor before liquidation. Health < 1.0 enters the [liquidation ladder](./tiered-liquidation.md) at the tier bands (1.1 / 1.0 / 0.8 / 0.667).
 
 > The arithmetic uses `Decimal` / `i128` throughout (no floats); the tier decision even right-shifts both operands by a common amount before the `Decimal` division when an account value would exceed `Decimal::MAX`, preserving the health ratio so the tier decision is unaffected.
 
