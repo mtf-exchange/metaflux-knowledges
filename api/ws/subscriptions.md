@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, and `candles` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, and `ledger_updates` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -28,6 +28,9 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
 | `candles` | **live** | `coin` + `interval` (both required) | committed-block fills folded into OHLCV bars, per commit |
+| `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), per commit |
+| `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, per commit |
+| `ledger_updates` | **live** | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), per commit |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -232,6 +235,61 @@ Each **push** is a **single bar object** (not the array) — the current open ba
 
 A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing. On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's `candle` (singular).
 
+### `order_updates`
+
+Per-account order lifecycle. Requires `user` (the 0x address). Each push is an array of order-update records for that account from the just-committed block; the initial snapshot is `[]`.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "order_updates", "user": "0x<address>" } }
+```
+
+```json
+{ "channel": "order_updates", "data": [ {
+  "order": { "coin": "BTC", "side": "B", "limit_px": "100", "sz": "600", "orig_sz": "1000",
+             "oid": 42, "cloid": "0x..", "tif": "GTC", "reduce_only": false },
+  "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
+```
+
+- `status` ∈ `open` (resting; `sz` is the post-commit book remainder) / `filled` (a taker carries cumulative `filled_sz` + `avg_px`; a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests) / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`).
+- `limit_px` / `sz` / `orig_sz` / `avg_px` are 1e8-plane decimal strings; `time` is consensus-ms; unknown fields are `null`.
+- **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
+
+### `notifications`
+
+Per-account margin / liquidation notices, derived by diffing consecutive committed states. Requires `user`. One array frame per affected commit; initial snapshot `[]`.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "notifications", "user": "0x<address>" } }
+```
+
+```json
+{ "channel": "notifications", "data": [
+  { "kind": "yellow_card", "tier": "yellow_card", "message": "...", "time": 1735689600123 },
+  { "kind": "forced_close_tier", "tier": "partial_market_50", "message": "...", "time": 1735689600123 },
+  { "kind": "tier_cleared", "tier": null, "message": "...", "time": 1735689600123 },
+  { "kind": "forced_close", "coin": "BTC", "side": "long", "closed_sz": "600", "message": "...", "time": 1735689600123 },
+  { "kind": "backstop_residual", "coin": "BTC", "side": "long", "lots": "120", "message": "...", "time": 1735689600123 },
+  { "kind": "backstop_residual_cleared", "coin": "BTC", "side": "long", "message": "...", "time": 1735689600123 } ] }
+```
+
+- `kind` is the machine tag; `message` is the human-readable text. `tier` ∈ `yellow_card` / `partial_market_50` / `full_market` / `backstop_takeover` (or `null` on clear).
+- `yellow_card` is the one-block margin-warning grace (the [tiered-liquidation](../../concepts/tiered-liquidation.md) T0 contract); `forced_close` fires when a liquidation actually executes against the account.
+
+### `ledger_updates`
+
+Per-account money movement, attributed to its **cause** (read from the committed block payload — a record appears only when the action applied). Requires `user`; initial snapshot `[]`.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "ledger_updates", "user": "0x<address>" } }
+```
+
+```json
+{ "channel": "ledger_updates", "data": [ { "kind": "usd_send", "destination": "0x..", "amount": "25.5", "time": 1735689600123 } ] }
+```
+
+- `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `deposit` (`amount` may be `null` for an inbound CCTP credit), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver).
+- Amounts are whole-token decimal strings except `withdraw` via MetaBridge, which carries `amount_units` (raw base units). Inbound bridge credit amounts and CoreWriter-delayed actions (which dispatch in a later block) are not yet attributed.
+
 ---
 
 ## `post` — request/response over WS
@@ -250,8 +308,8 @@ This is the supported path for authenticated reads and for submitting signed act
 
 The following channels appeared in earlier drafts but are **not implemented** on the node WS surface. They are not recognized channel names; subscribing returns an `unknown channel` error. Listed here so integrators are not misled by older SDK stubs.
 
-- **Public market data:** `meta` (universe metadata), `allMids` (per-asset mids), `mark` (mark/oracle price), `fundingTicks` (funding-rate updates).
-- **Per-user (would require auth):** `userFills`, `orderEvents`, `marginEvents`, `vaultEvents`, `twapEvents`, `rfqEvents`.
+- **Public market data:** `meta` (universe metadata), `mark` (mark/oracle price), `fundingTicks` (funding-rate updates).
+- **Per-user (would require auth):** `userFundings` (funding payment history — blocked on funding settlement), `userTwapSliceFills` / `userTwapHistory` (TWAP execution feed), `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
 
 Also not implemented today:
 
