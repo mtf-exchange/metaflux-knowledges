@@ -39,7 +39,7 @@ value  = num / denom
 - `decay = 0.5` (proposed default → ≈ 7 s half-life at the 5 s sample cadence). Clamped to `[0, 1]` at update time.
 - Sample cadence: **5 s**; EMA fold + settle cadence: **8000 ms** (`funding_update_guard` / `funding_distribute_guard`).
 
-> **Status:** settlement is **live** — each 8 s period advances the per-asset cumulative funding index by the accrued rate and moves `size × Δindex` between position owners' balances (zero-sum: longs pay shorts or vice versa, no mint/burn; conservation- and determinism-fuzzed, 4-node e2e). The EMA accumulator + cap are implemented. The remaining gap is the per-tick premium **driver** feeding live samples into the EMA; until it streams real premium, the rate stays at its seeded value.
+> **Status:** the full funding loop is **live** end to end. Each 8 s period the rate driver samples the premium from committed state (`premium = (mark − oracle) / oracle`, one sample per perp market) and folds it into the per-asset EMA (capped); settlement then advances the cumulative funding index by the accrued rate and moves `size × Δindex` between position owners' balances (zero-sum: longs pay shorts or vice versa, no mint/burn). So a perp trading above its index drives a positive rate which charges longs — all from committed market divergence, no external premium feeder. Conservation- and determinism-fuzzed, with a 4-node e2e proving divergence → premium → EMA → index → balance transfer.
 
 #### 2. Cap (clamp)
 
