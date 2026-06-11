@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, and `user_twap_history` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, and `spot_state` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -35,6 +35,8 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, per commit |
 | `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), per commit |
 | `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`: activated / finished / terminated), per commit |
+| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — per commit |
+| `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — per commit |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -316,6 +318,84 @@ re-emits it each committed block.
   OI-cap-derived size ceiling (raw-lot string); fields are identical to the REST
   [`active_asset_data`](../rest/info.md) read. On the gateway's `/hl/ws` the
   equivalent channel name is HL's `activeAssetData`.
+
+### `account_state`
+
+Per-account **PERP** clearinghouse state — the margin summary, open positions,
+and balances for one account — pushed each commit. Requires `user` (the 0x
+address; `address` is also accepted) — NOT a `coin`. The body is built from the
+same record builder as the REST focused account read, so a WS push never drifts
+from that read. The initial snapshot is the live state (zeroed for an account
+with no funds), not an empty array.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "account_state", "user": "0x<address>" } }
+```
+
+```json
+{
+  "channel": "account_state",
+  "data": {
+    "address": "0x<addr>",
+    "account_value": "10000", "free_collateral": "8500", "maint_margin": "300",
+    "init_margin": "1500", "health": "0.97", "tier": 0,
+    "margin_mode": "cross", "pm_enabled": false,
+    "positions": [
+      { "asset": 0, "size": "600", "entry_px": "62000", "unrealised_pnl": "441",
+        "isolated": false, "leverage": 7, "position_side": "long" }
+    ],
+    "balances": { "usdc": "10000", "spot": { "MTF": { "total": "12.5", "hold": "0" } } }
+  }
+}
+```
+
+- Margin scalars (`account_value` / `free_collateral` / `maint_margin` /
+  `init_margin` / `health`) are **whole-USDC** decimal strings, identical to the
+  REST account read's `MarginScalars`; `tier` is the liquidation tier index,
+  `margin_mode` the account default, `pm_enabled` whether portfolio margin is on.
+- `positions[]` — one entry per open perp position: `asset` (numeric id), `size`
+  (signed 1e8-plane string), `entry_px` / `unrealised_pnl` (whole-USDC),
+  `isolated`, `leverage`, and `position_side` (`long` / `short`, present in
+  hedge mode).
+- `balances` — `{usdc, spot}`: `usdc` is the quote collateral (whole-USDC); `spot`
+  maps token → `{total, hold}`.
+
+Frequency: one frame per committed block while the account has a live subscriber.
+
+{% hint style="warning" %}
+`account_state` is per-account data but currently has **no authentication** — any
+connection can subscribe to any address. Do not treat it as private until the
+auth-at-subscribe gate lands.
+{% endhint %}
+
+### `spot_state`
+
+Per-account **SPOT** clearinghouse state — the per-token spot balances for one
+account — pushed each commit. Requires `user`. The initial snapshot is the live
+balance set (`[]` for an account with no spot holdings).
+
+```json
+{ "method": "subscribe", "subscription": { "type": "spot_state", "user": "0x<address>" } }
+```
+
+```json
+{
+  "channel": "spot_state",
+  "data": {
+    "address": "0x<addr>",
+    "balances": [
+      { "asset": 1, "name": "USDC", "total": "2500", "hold": "100" },
+      { "asset": 2, "name": "MTF", "total": "12.5", "hold": "0" }
+    ]
+  }
+}
+```
+
+- `balances[]` — one entry per held spot token: `asset` (numeric id), `name`
+  (token symbol), `total` (whole-token decimal string), `hold` (amount reserved
+  by resting spot orders). Identical to the REST spot-balances read.
+
+Frequency: one frame per committed block while the account has a live subscriber.
 
 ---
 
