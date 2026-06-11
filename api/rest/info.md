@@ -523,6 +523,82 @@ populates once the trade indexer lands; `last_trade_ms` is real now.
 | `last_trade_ms` | uint64 | Timestamp of the last trade (`0` if none) |
 | `trades` | array | Empty until the indexer lands |
 
+### `candle`
+
+Historical OHLCV bars for `(coin, interval)` over a time window. The REST
+companion to the live [`candles`](../ws/subscriptions.md#candles) WS channel —
+the WS pushes the forming bar as trades land, this read returns the closed
+history.
+
+{% hint style="warning" %}
+**Price plane differs from the WS channel.** This REST read reports `open` /
+`close` / `high` / `low` in the **whole-USDC Decimal plane** (human dollars,
+e.g. `"67042.50"`) and `volume` in **base units** — whereas the live
+[`candles`](../ws/subscriptions.md#candles) WS frame carries raw **1e8
+fixed-point** integer strings. Same bars, different unit; rescale if you mix the
+two surfaces.
+{% endhint %}
+
+```json
+{ "type": "candle", "coin": "BTC", "interval": "1m" }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `coin` | string | yes | Market symbol, e.g. `"BTC"` |
+| `interval` | string | yes | Bucket token — one of `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
+| `start_time` | uint64 | no | Window start (ms); filters on bar open. Default `0` |
+| `end_time` | uint64 | no | Window end (ms); filters on bar open. Default unbounded |
+
+Args may be passed flat (above) or nested under a `req` object; `start_time` /
+`end_time` also accept the camelCase `startTime` / `endTime` spelling. Missing
+`coin` or `interval` → `400 {"error":"missing field <name>"}`.
+
+Response:
+
+```json
+{
+  "type": "candle",
+  "data": [
+    {
+      "coin":       "BTC",
+      "interval":   "1m",
+      "open_time":  1700000040000,
+      "close_time": 1700000099999,
+      "open":       "67000.00",
+      "close":      "67042.50",
+      "high":       "67080.00",
+      "low":        "66990.00",
+      "volume":     "12.5",
+      "num_trades": 37
+    }
+  ]
+}
+```
+
+Bars are ordered oldest-first by `open_time`; the newest element is the forming
+bar. An empty array is the honest-empty answer for an unsupported `interval`
+token, a market with no indexed trades, or a deployment with no indexer wired.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coin` | string | Echoed market symbol |
+| `interval` | string | Echoed bucket token |
+| `open_time` | uint64 | Bar open timestamp (ms, bucket-aligned) |
+| `close_time` | uint64 | Bar close timestamp (ms) — `open_time + interval − 1` |
+| `open` / `close` / `high` / `low` | Decimal string | Bar OHLC price, **whole-USDC plane** (human dollars, e.g. `"67042.50"`) |
+| `volume` | Decimal string | Σ traded size in the bar, **base units** (coin size, NOT notional) |
+| `num_trades` | uint64 | Fill count in the bar |
+
+{% hint style="info" %}
+**This type is served by the gateway, not the node.** Candles are derived
+display data folded from the public trade stream — they are **not** committed
+chain state, never touch the app-hash, and carry no consensus guarantee. The
+gateway answers `candle` from its own rolling store; a bare node queried
+directly returns `unknown info type: candle`. Honest-empty (`"data": []`) when
+the gateway has no trade history for the market yet.
+{% endhint %}
+
 ### `user_fills`
 
 Account-scoped fill history.
