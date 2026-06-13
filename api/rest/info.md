@@ -132,12 +132,17 @@ A positioned account adds entries under `positions`:
 
 ```json
 {
-  "asset":          0,
-  "size":           "100000000",
-  "entry_px":       "67000.00",
-  "unrealised_pnl": "5.00",
-  "isolated":       false,
-  "leverage":       10
+  "asset":             0,
+  "size":              "100000000",
+  "entry_px":          "67000.00",
+  "unrealised_pnl":    "5.00",
+  "isolated":          false,
+  "leverage":          10,
+  "liquidation_px":    "61000.00",
+  "return_on_equity":  "0.0075",
+  "cum_funding":       "-0.12",
+  "margin_used":       "201.00",
+  "position_value":    "6705.00"
 }
 ```
 
@@ -157,6 +162,11 @@ A positioned account adds entries under `positions`:
 | `positions[*].unrealised_pnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
 | `positions[*].isolated` | bool | `true` unless the position is cross-margined |
 | `positions[*].leverage` | uint8 | Position max leverage |
+| `positions[*].liquidation_px` | Decimal string | Price (whole-USDC) at which this position alone would bring the account to maintenance — single-position cross approximation; `"0"` when size / leverage is zero (no finite liq price) |
+| `positions[*].return_on_equity` | Decimal string | `unrealised_pnl / initial_margin` as a decimal fraction (`initial_margin = \|entry_notional\| / leverage`); `"0"` at zero leverage / notional |
+| `positions[*].cum_funding` | Decimal string | Accrued-but-unsettled funding for the leg, **whole-USDC** (signed); `real_size × (cumulative_funding − funding_entry)` — the same form the funding settlement pays |
+| `positions[*].margin_used` | Decimal string | Maintenance margin the leg contributes, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
+| `positions[*].position_value` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
 | `positions[*].position_side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
 | `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); each value is a `{total, hold}` object (`hold` = escrow locked behind resting spot orders; spendable = `total − hold`); empty if none |
@@ -204,6 +214,8 @@ Response:
     "sz_decimals":     5,
     "mark_px":         "67079.265",
     "oracle_px":       "67073.35",
+    "mid_px":          "67079.27",
+    "premium":         "0.0015",
     "tick_size":       "1000000",
     "step_size":       "1",
     "min_order":       "1",
@@ -271,6 +283,8 @@ Response:
       "sz_decimals":     5,
       "mark_px":         "67042.335",
       "oracle_px":       "67042.335",
+      "mid_px":          "67042.33",
+      "premium":         "0.0015",
       "tick_size":       "1000000",
       "step_size":       "1",
       "min_order":       "1",
@@ -299,6 +313,8 @@ Response:
 | `sz_decimals` | uint8 | Size display decimals (from the underlying spot token registry; `0` if no token spec) |
 | `mark_px` | Decimal string | On-book mark, **whole-USDC plane** (book mark scaled out of 1e8, oracle fallback; `"0"` if unset) |
 | `oracle_px` | Decimal string | Index price, **whole-USDC plane** (`"0"` if unset) |
+| `mid_px` | Decimal string \| null | Real order-book mid `(best_bid + best_ask) / 2`, **whole-USDC plane** (tick-snapped); `null` when the book is one-sided / empty |
+| `premium` | Decimal string \| null | Latest committed funding premium sample (signed); `null` when no sample exists |
 | `tick_size` | i128 string | Minimum price increment, **1e8 fixed-point** (order/book submission plane) |
 | `step_size` | u128 string | Minimum size increment (lot size), fixed-point |
 | `min_order` | u128 string | Minimum order size |
@@ -488,15 +504,17 @@ market returns empty `bids` / `asks` arrays.
 
 ### `recent_trades`
 
-Market-scoped trade tape.
+Market-scoped public trade tape, served directly from committed on-node state
+(a bounded per-market trade ring folded into the AppHash — no external indexer).
 
 ```json
 { "type": "recent_trades", "market_id": 0 }
 ```
 
-| Arg | Type | Required |
-|-----|------|----------|
-| `market_id` | uint32 | yes |
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `market_id` | uint32 | yes | Asset / market id |
+| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring |
 
 Response:
 
@@ -506,22 +524,34 @@ Response:
   "data": {
     "market_id":      0,
     "last_trade_ms":  1700000000555,
-    "trades":         []
+    "trades": [
+      {
+        "coin": 0,
+        "side": "B",
+        "px":   "67042.50",
+        "sz":   "0.125",
+        "time": 1700000000555,
+        "tid":  90123
+      }
+    ]
   }
 }
 ```
 
-{% hint style="warning" %}
-**Honest-empty.** `trades` is always `[]` today — committed state keeps only the
-per-book `last_trade_ms` scalar, not an itemized CLOB trade tape. The array
-populates once the trade indexer lands; `last_trade_ms` is real now.
-{% endhint %}
+Records are ordered oldest-first (newest last). The ring is bounded, so this is
+a recent window, not all history. An unknown / never-traded market returns
+`"trades": []` and `last_trade_ms: 0`.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `market_id` | uint32 | Echoed market id |
 | `last_trade_ms` | uint64 | Timestamp of the last trade (`0` if none) |
-| `trades` | array | Empty until the indexer lands |
+| `trades[*].coin` | uint32 | Asset / market id the trade executed on |
+| `trades[*].side` | `"B"` / `"A"` | Taker (aggressor) side token — `"B"` = buy, `"A"` = sell |
+| `trades[*].px` | Decimal string | Execution price, **whole-USDC plane** |
+| `trades[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
+| `trades[*].time` | uint64 | Trade timestamp (consensus ms) |
+| `trades[*].tid` | uint64 | Deterministic trade id (shared by both legs of the print) |
 
 ### `candle`
 
@@ -601,16 +631,21 @@ the gateway has no trade history for the market yet.
 
 ### `user_fills`
 
-Account-scoped fill history.
+Account-scoped fill history, served directly from committed on-node state (a
+bounded per-account fill ring folded into the AppHash — no external indexer).
 
 ```json
 { "type": "user_fills", "account_id": 42 }
 ```
 
-| Arg | Type | Required |
-|-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `account_id` | uint64 | one of `account_id` / `address` | Internal account id |
+| `address` | hex address | one of `account_id` / `address` | Account address |
+| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring |
+
+Either `account_id` (u64) or `address` (0x hex) identifies the account. When the
+request supplies `account_id`, it is echoed back in `data.account_id`.
 
 Response:
 
@@ -620,22 +655,179 @@ Response:
   "data": {
     "address":    "0x<addr>",
     "account_id": 42,
-    "fills":      []
+    "fills": [
+      {
+        "coin":           0,
+        "side":           "B",
+        "px":             "67042.50",
+        "sz":             "0.125",
+        "time":           1700000000555,
+        "oid":            12345,
+        "tid":            90123,
+        "fee":            "4.19",
+        "closed_pnl":     "0",
+        "dir":            "Open Long",
+        "start_position": "0"
+      }
+    ]
   }
 }
 ```
 
-{% hint style="warning" %}
-**Honest-empty.** `fills` is always `[]` today — committed state keeps only
-aggregate fill counters, not an itemized per-user fill log. The array populates
-once the fill indexer lands.
-{% endhint %}
+Records are ordered oldest-first (newest last). The ring is bounded, so this is
+a recent window, not all history. An account with no fills returns
+`"fills": []`.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
 | `account_id` | uint64 | Echoed only when the request used `account_id` |
-| `fills` | array | Empty until the indexer lands |
+| `fills[*].coin` | uint32 | Asset / market id the fill executed on |
+| `fills[*].side` | `"B"` / `"A"` | This leg's side token — `"B"` = buy/bid, `"A"` = sell/ask |
+| `fills[*].px` | Decimal string | Execution price, **whole-USDC plane** |
+| `fills[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
+| `fills[*].time` | uint64 | Fill timestamp (consensus ms) |
+| `fills[*].oid` | uint64 | This party's order id |
+| `fills[*].tid` | uint64 | Deterministic trade id (shared by both legs of the print) |
+| `fills[*].fee` | Decimal string | Fee this party paid, **whole-USDC plane** |
+| `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **whole-USDC plane** (signed) |
+| `fills[*].dir` | string | Direction label, e.g. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
+| `fills[*].start_position` | Decimal string | Signed leg size BEFORE the fill, **base units** (whole-unit, signed) |
+
+### `user_fills_by_time`
+
+Like [`user_fills`](#user_fills), but filtered to a time window over each
+record's consensus `time`. Same fill-record shape.
+
+```json
+{ "type": "user_fills_by_time", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `account_id` | uint64 | one of `account_id` / `address` | Internal account id |
+| `address` | hex address | one of `account_id` / `address` | Account address |
+| `start_time` | uint64 | no | Window start (ms, inclusive); filters on the fill `time`. Absent ⇒ open lower bound |
+| `end_time` | uint64 | no | Window end (ms, inclusive). Absent ⇒ open upper bound |
+
+Response:
+
+```json
+{
+  "type": "user_fills_by_time",
+  "data": {
+    "address":    "0x<addr>",
+    "account_id": 42,
+    "start_time": 1700000000000,
+    "end_time":   1700003600000,
+    "fills": [ /* same record shape as user_fills */ ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | hex address | Resolved account address |
+| `account_id` | uint64 | Echoed only when the request used `account_id` |
+| `start_time` | uint64 \| null | Echoed window start (`null` if omitted) |
+| `end_time` | uint64 \| null | Echoed window end (`null` if omitted) |
+| `fills` | array | In-window fill records (same per-fill shape as [`user_fills`](#user_fills)), oldest-first |
+
+### `order_status`
+
+Single-order lifecycle lookup by `oid` (server order id) **or** `cloid` (client
+order id). Reads the live books, the trigger registry, and the committed fill
+ring — all on-node committed state.
+
+```json
+{ "type": "order_status", "oid": 12345 }
+```
+
+Or by client order id:
+
+```json
+{ "type": "order_status", "cloid": "0x000000000000000000000000cafef00d" }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `oid` | uint64 | one of `oid` / `cloid` | Server order id |
+| `cloid` | hex string | one of `oid` / `cloid` | Client order id — `0x` + 32 hex chars |
+
+Neither present → `400 {"error":"missing field oid or cloid"}`. A malformed
+`cloid` → `400`. Resolution stops at the first hit, in this order: live resting
+order → parked trigger → terminal fill → unknown.
+
+The `data.status` discriminates the branch:
+
+`"resting"` — a live order open in a perp or spot book:
+
+```json
+{
+  "type": "order_status",
+  "data": {
+    "status": "resting",
+    "order": {
+      "oid":            12345,
+      "market_id":      0,
+      "side":           "bid",
+      "px":             "67000",
+      "size":           "700",
+      "inserted_at_ms": 1700000000000,
+      "cloid":          "0x000000000000000000000000cafef00d"
+    }
+  }
+}
+```
+
+`"triggered"` — a parked TP/SL/stop entry awaiting its mark cross:
+
+```json
+{
+  "type": "order_status",
+  "data": {
+    "status": "triggered",
+    "trigger": {
+      "oid":              12345,
+      "market_id":        0,
+      "side":             "ask",
+      "trigger_px":       "66000",
+      "trigger_above":    false,
+      "size":             "700",
+      "registered_at_ms": 1700000000000,
+      "fired":            false
+    }
+  }
+}
+```
+
+`"filled"` — the most recent matching fill in the per-account ring (the `fill`
+object is the same shape as one [`user_fills`](#user_fills) record):
+
+```json
+{
+  "type": "order_status",
+  "data": {
+    "status": "filled",
+    "fill": { /* same shape as a user_fills fill record */ }
+  }
+}
+```
+
+`"unknown"` — never seen, or evicted from the bounded ring (a `cloid`-only query
+that matched no resting/triggered order also resolves here, since the trigger
+registry and fill ring are keyed by `oid`):
+
+```json
+{ "type": "order_status", "data": { "status": "unknown" } }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | Resolved lifecycle state |
+| `order` | object | Present on `"resting"` — `oid`, `market_id`, `side` (`"bid"`/`"ask"`), `px` / `size` (fixed-point decimal strings), `inserted_at_ms`, `cloid` (hex \| null) |
+| `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `registered_at_ms`, `fired` (bool) |
+| `fill` | object | Present on `"filled"` — the matching fill record (see [`user_fills`](#user_fills)) |
 
 ### `funding_history`
 
@@ -657,22 +849,61 @@ Response:
   "data": {
     "market_id": 0,
     "samples": [
-      { "ts_ms": 1700000000000, "premium": "0.0015" },
-      { "ts_ms": 1700000008000, "premium": "-0.0007" }
+      { "ts_ms": 1700000000000, "premium": "0.0015", "funding_rate": "0.0015" },
+      { "ts_ms": 1700000008000, "premium": "-0.0007", "funding_rate": "-0.0007" }
     ]
   }
 }
 ```
 
-Samples are the ordered ring of `(ts_ms, premium)` from the funding tracker;
-`premium` is the exact `Decimal` rendered as a string (signed, full precision).
-An unknown / empty market returns `"samples": []`.
+Samples are the ordered ring of premium snapshots from the funding tracker.
+`premium` is the exact pre-clamp `Decimal` rendered as a string (signed, full
+precision); `funding_rate` is that premium passed through the per-asset funding
+cap (`±funding_rate_cap`, the dynamic-risk override else the `0.04`/hr baseline)
+— i.e. the realized rate that would actually be charged. When the premium is
+within the cap, `funding_rate == premium`; above it, `funding_rate` is clamped to
+the signed cap. An unknown / empty market returns `"samples": []`.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `market_id` | uint32 | Echoed market id |
 | `samples[*].ts_ms` | uint64 | Sample timestamp (consensus ms) |
-| `samples[*].premium` | decimal string | Funding premium sample (signed) |
+| `samples[*].premium` | decimal string | Raw funding premium sample, pre-clamp (signed) |
+| `samples[*].funding_rate` | decimal string | Realized rate = `premium` clamped to the per-asset cap (signed) |
+
+### `predicted_fundings`
+
+Per-market predicted funding rate + next payment time, across every registered
+perp market. No parameters.
+
+```json
+{ "type": "predicted_fundings" }
+```
+
+The `data` payload is an **array**, ordered deterministically by ascending
+`asset` (the node iterates the market-spec `BTreeMap`). An empty universe returns
+`"data": []`.
+
+Response:
+
+```json
+{
+  "type": "predicted_fundings",
+  "data": [
+    { "asset": 0, "predicted_rate": "0.0015", "next_funding_time": 1700003600000 }
+  ]
+}
+```
+
+`predicted_rate` is the latest premium sample (the per-hour rate proxy, decimal
+string) — `"0"` before the first sample. `next_funding_time` is the derived next
+payment timestamp (`last_sample_ts + 1h`), `0` before the first sample.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `asset` | uint32 | Asset / market id |
+| `predicted_rate` | decimal string | Latest premium sample (per-hour rate proxy); `"0"` pre-sample |
+| `next_funding_time` | uint64 | Next funding payment timestamp (consensus ms); `0` pre-sample |
 
 ### `block_info`
 
@@ -728,7 +959,7 @@ Response:
     "address":    "0x<master>",
     "account_id": 42,
     "agents": [
-      { "agent": "0x<agent_addr>", "expires_at_ms": 1700000500000 }
+      { "agent": "0x<agent_addr>", "name": "trading-bot", "expires_at_ms": 1700000500000 }
     ]
   }
 }
@@ -739,7 +970,8 @@ Response:
 | `address` | hex address | Resolved master address |
 | `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `agents[*].agent` | hex address | Approved agent wallet address |
-| `agents[*].expires_at_ms` | uint64 | Agent approval expiry (consensus ms) |
+| `agents[*].name` | string \| null | Agent label set at approval time; `null` if unset |
+| `agents[*].expires_at_ms` | uint64 \| null | Agent approval expiry (consensus ms); `null` for a never-expiring approval |
 
 ### `sub_accounts`
 
@@ -928,7 +1160,7 @@ Per-account fee / volume tier. Required: `account_id` (u64) **OR** `address` (0x
 | `address` | hex address | one of `account_id` / `address` |
 
 Neither present → `400`. An account with no fee state returns a **200** with
-zeroed figures (and `from_global: true`) — the established zeroed idiom.
+zeroed volumes and the base-tier bps — the established zeroed idiom.
 
 Response:
 
@@ -945,8 +1177,7 @@ Response:
     "referrer":         "0x<referrer>",
     "referrer_credit":  "420",
     "maker_bps":        1,
-    "taker_bps":        5,
-    "from_global":      true
+    "taker_bps":        3
   }
 }
 ```
@@ -961,21 +1192,19 @@ Response:
 | `mm_tier` | uint | Committed per-user market-maker tier index; `0` when untracked |
 | `referrer` | hex address \| null | This account's referrer if set, else `null` |
 | `referrer_credit` | Decimal string | Σ rebate accrued *to* this address acting as a referrer (whole-USDC) |
-| `maker_bps` | uint | Effective maker fee bps (the global default — see flag) |
-| `taker_bps` | uint | Effective taker fee bps (the global default — see flag) |
-| `from_global` | bool | Always `true` today — the bps come from the global schedule (see flag) |
+| `maker_bps` | uint | **Effective** maker fee bps, resolved from the committed [`fee_schedule`](#fee_schedule) volume-tier ladder at this account's 30-day maker volume |
+| `taker_bps` | uint | **Effective** taker fee bps, resolved from the committed ladder at this account's 30-day taker volume |
 
-{% hint style="warning" %}
-**`maker_bps` / `taker_bps` are the GLOBAL schedule defaults, flagged
-`from_global: true`.** `vip_tier` / `mm_tier` are **real** committed per-user tier
-*indices*, but the engine carries **no committed index→bps discount table yet**, so
-those indices do not map to committed bps. The bps reported here are
-`global_schedule.default_{maker,taker}_bps` (`5` / `1` at the flat tier). Treat
-`vip_tier` / `mm_tier` + the volume trackers as the live tiering signal; the
-[`fee_schedule`](#fee_schedule) ladder is the *target* schedule, not yet charged.
-{% endhint %}
+The effective `maker_bps` / `taker_bps` are resolved per side from the committed
+volume-tier ladder ([`fee_schedule`](#fee_schedule)) — the maker rate at the
+account's maker volume, the taker rate at its taker volume — using the same
+routine the settlement path charges with, so the reported bps match what the
+account is billed. A MIP-3 per-market spec override is **not** reflected here:
+this is the cross-market base rate. `vip_tier` / `mm_tier` remain the committed
+per-user tier indices and are a separate signal, surfaced alongside the effective
+bps.
 
-State source: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + `global_schedule`.
+State source: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + the committed volume-tier ladder.
 
 ### `staking_apr`
 
@@ -1095,6 +1324,200 @@ per-venue weight list rather than fabricating one.
 {% endhint %}
 
 State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
+
+## Governance query types
+
+The on-chain governance surface: the live vote machinery (`gov_state`), the
+cross-category pending-proposal view with quorum distance (`gov_proposals`), and
+the enacted-parameter audit trail (`gov_history`). All read committed
+`Exchange` state; same `{type, data}` envelope. Stake quorum is ⅔
+(stake-weighted); **jailed** validators are excluded from the active-stake
+denominator and every tally, matching the on-chain enactment check.
+
+### `gov_state`
+
+The live governance surface — stake-quorum context, pending `voteGlobal` rounds,
+open `govPropose` proposals, and the CURRENT value of every governed parameter.
+No parameters.
+
+```json
+{ "type": "gov_state" }
+```
+
+Response:
+
+```json
+{
+  "type": "gov_state",
+  "data": {
+    "total_stake":  "150000",
+    "quorum_bps":   6667,
+    "quorum_stake": "100005",
+    "pending_vote_global": [
+      {
+        "kind":          "set_reward_rate_bps",
+        "kind_id":       3,
+        "votes": [
+          { "validator": "0x<val>", "value": "900", "stake": "60000", "submitted_at_ms": 1700000000000 }
+        ],
+        "leading_stake": "60000"
+      }
+    ],
+    "open_proposals": [
+      { "proposal_id": 5, "voters": 2, "aye_stake": "90000", "nay_stake": "30000" }
+    ],
+    "params": {
+      "reward_rate_bps":   800,
+      "default_taker_bps": 5,
+      "default_maker_bps": 2,
+      "burn_bps":          8000
+    },
+    "oracle_weight_overrides": [
+      { "asset_id": 0, "weights": [1000, 1000, 1000] }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_stake` | decimal string | Σ stake across all validators |
+| `quorum_bps` | uint | ⅔ quorum threshold in bps (`6667`) |
+| `quorum_stake` | decimal string | Stake needed to enact (`total_stake × quorum_bps / 10000`) |
+| `pending_vote_global[*].kind` | string | Governed-parameter name (snake_case), e.g. `"set_reward_rate_bps"` |
+| `pending_vote_global[*].kind_id` | uint | Numeric kind id |
+| `pending_vote_global[*].votes[*].validator` | hex address | Voting validator |
+| `pending_vote_global[*].votes[*].value` | decimal string | Decoded proposed value (hex `0x…` if the payload is opaque) |
+| `pending_vote_global[*].votes[*].stake` | decimal string | The voter's stake |
+| `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | Vote submission timestamp (consensus ms) |
+| `pending_vote_global[*].leading_stake` | decimal string | Largest stake pooled behind a single payload in this round |
+| `open_proposals[*].proposal_id` | uint64 | govPropose round id |
+| `open_proposals[*].voters` | uint64 | Number of votes cast |
+| `open_proposals[*].aye_stake` / `nay_stake` | decimal string | Stake voting aye / nay |
+| `params` | object | Current value of every governed parameter (each a committed scalar) |
+| `oracle_weight_overrides[*].asset_id` | uint32 | Asset with a per-asset oracle-weight override |
+| `oracle_weight_overrides[*].weights` | uint[] | Committed per-source weights for the asset |
+
+The `params` object carries the full governed-parameter set the vote machinery
+can move (fee distribution split, staking knobs, MIP-3 limits, risk caps, spot /
+EVM / bridge flags, …); each is the live committed value.
+
+### `gov_proposals`
+
+Every ACTIVE governance proposal across ALL vote categories (not just
+`voteGlobal`), each with its live per-payload stake tally and distance to the ⅔
+quorum. The cross-category "what is being voted on right now, and how close is
+it" view. No parameters.
+
+```json
+{ "type": "gov_proposals" }
+```
+
+Response:
+
+```json
+{
+  "type": "gov_proposals",
+  "data": {
+    "total_active_stake":  "120000",
+    "quorum_bps":          6667,
+    "quorum_needed_stake": "80004",
+    "proposals": [
+      {
+        "round":         1000003,
+        "category":      "vote_global",
+        "sub_id":        3,
+        "proposer":      "0x<val>",
+        "created_at_ms": 1700000000000,
+        "voter_count":   1,
+        "leading_stake": "60000",
+        "meets_quorum":  false,
+        "payloads": [
+          { "payload_hex": "0392…", "stake": "60000", "meets_quorum": false }
+        ],
+        "proposal": {
+          "kind":         3,
+          "kind_name":    "set_reward_rate_bps",
+          "value":        "900",
+          "title":        "Raise staking rewards",
+          "proposer":     "0x<val>",
+          "opened_at_ms": 1700000000000
+        }
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_active_stake` | decimal string | Σ stake of non-jailed validators (the quorum denominator) |
+| `quorum_bps` | uint | ⅔ quorum threshold in bps (`6667`) |
+| `quorum_needed_stake` | decimal string | Stake a single payload must reach to enact |
+| `proposals[*].round` | uint64 | Synthetic vote round id |
+| `proposals[*].category` | string | Vote category, e.g. `"gov_propose"`, `"vote_global"`, `"dynamic_risk"`, `"treasury"`, `"metaliquidity"`, `"oracle_weights"`, `"funding_formula"`, `"spot_margin"` |
+| `proposals[*].sub_id` | uint64 | Category-relative id (the round minus the category's range base) |
+| `proposals[*].proposer` | hex address \| null | Earliest voter (proposer proxy) |
+| `proposals[*].created_at_ms` | uint64 | Earliest vote timestamp (consensus ms) |
+| `proposals[*].voter_count` | uint64 | Number of votes cast on the round |
+| `proposals[*].leading_stake` | decimal string | Largest stake pooled behind one payload |
+| `proposals[*].meets_quorum` | bool | Whether the leading payload's stake reaches the ⅔ quorum |
+| `proposals[*].payloads[*].payload_hex` | hex string | A distinct voted payload (no `0x` prefix) |
+| `proposals[*].payloads[*].stake` | decimal string | Active stake pooled behind that payload |
+| `proposals[*].payloads[*].meets_quorum` | bool | Whether this payload alone reaches quorum |
+| `proposals[*].proposal` | object \| null | The typed govPropose record when the round opened via `govPropose`, else `null` |
+| `proposals[*].proposal.kind` | uint | Governed-parameter kind id |
+| `proposals[*].proposal.kind_name` | string \| null | Decoded kind name (snake_case), `null` if unknown |
+| `proposals[*].proposal.value` | decimal string | Proposed value |
+| `proposals[*].proposal.title` | string | Human-readable proposal title |
+| `proposals[*].proposal.proposer` | hex address | Account that opened the proposal |
+| `proposals[*].proposal.opened_at_ms` | uint64 | Proposal open timestamp (consensus ms) |
+
+### `gov_history`
+
+The enacted-governance audit trail (bounded ring, oldest-first) — each entry
+proves a parameter MOVED by on-chain governance vs its genesis value. No
+parameters. Complements `gov_proposals` (the PENDING side).
+
+```json
+{ "type": "gov_history" }
+```
+
+Response:
+
+```json
+{
+  "type": "gov_history",
+  "data": {
+    "count": 1,
+    "enacted": [
+      {
+        "round":         1000003,
+        "kind":          3,
+        "kind_name":     "set_reward_rate_bps",
+        "value":         "900",
+        "via":           "vote_global",
+        "enacted_at_ms": 1700000900000,
+        "description":   "reward_rate_bps -> 900"
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `count` | uint | Number of entries in the ring |
+| `enacted[*].round` | uint64 | Synthetic vote round that enacted |
+| `enacted[*].kind` | uint | Governed-parameter kind id |
+| `enacted[*].kind_name` | string \| null | Decoded kind name (snake_case), `null` if unknown |
+| `enacted[*].value` | decimal string | Enacted value |
+| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Source track — `govPropose`/`govVote` vs direct `voteGlobal` |
+| `enacted[*].enacted_at_ms` | uint64 | Enactment timestamp (consensus ms) |
+| `enacted[*].description` | string | Human-readable summary of the change |
+
+The ring caps at the on-chain enacted-log bound, so this is a recent window, not
+all history.
 
 ## Differentiator query types (RFQ / FBA / portfolio margin)
 
@@ -2066,7 +2489,7 @@ Configured gossip root/seed peer endpoints (HL `gossipRootIps`). No parameters. 
 Response:
 
 ```json
-{ "type": "gossip_root_ips", "data": { "root_ips": ["mtf-node-2:4001", "mtf-node-3:4001"] } }
+{ "type": "gossip_root_ips", "data": { "root_ips": ["seed-a.example:4001", "seed-b.example:4001"] } }
 ```
 
 | Field | Type | Description |
@@ -2208,8 +2631,8 @@ client                     gateway              node
 **Q: Why both `asset_id` and `coin` accepted on `market_info`?**
 A: `asset_id` is canonical; `coin` is a convenience for human callers. Both resolve to the same record.
 
-**Q: Why are `user_fills` / `recent_trades` always empty?**
-A: Both are honest-empty today — committed state keeps aggregate counters and the per-book `last_trade_ms` scalar, but not an itemized fill / trade log. The arrays populate once the indexer lands; subscribe to the [WS feed](../ws/subscriptions.md) for live fills in the meantime.
+**Q: Do `user_fills` / `recent_trades` need an external indexer?**
+A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md).
 
 **Q: Is the response deterministic across nodes?**
 A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. Use [`block_info`](#block_info) to see the height a node has committed to.

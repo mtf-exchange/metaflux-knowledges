@@ -1,7 +1,7 @@
 # CCXT-compat REST surface
 
 {% hint style="info" %}
-**Preview.** A **9-method REST subset** is mounted today, each returning the exact [CCXT](https://docs.ccxt.com/) unified shape. **Symbol parsing, market lookup, and JWT auth are real**; monetary fields are stubbed (`"0.0"` / empty arrays / `0` ids) until the gateway → node read backhaul and the [indexer](../data-files.md) land. CCXT Pro (WS) is coming.
+**Preview.** A **9-method REST subset** is mounted today, each returning the exact [CCXT](https://docs.ccxt.com/) unified shape. **Symbol parsing, market lookup, and JWT auth are real**; monetary fields are stubbed (`"0.0"` / empty arrays / `0` ids) until the gateway → node read backhaul lands. CCXT Pro (WS) is coming.
 {% endhint %}
 
 ## TL;DR
@@ -27,18 +27,18 @@ The 9 REST methods that ship today, plus the auth bootstrap. **Translation** is 
 | `fetchMarkets` | `GET /ccxt/markets` | no | shape live; static genesis fixture | [`markets`](./info.md#markets) |
 | `fetchTicker` | `GET /ccxt/ticker?symbol=` | no | shape live; prices stubbed | [`market_info`](./info.md#market_info) + mid |
 | `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | no | shape live; empty book | [`l2_book`](./info.md#l2_book) |
-| `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | no | 🚧 indexer | [indexer](../data-files.md) ← `node_trades` |
+| `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | no | not served | OHLCV history — gateway indexer (roadmap) |
 | `createOrder` | `POST /ccxt/orders` | Bearer | shape live | → [`/exchange`](./exchange.md) |
 | `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | shape live | → [`/exchange`](./exchange.md) |
 | `fetchBalance` | `GET /ccxt/balance` | Bearer | shape live; balances stubbed | [`account_state`](./info.md#account_state) |
 | `fetchPositions` | `GET /ccxt/positions` | Bearer | shape live; positions stubbed | [`account_state`](./info.md#account_state) |
-| `fetchMyTrades` | `GET /ccxt/my-trades?symbol=` | Bearer | 🚧 indexer | [indexer](../data-files.md) ← `node_fills` |
+| `fetchMyTrades` | `GET /ccxt/my-trades?symbol=` | Bearer | node-backed; shape live | [`user_fills`](./info.md#user_fills) |
 | — auth bootstrap — | `POST /ccxt/auth` | no | real | EIP-712 login → JWT |
 
-Legend: **shape live** = route mounted, CCXT-correct shape returned, monetary fields are stubs awaiting the read backhaul · 🚧 indexer = served once the [data-file indexer](../data-files.md) lands.
+Legend: **shape live** = route mounted, CCXT-correct shape returned, monetary fields are stubs awaiting the read backhaul · **node-backed** = the underlying node read is live · not served = no node backing yet, served by the gateway indexer (roadmap).
 
 {% hint style="warning" %}
-**Surface is deliberately minimal.** Methods CCXT defines but the gateway does **not** mount yet — `fetchTickers`, `fetchTrades` (public tape), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` beyond the stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — return 404. They attach under `/ccxt/` as the read backhaul + indexer expand. `fetchOpenOrders` / `fetchOrder` will translate from the node [`open_orders`](./info.md#open_orders) read; `fetchTrades` / `fetchOHLCV` / `fetchMyTrades` / `fetchClosedOrders` are indexer-backed.
+**Surface is deliberately minimal.** Methods CCXT defines but the gateway does **not** mount yet — `fetchTickers`, `fetchTrades` (public tape), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` beyond the stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — return 404. They attach under `/ccxt/` as the read backhaul expands. `fetchOpenOrders` / `fetchOrder` will translate from the node [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) reads; `fetchTrades` will translate from the node [`recent_trades`](./info.md#recent_trades) tape; `fetchOHLCV` / `fetchClosedOrders` are not yet served (gateway indexer roadmap).
 {% endhint %}
 
 ## Symbol format
@@ -54,7 +54,7 @@ Spot markets (once a spot universe lands) use `"BASE/QUOTE"` without the `:SETTL
 
 ## Timeframes
 
-`fetchOHLCV` accepts CCXT's standard tokens: `"1m"`, `"5m"`, `"15m"`, `"30m"`, `"1h"`, `"4h"`, `"1d"`, `"1w"`. Invalid timeframes return 400. Bars are 🚧 indexer-backed — shape-correct empty until the indexer lands; use the WS [`candle`](../ws/subscriptions.md) channel for live data.
+`fetchOHLCV` accepts CCXT's standard tokens: `"1m"`, `"5m"`, `"15m"`, `"30m"`, `"1h"`, `"4h"`, `"1d"`, `"1w"`. Invalid timeframes return 400. OHLCV history is not yet served — shape-correct empty for now (gateway indexer roadmap); use the WS [`candle`](../ws/subscriptions.md) channel for live data.
 
 ## Authentication
 
@@ -231,14 +231,13 @@ See [WS subscriptions](../ws/subscriptions.md) for the underlying channels — C
 ## Limitations vs full CCXT spec
 
 - **Monetary fields are stubs** (`"0.0"` / empty arrays / `0` ids) on every shape-live method until the gateway → node read backhaul lands. The shape is final; only the values are pending.
-- **Historical methods** (`fetchOHLCV`, `fetchMyTrades`, and the future `fetchTrades` / `fetchClosedOrders`) are 🚧 **indexer-backed** — served from the [node data-file](../data-files.md) indexer (`node_trades` / `node_fills` / `node_order_statuses`), not the live node. Use the WS [`candle`](../ws/subscriptions.md) / [`userFills`](../ws/subscriptions.md) channels for live data meanwhile.
+- **`fetchMyTrades`** is now node-backed (the committed per-account fill tape). **OHLCV history** (`fetchOHLCV`) and the future `fetchClosedOrders` are not yet served — slated for the gateway indexer (roadmap). Use the WS [`candle`](../ws/subscriptions.md) / [`userFills`](../ws/subscriptions.md) channels for live data meanwhile.
 - **No HMAC API-key auth.** Only the EIP-712 → JWT scheme above. Clients retain key custody — the gateway escrows no secret.
 
 ## See also
 
 - [HL-compat](./hl-compat.md) — the other compat surface
 - [`POST /exchange`](./exchange.md) · [`POST /info`](./info.md) — MTF-native (what these translate from)
-- [Node data files](../data-files.md) — the indexer feedstock behind the 🚧 methods
 - [WS subscriptions](../ws/subscriptions.md) — CCXT Pro underlying
 - [Signing walkthrough](../../integration/signing.md) — EIP-712 login envelope
 - [Rate limits](../rate-limits.md)

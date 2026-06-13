@@ -26,7 +26,6 @@ choice of path.
 - [`POST /info`](./rest/info.md) — MTF-native; per-type schemas
 - [HL-compat](./rest/hl-compat.md) — mirror of Hyperliquid's wire
 - [CCXT-compat](./rest/ccxt-compat.md) — CCXT REST methods
-- [Node data files](./data-files.md) — per-block NDJSON streams (fills / trades / order statuses / L4 book diffs) feeding the indexer
 
 ## WebSocket
 
