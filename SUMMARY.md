@@ -18,6 +18,7 @@
   * [RFQ](concepts/rfq.md)
   * [Fees](concepts/fees.md)
   * [Funding rates](concepts/funding-rates.md)
+  * [Oracle prices](concepts/oracle-prices.md)
   * [Mark prices](concepts/mark-prices.md)
 * Margin & risk
   * [Margin modes](concepts/margin-modes.md)

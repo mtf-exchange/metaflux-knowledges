@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-The **mark price** is the protocol's authoritative price per asset for margin, liquidation, funding, and trigger evaluation. It's a composition of multiple sources (mid, oracle, EMA), guarded by sanity bands, recomputed every block. It is NOT the last trade price.
+The **mark price** is the protocol's authoritative price per asset for margin, liquidation, funding, and trigger evaluation. It's a median of three components — the oracle anchor (plus a basis EMA), the internal quote mid, and the external perp median — recomputed continuously. It is NOT the last trade price.
 
 ## Why mark ≠ last trade
 
@@ -19,23 +19,28 @@ Using last-trade for margin is exploitable: a small adversarial trade at a manip
 ### How it's computed
 
 ```
-mark = median3( C1, C2.unwrap_or(C1), C3.unwrap_or(C1) )
+mark = median( present components of {C1, C2, C3} )
+        # 3 present → median3   2 present → midpoint   1 present → that value
+        # a lone C2 (no external anchor) yields no update — see below
 ```
 
 with three components:
 
 | Component | Definition |
 |-----------|------------|
-| **C1** (oracle anchor) | `C1 = oracle + EMA(MTF_mid − oracle)` over a **150 s** time-weighted EMA |
-| **C2** (internal book) | `median(MTF_best_bid, MTF_best_ask, MTF_last_trade)`; degrades to a 2-point mid or a single value when inputs are missing; `None` if the book is fully empty |
-| **C3** (external perps) | `weighted_median(CEX perp mids)` across **7 perp-capable sources** (weights mirror the spot table, less Kraken / KuCoin / MTF) |
+| **C1** (oracle anchor) | `C1 = oracle + EMA(quote_mid − oracle)` — the oracle plus a fixed-decay EMA of the perp's **basis** (≈ **150 s** half-life at the recompute cadence) |
+| **C2** (internal book) | `mid(best_bid, best_ask)` — best bid/ask **only**. Requires both sides and an uncrossed book, else `None`. It deliberately **excludes the last trade** (folding the last trade back in would make the recompute self-referential and could freeze a thin one-sided book). |
+| **C3** (external perps) | `median(external perp mids)` over the **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC); requires **≥ 2** venues present, else `None` |
 
-The outer `median3` is robust to a single outlier. **The fallback is to C1 (the oracle anchor), not a flat re-average:** when the MTF book is empty `C2 = None → C1`; when every perp adapter is down `C3 = None → C1`. So with no internal book and no external perps, `mark = median3(C1, C1, C1) = C1 = oracle + EMA`. This degrades gracefully toward the spot oracle rather than freezing.
+The outer median is robust to a single outlier. **Absent components simply drop out** — with two present the mark is their midpoint, with one it's that value. With no internal book and no external perps, `mark = C1 = oracle + EMA(basis)`, degrading gracefully toward the spot oracle rather than freezing.
 
-- The **C1 EMA** is the determinism-safe `DeterministicEma` (fixed-point `(num, denom)`, `decay = 0.5`, window 150 s) — the same primitive funding uses; it absorbs `MTF_mid − oracle` only when a usable internal mid (C2) exists, so an empty book doesn't feed the EMA noise.
-- The EMA is **per-asset** (one `MarkPriceComputer` per market).
+**A lone C2 is rejected.** If the *only* present component is the internal quote-mid (no oracle, no external perps), the mark is left untouched rather than letting a single resting spread — which an adversary controls — define the liquidation/funding price. A lone C1 (external oracle) or a lone C3 (already a ≥ 2-venue median) is allowed.
 
-> ⚠️ **Correction vs. prior text.** The earlier doc modelled mark as `median(mid, oracle, ema_mid)` with a "degrade table". The real shape is `median3(C1, C2_or_C1, C3_or_C1)` where C1 already blends oracle + a 150 s EMA of (mid − oracle), C2 is a 3-point internal median, and C3 is a 7-venue weighted-median of *external perp* mids. The single-source degrade table is replaced by the `unwrap_or(C1)` fallback above.
+- The **C1 EMA** is the determinism-safe `DeterministicEma` (fixed-point `(num, denom)`, fixed decay `0.9548` ≈ a 150 s half-life at the ~10 s recompute cadence). It folds `quote_mid − oracle` only when both a usable two-sided quote and an oracle exist, so an empty or one-sided book doesn't feed it noise. A market that has never had a usable quote keeps `EMA = 0`, i.e. `C1 = the bare oracle`.
+- The EMA is **per-asset** (one per perp market).
+- The computed median is written to the market's **authoritative mark** (the value every consumer reads), so an ordinary fill stamping the last-trade price cannot shadow it — the median is authoritative for active markets, not just quiet ones.
+
+> ⚠️ **Correction vs. prior text.** The earlier doc modelled C2 as `median(bid, ask, last_trade)` and C3 as a 7-venue weighted median. The real shapes are: C2 = a **two-sided quote mid** (best bid/ask only, last trade excluded), C3 = the **median of 5 external perp venues** (≥ 2 required), and C1 = the oracle plus a fixed-decay (`0.9548`) EMA of the perp basis. Absent components drop out of the median (no `unwrap_or(C1)` substitution), and a lone C2 yields no update.
 
 ### Two price planes (read this before reading any number)
 
@@ -48,55 +53,26 @@ MTF carries prices on **two distinct numeric planes** — the #1 source of scale
 
 The mark computer and the oracle aggregation operate entirely in the **`Decimal` whole-USDC plane**. The result is converted to the **1e8 `FixedPrice` plane** when written to the book / `last_mark_px`. The human `market_info` / `markets` read, however, reports `mark_px` and `oracle_px` already scaled back into the **whole-USDC plane** (e.g. `"67042.335"`, not raw 1e8) — only the order/book *submission* fields (`l2_book` level px, order `limit_px`, `tick_size`) stay 1e8. PnL/funding *settlement* runs on a third minor convention — USDC `1e6` (`accumulated_funding_e6` in `mark_settle`). Always check which plane a formula is in before comparing magnitudes.
 
-## Oracle composition
+## The oracle (C1 anchor)
 
-`oracle` (the spot oracle, and the C1 anchor) is the **weighted median** of up to 10 spot sources, with weights that can be made **per-symbol** by governance.
+`oracle` — the C1 anchor — is the **weighted median** of up to 10 external spot venues (Binance 3, OKX 2, Bybit 2, Coinbase 2, Bitget / Kraken / KuCoin / Gate / MEXC / MetaFlux-spot 1 each; sum 15), published once per block and signed by the oracle validators. Per-symbol weights are governance-settable (`SetOracleWeights`, `ActionId 148`); a feed stale > 60 s or > 5 % off the cross-venue median is dropped; if < 50 % of weight is present the slot holds its last good value.
 
-### Default spot weight table (sum = 15)
+The mark's **C3 component is a separate feed set** — perp mids from the **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC), not the spot oracle table. See **[Oracle prices](./oracle-prices.md)** for the full composition, reliability rules, per-symbol overrides, and the `oracle_sources` read.
 
-| Venue | Weight | | Venue | Weight |
-|-------|-------:|-|-------|-------:|
-| Binance | 3 | | Kraken | 1 |
-| OKX | 2 | | KuCoin | 1 |
-| Bybit | 2 | | Gate | 1 |
-| Coinbase | 2 | | MEXC | 1 |
-| Bitget | 1 | | MTF spot | 1 |
+The [`market_info`](../api/rest/info.md#market_info) read surfaces `mark_source` (the descriptor `"MedianOfOraclesAndMid"`) and the composed `mark_px` / `oracle_px`; the individual C1/C2/C3 components and the weighted source list are not broken out as wire fields.
 
-The **C3 mark component** uses the same weights *filtered to perp-capable venues* (drops Kraken / KuCoin / MTF spot → 7 sources, weight sum = 12): Binance 3, OKX 2, Bybit 2, Coinbase 2, Bitget 1, Gate 1, MEXC 1.
+## Mark vs oracle — why they diverge
 
-### Per-symbol overrides
+It is **normal and expected** for the mark to sit far from the oracle. The oracle tracks **spot**; the mark tracks where the **perp** trades — and a perp can carry a persistent **basis** (premium or discount) to spot:
 
-The default table is a fallback. A governance-only `SetOracleWeights { asset_id, weights }` action (`ActionId 148`) **replaces** (not merges) the default for a given asset — needed because long-tail / MIP-3 markets often aren't listed on Binance/Coinbase. MIP-3 deployers **cannot** set weights themselves (a deployer choosing weights = choosing their own mark price); new markets cold-start on the default table.
+- **C2** is the MetaFlux perp book mid, **C3** is the external *perp* median — both reflect perp, not spot.
+- **C1** is `oracle + EMA(quote_mid − oracle)` — the basis EMA pulls even the oracle anchor toward the perp's running premium, so all three components track the perp.
 
-**Missing-source handling:** a venue absent in a tick is treated as weight 0 and the rest are renormalized. If less than **50 %** of total weight is present in a tick, the oracle slot is **not updated** — the previous good tick persists (the hard fallback that prevents a single CEX dominating during a market-wide outage).
-
-The per-market source list is the committed oracle-weights table (the default
-above, or a per-symbol `SetOracleWeights` override) — conceptually:
-
-```
-mark_source = "MedianOfOraclesAndMid"
-oracle_sources = [
-  { venue: BinanceSpot, weight: 3 },
-  { venue: OkxSpot,     weight: 2 },
-  { venue: BybitSpot,   weight: 2 },
-  ...
-]
-```
-
-The [`market_info`](../api/rest/info.md#market_info) read surfaces `mark_source`
-(the descriptor `"MedianOfOraclesAndMid"`) but does **not** yet enumerate the
-weighted source list as a wire field — the weights live in committed state
-(`SetOracleWeights`).
-
-Per-feed sub-rules:
-- A feed that hasn't updated within `feed_staleness_ms` (default 60 s) is dropped from the median.
-- A feed > `feed_deviation_pct` (default 5%) from the venue median is dropped as an outlier.
-
-The composed `oracle` is itself published once per block, signed by the oracle validators in the active validator set.
+So when a perp trades at, say, a 30 % discount to its spot index, `mark ≈ perp` and `oracle ≈ spot` legitimately diverge by ~30 %. That gap is exactly what **[funding](./funding-rates.md)** is there to close — and note that if the oracle itself is unreliable, funding is *gated off and decays to 0* even while the mark/oracle gap is wide (so a large gap with ~0 funding means the oracle for that market is being distrusted, not that funding is broken). See [funding gating](./funding-rates.md#gating-when-the-oracle-is-untrusted).
 
 ## Sanity bands
 
-> **Implementation status:** the 3-component `median3` and its `unwrap_or(C1)` fallback are implemented today. The per-block clamp described in this section (a `clamp(candidate, prior ± max_step)` ramp on top of the median) is a **design specification, not yet a discrete clamp in the mark computer** — the structural median is currently the primary manipulation defence. The closest live guard copies the oracle into a stale book's `last_mark_px` rather than ramping. Treat the numbers below as the intended band design; verify against the live values before relying on exact clamp numbers.
+> **Implementation status:** the 3-component median (absent components dropping out, lone-C2 rejected) is implemented today. The per-block clamp described in this section (a `clamp(candidate, prior ± max_step)` ramp on top of the median) is a **design specification, not yet a discrete clamp in the mark computer** — the structural median is currently the primary manipulation defence. The closest live guard copies the oracle into a stale book's `last_mark_px` rather than ramping. Treat the numbers below as the intended band design; verify against the live values before relying on exact clamp numbers.
 
 Even with composition, an adversary can push two of three sources simultaneously. Mark therefore is intended to enforce **bands** per block:
 
@@ -172,9 +148,10 @@ A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#
 
 - **Genuine 5% move in 1 s.** The band clamps the first 10 blocks; mark catches up at ~0.05% per block, then the regime-shift detection widens the band, and mark catches up faster. The total lag is ~1–2 seconds; large but bounded.
 - **Oracle outage > 50 % weight missing.** When less than 50 % of the spot weight is present in a tick, the oracle slot is **not updated** — the previous good tick persists. C1 keeps using the last good oracle + its EMA, so mark stays anchored.
-- **Empty MTF book.** `C2 = None → C1`. Mark = `median3(C1, C1, C3_or_C1)` — i.e. it tracks the oracle anchor blended with external perps. Funding still uses the available oracle. Liquidations proceed against the oracle-anchored mark.
-- **All external perps down.** `C3 = None → C1`. Mark = `median3(C1, C2_or_C1, C1)` — internal book vs the oracle anchor.
-- **No book and no perps.** `mark = median3(C1, C1, C1) = C1 = oracle + EMA(mid − oracle)`. Pure oracle-anchored.
+- **Empty / one-sided MTF book.** C2 drops out. Mark = `midpoint(C1, C3)` (or `C1` alone if perps are also down) — it tracks the oracle anchor blended with external perps. Funding still uses the available oracle; liquidations proceed against the oracle-anchored mark.
+- **All external perps down.** C3 drops out. Mark = `midpoint(C1, C2)` — internal quote mid vs the oracle anchor.
+- **No book and no perps.** Only C1 remains ⇒ `mark = C1 = oracle + EMA(basis)`. Pure oracle-anchored.
+- **Only a one-sided/empty oracle-less quote.** A lone C2 is rejected ⇒ no update; the mark holds its last value until an external anchor (oracle or perps) returns.
 - **Stale C1 EMA.** The EMA is by construction always defined once at least one internal mid has ever folded in; it holds its last value while no new mid arrives (it's only updated when C2 is present).
 - **Trigger orders during freeze.** Trigger evaluation uses mark; during freeze, no trigger fires. Resting orders sit until a real mark resumes.
 
@@ -197,14 +174,14 @@ block T+1:  adversary persists at 110.0; oracle/perps drift up slowly
 ... mark tracks the (C1, C3) consensus; a single manipulated source never wins the median
 ```
 
-The defence is structural: to move the median an adversary must move at least **two** of the three components, and C1 (oracle) + C3 (7-venue external perp median) are exactly the hard-to-move ones. The optional per-block sanity band below is an additional clamp on top.
+The defence is structural: to move the median an adversary must move at least **two** of the three components, and C1 (oracle) + C3 (5-venue external perp median) are exactly the hard-to-move ones. The optional per-block sanity band below is an additional clamp on top.
 
 ## See also
 
 - [Funding rates](./funding-rates.md) — funding uses mark vs oracle
 - [Tiered liquidation](./tiered-liquidation.md) — tier eval against mark
 - [`mark` WS channel (roadmap)](../api/ws/subscriptions.md#roadmap--not-yet-available)
-- [Oracle](#oracle-composition) — full source list per market
+- [Oracle prices](./oracle-prices.md) — full source list, weights, reliability rules
 
 ## FAQ
 
