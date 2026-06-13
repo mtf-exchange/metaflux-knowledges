@@ -243,6 +243,9 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`set_display_name`](#set_display_name) | Set the account handle | sender / agent |
 | [`set_referrer`](#set_referrer) | Bind to a referrer address | sender / agent |
 | [`approve_builder_fee`](#approve_builder_fee) | Approve a builder fee ceiling | sender / agent |
+| [`create_sub_account`](#create_sub_account) | Open a sub-account under the sender | sender / agent |
+| [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | sender / agent |
+| [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | sender / agent |
 | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Lift account to multi-sig | sender / agent |
 | [`set_position_mode`](#set_position_mode) | Toggle one-way / hedge position mode | sender / agent |
 
@@ -250,6 +253,8 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
+| [`c_deposit`](#c_deposit) | Move spot MTF into the free staking balance | sender / agent |
+| [`c_withdraw`](#c_withdraw) | Move the free staking balance back to spot MTF | sender / agent |
 | [`token_delegate`](#token_delegate) | Delegate / undelegate stake | sender / agent |
 | [`claim_rewards`](#claim_rewards) | Claim staking rewards | sender / agent |
 | [`link_staking_user`](#link_staking_user) | Alias a staking target | sender / agent |
@@ -298,10 +303,8 @@ disposition of each.
 | Draft name | Native tag (if recognized) | Why not bridged |
 |-----------|----------------------------|-----------------|
 | `ScaleOrder` | — | No native action; ladder client-side into `batch_order` |
-| `Trigger` | (via `submit_order.kind`) | `stop_loss` / `take_profit` kinds reject — trigger wiring not present |
 | `UpdateMarginMode` | — | No native action; isolation is the `is_isolated` flag on `update_leverage` |
-| `CreateSubAccount` / `SubAccountTransfer` / `SubAccountSpotTransfer` | — | Sub-account flows not bridged |
-| `MultiSig` | — | Multi-sig wrapper not bridged (the account is converted via `convert_to_multi_sig_user`) |
+| `MultiSig` | — | Multi-sig collect-and-execute wrapper not bridged (preview / not executing — the account is *registered* via `convert_to_multi_sig_user`) |
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |
@@ -348,7 +351,8 @@ approved agent). To place many orders under one signature, use
 | `owner` | hex address | 40 hex chars | Claimed account; must equal the recovered signer or an approved agent of it. Wire-only — dropped on lowering |
 | `market` | uint32 | `[0, market_count)` | Asset/market id (identity-mapped to `AssetId`) |
 | `side` | enum | `"bid"` / `"ask"` | — |
-| `kind` | enum | `"limit"` / `"market"` | Only `limit` / `market` are accepted; `"stop_loss"` / `"take_profit"` are rejected (`unsupported order kind` — triggers not wired) |
+| `kind` | enum | `"limit"` / `"market"` / `"stop_loss"` / `"take_profit"` | `limit` / `market` place a live order. `stop_loss` / `take_profit` are accepted **only when a `trigger` block is also present** — that pair parks a single reduce-only TP/SL leg (see [trigger orders](#trigger-orders-stop_loss--take_profit)); a `stop_loss` / `take_profit` *without* a `trigger` block is rejected (`unsupported order kind`) |
+| `trigger` | object \| null | — | Optional [trigger block](#trigger-orders-stop_loss--take_profit). Its presence — on **any** `kind` — turns this `submit_order` into a single parked reduce-only TP/SL leg instead of a live order: `{ "trigger_px": <u64>, "is_market": <bool>, "tpsl": "tp" \| "sl" }` |
 | `size` | uint64 | `> 0` | Fixed-point tick units (widened to `u128`) |
 | `limit_px` | uint64 | `> 0` | Fixed-point tick units (widened to `i128`) |
 | `tif` | enum | `"gtc"`, `"ioc"`, `"alo"` | `"aon"` is rejected (`unsupported time-in-force` — no core equivalent) |
@@ -397,6 +401,56 @@ There is no implicit flip — closing the long leg never opens a short.
 
 Switch an account into hedge mode (while flat) with
 [`set_position_mode`](#set_position_mode).
+
+#### Trigger orders (`stop_loss` / `take_profit`)
+
+A single-leg protective trigger (a stop-loss or take-profit) is expressed as a
+`submit_order` whose `order` body carries a `trigger` block. The block's
+**presence** — not the `kind` — is what routes it: the order is **parked** in the
+canonical trigger registry instead of going to the book, and fires later as a
+**reduce-only IOC** when the mark price crosses `trigger_px`.
+
+```json
+{
+  "type": "submit_order",
+  "order": {
+    "owner":       "0x00000000000000000000000000000000000000aa",
+    "market":       7,
+    "side":         "ask",
+    "kind":         "take_profit",
+    "size":         50000000,
+    "limit_px":     0,
+    "tif":          "ioc",
+    "stp_mode":     "cancel_oldest",
+    "reduce_only":  false,
+    "trigger":     { "trigger_px": 4200000000000, "is_market": true, "tpsl": "tp" }
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `trigger.trigger_px` | uint64 | `> 0` | Trigger price in fixed-point tick units (widened to `i128`). The parked leg parks **at this price** — it is reused as the fired leg's price (the order's own `limit_px` is ignored for a trigger) |
+| `trigger.is_market` | bool | — | Advisory label (`true` = the fired leg is a market/IOC). The park path always fires reduce-only IOC regardless; carried for read-path fidelity, not control |
+| `trigger.tpsl` | enum | `"tp"` / `"sl"` | Advisory take-profit / stop-loss label. The executor infers the fire direction from the leg `side` vs the mark; this is surfaced in `/info`, not control |
+
+Semantics:
+
+- **Reduce-only is forced.** A trigger leg always closes — it can never open or
+  grow a position — regardless of the order's `reduce_only` wire value.
+- **The leg `side` chooses what is protected.** An `ask` trigger closes a long;
+  a `bid` trigger closes a short. On a [hedge account](#position_side-hedge-mode),
+  carry `position_side` to name the leg, exactly as for a live order.
+- **`trigger_px` is the parked price**, not the order's `limit_px` — send
+  `limit_px` as you like (`0` is fine); the trigger block's price is what is used.
+- **OCO.** Trigger legs grouped together collapse on fire (a fired leg retires;
+  its sibling is cancelled).
+
+Admission returns the same per-order status union as a live `submit_order`. A
+trigger that parks reports through the order path; the eventual fire is a
+committed effect observable on the [WS feed](../ws/subscriptions.md) / `/info`.
+Multi-leg entry-plus-protective baskets use [`batch_order`](#batch_order) with
+`grouping: "normalTpsl"` / `"positionTpsl"`.
 
 ---
 
@@ -530,7 +584,8 @@ Returns a count of cancelled orders.
 ### `modify`
 
 Amend a resting order's price and/or size in place. At least one of `new_px` /
-`new_size` must be present.
+`new_size` must be present. The target order is addressed **by `oid`** or **by
+`cloid`** (the client order id the order was placed with) — send one or the other.
 
 ```json
 {
@@ -544,12 +599,28 @@ Amend a resting order's price and/or size in place. At least one of `new_px` /
 }
 ```
 
+Address by `cloid` instead of `oid` (omit `oid`, or leave it `0`):
+
+```json
+{
+  "type": "modify",
+  "params": {
+    "market":       3,
+    "cloid":        "0xabababababababababababababababab",
+    "new_px":       10049000000,
+    "always_place": true
+  }
+}
+```
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `market` | uint32 | Asset/market id |
-| `oid` | uint64 | Target order id |
+| `oid` | uint64 | Target order id. Defaults to `0` (= address by `cloid`) when omitted |
+| `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes). When set, the target is resolved by client order id (the same resolver [`cancel_by_cloid`](#cancel_by_cloid) uses) instead of `oid`. A malformed `cloid` is rejected at admission |
 | `new_px` | uint64 \| null | New price in fixed-point tick units (`null` / omitted = unchanged) |
 | `new_size` | uint64 \| null | New size in fixed-point tick units (`null` / omitted = unchanged) |
+| `always_place` | bool | When `true`, a target that no longer rests is a best-effort no-op rather than a rejection. Defaults to `false` |
 
 Returns a single modify status.
 
@@ -1113,9 +1184,122 @@ Convert the account to a multi-sig roster. **Irreversible**.
 | Field | Type | Description |
 |-------|------|-------------|
 | `signers` | array of hex addresses | The multi-sig signer set |
-| `threshold` | uint32 | M-of-N threshold (validated by the core handler) |
+| `threshold` | uint32 | M-of-N threshold (`1 ≤ threshold ≤ signers.len()`; validated by the core handler) |
+
+{% hint style="warning" %}
+**Conversion works; the collect-and-execute wrapper is a preview.**
+`convert_to_multi_sig_user` **registers** the roster (threshold + signer set) on
+the account and takes effect immediately. The companion `multi_sig` envelope that
+would **collect signatures and execute a wrapped inner action** is **not yet
+executing**: it validates the roster, the threshold, and that every named signer
+is in the configured set, but it does **not** verify the member signatures and
+does **not** run the inner action. It is also **not bridged on the public
+`/exchange` path** (see the [non-bridged table](#non-bridged-actions)). Treat
+multi-sig as **register-only / preview** for now — do not rely on it to gate live
+state changes.
+{% endhint %}
 
 See [multi-sig](../../concepts/multi-sig.md).
+
+---
+
+### `create_sub_account`
+
+Open a sub-account owned by the sender (the recovered signer becomes the sole
+master). The sub-account gets a derived on-chain address that carries its own
+balances. **Sender-authorized** — no `owner` field.
+
+```json
+{
+  "type": "create_sub_account",
+  "params": {
+    "name":             "trading-bot-1",
+    "explicit_index":   null,
+    "shared_stp_group": true
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Human-readable label for the sub-account (non-empty) |
+| `explicit_index` | uint32 \| null | Optional explicit sub-account index; `null` = use the next free index. An in-use explicit index is rejected at commit (`index in use`) |
+| `shared_stp_group` | bool | Whether the sub-account shares the parent's self-trade-prevention group |
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission). The
+assigned `sub_id` and derived sub-account address are carried in the **commit
+outcome**, not the HTTP body — track the commit via the returned `action_hash`.
+
+**Common errors** (at commit): `empty name`, `index in use`.
+
+---
+
+### `sub_account_transfer`
+
+Move perp cross-margin USDC collateral between the master account and one of its
+sub-accounts. **Sender-authorized** — no `owner` field; the signer is the master.
+
+```json
+{
+  "type": "sub_account_transfer",
+  "params": {
+    "sub_index": 0,
+    "deposit":   true,
+    "amount":    "150.5"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sub_index` | uint32 | Index of the sender's sub-account (as assigned at create time) |
+| `deposit` | bool | `true` = master → sub; `false` = sub → master |
+| `amount` | decimal string | Cross-margin USDC to move (`> 0`), as a JSON string |
+
+The source must hold at least `amount` of free cross-collateral; debit + credit
+are equal so the parent-plus-subs total is conserved.
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission).
+
+**Common errors** (at commit): `amount must be positive`, `sub account not
+found` (unknown/unowned `sub_index`), `insufficient cross collateral`.
+
+---
+
+### `sub_account_spot_transfer`
+
+Move a **spot token** balance between the master account and one of its
+sub-accounts. **Sender-authorized** — no `owner` field.
+
+```json
+{
+  "type": "sub_account_spot_transfer",
+  "params": {
+    "sub_index": 0,
+    "token":     101,
+    "deposit":   false,
+    "amount":    "42"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sub_index` | uint32 | Index of the sender's sub-account |
+| `token` | uint32 | Spot token id to move |
+| `deposit` | bool | `true` = master → sub; `false` = sub → master |
+| `amount` | decimal string | Token amount to move (`> 0`), as a JSON string |
+
+The source must hold at least `amount` of the token; the per-token parent-plus-sub
+total is conserved.
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission).
+
+**Common errors** (at commit): `amount must be positive`, `sub account not
+found`, `insufficient spot balance`.
 
 ---
 
@@ -1157,9 +1341,66 @@ liquidation and dual-leg position reporting are still rolling out; see
 
 ---
 
+### `c_deposit`
+
+Move whole-MTF from the sender's **spot MTF balance** into their **free staking
+balance** (the undelegated pool that [`token_delegate`](#token_delegate) draws
+from). Pure value-move between two ledgers — no mint, no burn — and it does
+**not** touch delegations, vote power, or the validator set. **Sender-authorized**
+— no `owner` field.
+
+```json
+{
+  "type": "c_deposit",
+  "params": { "amount": "1000" }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `amount` | decimal string | MTF to move spot → free staking balance (`> 0`), as a JSON string |
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission). Confirm
+the resulting balances via [`/info`](./info.md).
+
+**Common errors** (at commit): `amount must be positive`, `insufficient spot MTF
+balance`, MTF spot asset not configured on this chain.
+
+---
+
+### `c_withdraw`
+
+The exact reverse of [`c_deposit`](#c_deposit): move whole-MTF from the sender's
+**free staking balance** back to their **spot MTF balance**. No unbonding window
+applies — this is the *free* (undelegated) balance; **delegated** stake has its
+own undelegation window via [`token_delegate`](#token_delegate), which this does
+not touch. **Sender-authorized** — no `owner` field.
+
+```json
+{
+  "type": "c_withdraw",
+  "params": { "amount": "250.25" }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `amount` | decimal string | MTF to move free staking balance → spot (`> 0`), as a JSON string |
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission).
+
+**Common errors** (at commit): `amount must be positive`, `insufficient staking
+balance`, MTF spot asset not configured on this chain.
+
+---
+
 ### `token_delegate`
 
-Delegate or undelegate stake to a validator.
+Delegate or undelegate stake to a validator. The delegate side draws from the
+**free staking balance** (funded by [`c_deposit`](#c_deposit)); undelegation
+enters a slashable unbonding window before the stake returns to that balance.
 
 ```json
 {
@@ -1559,10 +1800,8 @@ here only to redirect integrators to the supported path.
 |-----------|-----------|-------------|-------------|
 | `Order` (multi) / `Cancel` (multi) | — | Single vs. batch are distinct tags | [`submit_order`](#submit_order) + [`batch_order`](#batch_order); [`cancel_order`](#cancel_order) + [`batch_cancel`](#batch_cancel) |
 | `ScaleOrder` | — | No native action | Ladder client-side into [`batch_order`](#batch_order) |
-| `Trigger` | (via `kind`) | `stop_loss` / `take_profit` kinds reject | — (trigger wiring not present) |
 | `UpdateMarginMode` | — | No native action | `is_isolated` flag on [`update_leverage`](#update_leverage) |
-| `CreateSubAccount` / `SubAccountTransfer` / `SubAccountSpotTransfer` | — | Sub-account flows not bridged | — |
-| `MultiSig` | — | Wrapper not bridged | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) converts the account |
+| `MultiSig` | — | Collect-and-execute wrapper not bridged (preview / not executing) | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
 | `WithdrawUsdc` | — | Draft name; not a native tag | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
@@ -1643,7 +1882,8 @@ the `error` reason, and the `mempool_depth` at the time:
 | `owner: expected 40 hex chars, got N` | In-action `owner` length wrong | Drop `0x`, count hex chars |
 | `action: <parse error>` | `action` not valid JSON / unknown `type` (parse happens **after** signature recovery — a bad sig 401s first) | Check the catalog above; send valid JSON |
 | `unsupported action: <Variant>` | Action variant recognised but not bridged on `/exchange` | See the [non-bridged table](#non-bridged-actions) |
-| `unsupported time-in-force` / `unsupported stp_mode` / `unsupported order kind` | Order carried `aon` / `reject` / a trigger kind | Use a supported value |
+| `unsupported time-in-force` / `unsupported stp_mode` | Order carried `aon` (no core all-or-none) / `reject` (no core STP equivalent) | Use a supported value |
+| `unsupported order kind` | `stop_loss` / `take_profit` **without** a `trigger` block | Add a [`trigger`](#trigger-orders-stop_loss--take_profit) block, or use `limit` / `market` |
 | `action carries no owner` | An owner-less action that is not sender-authorized | Use a supported action |
 | `duplicate cloid` | `submit_order` reused a client order id on the same account | Use a fresh `cloid` |
 

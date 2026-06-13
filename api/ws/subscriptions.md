@@ -1,7 +1,7 @@
 # WS subscription channels
 
 {% hint style="info" %}
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, and `spot_state` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, and `web_data2` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./README.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
 {% endhint %}
 
 {% hint style="info" %}
@@ -37,6 +37,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"c
 | `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`: activated / finished / terminated), per commit |
 | `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — per commit |
 | `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — per commit |
+| `web_data2` | **live** | `user`/`address` (required) | per-account composite UI snapshot — clearinghouse + spot balances + open orders + vault equities + exchange status — per commit |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -397,6 +398,98 @@ balance set (`[]` for an account with no spot holdings).
 
 Frequency: one frame per committed block while the account has a live subscriber.
 
+### `web_data2`
+
+Per-account **composite** "everything for the frontend" snapshot — the perp
+clearinghouse summary, spot balances, open orders, vault equities, and the global
+exchange status for one account, all in one frame, pushed each commit. Requires
+`user` (the 0x address; `address` is also accepted) — NOT a `coin`. The body is
+the byte-identical composite the REST [`web_data2`](../rest/info.md#web_data2)
+read returns (it composes the same sub-readers), so a WS push never drifts from
+that read. The initial snapshot is the live composite (zeroed-config defaults
+when the account has no funds / positions / orders), not an empty array.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "web_data2", "user": "0x<address>" } }
+```
+
+```json
+{
+  "channel": "web_data2",
+  "data": {
+    "address": "0x<addr>",
+    "clearinghouse": {
+      "account_value": "10000",
+      "margin_used": "300",
+      "positions": [
+        { "asset": 0, "size": "600", "entry_notional": "2500", "margin_mode": "cross", "leverage": 10 }
+      ]
+    },
+    "spot_balances": [
+      { "asset": 2, "name": "MTF", "total": "12.5", "hold": "0" }
+    ],
+    "open_orders": [
+      { "oid": 42, "market_id": 0, "side": "bid", "px": "6700000000000", "size": "10000000",
+        "tif": "gtc", "cloid": "0xab..", "trigger": null, "inserted_at_ms": 1735689600123 }
+    ],
+    "vault_equities": [
+      { "vault_id": 1, "vault_address": "0x<vault>", "shares": "1000", "equity": "1050" }
+    ],
+    "exchange_status": {
+      "spot_disabled": false,
+      "post_only_until_time_ms": 0,
+      "post_only_until_height": 0,
+      "scheduled_freeze_height": null,
+      "mip3_enabled": true,
+      "frozen": false,
+      "replay_complete": true
+    }
+  }
+}
+```
+
+The composite carries exactly these sections (each composed from the matching
+sub-reader, so the shapes never drift from the standalone reads):
+
+- `address` — the canonical lowercase 0x address the frame is keyed on.
+- `clearinghouse` — the perp account summary: `account_value` (cross account
+  value, whole-USDC decimal string), `margin_used` (Σ per-asset maintenance
+  margin used, whole-USDC), and `positions[]`. Each position row is
+  `{asset, size, entry_notional, margin_mode, leverage}`: `asset` is the numeric
+  market id, `size` is the signed 1e8-plane size string (one row per non-zero
+  leg, so a hedge-mode account reports both legs), `entry_notional` is whole-USDC,
+  `margin_mode` ∈ `cross` / `isolated` / `strict_iso`, `leverage` is the
+  position's max leverage. Zero-size legs are omitted.
+- `spot_balances` — the `balances` array from [`spot_state`](#spot_state) /
+  REST `spot_clearinghouse_state`: one entry per held spot token,
+  `{asset, name, total, hold}`.
+- `open_orders` — the `orders` array from REST `frontend_open_orders`: one entry
+  per resting order **and** per parked TP/SL / stop trigger,
+  `{oid, market_id, side, px, size, tif, cloid, trigger, inserted_at_ms}`.
+  `side` ∈ `bid` / `ask`; `px` / `size` are 1e8-plane decimal strings; `tif` ∈
+  `alo` / `ioc` / `gtc` (or `trigger` for an off-book parked stop); `cloid` is the
+  client order id or `null`; `trigger` is `null` for a plain book order, otherwise
+  `{trigger_px, trigger_above}` (parked stops also carry `is_parked: true`).
+- `vault_equities` — the `equities` array from REST `user_vault_equities`: one
+  entry per vault the account has shares in,
+  `{vault_id, vault_address, shares, equity}` (`equity` is whole-USDC, `shares`
+  is a raw integer string). Empty when the account follows no vault.
+- `exchange_status` — the global trading-status scalars (same body as REST
+  `exchange_status`): `{spot_disabled, post_only_until_time_ms,
+  post_only_until_height, scheduled_freeze_height, mip3_enabled, frozen,
+  replay_complete}`. This block is identical for every subscriber on a given
+  commit.
+
+Frequency: one frame per committed block while the account has a live subscriber.
+On each commit the current composite is re-emitted for every subscribed account.
+
+{% hint style="warning" %}
+`web_data2` is per-account data but currently has **no authentication** — any
+connection can subscribe to any address. Do not treat it as private until the
+auth-at-subscribe gate lands; for authenticated reads use `post` with a signed
+action.
+{% endhint %}
+
 ---
 
 ## `post` — request/response over WS
@@ -416,7 +509,7 @@ This is the supported path for authenticated reads and for submitting signed act
 The following channels appeared in earlier drafts but are **not implemented** on the node WS surface. They are not recognized channel names; subscribing returns an `unknown channel` error. Listed here so integrators are not misled by older SDK stubs.
 
 - **Public market data:** `meta` (universe metadata), `mark` (mark/oracle price), `fundingTicks` (funding-rate updates).
-- **Per-user (would require auth):** `vaultEvents`, `rfqEvents`, `webData2` (aggregate UI snapshot).
+- **Per-user (would require auth):** `vaultEvents`, `rfqEvents`.
 
 Also not implemented today:
 

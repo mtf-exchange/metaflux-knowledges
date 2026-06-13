@@ -65,7 +65,6 @@
     * [Overview](api/ws/README.md)
     * [Subscriptions](api/ws/subscriptions.md)
   * Reference
-    * [Node data files](api/data-files.md)
     * [Errors](api/errors.md)
     * [Rate limits](api/rate-limits.md)
 * [EVM](evm/README.md)

@@ -1,7 +1,7 @@
 # HL-compat REST surface
 
 {% hint style="info" %}
-**Preview.** The gateway answers every HL `/info` request type with HL's exact wire shape. Some types are **wired** to live node state today; the rest return HL's **honest-empty** shape (never `null`, never a fabricated value) until the corresponding node read or [indexer](../data-files.md) lands. The status of each type is in the [translation table](#hl-info-type--mtf-native-node-type) below.
+**Preview.** The gateway answers every HL `/info` request type with HL's exact wire shape. Some types are **wired** to live node state today; the rest return HL's **honest-empty** shape (never `null`, never a fabricated value) until the corresponding node read lands. The status of each type is in the [translation table](#hl-info-type--mtf-native-node-type) below.
 {% endhint %}
 
 ## TL;DR
@@ -58,14 +58,14 @@ This is the master map. **Translation** is always: snake_case → camelCase, int
 | `maxBuilderFee` | **wired** | [`max_builder_fee`](./info.md#max_builder_fee) | projects node `max_fee_bps` as the bare HL number; unapproved pair → `0` |
 | `userRateLimit` | **wired** | [`user_rate_limit`](./info.md#user_rate_limit) | node `lifetime_count` → `nRequestsUsed`, baseline `nRequestsCap`; `cumVlm:"0.0"` (no node volume on this read) |
 | `userNonFundingLedgerUpdates` | stub | — | returns `[]` |
-| `userFunding` / `userFundings` | 🚧 indexer | — | per-user funding-payment history — fed by [indexer](../data-files.md) |
-| `fundingHistory` | 🚧 indexer | [`funding_history`](./info.md#funding_history) (live samples) | per-coin historical rates over a window — archived by the indexer |
-| `userFills` | 🚧 indexer | [`user_fills`](./info.md#user_fills) (honest-empty on node) | itemized fill log — fed by [`node_fills`](../data-files.md#node_fills--per-fill-records) |
-| `userFillsByTime` | 🚧 indexer | — | time-windowed `userFills` |
-| `historicalOrders` | 🚧 indexer | — | terminal-state orders — fed by [`node_order_statuses`](../data-files.md#node_order_statuses--order-lifecycle) |
-| `candleSnapshot` | 🚧 indexer | — | OHLCV bars — fed by [`node_trades`](../data-files.md#node_trades--public-trade-tape) |
+| `userFunding` / `userFundings` | not served | — | per-user funding-payment history — served by the gateway indexer (roadmap) |
+| `fundingHistory` | **wired** | [`funding_history`](./info.md#funding_history) | per-coin premium/realized-rate samples over a window, from the live node funding tracker |
+| `userFills` | **wired** | [`user_fills`](./info.md#user_fills) | itemized fill log, from the committed per-account fill tape |
+| `userFillsByTime` | **wired** | [`user_fills_by_time`](./info.md#user_fills_by_time) | time-windowed `userFills`, same committed fill tape |
+| `historicalOrders` | not served | — | terminal-state order list — served by the gateway indexer (roadmap) |
+| `candleSnapshot` | not served | — | OHLCV history — served by the gateway indexer (roadmap) |
 
-Legend: **wired** = live node state today · stub = HL-correct empty shape, no node backing yet · 🚧 indexer = served once the [data-file indexer](../data-files.md) lands.
+Legend: **wired** = live node state today · stub = HL-correct empty shape, no node backing yet · not served = no node backing yet, served by the gateway indexer (roadmap).
 
 {% hint style="info" %}
 The **honest-empty** contract is load-bearing: HL clients iterate these responses unconditionally. A stub must emit `[]` / `{}` / the typed zero — **never** `null` where a client expects an object — so unmodified HL SDKs deserialize identically whether the data is live or pending.
@@ -320,20 +320,17 @@ MetaFlux vaults are not HL vaults — same query shape, different entities (see 
 | `orderStatus` | `{"status":"unknownOid","order":null}` |
 | `userNonFundingLedgerUpdates` | `[]` |
 
-### 🚧 Indexer-backed types
+### Not-yet-served types
 
-Served once the [data-file indexer](../data-files.md) lands. Each returns HL's empty shape today:
+These have no node backing yet and return HL's empty shape today; they are slated for the gateway indexer (roadmap):
 
-| Type | Empty stub | Fed by |
-|------|------------|--------|
-| `userFills` | `[]` | [`node_fills`](../data-files.md#node_fills--per-fill-records) |
-| `userFillsByTime` | `[]` | `node_fills` |
-| `historicalOrders` | `[]` | [`node_order_statuses`](../data-files.md#node_order_statuses--order-lifecycle) |
-| `candleSnapshot` | `[]` | [`node_trades`](../data-files.md#node_trades--public-trade-tape) |
-| `fundingHistory` | `[]` | indexer (node keeps live samples in [`funding_history`](./info.md#funding_history)) |
-| `userFunding` / `userFundings` | `[]` | indexer |
+| Type | Empty stub | Notes |
+|------|------------|-------|
+| `historicalOrders` | `[]` | terminal-state order list |
+| `candleSnapshot` | `[]` | OHLCV history (use the WS [`candle`](../ws/subscriptions.md) channel for live bars) |
+| `userFunding` / `userFundings` | `[]` | per-user funding-payment history |
 
-The HL fill record shape (once live): `{coin, px, sz, side, time, startPosition, dir, closedPnl, hash, oid, crossed, fee, tid, feeToken}`.
+`userFills` / `userFillsByTime` and `fundingHistory` are now **wired** to live node state — see the [translation table](#hl-info-type--mtf-native-node-type) above. The HL fill record shape: `{coin, px, sz, side, time, startPosition, dir, closedPnl, hash, oid, crossed, fee, tid, feeToken}`.
 
 ### Errors on `/info`
 
@@ -469,12 +466,11 @@ See [migrating from HL](../../integration/migrating-from-hl.md) for the full ref
 - **Asset IDs are not numerically the same** as HL's. Look up via `info { "type": "meta" }` once that read is wired; never hard-code.
 - **T0 yellow card** liquidation tier exists on MTF (between healthy and HL's "Partial Liquidation"). Bots that watch liquidation events see one more event type.
 - **HL action types beyond `order` / `cancel`** return `err` during rollout. Use MTF-native [`POST /exchange`](./exchange.md), or wait.
-- **Historical / itemized reads** (`userFills`, `historicalOrders`, `candleSnapshot`, `fundingHistory`) are 🚧 indexer-backed — empty until the [data-file indexer](../data-files.md) lands. Use the WS [`userFills`](../ws/subscriptions.md) channel for live fills meanwhile.
+- **Itemized reads** `userFills` / `userFillsByTime` / `fundingHistory` are now served live from committed node state. The remaining history reads (`historicalOrders`, `candleSnapshot`, `userFunding`) are not yet served — slated for the gateway indexer (roadmap). Use the WS [`userFills`](../ws/subscriptions.md) / [`candle`](../ws/subscriptions.md) channels for live data meanwhile.
 
 ## See also
 
 - [`POST /info`](./info.md) — MTF-native node reads these HL types translate from
 - [`POST /exchange`](./exchange.md) — MTF-native write path
 - [CCXT-compat](./ccxt-compat.md) — the other compat surface
-- [Node data files](../data-files.md) — the indexer feedstock behind the 🚧 types
 - [Migrating from HL](../../integration/migrating-from-hl.md) · [Signing walkthrough](../../integration/signing.md) · [Errors](../errors.md)
