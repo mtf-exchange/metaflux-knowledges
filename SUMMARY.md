@@ -75,6 +75,7 @@
 * [Integration](integration/README.md)
   * [Quickstart](integration/quickstart.md)
   * [Signing walkthrough](integration/signing.md)
+  * [Typed-data signing](integration/typed-data-signing.md)
   * [Agent wallets how-to](integration/agent-wallets-howto.md)
   * [Idempotency](integration/idempotency.md)
   * [Error handling](integration/error-handling.md)

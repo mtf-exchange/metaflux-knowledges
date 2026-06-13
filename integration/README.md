@@ -22,6 +22,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 
 - [Quickstart](./quickstart.md) — 5-minute end-to-end (deposit → trade → withdraw)
 - [Signing walkthrough](./signing.md) — EIP-712 envelope end-to-end with working examples
+- [Typed-data signing](./typed-data-signing.md) — opt-in `sig_scheme: "typed"` for human-readable wallet prompts
 - [Agent wallets howto](./agent-wallets-howto.md) — concrete code for the hot-key pattern
 - [Idempotency](./idempotency.md) — nonce strategy + safe retry
 - [Error handling](./error-handling.md) — admission vs commit vs network decision tree

@@ -6,6 +6,14 @@
 
 End-to-end with working examples in TypeScript and Python. Once this clicks, every action is the same — only the inner payload changes.
 
+{% hint style="info" %}
+**Want a human-readable wallet prompt?** A subset of actions (transfers,
+withdrawals, agent approvals, account/staking/vault settings) can be signed as
+structured EIP-712 typed data so wallets render each field by name. See
+[typed-data signing](./typed-data-signing.md) (`sig_scheme: "typed"`). The scheme
+on this page is the default and covers **all** actions.
+{% endhint %}
+
 ## TL;DR
 
 ```
