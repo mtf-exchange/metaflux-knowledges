@@ -22,15 +22,16 @@ so a wallet (MetaMask, Rabby, Ledger, WalletConnect) renders each field by name 
 | | Default scheme | Typed scheme (`sig_scheme: "typed"`) |
 |--|----------------|--------------------------------------|
 | Wallet prompt | Opaque hash / blob | Each field rendered by name |
-| Action coverage | **All** `/exchange` actions | **18 actions** (listed below) |
+| Action coverage | **All** `/exchange` actions | **All wallet-signed actions** (listed below); only orders & cancels stay default-only |
 | Primary type | `MetaFluxAction(string action,uint64 nonce)` (one, frozen) | `MetaFluxTransaction:<Action>` (one per action) |
 | What is hashed | The raw `action` JSON bytes | The structured fields (atomic EIP-712 encoding) |
 | Opt-in | default (absent / `"legacy"`) | set `sig_scheme: "typed"` |
 
 Use typed signing when you want users to **see what they sign** in a standard
-wallet — transfers, withdrawals, agent approvals, and account/staking/vault
-settings. For orders, cancels, and the [deferred actions](#deferred-actions),
-keep the [default scheme](./signing.md).
+wallet — transfers, withdrawals, agent approvals, and account/staking/vault/
+spot-margin/earn/bridge settings. Every wallet-signed `/exchange` action can be
+typed-signed. Only **orders and cancels** stay default-scheme only — keep the
+[default scheme](./signing.md) for those.
 
 ## Wire shape
 
@@ -129,11 +130,13 @@ This is why typed signing carries decimals as strings rather than scaled
 integers: the wallet prompt shows a human-readable amount, and the hash-then-parse
 rule keeps the signed bytes unambiguous.
 
-## The 18 typed-signable actions
+## The typed-signable actions
 
-For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
-`encodeType` string is given below (the field order is the message field order).
-`action.type` is the `snake_case` tag you put on the POST.
+Every wallet-signed `/exchange` action is typed-signable (only orders and cancels
+stay default-scheme only). For each action the **primary type** is
+`MetaFluxTransaction:<Action>` and the `encodeType` string is given below (the
+field order is the message field order). `action.type` is the `snake_case` tag you
+put on the POST.
 
 ### Transfers
 
@@ -168,6 +171,72 @@ Notes on specific fields:
 - `claim_rewards`: `validator` = the zero address means **claim across all
   delegations**.
 - `create_vault`: `kind` is `0` = User, `1` = Metaliquidity.
+
+### Margin
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `update_isolated_margin` | `MetaFluxTransaction:UpdateIsolatedMargin(string metafluxChain,uint32 asset,string delta,uint64 nonce)` |
+| `top_up_isolated_only_margin` | `MetaFluxTransaction:TopUpIsolatedOnlyMargin(string metafluxChain,uint32 asset,string amount,uint64 nonce)` |
+
+`delta` and `amount` are canonical decimal strings (hash-then-parse).
+
+### Staking
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `token_delegate` | `MetaFluxTransaction:TokenDelegate(string metafluxChain,address validator,string amount,bool isUndelegate,uint64 nonce)` |
+
+`amount` is a canonical decimal string. `isUndelegate` = `true` undelegates,
+`false` delegates.
+
+### Vault
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `vault_transfer` | `MetaFluxTransaction:VaultTransfer(string metafluxChain,uint64 vaultId,bool deposit,string amount,uint64 nonce)` |
+| `vault_withdraw` | `MetaFluxTransaction:VaultWithdraw(string metafluxChain,uint64 vaultId,string shares,uint64 nonce)` |
+
+`vault_transfer.deposit` = `true` deposits, `false` withdraws; `amount` is a
+canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
+
+### Spot margin
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `spot_margin_deposit` | `MetaFluxTransaction:SpotMarginDeposit(string metafluxChain,uint32 pair,string amount,uint64 nonce)` |
+| `spot_margin_withdraw` | `MetaFluxTransaction:SpotMarginWithdraw(string metafluxChain,uint32 pair,string amount,uint64 nonce)` |
+| `spot_margin_open` | `MetaFluxTransaction:SpotMarginOpen(string metafluxChain,uint32 pair,uint64 size,uint64 limitPx,string borrow,uint64 nonce)` |
+
+`amount` and `borrow` are canonical decimal strings; `size` and `limitPx` are
+integers.
+
+### Earn
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `earn_deposit` | `MetaFluxTransaction:EarnDeposit(string metafluxChain,uint32 asset,string amount,uint64 nonce)` |
+| `earn_withdraw` | `MetaFluxTransaction:EarnWithdraw(string metafluxChain,uint32 asset,string shares,uint64 nonce)` |
+
+`amount` and `shares` are canonical decimal strings.
+
+### Agent abstraction & bridge
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `agent_set_abstraction` | `MetaFluxTransaction:AgentSetAbstraction(string metafluxChain,address user,uint8 kind,string value,uint64 nonce)` |
+| `mb_withdraw` | `MetaFluxTransaction:MbWithdraw(string metafluxChain,uint8 chain,uint32 asset,uint64 amount,string dstAddr,uint64 nonce)` |
+
+Notes on specific fields:
+
+- `agent_set_abstraction`: `value` is an EIP-712 **`string`** — sign the verbatim
+  string (it is not a number; hashed as `keccak256(utf8)`).
+- `mb_withdraw`: the typed `chain` field is a **`uint8`** — `0` = Solana, `1` =
+  Base, `2` = Arbitrum. But the POST `action.params.chain` is the **string name**
+  (`"Solana"` / `"Base"` / `"Arbitrum"`), exactly as on the default path. So sign
+  the `uint8` in the typed message and send the string name in `params`.
+- `mb_withdraw`: `amount` is a `uint64` **integer** (not a decimal string);
+  `dstAddr` is the destination-chain address string.
 
 ### Fields that are *not* in the typed digest
 
@@ -333,18 +402,12 @@ specification; a cross-implementation known-answer test pins each action's diges
 byte-for-byte, so any compliant `eth_signTypedData_v4` implementation reproduces
 the same result.
 
-## Deferred actions
+## Orders and cancels
 
-These actions stay on the [default scheme](./signing.md) for now — typed signing
-is **not yet** available for them, and posting them with `sig_scheme: "typed"`
-returns an unsupported-scheme error. Sign them with the default opaque envelope:
-
-`update_isolated_margin`, `top_up_isolated_only_margin`, `token_delegate`,
-`vault_transfer`, `vault_withdraw`, `spot_margin_deposit`, `spot_margin_withdraw`,
-`spot_margin_open`, `earn_deposit`, `earn_withdraw`, `agent_set_abstraction`,
-`mb_withdraw`.
-
-Orders and cancels are also default-scheme only.
+Every wallet-signed `/exchange` action above is typed-signable. The **only**
+actions that stay on the [default scheme](./signing.md) are **orders and
+cancels** — posting them with `sig_scheme: "typed"` returns an unsupported-scheme
+error, so sign them with the default opaque envelope.
 
 ## See also
 
