@@ -106,6 +106,15 @@ variant never adds a signing primitive. See [signing
 walkthrough](../../integration/signing.md) for a working example; a
 cross-implementation known-answer test pins this digest.
 
+{% hint style="info" %}
+**Opt-in alternative: structured typed data.** A subset of actions can instead be
+signed as per-action EIP-712 typed data (`eth_signTypedData_v4`), so a wallet
+renders each field by name. Set `sig_scheme: "typed"` on the envelope to select
+it; absent / `"legacy"` keeps the opaque scheme described here. See
+[typed-data signing](../../integration/typed-data-signing.md) for the covered
+actions and their type strings.
+{% endhint %}
+
 ### Chain IDs
 
 | Network | `chainId` |
@@ -1732,6 +1741,7 @@ client                gateway                 node                  consensus
 - [HL-compat `/exchange`](./hl-compat.md) — alternative wire shape for HL clients
 - [Agent wallets](../../concepts/agent-wallets.md)
 - [Signing walkthrough](../../integration/signing.md)
+- [Typed-data signing](../../integration/typed-data-signing.md) — opt-in `sig_scheme: "typed"`
 - [Order types](../../concepts/order-types.md)
 - [Idempotency](../../integration/idempotency.md)
 - [Errors](../errors.md)
