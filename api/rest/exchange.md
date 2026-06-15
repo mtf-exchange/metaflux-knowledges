@@ -289,6 +289,7 @@ signature would act on the agent's own (separate) account, never the master's.
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
+| [`core_evm_transfer`](#core_evm_transfer) | Move USDC from the Core ledger to MetaFluxEVM | sender (master) |
 | [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | sender (master) |
 
 ### Not on the public `/exchange` path
@@ -1711,6 +1712,86 @@ the operator must be in the MLP whitelist.
 | `operator` | hex address | Off-chain strategy key (must be MLP-whitelisted) |
 | `allowed` | bool | `true` = register as approved agent; `false` = revoke |
 | `expires_at_ms` | uint64 \| null | Optional approval expiry; `null` = never expires |
+
+---
+
+### `core_evm_transfer`
+
+Move USDC from the **Core clearing ledger** to the **MetaFluxEVM** side: debits
+the sender's USDC cross-collateral on Core and mints the scale-converted
+6-decimal EVM USDC to `destination` on the next EVM block. The MTF analogue of a
+Core → EVM asset transfer. **Sender-authorized** — no `owner` field; the
+recovered signer is the account debited. An agent signature therefore acts on
+the **agent's own** account, never the master's, so this is effectively
+master-only (consistent with the [signed-by table](#signed-by-semantics)).
+
+This action is **typed-only**: it is accepted exclusively under the EIP-712
+[`sig_scheme: "typed"`](#signing) path (primary type
+`MetaFluxTransaction:CoreEvmTransfer`). There is no opaque-envelope form.
+
+```json
+{
+  "type": "core_evm_transfer",
+  "params": {
+    "amount":      "250.5",
+    "to_evm":      true,
+    "destination": "0xabababababababababababababababababababab"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `amount` | decimal string | `> 0` | Amount in the **whole-USDC** plane (the Core cross-collateral unit), as a JSON string. Carried verbatim into the signed digest, then parsed. The EVM side receives `amount × 1e6` FiatToken base units (6-decimal scale) |
+| `to_evm` | bool | `true` only | Direction. `true` = **Core → EVM** (the only supported direction on this path). `false` (**EVM → Core**) is **rejected** — see below |
+| `destination` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). The sender's own EVM address for a self-bridge; any EVM account otherwise (the EVM credit is a mint to this address, with no owner check) |
+
+**Direction (Core → EVM only).** Only `to_evm: true` is accepted here. An
+**EVM → Core** move (`to_evm: false`) is **rejected at commit** (`EVM->Core
+transfer must originate as an EVM burn tx, not /exchange`): the EVM-side USDC
+debit is a FiatToken **burn** that only the node's EVM executor can perform, and
+crediting Core without a confirmed burn would mint value out of nothing. To move
+USDC EVM → Core, send an EVM transaction that burns the EVM USDC to the system
+withdraw sink; the node mirrors the burn onto the Core ledger.
+
+**Scale.** Core USDC is the whole-USDC decimal cross-collateral plane; EVM USDC
+is a 6-decimal FiatToken integer. The conversion is `evm_units = whole_usdc ×
+1e6`. The whole-USDC amount is debited from Core the moment the action commits,
+so the queued EVM credit is always fully backed (zero-sum).
+
+**Funding check.** The move is gated on **free collateral** (equity minus margin
+held by open positions), not raw equity — collateral backing open positions is
+not transferable, mirroring the [`mb_withdraw`](#mb_withdraw) /
+withdrawable-collateral gate. An underfunded transfer errors at commit
+(`insufficient free collateral for core->evm transfer`).
+
+**What commit does.** The debit and the EVM-mint queueing are atomic at commit:
+`amount` leaves the sender's Core cross-collateral balance, and an L1 → EVM
+transfer entry is enqueued so the node mints the scale-converted 6-decimal EVM
+USDC to `destination` on the next EVM block. Because Core is debited at commit,
+the queued credit is fully backed.
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission):
+
+```json
+{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+```
+
+The EVM-side mint is asynchronous: the Core debit is immediate at commit, the
+EVM credit lands on the next EVM block.
+
+**Common errors** (at commit): `amount must be positive`, `zero destination`,
+`evm disabled` (the EVM side is not enabled on this chain), `EVM->Core transfer
+must originate as an EVM burn tx, not /exchange`, `insufficient free collateral
+for core->evm transfer`.
+
+**Gotchas.**
+- `destination` is the **EVM-side** recipient and is **not** owner-checked — the
+  EVM credit is a mint to that address. Double-check it; a transfer to a
+  wrong-but-well-formed address is unrecoverable.
+- Set `to_evm: true`. The reverse direction is not a `/exchange` action — use an
+  EVM burn transaction (see above).
 
 ---
 
