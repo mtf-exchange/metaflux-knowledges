@@ -52,7 +52,7 @@ Running the node yourself, the same native `/exchange` is served directly at
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `signature` | hex string, 65 bytes (130 hex chars; `0x` optional) | yes | secp256k1 ECDSA over the EIP-712 digest of the **exact `action` bytes** + `nonce`. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
+| `signature` | hex string, 65 bytes (130 hex chars; `0x` optional) | yes | secp256k1 ECDSA over the EIP-712 [typed-data digest](#signing) of the action's structured fields + `nonce`. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
 | `nonce` | uint64 | yes | Strictly-monotonic per actor. Conventionally `Date.now()`. Bound into the signed digest. See [idempotency](../../integration/idempotency.md). |
 | `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. |
 
@@ -69,25 +69,27 @@ whose state mutates is determined per action:
   dispatch.
 {% endhint %}
 
-The `action` is verified over the **exact bytes sent** — the server never
-re-serializes it. Send the `action` field byte-for-byte as it was signed (do not
-reorder keys or change whitespace after signing), or recovery yields a different
-signer and the request is rejected `401`.
+The server reconstructs the EIP-712 typed struct from `action.type` +
+`action.params` and recovers the signer over **those field values** — so the
+`action.params` you send must carry the **same values** (and the same canonical
+decimal strings) you put in the typed message you signed. A mismatch recovers a
+different signer and the request is rejected `401`. See
+[typed-data signing](../../integration/typed-data-signing.md).
 
 ## Signing
 
-The signature is a secp256k1 ECDSA recovery over a standard EIP-712 digest whose
-**struct hash** binds the raw JSON `action` bytes and the `nonce`:
+The signature is a secp256k1 ECDSA recovery over a standard EIP-712 digest. Each
+action is signed as **structured EIP-712 typed data** (`eth_signTypedData_v4`)
+with a per-action primary type `MetaFluxTransaction:<Action>`, so a wallet renders
+each field by name. The server reconstructs the typed struct from `action.type` +
+`action.params`, recomputes the digest, and recovers the signer:
 
 ```
-type_hash   = keccak256("MetaFluxAction(string action,uint64 nonce)")
-struct_hash = keccak256( type_hash ‖ keccak256(action_json) ‖ uint256_be(nonce) )
+struct_hash = keccak256( typeHash(MetaFluxTransaction:<Action>) ‖ encodeData(fields) )
 signed_hash = keccak256( 0x1901 ‖ domain_separator ‖ struct_hash )
 ```
 
-where `action_json` is the **exact UTF-8 bytes of the `action` object** the
-client signs and sends (the server hashes the raw received bytes, not a
-re-serialization), and:
+where the domain separator is:
 
 ```
 domain_separator = keccak256(
@@ -99,20 +101,16 @@ domain_separator = keccak256(
 )
 ```
 
-The `action` body is treated as a single EIP-712 `string` field — there is **no
-per-action `typeHash`**. One canonical encoder (`MetaFluxAction(string
-action,uint64 nonce)`) covers the whole action surface, so adding a new action
-variant never adds a signing primitive. See [signing
-walkthrough](../../integration/signing.md) for a working example; a
-cross-implementation known-answer test pins this digest.
+The per-action type strings, the atomic `encodeData` rules, and worked examples
+are in [typed-data signing](../../integration/typed-data-signing.md) — the single
+signing scheme. A cross-implementation known-answer test pins each action's
+digest.
 
 {% hint style="info" %}
-**Opt-in alternative: structured typed data.** A subset of actions can instead be
-signed as per-action EIP-712 typed data (`eth_signTypedData_v4`), so a wallet
-renders each field by name. Set `sig_scheme: "typed"` on the envelope to select
-it; absent / `"legacy"` keeps the opaque scheme described here. See
-[typed-data signing](../../integration/typed-data-signing.md) for the covered
-actions and their type strings.
+**`sig_scheme` is vestigial.** Earlier builds carried a `sig_scheme` selector on
+the envelope; it is no longer required and the server ignores it (typed-data
+recovery runs unconditionally). **Omit it.** If present, the only accepted value
+is `"typed"`.
 {% endhint %}
 
 ### Chain IDs
@@ -1725,9 +1723,8 @@ recovered signer is the account debited. An agent signature therefore acts on
 the **agent's own** account, never the master's, so this is effectively
 master-only (consistent with the [signed-by table](#signed-by-semantics)).
 
-This action is **typed-only**: it is accepted exclusively under the EIP-712
-[`sig_scheme: "typed"`](#signing) path (primary type
-`MetaFluxTransaction:CoreEvmTransfer`). There is no opaque-envelope form.
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:CoreEvmTransfer`.
 
 ```json
 {
@@ -2062,7 +2059,7 @@ client                gateway                 node                  consensus
 - [HL-compat `/exchange`](./hl-compat.md) — alternative wire shape for HL clients
 - [Agent wallets](../../concepts/agent-wallets.md)
 - [Signing walkthrough](../../integration/signing.md)
-- [Typed-data signing](../../integration/typed-data-signing.md) — opt-in `sig_scheme: "typed"`
+- [Typed-data signing](../../integration/typed-data-signing.md) — the EIP-712 signing scheme
 - [Order types](../../concepts/order-types.md)
 - [Idempotency](../../integration/idempotency.md)
 - [Errors](../errors.md)
@@ -2070,8 +2067,8 @@ client                gateway                 node                  consensus
 
 ## FAQ
 
-**Q: Why hash the raw JSON `action` instead of EIP-712 typed-data per variant?**
-A: Per-variant EIP-712 typed-data needs one `typeHash` per action type. With ~30 action types and a growing surface, that's a maintenance burden on every SDK. Instead the action body is signed as a single EIP-712 `string` field under one frozen encoder — `MetaFluxAction(string action,uint64 nonce)` — so the whole surface shares one signing primitive. The server hashes the **exact received `action` bytes** (never a re-serialization), which also closes the signature-substitution trap: a body that recovers a valid signer cannot decode to a different action. The EIP-712 envelope (domain + `0x1901` + struct hash) is preserved so wallet integrations (MetaMask, Rabby, Ledger) still see a clean signed-data prompt.
+**Q: How are actions signed?**
+A: As EIP-712 structured typed data (`eth_signTypedData_v4`), one primary type per action (`MetaFluxTransaction:<Action>`), so wallets (MetaMask, Rabby, Ledger) render each field by name instead of an opaque blob. The server reconstructs the typed struct from `action.type` + `action.params`, recomputes the digest, and recovers the signer — so `action.params` must carry the same field values (and the same canonical decimal strings) you signed. A cross-implementation known-answer test pins each action's digest. Full spec: [typed-data signing](../../integration/typed-data-signing.md).
 
 **Q: Can I batch unrelated actions in one request?**
 A: No. Each request is one `action`. For multi-order batching use `batch_order` (an `orders: []` array under one signature), for multi-cancel use `batch_cancel` (a `cancels: []` array), and so on.

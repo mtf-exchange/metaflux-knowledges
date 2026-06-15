@@ -1,41 +1,30 @@
-# Typed-data signing (`sig_scheme: "typed"`)
+# Typed-data signing
 
 {% hint style="info" %}
-**Status: available.** A subset of `/exchange` actions can be signed as
-**structured EIP-712 typed data** (`eth_signTypedData_v4`) instead of the opaque
-[default scheme](./signing.md). The default scheme stays fully supported — typed
-signing is an **opt-in alternative** for the actions listed below.
+**Status: this is the signing scheme.** Every `/exchange` action is signed as
+**structured EIP-712 typed data** (`eth_signTypedData_v4`). There is no alternate
+or legacy scheme to choose between — a wallet (MetaMask, Rabby, Ledger,
+WalletConnect) renders each action field by name in its signing prompt.
 {% endhint %}
 
-The [default signing walkthrough](./signing.md) signs the whole `action` object
-as a single EIP-712 `string` field (one frozen `MetaFluxTransaction`-free
-encoder, the server hashes the raw bytes). That works everywhere but shows the
-user an opaque blob in their wallet.
+Each action has a real per-action EIP-712 type, so the wallet shows the user the
+actual fields they are signing — `destination`, `amount`, `agentName` — rather
+than an opaque blob. The server reconstructs the typed struct from `action.type`
++ `action.params`, recomputes the digest, and recovers the signer.
 
-**Typed-data signing** gives a subset of actions a real per-action EIP-712 type,
-so a wallet (MetaMask, Rabby, Ledger, WalletConnect) renders each field by name —
-`destination`, `amount`, `agentName` — in its signing prompt. Pass
-`sig_scheme: "typed"` on the POST to select it.
+## How it works
 
-## When to use it
+| | Typed data |
+|--|------------|
+| Wallet prompt | Each field rendered by name |
+| Primary type | `MetaFluxTransaction:<Action>` (one per action) |
+| What is hashed | The structured fields (atomic EIP-712 encoding) |
 
-| | Default scheme | Typed scheme (`sig_scheme: "typed"`) |
-|--|----------------|--------------------------------------|
-| Wallet prompt | Opaque hash / blob | Each field rendered by name |
-| Action coverage | **All** `/exchange` actions | **All wallet-signed actions** (listed below); only orders & cancels stay default-only |
-| Primary type | `MetaFluxAction(string action,uint64 nonce)` (one, frozen) | `MetaFluxTransaction:<Action>` (one per action) |
-| What is hashed | The raw `action` JSON bytes | The structured fields (atomic EIP-712 encoding) |
-| Opt-in | default (absent / `"legacy"`) | set `sig_scheme: "typed"` |
-
-Use typed signing when you want users to **see what they sign** in a standard
-wallet — transfers, withdrawals, agent approvals, and account/staking/vault/
-spot-margin/earn/bridge settings. Every wallet-signed `/exchange` action can be
-typed-signed. Only **orders and cancels** stay default-scheme only — keep the
-[default scheme](./signing.md) for those.
+Users **see what they sign** in a standard wallet — transfers, withdrawals, agent
+approvals, and account/staking/vault/spot-margin/earn/bridge settings all carry
+named fields.
 
 ## Wire shape
-
-The POST envelope is the same as the default path, with one extra field:
 
 ```json
 {
@@ -44,26 +33,30 @@ The POST envelope is the same as the default path, with one extra field:
   "action": {
     "type":   "send_asset",
     "params": { /* the action fields */ }
-  },
-  "sig_scheme": "typed"
+  }
 }
 ```
 
 | Field | Meaning |
 |-------|---------|
-| `sig_scheme: "typed"` | Selects the structured path. **Absent** or `"legacy"` keeps the [default opaque scheme](./signing.md). |
 | `nonce` | The single envelope `nonce` is **also** the `nonce` field inside the signed typed struct — they must match. |
-| `action.type` | `snake_case` action tag, exactly as on the default path. |
+| `action.type` | `snake_case` action tag. |
 | `action.params` | The action fields. Must carry the **same values** (and the same canonical decimal strings) you hashed. |
 
 The server reconstructs the typed struct from `action.type` + `action.params`,
-recomputes the EIP-712 digest, recovers the signer, and authorizes it exactly
-like the default path (signer is the account, or an approved
-[agent](../concepts/agent-wallets.md) of it).
+recomputes the EIP-712 digest, recovers the signer, and authorizes it (signer is
+the account, or an approved [agent](../concepts/agent-wallets.md) of it).
+
+{% hint style="info" %}
+**`sig_scheme` is vestigial.** Earlier builds carried a `sig_scheme` selector on
+the envelope. It is no longer required and the server ignores it — typed-data
+recovery runs unconditionally. **Omit it.** If you do send it, the only accepted
+value is `"typed"`.
+{% endhint %}
 
 ## EIP-712 domain
 
-Identical to the default scheme — one domain per network, cache it:
+One domain per network, cache it:
 
 ```
 EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)
@@ -130,13 +123,11 @@ This is why typed signing carries decimals as strings rather than scaled
 integers: the wallet prompt shows a human-readable amount, and the hash-then-parse
 rule keeps the signed bytes unambiguous.
 
-## The typed-signable actions
+## Action type strings
 
-Every wallet-signed `/exchange` action is typed-signable (only orders and cancels
-stay default-scheme only). For each action the **primary type** is
-`MetaFluxTransaction:<Action>` and the `encodeType` string is given below (the
-field order is the message field order). `action.type` is the `snake_case` tag you
-put on the POST.
+For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
+`encodeType` string is given below (the field order is the message field order).
+`action.type` is the `snake_case` tag you put on the POST.
 
 ### Transfers
 
@@ -233,24 +224,20 @@ Notes on specific fields:
   string (it is not a number; hashed as `keccak256(utf8)`).
 - `mb_withdraw`: the typed `chain` field is a **`uint8`** — `0` = Solana, `1` =
   Base, `2` = Arbitrum. But the POST `action.params.chain` is the **string name**
-  (`"Solana"` / `"Base"` / `"Arbitrum"`), exactly as on the default path. So sign
-  the `uint8` in the typed message and send the string name in `params`.
+  (`"Solana"` / `"Base"` / `"Arbitrum"`). So sign the `uint8` in the typed message
+  and send the string name in `params`.
 - `mb_withdraw`: `amount` is a `uint64` **integer** (not a decimal string);
   `dstAddr` is the destination-chain address string.
 
 ### Fields that are *not* in the typed digest
 
-Two actions accept extra `params` keys on the default path that the typed type
-string does **not** cover, so under `sig_scheme: "typed"` the server forces them
-to default:
+Two actions have `params` keys that the typed type string does **not** cover, so
+the server forces them to their default:
 
-- `approve_agent` — the typed `ApproveAgent` type has **no `expires_at_ms`**.
-  Typed `approve_agent` is therefore **no-expiry**. **Omit** `expires_at_ms`.
-- `create_vault` — the typed `CreateVault` type has **no `parent`**. Typed
-  `create_vault` is therefore **top-level** (no parent). **Omit** `parent`.
-
-If you need an agent expiry or a parented vault, use the
-[default scheme](./signing.md) for that one action.
+- `approve_agent` — the `ApproveAgent` type has **no `expires_at_ms`**, so
+  `approve_agent` is **no-expiry**. **Omit** `expires_at_ms`.
+- `create_vault` — the `CreateVault` type has **no `parent`**, so `create_vault`
+  is **top-level** (no parent). **Omit** `parent`.
 
 ## Worked example — `send_asset` (a transfer)
 
@@ -323,7 +310,6 @@ await fetch(`${BASE_URL}/exchange`, {
         to_perp:         true,
       },
     },
-    sig_scheme: 'typed',
   }),
 });
 ```
@@ -382,10 +368,9 @@ await fetch(`${BASE_URL}/exchange`, {
       params: {
         agent: '0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1',
         name:  'trading-bot',
-        // no expires_at_ms — typed approve_agent is no-expiry
+        // no expires_at_ms — approve_agent is no-expiry
       },
     },
-    sig_scheme: 'typed',
   }),
 });
 ```
@@ -404,14 +389,13 @@ the same result.
 
 ## Orders and cancels
 
-Every wallet-signed `/exchange` action above is typed-signable. The **only**
-actions that stay on the [default scheme](./signing.md) are **orders and
-cancels** — posting them with `sig_scheme: "typed"` returns an unsupported-scheme
-error, so sign them with the default opaque envelope.
+Orders and cancels (`submit_order`, `batch_order`, `cancel_order`,
+`batch_cancel`) are submitted through the same `/exchange` envelope and signed the
+same EIP-712 typed-data way. Their action-body shapes are in the
+[`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
 
 ## See also
 
-- [Signing walkthrough](./signing.md) — the default opaque scheme (all actions)
 - [`POST /exchange`](../api/rest/exchange.md) — the endpoint and full action catalog
 - [Agent wallets](../concepts/agent-wallets.md) — approval lifecycle
 - [Networks](../networks.md) — `chainId` per network
