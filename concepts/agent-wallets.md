@@ -85,7 +85,7 @@ domain_separator = keccak256(
 
 This composition matches EIP-712 standard envelope semantics; clients on the EVM stack that already speak EIP-712 (MetaMask, Rabby, Ledger, WalletConnect) can be pointed at this domain unmodified.
 
-`action` is encoded as **msgpack** rather than EIP-712 typed-data. This is a deliberate simplification — typed-data would force one `typeHash` per action variant, but msgpack gets a single hash function for the entire action surface. Signature recovery and EVM-compat are unchanged.
+`action` is signed as **EIP-712 structured typed data** — one primary type per action variant (`MetaFluxTransaction:<Action>`), so wallets render each field by name. See [typed-data signing](../integration/typed-data-signing.md) for the per-action type strings. Signature recovery and EVM-compat are unchanged whether the master or an approved agent signs.
 
 ## What the chain stores
 

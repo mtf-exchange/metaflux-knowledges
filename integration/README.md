@@ -16,13 +16,13 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 | A CCXT-based quant framework | [CCXT integration](../api/rest/ccxt-compat.md) |
 | Greenfield TypeScript / browser | [TypeScript SDK](./typescript-sdk.md) |
 | Greenfield Rust service | [Rust SDK](./rust-sdk.md) |
-| Anything else (Python, Go, …) | [Signing walkthrough](./signing.md) — implement the EIP-712 envelope yourself |
+| Anything else (Python, Go, …) | [Typed-data signing](./typed-data-signing.md) — implement the EIP-712 typed-data signature yourself |
 
 ## Topics
 
 - [Quickstart](./quickstart.md) — 5-minute end-to-end (deposit → trade → withdraw)
-- [Signing walkthrough](./signing.md) — EIP-712 envelope end-to-end with working examples
-- [Typed-data signing](./typed-data-signing.md) — opt-in `sig_scheme: "typed"` for human-readable wallet prompts
+- [Typed-data signing](./typed-data-signing.md) — the EIP-712 signing scheme, end-to-end with working examples
+- [Signing walkthrough](./signing.md) — pointer to typed-data signing (kept for older links)
 - [Agent wallets howto](./agent-wallets-howto.md) — concrete code for the hot-key pattern
 - [Idempotency](./idempotency.md) — nonce strategy + safe retry
 - [Error handling](./error-handling.md) — admission vs commit vs network decision tree
@@ -36,7 +36,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 | TypeScript / JavaScript | preview | [`@metaflux/sdk`](./typescript-sdk.md) |
 | Rust | preview | [`metaflux-client`](./rust-sdk.md) |
 
-For other languages (Python, Go, Java, C++ …), implement the EIP-712 envelope per the [signing walkthrough](./signing.md) — every step is documented with worked examples. The wire is small enough that a hand-rolled client is the right call for niche stacks.
+For other languages (Python, Go, Java, C++ …), implement the EIP-712 typed-data signature per [typed-data signing](./typed-data-signing.md) — every step is documented with worked examples. The wire is small enough that a hand-rolled client is the right call for niche stacks.
 
 ## Network endpoints
 
