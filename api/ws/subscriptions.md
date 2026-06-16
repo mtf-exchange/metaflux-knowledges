@@ -342,8 +342,8 @@ with no funds), not an empty array.
     "init_margin": "1500", "health": "0.97", "tier": 0,
     "margin_mode": "cross", "pm_enabled": false,
     "positions": [
-      { "asset": 0, "size": "600", "entry_px": "62000", "unrealised_pnl": "441",
-        "isolated": false, "leverage": 7, "position_side": "long" }
+      { "asset": 0, "size": "600", "entry": "62000", "upnl": "441",
+        "isolated": false, "lev": 7, "side": "long" }
     ],
     "balances": { "usdc": "10000", "spot": { "MTF": { "total": "12.5", "hold": "0" } } }
   }
@@ -355,8 +355,8 @@ with no funds), not an empty array.
   REST account read's `MarginScalars`; `tier` is the liquidation tier index,
   `margin_mode` the account default, `pm_enabled` whether portfolio margin is on.
 - `positions[]` — one entry per open perp position: `asset` (numeric id), `size`
-  (signed 1e8-plane string), `entry_px` / `unrealised_pnl` (whole-USDC),
-  `isolated`, `leverage`, and `position_side` (`long` / `short`, present in
+  (signed 1e8-plane string), `entry` / `upnl` (whole-USDC),
+  `isolated`, `lev`, and `side` (`long` / `short`, present in
   hedge mode).
 - `balances` — `{usdc, spot}`: `usdc` is the quote collateral (whole-USDC); `spot`
   maps token → `{total, hold}`.
