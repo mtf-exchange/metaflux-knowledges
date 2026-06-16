@@ -109,7 +109,7 @@ Response (a faucet-funded account, no positions):
     "init_margin":     "0",
     "health":          "3000",
     "tier":            "Safe",
-    "margin_mode":     "Cross",
+    "mode":            "Cross",
     "pm_enabled":      false,
     "positions": [],
     "balances": {
@@ -154,7 +154,7 @@ A positioned account adds entries under `positions`:
 | `init_margin` | Decimal string | Held initial-margin requirement |
 | `health` | Decimal string | `account_value − maint_margin` (signed; can be negative) |
 | `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / maint_margin`; `"Safe"` when no maint margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
-| `margin_mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` (derived from the account's open positions) |
+| `mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` (derived from the account's open positions) |
 | `pm_enabled` | bool | Portfolio margin opt-in state |
 | `positions[*].asset` | uint32 | Asset id |
 | `positions[*].size` | i128 string | Signed position size in **raw lots** — `size / 10^sz_decimals` = whole units (`sz_decimals` is the market's size precision, e.g. 5 for BTC). This is the SIZE plane, orthogonal to the 1e8 price plane. |
@@ -183,7 +183,7 @@ is not needed. Required: `address` (0x hex).
 ```
 
 Response (`data`): `address`, `account_value`, `free_collateral`,
-`maint_margin`, `init_margin`, `health`, `tier`, `margin_mode`, `pm_enabled` —
+`maint_margin`, `init_margin`, `health`, `tier`, `mode`, `pm_enabled` —
 identical field semantics to the same-named fields on
 [`account_state`](#account_state) (computed by the shared helper, so the two
 never disagree).
@@ -2515,7 +2515,7 @@ Response:
     "address": "0x<addr>",
     "clearinghouse": {
       "account_value": "1000000", "margin_used": "100000",
-      "positions": [ { "asset": 0, "size": "50", "entry_notional": "2500", "margin_mode": "cross", "leverage": 10 } ]
+      "positions": [ { "asset": 0, "size": "50", "entry_ntl": "2500", "mode": "cross", "lev": 10 } ]
     },
     "spot_balances": [ /* <spot_clearinghouse_state.balances> */ ],
     "open_orders": [ /* <frontend_open_orders.orders> */ ],

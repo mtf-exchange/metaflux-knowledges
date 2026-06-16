@@ -340,7 +340,7 @@ with no funds), not an empty array.
     "address": "0x<addr>",
     "account_value": "10000", "free_collateral": "8500", "maint_margin": "300",
     "init_margin": "1500", "health": "0.97", "tier": 0,
-    "margin_mode": "cross", "pm_enabled": false,
+    "mode": "cross", "pm_enabled": false,
     "positions": [
       { "asset": 0, "size": "600", "entry": "62000", "upnl": "441",
         "isolated": false, "lev": 7, "side": "long" }
@@ -353,7 +353,7 @@ with no funds), not an empty array.
 - Margin scalars (`account_value` / `free_collateral` / `maint_margin` /
   `init_margin` / `health`) are **whole-USDC** decimal strings, identical to the
   REST account read's `MarginScalars`; `tier` is the liquidation tier index,
-  `margin_mode` the account default, `pm_enabled` whether portfolio margin is on.
+  `mode` the account default, `pm_enabled` whether portfolio margin is on.
 - `positions[]` — one entry per open perp position: `asset` (numeric id), `size`
   (signed 1e8-plane string), `entry` / `upnl` (whole-USDC),
   `isolated`, `lev`, and `side` (`long` / `short`, present in
@@ -422,7 +422,7 @@ when the account has no funds / positions / orders), not an empty array.
       "account_value": "10000",
       "margin_used": "300",
       "positions": [
-        { "asset": 0, "size": "600", "entry_notional": "2500", "margin_mode": "cross", "leverage": 10 }
+        { "asset": 0, "size": "600", "entry_ntl": "2500", "mode": "cross", "lev": 10 }
       ]
     },
     "spot_balances": [
@@ -455,10 +455,10 @@ sub-reader, so the shapes never drift from the standalone reads):
 - `clearinghouse` — the perp account summary: `account_value` (cross account
   value, whole-USDC decimal string), `margin_used` (Σ per-asset maintenance
   margin used, whole-USDC), and `positions[]`. Each position row is
-  `{asset, size, entry_notional, margin_mode, leverage}`: `asset` is the numeric
+  `{asset, size, entry_ntl, mode, lev}`: `asset` is the numeric
   market id, `size` is the signed 1e8-plane size string (one row per non-zero
-  leg, so a hedge-mode account reports both legs), `entry_notional` is whole-USDC,
-  `margin_mode` ∈ `cross` / `isolated` / `strict_iso`, `leverage` is the
+  leg, so a hedge-mode account reports both legs), `entry_ntl` is whole-USDC,
+  `mode` ∈ `cross` / `isolated` / `strict_iso`, `lev` is the
   position's max leverage. Zero-size legs are omitted.
 - `spot_balances` — the `balances` array from [`spot_state`](#spot_state) /
   REST `spot_clearinghouse_state`: one entry per held spot token,
