@@ -134,15 +134,15 @@ A positioned account adds entries under `positions`:
 {
   "asset":             0,
   "size":              "100000000",
-  "entry_px":          "67000.00",
-  "unrealised_pnl":    "5.00",
+  "entry":             "67000.00",
+  "upnl":              "5.00",
   "isolated":          false,
-  "leverage":          10,
-  "liquidation_px":    "61000.00",
-  "return_on_equity":  "0.0075",
-  "cum_funding":       "-0.12",
-  "margin_used":       "201.00",
-  "position_value":    "6705.00"
+  "lev":               10,
+  "liq":               "61000.00",
+  "roe":               "0.0075",
+  "funding":           "-0.12",
+  "margin":            "201.00",
+  "notional":          "6705.00"
 }
 ```
 
@@ -158,16 +158,16 @@ A positioned account adds entries under `positions`:
 | `pm_enabled` | bool | Portfolio margin opt-in state |
 | `positions[*].asset` | uint32 | Asset id |
 | `positions[*].size` | i128 string | Signed position size in **raw lots** — `size / 10^sz_decimals` = whole units (`sz_decimals` is the market's size precision, e.g. 5 for BTC). This is the SIZE plane, orthogonal to the 1e8 price plane. |
-| `positions[*].entry_px` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
-| `positions[*].unrealised_pnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
+| `positions[*].entry` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
+| `positions[*].upnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
 | `positions[*].isolated` | bool | `true` unless the position is cross-margined |
-| `positions[*].leverage` | uint8 | Position max leverage |
-| `positions[*].liquidation_px` | Decimal string | Price (whole-USDC) at which this position alone would bring the account to maintenance — single-position cross approximation; `"0"` when size / leverage is zero (no finite liq price) |
-| `positions[*].return_on_equity` | Decimal string | `unrealised_pnl / initial_margin` as a decimal fraction (`initial_margin = \|entry_notional\| / leverage`); `"0"` at zero leverage / notional |
-| `positions[*].cum_funding` | Decimal string | Accrued-but-unsettled funding for the leg, **whole-USDC** (signed); `real_size × (cumulative_funding − funding_entry)` — the same form the funding settlement pays |
-| `positions[*].margin_used` | Decimal string | Maintenance margin the leg contributes, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
-| `positions[*].position_value` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
-| `positions[*].position_side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
+| `positions[*].lev` | uint8 | Position max leverage |
+| `positions[*].liq` | Decimal string | Price (whole-USDC) at which this position alone would bring the account to maintenance — single-position cross approximation; `"0"` when size / leverage is zero (no finite liq price) |
+| `positions[*].roe` | Decimal string | `upnl / initial_margin` as a decimal fraction (`initial_margin = \|entry_notional\| / leverage`); `"0"` at zero leverage / notional |
+| `positions[*].funding` | Decimal string | Accrued-but-unsettled funding for the leg, **whole-USDC** (signed); `real_size × (cumulative_funding − funding_entry)` — the same form the funding settlement pays |
+| `positions[*].margin` | Decimal string | Maintenance margin the leg contributes, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
+| `positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
+| `positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
 | `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); each value is a `{total, hold}` object (`hold` = escrow locked behind resting spot orders; spendable = `total − hold`); empty if none |
 
