@@ -12,7 +12,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 | If you're starting from… | Go to |
 |--------------------------|-------|
 | Nothing — just want to try it | [Quickstart](./quickstart.md) |
-| An existing Hyperliquid bot / tool | [Migrating from Hyperliquid](./migrating-from-hl.md) |
+| An existing HL bot / tool | [Migrating from HL](./migrating-from-hl.md) |
 | A CCXT-based quant framework | [CCXT integration](../api/rest/ccxt-compat.md) |
 | Greenfield TypeScript / browser | [TypeScript SDK](./typescript-sdk.md) |
 | Greenfield Rust service | [Rust SDK](./rust-sdk.md) |
@@ -27,7 +27,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 - [Idempotency](./idempotency.md) — nonce strategy + safe retry
 - [Error handling](./error-handling.md) — admission vs commit vs network decision tree
 - [Risk-watcher pattern](./risk-watcher.md) — automated margin top-up
-- [Migrating from Hyperliquid](./migrating-from-hl.md) — drop-in for HL bots
+- [Migrating from HL](./migrating-from-hl.md) — drop-in for HL bots
 
 ## SDKs
 
@@ -47,7 +47,7 @@ The gateway (`https://<net>-gateway.mtf.exchange`) is the single public front do
 | Path | Serves | Purpose |
 |------|--------|---------|
 | `POST /info` · `POST /exchange` · `GET /ws` | MTF-native (default) | Native snake_case surface |
-| `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` | HL-compat | Hyperliquid wire shape |
+| `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` | HL-compat | HL wire shape |
 | `/ccxt/*` | CCXT-compat | CCXT REST methods |
 | `POST /evm` | EVM JSON-RPC | EVM sidechain RPC |
 | `POST /faucet` | Faucet | devnet/testnet test tap |

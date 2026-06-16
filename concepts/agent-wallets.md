@@ -208,4 +208,4 @@ Agents *can* trade, cancel, modify margin mode within bounds, place / cancel TWA
 
 - [`POST /exchange`](../api/rest/exchange.md) — the admission path
 - [Signing walkthrough](../integration/signing.md) — concrete EIP-712 example end-to-end
-- [Migrating from Hyperliquid](../integration/migrating-from-hl.md) — drop-in patterns for HL bots
+- [Migrating from HL](../integration/migrating-from-hl.md) — drop-in patterns for HL bots

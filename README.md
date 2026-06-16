@@ -24,14 +24,14 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 
 {% hint style="info" %}
 **New?** Start with the [Quickstart](./integration/quickstart.md) (5 minutes, deposit → trade → withdraw).
-**Migrating from another perps DEX?** Jump to [Migrating from Hyperliquid](./integration/migrating-from-hl.md) — the patterns translate to other HL-compatible bots.
+**Migrating from another perps DEX?** Jump to [Migrating from HL](./integration/migrating-from-hl.md) — the patterns translate to other HL-compatible bots.
 **Building on-chain?** See [MIP-3 permissionless market deploy](./mip/mip-3.md).
 {% endhint %}
 
 ## Quick links
 
 - [Quickstart](./integration/quickstart.md) — 5-minute end-to-end
-- [Migrating from Hyperliquid](./integration/migrating-from-hl.md) — drop-in for HL bots
+- [Migrating from HL](./integration/migrating-from-hl.md) — drop-in for HL bots
 - [`POST /exchange`](./api/rest/exchange.md) — write path with full action catalog
 - [`POST /info`](./api/rest/info.md) — read path
 - [Tiered liquidation](./concepts/tiered-liquidation.md) — T0 yellow card → T4 ADL ladder
@@ -81,7 +81,7 @@ For developers building on MetaFlux:
 - [Idempotency](./integration/idempotency.md)
 - [Error handling](./integration/error-handling.md)
 - [Risk-watcher pattern](./integration/risk-watcher.md)
-- [Migrating from Hyperliquid](./integration/migrating-from-hl.md)
+- [Migrating from HL](./integration/migrating-from-hl.md)
 - [TypeScript SDK](./integration/typescript-sdk.md)
 - [Rust SDK](./integration/rust-sdk.md)
 

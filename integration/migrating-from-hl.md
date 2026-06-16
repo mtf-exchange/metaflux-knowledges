@@ -1,10 +1,10 @@
-# Migrating from Hyperliquid
+# Migrating from HL
 
 {% hint style="info" %}
 **Preview.** The HL-compat surface covers `POST /info` (15 query types) and `POST /exchange` (order + cancel today, more action types over time).
 {% endhint %}
 
-If your bot already speaks Hyperliquid's protocol, you can point it at MetaFlux with **no code change** for the covered surface — same URL shapes, same request/response JSON, same EIP-712 envelope.
+If your bot already speaks HL's protocol, you can point it at MetaFlux with **no code change** for the covered surface — same URL shapes, same request/response JSON, same EIP-712 envelope.
 
 ## What works out of the box
 
@@ -29,7 +29,7 @@ Update one constant in your signing code and the rest of the EIP-712 envelope is
 ### 2. Base URL
 
 ```
-HL:  https://api.hyperliquid.xyz/{info,exchange}
+HL:  https://<your-current-hl-api-base>/{info,exchange}
 MTF: https://gateway.<your-deployment>/hl/{info,exchange}
 ```
 
@@ -110,13 +110,13 @@ These are MTF-native actions, sent on the gateway's default path (`POST /exchang
 ### 1. Simple limit-order MM (the canonical pattern)
 
 ```diff
-- const HL_URL = 'https://api.hyperliquid.xyz';
+- const HL_URL = 'https://<your-current-hl-api-base>';
 + const MTF_URL = 'https://gateway.mtf.exchange/hl';   // HL-compat is under /hl/*
 
 - const HL_CHAIN_ID = 1337;
 + const MTF_CHAIN_ID = 114514;    // testnet (mainnet 8964, devnet 31337)
 
-- const HL_DOMAIN_NAME = 'HyperliquidSignTransaction';   // varies by mode
+- const HL_DOMAIN_NAME = 'HLSignTransaction';   // varies by mode
 + const MTF_DOMAIN_NAME = 'MetaFlux';
 + const MTF_DOMAIN_VERSION = '1';
 

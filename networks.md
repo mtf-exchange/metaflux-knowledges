@@ -80,7 +80,7 @@ Pre-mainnet rehearsal network with stability guarantees.
 | Faucet | TBD (rate-limited) |
 | Explorer | TBD |
 
-Testnet `chainId`: `114514` (`0x1bf52`). (Never 998 — that is Hyperliquid's testnet id; MetaFlux is an independent network.)
+Testnet `chainId`: `114514` (`0x1bf52`). MetaFlux is an independent network with its own chain ids.
 
 Testnet differences from mainnet:
 - USDC is bridged via MetaBridge from a testnet source chain (Base Sepolia test USDC), not real USDC.

@@ -80,7 +80,7 @@
   * [Idempotency](integration/idempotency.md)
   * [Error handling](integration/error-handling.md)
   * [Risk-watcher pattern](integration/risk-watcher.md)
-  * [Migrating from Hyperliquid](integration/migrating-from-hl.md)
+  * [Migrating from HL](integration/migrating-from-hl.md)
   * SDKs
     * [TypeScript SDK](integration/typescript-sdk.md)
     * [Rust SDK](integration/rust-sdk.md)

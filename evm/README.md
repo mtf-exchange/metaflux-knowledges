@@ -9,8 +9,8 @@ cross-chain precompiles are upcoming. The [bridge](../bridge/) is live.
 
 The MetaFlux EVM is a [revm](https://github.com/bluealloy/revm)-based **sidechain**
 that runs ordinary Solidity contracts and exposes MetaFlux **Core** — the L1 perps
-clearinghouse and on-chain CLOB — to those contracts. It is the MetaFlux analogue
-of HyperEVM ↔ HyperCore.
+clearinghouse and on-chain CLOB — to those contracts: an EVM execution layer wired
+directly into the L1 it settles against.
 
 ## What's different from a vanilla EVM
 

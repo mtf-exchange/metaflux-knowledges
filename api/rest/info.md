@@ -1750,9 +1750,9 @@ The worst-case scenario loss is intentionally **omitted**: it is not persisted i
 committed state, and recomputing it would require re-running the scenario sweep,
 which is not a read-only operation.
 
-## HL-node parity query types
+## Node snapshot query types
 
-The following query types bring the node `/info` surface to parity with the Hyperliquid NODE info-server (`--serve-info`) snapshot set. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index).
+The following query types expose the node's committed-state snapshot surface. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index).
 
 ### `spot_meta`
 
@@ -2537,11 +2537,11 @@ Response:
 
 State source: composite over the readers above.
 
-## HL node info type → MTF-native type (parity table)
+## hl-compat alias → MTF-native type (parity table)
 
-The Hyperliquid NODE info-server (`github.com/hyperliquid-dex/node`, `--serve-info`) serves the snapshot query set below. The middle column is the served MTF-native equivalent; ✅ = served, ⚠️ = served with a flagged proxy (no exact backing in committed state).
+The gateway's [hl-compat](./hl-compat.md) surface exposes each node snapshot type under a camelCase alias for drop-in clients. The left column is that alias; the middle is the MTF-native node type it maps to; ✅ = served, ⚠️ = served with a flagged proxy (no exact backing in committed state).
 
-| HL node info type | MTF-native type | Status | Notes |
+| hl-compat alias | MTF-native type | Status | Notes |
 |----------------------------|------------------------------|--------|-------|
 | `meta` | `markets` | ✅ | already served (S6) |
 | `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
