@@ -76,7 +76,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **High-water mark.** Highest historical share price for a vault, used to gate performance-fee accrual. See [vaults](./vaults.md).
 
-**HL-compat.** The gateway's protocol surface that mirrors Hyperliquid's wire shape (URL, JSON, signatures). See [hl-compat](../api/rest/hl-compat.md).
+**HL-compat.** The gateway's protocol surface that mirrors HL's wire shape (URL, JSON, signatures). See [hl-compat](../api/rest/hl-compat.md).
 
 ## I
 

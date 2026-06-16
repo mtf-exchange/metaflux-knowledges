@@ -13,8 +13,9 @@ on-chain CLOB) in two directions:
 - **Read** — `staticcall` a system **precompile** to get a Core-derived value.
 - **Write** — call the **CoreWriter** system contract to submit an L1 action.
 
-This mirrors the Hyperliquid HyperCore interaction model, so HL-oriented tooling
-and encoders largely carry over.
+The read-precompile / write-contract split lets an EVM contract compose directly
+with live L1 state — quote against the chain's own formulas, then act on the
+clearinghouse — without leaving the VM.
 
 ## Writing to Core — CoreWriter
 
@@ -53,8 +54,7 @@ the EVM call and the L1 outcome.
 
 ### Actions
 
-Ids 1–15 mirror the Hyperliquid CoreWriter action set; 16–20 are MetaFlux
-additions.
+CoreWriter exposes 20 L1 actions (id, big-endian, in the `uint24` slot above):
 
 | id | Action | Purpose |
 |---:|--------|---------|
