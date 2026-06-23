@@ -26,6 +26,7 @@ const sidebars = {
             'concepts/fba',
             'concepts/rfq',
             'concepts/fees',
+            'concepts/fee-schedule',
             'concepts/funding-rates',
             'concepts/oracle-prices',
             'concepts/mark-prices',
