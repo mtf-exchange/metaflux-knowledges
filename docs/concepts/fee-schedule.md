@@ -6,9 +6,9 @@ description: The MetaFlux perpetual fee schedule — volume fee tiers, maker reb
 
 :::info
 **Rate card.** This page is the user-facing schedule of perpetual trading rates.
-For the underlying mechanics — how a fee is split, the burn, referrer and builder
-credits — see [Fees](./fees.md). Tier values are network parameters and can be
-updated by governance.
+For the underlying mechanics — how a fee is split, the buyback-and-distribute
+flow, and the referrer and builder credits — see [Fees](./fees.md). Tier values
+are network parameters and can be updated by governance.
 :::
 
 ## TL;DR
@@ -147,7 +147,8 @@ effective rates above:
 - **Builder codes** — an order-flow originator (front-end, aggregator) can claim a
   share when their address is set on the order.
 
-See [Fees](./fees.md) for the full mechanics, the burn, and how credits are split.
+See [Fees](./fees.md) for the full mechanics — how credits are split and how
+collected fees fund the MTF buyback that is burned and distributed to stakers.
 
 ## Edge cases
 
@@ -171,6 +172,6 @@ See [Fees](./fees.md) for the full mechanics, the burn, and how credits are spli
 
 ## See also
 
-- [Fees](./fees.md) — fee mechanics, burn, referral and builder credits
+- [Fees](./fees.md) — fee mechanics, buyback-and-distribute flow, referral and builder credits
 - [Staking](./staking.md) — stake MTF to unlock the taker discount tiers
 - [Spot trading](./spot-trading.md) — spot fills carry their own per-pair rates
