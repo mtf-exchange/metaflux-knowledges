@@ -448,6 +448,7 @@ Response:
         "side":         "bid",
         "px":        "99000",
         "size":      "700",
+        "cloid":        "0x000000000000000000000000cafef00d",
         "inserted_at_ms": 1700000000000
       }
     ]
@@ -464,7 +465,8 @@ Response:
 | `orders[*].side` | `"bid"` / `"ask"` | Order side |
 | `orders[*].px` | i128 string | Resting price, fixed-point decimal string |
 | `orders[*].size` | u128 string | Remaining size, fixed-point decimal string |
-| `orders[*].inserted_at_ms` | uint64 | Insertion timestamp (consensus ms) |
+| `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none |
+| `orders[*].inserted_at_ms` | uint64 | Placement / insertion timestamp (consensus ms) |
 
 ### `l2_book`
 
@@ -526,12 +528,14 @@ Response:
     "last_trade_ms":  1700000000555,
     "trades": [
       {
-        "coin": 0,
-        "side": "B",
-        "px":   "67042.50",
-        "sz":   "0.125",
-        "time": 1700000000555,
-        "tid":  90123
+        "coin":  0,
+        "side":  "B",
+        "px":    "67042.50",
+        "sz":    "0.125",
+        "time":  1700000000555,
+        "tid":   90123,
+        "block": 562,
+        "hash":  "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c"
       }
     ]
   }
@@ -548,10 +552,12 @@ a recent window, not all history. An unknown / never-traded market returns
 | `last_trade_ms` | uint64 | Timestamp of the last trade (`0` if none) |
 | `trades[*].coin` | uint32 | Asset / market id the trade executed on |
 | `trades[*].side` | `"B"` / `"A"` | Taker (aggressor) side token — `"B"` = buy, `"A"` = sell |
-| `trades[*].px` | Decimal string | Execution price, **whole-USDC plane** |
+| `trades[*].px` | Decimal string | Execution price, **decimal USDC** (human-readable) |
 | `trades[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
 | `trades[*].time` | uint64 | Trade timestamp (consensus ms) |
 | `trades[*].tid` | uint64 | Deterministic trade id (shared by both legs of the print) |
+| `trades[*].block` | uint64 | Committed block height the trade settled in (on-chain locator) |
+| `trades[*].hash` | hex string | Transaction hash of the originating order, `0x`-prefixed hex — lets a print be traced on-chain |
 
 ### `candle`
 
@@ -559,15 +565,6 @@ Historical OHLCV bars for `(coin, interval)` over a time window. The REST
 companion to the live [`candles`](../ws/subscriptions.md#candles) WS channel —
 the WS pushes the forming bar as trades land, this read returns the closed
 history.
-
-{% hint style="warning" %}
-**Price plane differs from the WS channel.** This REST read reports `open` /
-`close` / `high` / `low` in the **whole-USDC Decimal plane** (human dollars,
-e.g. `"67042.50"`) and `volume` in **base units** — whereas the live
-[`candles`](../ws/subscriptions.md#candles) WS frame carries raw **1e8
-fixed-point** integer strings. Same bars, different unit; rescale if you mix the
-two surfaces.
-{% endhint %}
 
 ```json
 { "type": "candle", "coin": "BTC", "interval": "1m" }
@@ -591,34 +588,46 @@ Response:
   "type": "candle",
   "data": [
     {
-      "coin":       "BTC",
-      "interval":   "1m",
-      "open_time":  1700000040000,
-      "close_time": 1700000099999,
-      "open":       "67000.00",
-      "close":      "67042.50",
-      "high":       "67080.00",
-      "low":        "66990.00",
-      "volume":     "12.5",
-      "num_trades": 37
+      "t": 1700000040000,
+      "T": 1700000099999,
+      "s": "BTC",
+      "i": "1m",
+      "o": "67000.00",
+      "c": "67042.50",
+      "h": "67080.00",
+      "l": "66990.00",
+      "v": "12.5",
+      "q": "837843.75",
+      "n": 37
     }
   ]
 }
 ```
 
-Bars are ordered oldest-first by `open_time`; the newest element is the forming
-bar. An empty array is the honest-empty answer for an unsupported `interval`
-token, a market with no indexed trades, or a deployment with no indexer wired.
+Bars are ordered oldest-first by `t` (open time); the newest element is the
+forming bar. An empty array is the honest-empty answer for an unsupported
+`interval` token, a market with no indexed trades, or a deployment with no
+indexer wired.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `coin` | string | Echoed market symbol |
-| `interval` | string | Echoed bucket token |
-| `open_time` | uint64 | Bar open timestamp (ms, bucket-aligned) |
-| `close_time` | uint64 | Bar close timestamp (ms) — `open_time + interval − 1` |
-| `open` / `close` / `high` / `low` | Decimal string | Bar OHLC price, **whole-USDC plane** (human dollars, e.g. `"67042.50"`) |
-| `volume` | Decimal string | Σ traded size in the bar, **base units** (coin size, NOT notional) |
-| `num_trades` | uint64 | Fill count in the bar |
+| `t` | uint64 | Bar **open** timestamp (ms, bucket-aligned) |
+| `T` | uint64 | Bar **close** timestamp (ms) — `t + interval − 1` |
+| `s` | string | Coin / market symbol |
+| `i` | string | Interval bucket token |
+| `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **decimal USDC** (human dollars, e.g. `"67042.50"`) |
+| `v` | Decimal string | **Base-asset volume** — Σ traded size in the bar (coin size, NOT notional) |
+| `q` | Decimal string | **Quote (USD) volume** — `Σ price × size` over the bar's fills |
+| `n` | uint64 | Trade (fill) count in the bar |
+
+{% hint style="info" %}
+**The series is gapless.** An interval with **no trades** still emits a flat bar
+that carries the prior bar's close forward: `o = h = l = c = previous close`, and
+`v = q = 0`, `n = 0`. Consumers get a continuous bar-per-interval series with no
+holes to interpolate. **No bar is emitted before the market's first trade** — the
+series begins at the bucket of the first print, so an empty array means the market
+has never traded (or no history is wired), not that early buckets were dropped.
+{% endhint %}
 
 {% hint style="info" %}
 **This type is served by the gateway, not the node.** Candles are derived
@@ -667,7 +676,9 @@ Response:
         "fee":            "4.19",
         "closed_pnl":     "0",
         "dir":            "Open Long",
-        "start_position": "0"
+        "start_position": "0",
+        "block":          562,
+        "hash":           "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c"
       }
     ]
   }
@@ -684,15 +695,17 @@ a recent window, not all history. An account with no fills returns
 | `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `fills[*].coin` | uint32 | Asset / market id the fill executed on |
 | `fills[*].side` | `"B"` / `"A"` | This leg's side token — `"B"` = buy/bid, `"A"` = sell/ask |
-| `fills[*].px` | Decimal string | Execution price, **whole-USDC plane** |
+| `fills[*].px` | Decimal string | Execution price, **decimal USDC** (human-readable) |
 | `fills[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
 | `fills[*].time` | uint64 | Fill timestamp (consensus ms) |
 | `fills[*].oid` | uint64 | This party's order id |
 | `fills[*].tid` | uint64 | Deterministic trade id (shared by both legs of the print) |
-| `fills[*].fee` | Decimal string | Fee this party paid, **whole-USDC plane** |
-| `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **whole-USDC plane** (signed) |
+| `fills[*].fee` | Decimal string | Fee this party paid, **decimal USDC** |
+| `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **decimal USDC** (signed) |
 | `fills[*].dir` | string | Direction label, e.g. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Signed leg size BEFORE the fill, **base units** (whole-unit, signed) |
+| `fills[*].block` | uint64 | Committed block height the fill settled in (on-chain locator) |
+| `fills[*].hash` | hex string | Transaction hash of the originating order, `0x`-prefixed hex — lets the fill be traced on-chain |
 
 ### `user_fills_by_time`
 
