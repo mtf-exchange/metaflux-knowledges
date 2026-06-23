@@ -265,6 +265,27 @@ a { color: var(--ifm-color-primary); font-weight: 500; }
   border-bottom: 1px solid var(--mtf-border);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 40px -24px rgba(0, 0, 0, 0.6);
 }
+/* Mobile menu drawer fix. `.navbar-sidebar` (and its backdrop) are position:fixed and
+   expect the VIEWPORT as containing block — top/bottom:0 → full height. But a
+   backdrop-filter on an ancestor makes THAT ancestor the containing block for fixed
+   descendants, so the drawer resolved top/bottom against the 64px navbar box and
+   collapsed to navbar height, hiding the menu below it (looked like a z-index issue,
+   wasn't one). When the drawer is open, drop the navbar's backdrop-filter so the
+   viewport is the containing block again — the open drawer covers the navbar anyway,
+   so the glass blur isn't visible here. */
+.navbar.navbar-sidebar--show {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* The drawer borrowed the navbar's blur for legibility; now that we drop that blur
+   while open, give the drawer its own frosted surface so page content doesn't bleed
+   through the translucent menu. (A backdrop-filter here is safe — the drawer has no
+   fixed descendants that need the viewport as their containing block.) */
+.navbar-sidebar {
+  background: var(--mtf-glass-bg);
+  backdrop-filter: var(--mtf-glass-blur);
+  -webkit-backdrop-filter: var(--mtf-glass-blur);
+}
 .navbar__link {
   font-size: 0.9rem;
   font-weight: 500;
