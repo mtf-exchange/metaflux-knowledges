@@ -75,7 +75,7 @@ weight** (not raw token count — see [Staking](./staking.md) for the multiplier
 | Deputy Division Chief                 | `> 8,000`      | 15% | uncapped |
 | Director-General (Mayor)              | `> 30,000`     | 20% | uncapped |
 | Deputy Director-General               | `> 100,000`    | 25% | uncapped |
-| Minister (Governor)                   | `> 500,000` **and top 26 by weight** | 32% | **26 seats** |
+| Minister (Governor)                   | `> 500,000`    | 32% | uncapped |
 | Vice Minister (Vice Governor)         | `> 1,500,000`  | 35% | uncapped |
 | State Councilor / Vice Premier        | `> 5,000,000`  | 40% | uncapped |
 | Premier / President / General Secretary | `> 10,000,000` **and ranked #1 by weight** | 50% | **1 seat** |
@@ -83,28 +83,24 @@ weight** (not raw token count — see [Staking](./staking.md) for the multiplier
 Discounts climb monotonically from **5% to 50%**, thresholds from **100 to
 10,000,000**.
 
-### Two tracks: uncapped grades vs capped seats
+### Two tracks: uncapped grades vs the single capped seat
 
 The ladder runs on **two tracks**:
 
-- **Threshold grades (uncapped).** Every grade except the two top full grades is a
+- **Threshold grades (uncapped).** Every grade except the single top grade is a
   pure threshold: clear the effective-weight bar and you hold the grade, with no
-  limit on how many accounts can. The **Deputy** grades are all pure-threshold and
-  uncapped.
-- **Competitive seats (capped).** The two top full grades are **capped and
-  competitive** — you must both clear the threshold **and** rank high enough:
-  - **Minister (Governor)** is the **top 26 accounts by effective weight** among
-    those over `500,000`. There are **26 Minister seats**.
+  limit on how many accounts can. The **Deputy** grades and **Minister (Governor)**
+  are all pure-threshold and uncapped.
+- **Competitive seat (capped).** Only the top grade is **capped and competitive** —
+  you must both clear the threshold **and** rank high enough:
   - **Premier / President / General Secretary** is the **single #1 account** by
     effective weight among those over `10,000,000`. There is **1 seat**.
 
-  Seats are awarded in **real time**: if a seated holder unstakes or their
+  The seat is awarded in **real time**: if the seated holder unstakes or their
   effective weight drops below a contender's, the seat **passes to the
-  next-ranked qualifying account immediately**. An account that clears a capped
-  grade's threshold but does not win a seat is held at the **highest uncapped grade
-  it qualifies for** (e.g. a `> 500,000` account outside the top 26 sits at Deputy
-  Director-General; a `> 10,000,000` account that is not #1 sits at State Councilor
-  / Vice Premier).
+  next-ranked qualifying account immediately**. An account that clears the
+  `> 10,000,000` threshold but does not win the seat is held at the **highest
+  uncapped grade it qualifies for** (State Councilor / Vice Premier).
 
 See [Staking](./staking.md) for how to stake MTF and how effective weight is
 derived. **Flexible (no-lock) staking carries 0× weight** and therefore only ever
@@ -203,11 +199,10 @@ collected fees fund the MTF buyback that is burned and distributed to stakers.
 - **Staking discount, maker rate.** The staking discount applies to taker only. A
   Premier / President / General Secretary staker still pays (or earns) the full
   maker rate; only the taker side is discounted.
-- **Capped grades are competitive.** The two top full grades (Minister, 26 seats;
-  Premier / President / General Secretary, 1 seat) are awarded by **rank**, not
-  threshold alone. Clearing
-  the threshold is necessary but not sufficient — if the seats are full you hold
-  the highest uncapped grade you qualify for until a seat frees up. Seats reassign
+- **The top grade is competitive.** Only the top grade (Premier / President /
+  General Secretary, 1 seat) is awarded by **rank**, not threshold alone. Clearing
+  the threshold is necessary but not sufficient — if the seat is taken you hold
+  the highest uncapped grade you qualify for until it frees up. The seat reassigns
   in real time as effective weights move.
 
 </details>

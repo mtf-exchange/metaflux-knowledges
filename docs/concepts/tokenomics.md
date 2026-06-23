@@ -66,16 +66,16 @@ administrative-grade ladder up to **50%** off taker:
 | Deputy Division Chief                     | 15% |
 | Director-General (Mayor)                  | 20% |
 | Deputy Director-General                   | 25% |
-| Minister (Governor) *(top 26)*            | 32% |
+| Minister (Governor)                       | 32% |
 | Vice Minister (Vice Governor)             | 35% |
 | State Councilor / Vice Premier            | 40% |
 | Premier / President / General Secretary *(#1)* | 50% |
 
-The two top full grades — **Minister (Governor)** (the top 26 accounts by
-effective weight) and **Premier / President / General Secretary** (the single #1
-account) — are **capped and competitive**; every other grade, including all the
-**Deputy** grades, is a pure uncapped threshold. Seats reassign in real time as
-weights move. Full thresholds and seat rules are on the
+Only the top grade — **Premier / President / General Secretary** (the single #1
+account by effective weight) — is **capped and competitive**; every other grade,
+including all the **Deputy** grades and **Minister (Governor)**, is a pure uncapped
+threshold. The seat reassigns in real time as weights move. Full thresholds and
+seat rules are on the
 [Fee schedule](./fee-schedule.md#3-staking-discount-tiers-mtf-staked).
 
 The discount applies to the **taker rate only** and stacks with the volume-based
@@ -511,21 +511,20 @@ evaluated on weight:
 | Deputy Division Chief                 | `> 8,000`      | 15% | uncapped |
 | Director-General (Mayor)              | `> 30,000`     | 20% | uncapped |
 | Deputy Director-General               | `> 100,000`    | 25% | uncapped |
-| Minister (Governor)                   | `> 500,000` **and top 26 by weight** | 32% | **26 seats** |
+| Minister (Governor)                   | `> 500,000`    | 32% | uncapped |
 | Vice Minister (Vice Governor)         | `> 1,500,000`  | 35% | uncapped |
 | State Councilor / Vice Premier        | `> 5,000,000`  | 40% | uncapped |
 | Premier / President / General Secretary | `> 10,000,000` **and ranked #1 by weight** | 50% | **1 seat** |
 
 Two tracks run here, same as the [fee schedule](./fee-schedule.md#3-staking-discount-tiers-mtf-staked):
-the **Deputy** grades and all grades below the top two are **pure uncapped
-thresholds**; **Minister (Governor)** (top 26 by weight) and **Premier / President
-/ General Secretary** (the single #1) are **capped, competitive seats** reassigned
-in real time. Flexible (0×) stakers reach only the **lowest grade** regardless of
-threshold; the **higher** grades require a lock so that
-`staked_amount × time_multiplier` clears the bar (and, for the two capped grades, a
-winning rank). So **raw tokens alone are not enough for the top grades** — they
-must be committed to a long enough lock, and the top two must also out-rank the
-field.
+the **Deputy** grades, **Minister (Governor)**, and every grade below the top are
+**pure uncapped thresholds**; only **Premier / President / General Secretary** (the
+single #1) is a **capped, competitive seat** reassigned in real time. Flexible (0×)
+stakers reach only the **lowest grade** regardless of threshold; the **higher**
+grades require a lock so that `staked_amount × time_multiplier` clears the bar (and,
+for the single capped grade, a winning rank). So **raw tokens alone are not enough
+for the top grades** — they must be committed to a long enough lock, and the very
+top must also out-rank the field.
 
 #### Worked example — short / flexible does NOT climb; a long lock does
 
@@ -560,16 +559,15 @@ months to climb." It is **commit to the lock and you reach the grade after the
 *commitment*, not earned by elapsed time. The price is that the tokens are then
 **hard-locked for the full term and cannot be unstaked early**.
 
-**The two capped grades add a second hurdle.** The two top full grades —
-**Minister (Governor)** (the top 26 by effective weight) and **Premier / President
-/ General Secretary** (the single #1) — require not just clearing the threshold but
-**winning a seat**. A whale who clears `> 500,000` but ranks outside the top 26 is
-held at the highest **uncapped** grade they qualify for (Deputy Director-General);
-clearing `> 10,000,000` without being #1 lands at State Councilor / Vice Premier.
-Seats reassign in real time as effective weights move.
+**The top grade adds a second hurdle.** The single top grade — **Premier /
+President / General Secretary** (the single #1 by effective weight) — requires not
+just clearing the threshold but **winning the seat**. A whale who clears
+`> 10,000,000` without being #1 is held at the highest **uncapped** grade they
+qualify for (State Councilor / Vice Premier). The seat reassigns in real time as
+effective weights move.
 
 So the upper grades are **bought with a time-commitment, not with size alone** —
-and the very top two also demand a **competitive rank**. A flexible or short-locked
+and the very top also demands a **competitive rank**. A flexible or short-locked
 whale is capped low and earns no dividend; a smaller staker who commits a longer
 lock can out-rank them and take a dividend slice. Capital that refuses to lock gets
 a fee break but not a cut of the buyback — the core anti-mercenary property of the
@@ -757,11 +755,10 @@ Activation (24h) and the exit lock (your chosen term) are two separate things.
 **Q: Can a whale buy the top grade just by staking a lot?**
 A: No. The higher grades are keyed on **effective weight = amount × time-multiplier**,
 so a large amount with no/short lock is capped at a low grade and earns no
-revenue-share. Climbing requires **committing a long lock**. The two top full grades
-add a second hurdle: **Minister (Governor)** is the **top 26 by weight** (26 seats)
-and **Premier / President / General Secretary** is the **single #1** (1 seat) — so
-they demand a winning **rank**, not just size, and reassign in real time as weights
-move.
+revenue-share. Climbing requires **committing a long lock**. The single top grade
+adds a second hurdle: **Premier / President / General Secretary** is the **single
+#1** by weight (1 seat) — so it demands a winning **rank**, not just size, and
+reassigns in real time as weights move.
 
 **Q: Do I have to stake to use the chain?**
 A: No. You need MTF to pay gas on the EVM sidechain, but trading on the perp core

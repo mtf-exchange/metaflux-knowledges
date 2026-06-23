@@ -10,6 +10,17 @@ from perps, with no leverage and no positions. (Leveraged spot is the separate,
 planned [spot-margin](./spot-margin.md) track.)
 :::
 
+:::info
+**Spot only is Sharia-compliant.** Among the products on MetaFlux, only spot
+trading — buying and selling assets outright, with no leverage, no margin, and no
+funding payments — is generally regarded as compatible with Islamic (Sharia)
+finance principles. The leveraged and derivative products — perpetual futures,
+margin, and other leveraged order types — involve interest-like funding payments
+(riba), excessive uncertainty (gharar), and speculation (maysir), and are
+generally NOT Sharia-compliant. Muslim users should trade accordingly and consult
+their own scholars. This is informational, not religious or financial advice.
+:::
+
 ## TL;DR
 
 Spot is a **token-for-token central limit order book**: you swap one token for

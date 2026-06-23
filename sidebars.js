@@ -13,6 +13,8 @@ const sidebars = {
       items: ['start-here', 'networks', 'security', 'versioning'],
     },
 
+    {type: 'doc', id: 'concepts/consensus', label: 'Consensus'},
+
     {
       type: 'category',
       label: 'Concepts',
