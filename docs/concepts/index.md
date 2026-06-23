@@ -25,6 +25,14 @@ Plain-language explanations of MetaFlux's core mechanisms — what they do, how 
 - [Spot margin](./spot-margin.md) — **planned**: leveraged spot funded by the Earn pool
 - [Earn](./earn.md) — **planned**: USDC lending pool that funds spot-margin borrows
 
+:::info
+**Spot only is Sharia-compliant.** Spot trading — no leverage, no margin, no
+funding payments — is the only MetaFlux product generally regarded as compatible
+with Islamic (Sharia) finance principles; the leveraged and derivative products
+are generally not. See [Spot trading](./spot-trading.md). Informational, not
+religious or financial advice.
+:::
+
 ## Advanced
 
 - [ADL](./adl.md) — T4 auto-deleverage math
