@@ -67,12 +67,12 @@ applied to the taker rate only — it never reduces your maker rate.
 
 | MTF staked   | Taker discount | Tier |
 |--------------|---------------:|------|
-| `> 10`       | 5%             | Wood |
-| `> 100`      | 10%            | Bronze |
-| `> 1,000`    | 15%            | Silver |
-| `> 10,000`   | 20%            | Gold |
-| `> 100,000`  | 30%            | Platinum |
-| `> 500,000`  | 40%            | Diamond |
+| `> 10`       | 5%             | Clerk |
+| `> 100`      | 10%            | Section Chief |
+| `> 1,000`    | 15%            | Division Director |
+| `> 10,000`   | 20%            | Bureau Director |
+| `> 100,000`  | 30%            | Minister |
+| `> 500,000`  | 40%            | Premier |
 
 See [Staking](./staking.md) for how to stake MTF.
 
@@ -104,8 +104,8 @@ A negative `effective_maker` is a rebate paid **to** you.
 
 ## Worked examples
 
-**A Diamond staker at the base volume tier.**
-You stake `> 500,000` MTF (Diamond, 40% taker discount) but your 30-day volume is
+**A Premier staker at the base volume tier.**
+You stake `> 500,000` MTF (Premier, 40% taker discount) but your 30-day volume is
 under $5M (base fee tier: taker 0.0350%, maker 0.0100%).
 
 ```text
@@ -128,7 +128,7 @@ on every maker fill. Your taker rate stays 0.0200% (less any staking discount).
 
 **Stacking all three.**
 Volume `≥ $100M` (taker 0.0250%, maker 0.0040%), maker share `≥ 1.5%` (rebate
-−0.0020%), and Gold staking (20% taker discount):
+−0.0020%), and Bureau Director staking (20% taker discount):
 
 ```text
 effective_taker = 0.0250% × (1 − 0.20) = 0.0200%
@@ -165,7 +165,7 @@ collected fees fund the MTF buyback that is burned and distributed to stakers.
   of taker fees collected on the same flow. The exchange never pays out more in
   maker rebates than it takes in.
 - **Staking discount, maker rate.** The staking discount applies to taker only. A
-  Diamond staker still pays (or earns) the full maker rate; only the taker side is
+  Premier staker still pays (or earns) the full maker rate; only the taker side is
   discounted.
 
 </details>
