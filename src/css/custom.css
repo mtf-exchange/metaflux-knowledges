@@ -543,8 +543,15 @@ pre code { border: 0; background: transparent; padding: 0; font-size: 0.875rem; 
 .markdown hr { height: 1px; border: 0; background: var(--mtf-border); margin: 2.4rem 0; }
 .hash-link { color: var(--mtf-accent); }
 
-/* ~70ch measure for prose; wide tables get width via their own overflow-x scroll */
-.theme-doc-markdown { max-width: 46rem; }
+/* Prose holds a ~70ch measure, but tables must break OUT of it. The article element
+   carries BOTH .theme-doc-markdown and .markdown, so capping it at 46rem made the
+   table's own `max-width: 100%` resolve to 100%-of-46rem (~736px) — wide rate tables
+   got crammed into the prose column and scrolled horizontally even on a wide screen,
+   with empty space to their right. Instead: let the column run full-width and re-apply
+   the 46rem measure to prose blocks ONLY. Tables now grow to the full content width
+   (their `max-width: 100%` = the real column) before they ever need to scroll. */
+.theme-doc-markdown { max-width: none; }
+.markdown > :not(table) { max-width: 46rem; }
 
 /* Tabs */
 .tabs__item { font-weight: 600; font-size: 0.88rem; border-radius: 8px 8px 0 0; }
