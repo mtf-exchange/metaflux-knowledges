@@ -59,6 +59,7 @@ const sidebars = {
             'concepts/vaults',
           ],
         },
+        'concepts/tokenomics',
         'concepts/glossary',
       ],
     },
