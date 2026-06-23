@@ -514,9 +514,13 @@ pre code { border: 0; background: transparent; padding: 0; font-size: 0.875rem; 
 .markdown table tbody tr { background: transparent; }
 .markdown table tbody tr:nth-child(2n) { background: var(--ifm-table-stripe-background); }
 [data-theme='light'] .markdown table tbody tr:nth-child(2n) { background: #f3f5f9; }
-/* dense API field tables: pin code/type columns, let prose wrap cleanly */
+/* dense API field tables: pin only the first (code/field) column on one line; let
+   every other column wrap. NB: do NOT nowrap col 2 — on /api it's a short type token
+   (`enum`) so nowrap is harmless, but on /bridge it's a full sentence, and a second
+   nowrap column starves the flexible last column to ~1ch (overflow-wrap lets it
+   collapse) so rows explode vertically. One pinned column is the safe ceiling. */
 .markdown table th:first-child, .markdown table td:first-child { white-space: nowrap; }
-.markdown table th:nth-child(2), .markdown table td:nth-child(2) { white-space: nowrap; color: var(--mtf-text-mid); }
+.markdown table th:nth-child(2), .markdown table td:nth-child(2) { color: var(--mtf-text-mid); }
 .markdown table td { overflow-wrap: anywhere; }
 /* clean inline code inside cells — no chip clutter on code-dense API tables */
 .markdown table code { background: transparent; border: 0; padding: 0 0.1em; font-size: 0.92em; color: var(--mtf-text); }
