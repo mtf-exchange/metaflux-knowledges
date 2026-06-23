@@ -63,18 +63,53 @@ This rebate applies to the **maker rate only**. It does not affect your taker ra
 ## 3. Staking discount tiers (MTF staked)
 
 Staking MTF earns a **percentage discount on your taker rate**. The discount is
-applied to the taker rate only — it never reduces your maker rate.
+applied to the taker rate only — it never reduces your maker rate. The ladder is a
+**ten-rung administrative grade** evaluated on your **time-weighted effective
+weight** (not raw token count — see [Staking](./staking.md) for the multiplier).
 
-| MTF staked   | Taker discount | Tier |
-|--------------|---------------:|------|
-| `> 10`       | 5%             | Clerk |
-| `> 100`      | 10%            | Section Chief |
-| `> 1,000`    | 15%            | Division Director |
-| `> 10,000`   | 20%            | Bureau Director |
-| `> 100,000`  | 30%            | Minister |
-| `> 500,000`  | 40%            | Premier |
+| Grade | Effective weight | Taker discount | Slot cap |
+|-------|-----------------:|---------------:|----------|
+| Section Chief (Township Head)        | `> 100`        | 5%  | uncapped |
+| Deputy Section Chief                  | `> 500`        | 8%  | uncapped |
+| Division Chief (County Chief)         | `> 2,000`      | 12% | uncapped |
+| Deputy Division Chief                 | `> 8,000`      | 15% | uncapped |
+| Director-General (Mayor)              | `> 30,000`     | 20% | uncapped |
+| Deputy Director-General               | `> 100,000`    | 25% | uncapped |
+| Minister (Governor)                   | `> 500,000` **and top 26 by weight** | 32% | **26 seats** |
+| Vice Minister (Vice Governor)         | `> 1,500,000`  | 35% | uncapped |
+| State Councilor / Vice Premier        | `> 5,000,000`  | 40% | uncapped |
+| Premier / President / General Secretary | `> 10,000,000` **and ranked #1 by weight** | 50% | **1 seat** |
 
-See [Staking](./staking.md) for how to stake MTF.
+Discounts climb monotonically from **5% to 50%**, thresholds from **100 to
+10,000,000**.
+
+### Two tracks: uncapped grades vs capped seats
+
+The ladder runs on **two tracks**:
+
+- **Threshold grades (uncapped).** Every grade except the two top full grades is a
+  pure threshold: clear the effective-weight bar and you hold the grade, with no
+  limit on how many accounts can. The **Deputy** grades are all pure-threshold and
+  uncapped.
+- **Competitive seats (capped).** The two top full grades are **capped and
+  competitive** — you must both clear the threshold **and** rank high enough:
+  - **Minister (Governor)** is the **top 26 accounts by effective weight** among
+    those over `500,000`. There are **26 Minister seats**.
+  - **Premier / President / General Secretary** is the **single #1 account** by
+    effective weight among those over `10,000,000`. There is **1 seat**.
+
+  Seats are awarded in **real time**: if a seated holder unstakes or their
+  effective weight drops below a contender's, the seat **passes to the
+  next-ranked qualifying account immediately**. An account that clears a capped
+  grade's threshold but does not win a seat is held at the **highest uncapped grade
+  it qualifies for** (e.g. a `> 500,000` account outside the top 26 sits at Deputy
+  Director-General; a `> 10,000,000` account that is not #1 sits at State Councilor
+  / Vice Premier).
+
+See [Staking](./staking.md) for how to stake MTF and how effective weight is
+derived. **Flexible (no-lock) staking carries 0× weight** and therefore only ever
+reaches the **lowest grade** (Section Chief) and earns **no dividend** — the
+deliberate market-maker lane.
 
 ## How the three combine
 
@@ -104,9 +139,10 @@ A negative `effective_maker` is a rebate paid **to** you.
 
 ## Worked examples
 
-**A Premier staker at the base volume tier.**
-You stake `> 500,000` MTF (Premier, 40% taker discount) but your 30-day volume is
-under $5M (base fee tier: taker 0.0350%, maker 0.0100%).
+**A State Councilor / Vice Premier staker at the base volume tier.**
+Your effective weight clears `> 5,000,000` (State Councilor / Vice Premier, 40%
+taker discount) but your 30-day volume is under $5M (base fee tier: taker 0.0350%,
+maker 0.0100%).
 
 ```text
 effective_taker = 0.0350% × (1 − 0.40) = 0.0210%
@@ -128,7 +164,7 @@ on every maker fill. Your taker rate stays 0.0200% (less any staking discount).
 
 **Stacking all three.**
 Volume `≥ $100M` (taker 0.0250%, maker 0.0040%), maker share `≥ 1.5%` (rebate
-−0.0020%), and Bureau Director staking (20% taker discount):
+−0.0020%), and Director-General (Mayor) staking (20% taker discount):
 
 ```text
 effective_taker = 0.0250% × (1 − 0.20) = 0.0200%
@@ -165,8 +201,14 @@ collected fees fund the MTF buyback that is burned and distributed to stakers.
   of taker fees collected on the same flow. The exchange never pays out more in
   maker rebates than it takes in.
 - **Staking discount, maker rate.** The staking discount applies to taker only. A
-  Premier staker still pays (or earns) the full maker rate; only the taker side is
-  discounted.
+  Premier / President / General Secretary staker still pays (or earns) the full
+  maker rate; only the taker side is discounted.
+- **Capped grades are competitive.** The two top full grades (Minister, 26 seats;
+  Premier / President / General Secretary, 1 seat) are awarded by **rank**, not
+  threshold alone. Clearing
+  the threshold is necessary but not sufficient — if the seats are full you hold
+  the highest uncapped grade you qualify for until a seat frees up. Seats reassign
+  in real time as effective weights move.
 
 </details>
 
