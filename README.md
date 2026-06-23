@@ -21,10 +21,6 @@ npm run serve      # preview the production build locally
 
 ## Deployment
 
-Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds the site
-and publishes it to GitHub Pages. The custom domain (`docs.mtf.exchange`) is set
-via [`static/CNAME`](./static/CNAME).
-
 > **DNS:** point `docs.mtf.exchange` at GitHub Pages with a CNAME record →
 > `mtf-exchange.github.io`. Then in the repo's **Settings → Pages**, set the
 > source to **GitHub Actions** and confirm the custom domain.
