@@ -203,6 +203,7 @@ A market-maker with $5B 30-day volume:
 
 ## See also
 
+- [Fee schedule](./fee-schedule.md) — user-facing rate card: volume, maker-rebate, and staking discount tiers
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — MTF-native per-user tier / 30-day volume
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — cumulative fee pools (burn / treasury / validator)
