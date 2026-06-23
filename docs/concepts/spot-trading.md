@@ -11,12 +11,15 @@ planned [spot-margin](./spot-margin.md) track.)
 :::
 
 :::info
-**Spot only is Sharia-compliant.** Among the products on MetaFlux, only spot
-trading — buying and selling assets outright, with no leverage, no margin, and no
-funding payments — is generally regarded as compatible with Islamic (Sharia)
-finance principles. The leveraged and derivative products — perpetual futures,
-margin, and other leveraged order types — involve interest-like funding payments
-(riba), excessive uncertainty (gharar), and speculation (maysir), and are
+**Non-leveraged spot only is Sharia-compliant.** Among the products on MetaFlux,
+only **non-leveraged** spot trading — buying and selling assets outright at full
+value, with **no leverage, no margin, no borrowing, and no funding** — is
+generally regarded as compatible with Islamic (Sharia) finance principles. Do not
+read "spot" in general as compliant: only the non-leveraged form is. The
+non-compliant products explicitly include **spot margin (leveraged spot
+trading)** as well as perpetual futures and every other leveraged, derivative, or
+borrowed product. The leverage and borrowing introduce interest (riba), and the
+resulting speculation and uncertainty introduce gharar and maysir — so these are
 generally NOT Sharia-compliant. Muslim users should trade accordingly and consult
 their own scholars. This is informational, not religious or financial advice.
 :::
