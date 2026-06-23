@@ -54,8 +54,8 @@
   <!-- url + foundation, bottom-left -->
   <text x="80" y="570"
         font-family="-apple-system, 'Geist Mono', monospace"
-        font-size="20" font-weight="500" fill="#8b96a8" letter-spacing="0.5">
-    mtf.exchange
+        font-size="20" font-weight="500" fill="#ffffff" letter-spacing="0.5">
+    MTF.EXCHANGE
   </text>
   <text x="80" y="598"
         font-family="-apple-system, 'Geist Mono', monospace"
