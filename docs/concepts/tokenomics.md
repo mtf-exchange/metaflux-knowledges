@@ -8,10 +8,10 @@ description: The MTF token economic model — utility, supply, allocation, emiss
 **The final model.** The **utility** layer (gas, staking discounts, consensus,
 governance, and fee-driven buyback-and-burn) is **already built and live** — the
 value core of the token. The **economic parameters** (total supply, allocation,
-vesting, the fixed-supply emission model, the buyback split, and the staking
+vesting, the population-pegged emission model, the buyback split, and the staking
 multiplier curve) are **finalized** and documented below. Tier values and the
-buyback split are network parameters that governance can later tune; the supply
-cap is fixed.
+buyback split are network parameters that governance can later tune; total supply
+is pegged to the population of China and re-pegged annually by validator vote.
 :::
 
 ## TL;DR
@@ -34,8 +34,11 @@ discount **and a share of that buyback**, pulling supply off the float into the
 hands of long-term participants who secure the chain. Upper-tier benefits are
 **time-weighted**: the longer you lock, the larger your effective weight, discount
 tier, and revenue-share slice. A **flexible (no-lock)** lane gives market makers
-the basic fee discount with no lock and no revenue-share. Supply is **fixed at
-10,000,000,000 MTF** with no inflation.
+the basic fee discount with no lock and no revenue-share. Total supply is
+**1,404,890,000 MTF**, **pegged to the population of China** and re-pegged by an
+annual validator vote — minting if the population grew, burning treasury MTF if it
+shrank — so supply tracks the population rather than sitting at a fixed cap. The
+fee buyback-and-burn is a **separate** deflationary force on top.
 
 ## Token utility
 
@@ -52,17 +55,28 @@ demand for on-chain compute is demand for MTF.
 
 ### 2. Staking → taker-fee discount
 
-Staking MTF grants a **discount on your taker trading fee**, scaled by a tier
-ladder up to **40%** off taker:
+Staking MTF grants a **discount on your taker trading fee**, scaled by a ten-rung
+administrative-grade ladder up to **50%** off taker:
 
-| Tier | Taker discount |
-|------|---------------:|
-| Clerk     | 5%  |
-| Section Chief   | 10% |
-| Division Director   | 15% |
-| Bureau Director     | 20% |
-| Minister | 30% |
-| Premier  | 40% |
+| Grade | Taker discount |
+|-------|---------------:|
+| Section Chief (Township Head)            | 5%  |
+| Deputy Section Chief                      | 8%  |
+| Division Chief (County Chief)             | 12% |
+| Deputy Division Chief                     | 15% |
+| Director-General (Mayor)                  | 20% |
+| Deputy Director-General                   | 25% |
+| Minister (Governor) *(top 26)*            | 32% |
+| Vice Minister (Vice Governor)             | 35% |
+| State Councilor / Vice Premier            | 40% |
+| Premier / President / General Secretary *(#1)* | 50% |
+
+The two top full grades — **Minister (Governor)** (the top 26 accounts by
+effective weight) and **Premier / President / General Secretary** (the single #1
+account) — are **capped and competitive**; every other grade, including all the
+**Deputy** grades, is a pure uncapped threshold. Seats reassign in real time as
+weights move. Full thresholds and seat rules are on the
+[Fee schedule](./fee-schedule.md#3-staking-discount-tiers-mtf-staked).
 
 The discount applies to the **taker rate only** and stacks with the volume-based
 fee tiers and maker-rebate tiers. The **basic** discount tier is available to
@@ -127,37 +141,49 @@ fee mechanics are on the [Fees](./fees.md#burn-buyback-and-burn) page.
 
 :::info
 **Final.** The total supply and the genesis allocation below are finalized. The
-cap is **10,000,000,000 MTF**, distributed across the three buckets in the table.
+genesis total is **1,404,890,000 MTF** — **pegged to the population of China** —
+distributed across the three buckets in the table. The total is **re-pegged
+annually by validator vote** (see [Emission & inflation](#emission--inflation)).
 :::
 
 ### Total supply
 
-**Fixed maximum supply: 10,000,000,000 MTF (ten billion).**
+**Genesis total supply: 1,404,890,000 MTF — pegged to the population of China**
+(this equals China's 2026 population).
 
-The cap is **hard** — no MTF is ever minted beyond it. Combined with the
-fee-driven buyback-and-burn, supply is **fixed-then-shrinking**: it can only fall
-from 10B as fees burn tokens, never rise. The fixed cap directly implies the
-**fixed-supply, no-perpetual-inflation** emission model
-([Emission & inflation](#emission--inflation)).
+The token is **not a fixed cap.** Its supply **target is the population of China**,
+and it is **re-pegged once a year by a validator governance vote**: if the
+population grew, validators vote to **mint** new MTF; if it shrank, they vote to
+**burn** treasury MTF — so total supply tracks the current population over time.
+The population figure each year is the **median across several authoritative
+Chinese central-government data sources** (median, so an outlier source cannot move
+the peg). The full mechanism is in [Emission & inflation](#emission--inflation).
+
+The fee-driven **buyback-and-burn is a separate, independent deflationary force**:
+the population is the supply **target** (set by the annual re-peg), while the
+buyback continuously removes MTF from the float on top of it. The two are distinct
+— one is the annual population re-peg of treasury MTF, the other is the
+volume-driven burn.
 
 Notes:
 
-- **18-decimal gas headroom.** As an 18-decimal EVM gas token, 10B nominal units
+- **18-decimal gas headroom.** As an 18-decimal EVM gas token, ~1.4B nominal units
   leave ample granularity for ordinary sidechain transactions to cost a clean,
   small fraction of a token.
-- **Staking-ladder scale.** The fee-discount tiers and the time-weighted
-  effective-weight thresholds (Clerk…Premier) are denominated in tokens/weight;
-  against a 10B cap the Premier threshold is a small fraction of supply,
-  reachable by a serious committed desk, which is the intended signal.
+- **Staking-ladder scale.** The fee-discount grades and the time-weighted
+  effective-weight thresholds (Section Chief…Premier / President / General
+  Secretary) are denominated in tokens/weight; against a ~1.4B supply the top-grade
+  threshold (10,000,000) is a small fraction of supply, reachable by a serious
+  committed desk, which is the intended signal.
 
 ### Genesis allocation
 
 | Allocation | Share | Tokens | Lockup / vesting | Purpose |
 |------------|------:|-------:|------------------|---------|
-| **TGE Airdrop** | 30% | 3,000,000,000 | Distributed **at TGE on MetaFlux mainnet** (after the 6-month testnet concludes) | Airdropped to active traders, market makers, and points-program holders. The community-distribution event. |
-| **Core Contributors** | 20% | 2,000,000,000 | **1-year full lockup (cliff)**, then **6-year linear vesting** | Founders and core contributors. No contributor tokens unlock in year one; a 6-year linear tail thereafter. |
-| **Treasury / Community / Ecosystem / Validators** | 50% | 5,000,000,000 | Combined pool; governance-released | A single long-horizon pool covering the protocol treasury, community & ecosystem incentives, the protocol-owned liquidity vault seed, and validator / staking-reward bootstrap. |
-| **Total** | **100%** | **10,000,000,000** | | |
+| **TGE Airdrop** | 30% | 421,467,000 | Distributed **at TGE on MetaFlux mainnet** (after the 6-month testnet concludes) | Airdropped to active traders, market makers, and points-program holders. The community-distribution event. |
+| **Core Contributors** | 20% | 280,978,000 | **1-year full lockup (cliff)**, then **6-year linear vesting** | Founders and core contributors. No contributor tokens unlock in year one; a 6-year linear tail thereafter. |
+| **Treasury / Community / Ecosystem / Validators** | 50% | 702,445,000 | Combined pool; governance-released | A single long-horizon pool covering the protocol treasury, community & ecosystem incentives, the protocol-owned liquidity vault seed, and validator / staking-reward bootstrap. **Also the source/sink for the annual population re-peg** (mint into / burn from this pool). |
+| **Total** | **100%** | **1,404,890,000** | | |
 
 Notes:
 
@@ -183,6 +209,7 @@ Notes:
 ### Circulating-supply trajectory
 
 ```text
+genesis total        : 1,404,890,000 MTF (pegged to China's population)
 TGE (mainnet)        : 30% airdrop distributed; portions of the 50% pool seed
                        liquidity / early incentives per governance
 year 1               : contributor cliff holds — ZERO contributor unlock; pool
@@ -190,33 +217,65 @@ year 1               : contributor cliff holds — ZERO contributor unlock; pool
 year 1 cliff lapses  : contributor 6-year linear vesting begins
 years 2–7            : contributor linear unlock completes over six years; pool
                        releases continue only on governance vote
+annual re-peg        : validators vote to mint (population grew) or burn treasury
+                       MTF (population shrank), re-pegging total supply to the
+                       median population figure for the year
 steady state         : net float SHRINKS as buyback-and-burn outpaces residual
-                       unlocks and pool releases
+                       unlocks, pool releases, and any re-peg mint
 ```
 
 The design intent is that, well before the 6-year contributor vesting completes,
-the **buyback-and-burn sink is removing supply faster than the remaining unlocks
-and governed pool releases add it**, so circulating supply trends down at
-steady-state volume. That crossover is the whole point of the model.
+the **buyback-and-burn sink is removing supply faster than the remaining unlocks,
+governed pool releases, and any annual re-peg mint add to it**, so circulating
+supply trends down at steady-state volume. The population re-peg moves the supply
+**target** slowly (China's population changes by a fraction of a percent a year),
+while the buyback burn is the fast, volume-driven sink — the two are independent.
+That crossover is the whole point of the model.
 
 ## Emission & inflation
 
 :::info
-**Fixed supply, no perpetual inflation.** The 10B cap is hard; MTF is **never**
-minted beyond it. Staking rewards are funded without dilution. The trade-off this
-choice accepts is documented below, along with the rejected inflationary
-alternative.
+**Population-pegged supply, re-pegged annually by validator vote.** Total supply is
+not a fixed cap — it **tracks the population of China**, starting at
+**1,404,890,000 MTF** at genesis. Once a year, validators vote to **mint** (if the
+population grew) or **burn treasury MTF** (if it shrank) to re-peg supply to the
+year's population figure. Staking rewards are not paid by dilution; the re-peg is a
+slow, governed adjustment of the supply target, separate from the volume-driven
+buyback-and-burn.
 :::
 
-The 10,000,000,000 fixed cap **is** the emission decision: there is no inflation
-lever. Staking rewards are paid from two **non-inflationary** sources:
+### The population peg
+
+Total supply targets the **population of China** and is **re-pegged once a year by
+a validator governance vote**:
+
+1. **Take the year's population figure** as the **median across several
+   authoritative Chinese central-government data sources**. The median (not a
+   single source, not a mean) makes the peg **robust to outliers** — one
+   anomalous source cannot move it.
+2. **Validators vote to re-peg.** If the median population **grew** over the year,
+   validators vote to **mint** the difference in new MTF; if it **shrank**, they
+   vote to **burn** that much **treasury MTF**. Either way, total supply is moved to
+   match the new population figure.
+3. **The mint/burn flows through the treasury pool** (the 50% combined pool), so
+   the re-peg never touches user, contributor, or staker balances — only the
+   protocol-controlled treasury.
+
+Because China's population moves by only a fraction of a percent per year, the
+re-peg is a **small, slow** annual adjustment to the supply **target** — not a
+recurring inflation lever pulled for yield.
+
+### Staking rewards are non-dilutive
+
+Staking rewards are paid from two sources, **neither of which is the population
+re-peg**:
 
 1. The **validator / staking-reward bootstrap** funded out of the combined
    treasury/community/ecosystem/validators pool pays a stake-curve-shaped APR in
    the early period.
 2. A **share of protocol fee revenue** is routed to stakers on an ongoing basis
    (the fee-funded staking yield and the [dividend](#2b-staking--revenue-share-dividend)),
-   funded by real exchange volume rather than dilution.
+   funded by real exchange volume.
 
 The early-period APR follows a **stake curve** rather than a flat rate: it is
 high when little is staked (to bootstrap security) and decays as total stake
@@ -228,34 +287,28 @@ and its committed inputs are observable on the live
 
 **The trade-off this choice accepts.** The bootstrap reward budget is finite. If
 fee revenue does not grow to carry the yield before the budget is meaningfully
-drawn down, the headline staking APR falls. This is the deliberate property of a
-fixed-supply token — it forces yield to be **earned from volume**, not printed —
-but it means the early reward budget (carved from the 50% pool) must be sized to
-cover the runway until fee revenue takes over.
+drawn down, the headline staking APR falls. This forces yield to be **earned from
+volume**, not printed — but it means the early reward budget (carved from the 50%
+pool) must be sized to cover the runway until fee revenue takes over. The annual
+population re-peg is **not** a yield source: it adjusts the supply target, it does
+not fund staking.
 
-### Rejected alternative — perpetual inflation
+### Why population-pegged rather than a fixed cap
 
-Minting a small fixed percentage of supply per year (e.g. 1–3%) to pay validators
-in perpetuity would guarantee a security budget independent of fee revenue, but it
-was **rejected**: perpetual inflation **directly fights the buyback-and-burn
-flywheel** — the protocol would be burning MTF with one hand and printing it with
-the other. For a token whose entire value thesis is fee-driven deflation, that is
-self-defeating; inflation also has to overcome the burn before net supply can
-shrink, raising the volume bar for the deflation narrative to hold.
+The population peg gives MTF a **legible, exogenous supply anchor** — a number
+nobody at the protocol sets by hand — while keeping the deflationary thesis
+intact, because the **buyback-and-burn is a separate force** that removes MTF from
+the float faster than the slow annual re-peg can add it. The token is deflationary
+by construction from the buyback; the population peg simply moves the target the
+buyback shrinks toward.
 
-### Why fixed supply
-
-The fixed-supply decision is coherent with the buyback-and-burn thesis: the token
-is deflationary by construction, and staking yield is funded by a finite bootstrap
-budget up front, then increasingly by fee revenue as the exchange scales.
-Validators are additionally paid a direct share of fee revenue (the security carve
-in the fee split), so their economics do not depend on dilution.
-
-For reference, the leading on-chain perp venue runs a **fixed-supply,
-fee-buyback** model with no perpetual staking inflation; the deflation comes
-entirely from fee-funded buybacks. Several other DEX tokens chose perpetual
-emission and have spent their post-launch life with inflation overhanging price.
-The fixed-supply choice is the one that has aged best in this cohort.
+The re-peg is **not perpetual inflation for yield.** Minting a fixed percentage of
+supply per year to pay validators would **directly fight the buyback-and-burn
+flywheel** — burning with one hand and printing with the other — and was
+**rejected**. The population re-peg is different: it is a small, governed, two-way
+adjustment (it can **burn** as well as mint) tied to an external figure, not a
+recurring dilution to fund rewards. Staking yield is funded by the bootstrap budget
+and fee revenue, never by the re-peg.
 
 ## Value accrual & flywheel
 
@@ -364,7 +417,7 @@ is on the dedicated [Staking](./staking.md) page.
 
 | Benefit | Source | Notes |
 |---------|--------|-------|
-| **Taker-fee discount** | Tier ladder by **time-weighted effective weight** | 5%→40% off taker, [Clerk→Premier](./fee-schedule.md#3-staking-discount-tiers-mtf-staked) |
+| **Taker-fee discount** | Ten-rung grade ladder by **time-weighted effective weight** | 5%→50% off taker, [Section Chief→Premier / President / General Secretary](./fee-schedule.md#3-staking-discount-tiers-mtf-staked) |
 | **MTF revenue-share** | **20% of every buyback**, paid in MTF via your validator | Routed through validators to their delegators; weighted by your time-weighted stake |
 | **Staking yield** | Reward bootstrap (early) + fee-revenue share (ongoing) | Stake-curve APR, observable live |
 | **Consensus weight** | Validator stake / delegation | Secures the chain, slashable |
@@ -428,7 +481,8 @@ the weight immediately, cannot unlock early**:
 
 2. **The benefit goes live after the universal 24-hour activation delay** — the
    same activation delay that applies to all stakers. So a 6-month locker enjoys
-   their (e.g. Premier) discount and full dividend weight after just **24 hours**.
+   their (e.g. State Councilor / Vice Premier) discount and full dividend weight
+   after just **24 hours**.
 
 3. **The lock is an early-exit constraint.** In exchange for the higher weight you
    **cannot unstake before the committed duration elapses**. The activation delay
@@ -443,62 +497,83 @@ esGMX-style time-vesting on GMX-class venues). The MetaFlux model applies the ve
 multiplier to the **fee discount and the MTF revenue-share**, and reserves a
 flexible, dividend-free entry lane for market makers.
 
-#### Effective-weight tier thresholds
+#### Effective-weight grade thresholds
 
-The fee-discount tiers (and the dividend allocation, for locked stakers) are read
-off `effective_weight`, on the **same threshold ladder** the fee schedule uses —
-but evaluated on weight:
+The fee-discount grades (and the dividend allocation, for locked stakers) are read
+off `effective_weight`, on the **same ten-rung ladder** the fee schedule uses — but
+evaluated on weight:
 
-| Tier | Effective-weight threshold | Taker discount |
-|------|---------------------------:|---------------:|
-| Clerk     | `> 10`      | 5%  |
-| Section Chief   | `> 100`     | 10% |
-| Division Director   | `> 1,000`   | 15% |
-| Bureau Director     | `> 10,000`  | 20% |
-| Minister | `> 100,000` | 30% |
-| Premier  | `> 500,000` | 40% |
+| Grade | Effective-weight threshold | Taker discount | Slot cap |
+|-------|---------------------------:|---------------:|----------|
+| Section Chief (Township Head)        | `> 100`        | 5%  | uncapped |
+| Deputy Section Chief                  | `> 500`        | 8%  | uncapped |
+| Division Chief (County Chief)         | `> 2,000`      | 12% | uncapped |
+| Deputy Division Chief                 | `> 8,000`      | 15% | uncapped |
+| Director-General (Mayor)              | `> 30,000`     | 20% | uncapped |
+| Deputy Director-General               | `> 100,000`    | 25% | uncapped |
+| Minister (Governor)                   | `> 500,000` **and top 26 by weight** | 32% | **26 seats** |
+| Vice Minister (Vice Governor)         | `> 1,500,000`  | 35% | uncapped |
+| State Councilor / Vice Premier        | `> 5,000,000`  | 40% | uncapped |
+| Premier / President / General Secretary | `> 10,000,000` **and ranked #1 by weight** | 50% | **1 seat** |
 
-Flexible (0×) stakers reach the **basic discount tier** regardless of these
-weight thresholds; the **higher** tiers require a lock so that
-`staked_amount × time_multiplier` clears the threshold. So **raw tokens alone are
-not enough for the top tier** — they must be committed to a long enough lock.
+Two tracks run here, same as the [fee schedule](./fee-schedule.md#3-staking-discount-tiers-mtf-staked):
+the **Deputy** grades and all grades below the top two are **pure uncapped
+thresholds**; **Minister (Governor)** (top 26 by weight) and **Premier / President
+/ General Secretary** (the single #1) are **capped, competitive seats** reassigned
+in real time. Flexible (0×) stakers reach only the **lowest grade** regardless of
+threshold; the **higher** grades require a lock so that
+`staked_amount × time_multiplier` clears the bar (and, for the two capped grades, a
+winning rank). So **raw tokens alone are not enough for the top grades** — they
+must be committed to a long enough lock, and the top two must also out-rank the
+field.
 
-#### Worked example — short / flexible does NOT get Premier; a ≥6-month lock does
+#### Worked example — short / flexible does NOT climb; a long lock does
 
 The hard constraint the model is designed to satisfy:
 
-> A whale stakes **500,000 MTF** but does **not** commit a long lock.
+> A whale stakes **2,000,000 MTF** but does **not** commit a long lock.
 
 A flexible or sub-1-month position contributes **0× dividend weight** and is held
-at the **basic discount tier** — 500,000 raw tokens do **not** clear the Premier
-weight threshold without a lock multiplier:
+at the **lowest grade** — 2,000,000 raw tokens do **not** clear the upper-grade
+weight thresholds without a lock multiplier:
 
 ```text
-flexible:  500,000 × 0×   → 0 dividend weight, basic discount tier only
-1-month :  500,000 × 1.0× = 500,000  →  below the Premier threshold  → Minister
+flexible:  2,000,000 × 0×   → 0 dividend weight, lowest grade (Section Chief) only
+1-month :  2,000,000 × 1.0× = 2,000,000  → clears Vice Minister (> 1,500,000)
+                                            but below State Councilor (> 5,000,000)
+                                          → Vice Minister (35%)
 ```
 
-To unlock **Premier** (40% taker discount **and** the top dividend slice) with the
-**same** 500,000 tokens, the whale must **commit a lock of ≥ ~6 months**, where
-the multiplier reaches **2.5×**:
+To climb to **State Councilor / Vice Premier** (40% taker discount **and** a top
+dividend slice) with the **same** 2,000,000 tokens, the whale must **commit a lock
+of ≥ ~6 months**, where the multiplier reaches **2.5×**:
 
 ```text
-effective_weight = 500,000 × time_multiplier(6-month lock) = 500,000 × 2.5 = 1,250,000
-                 ≥ Premier threshold   → Premier ✓  (+ full dividend share)
+effective_weight = 2,000,000 × time_multiplier(6-month lock) = 2,000,000 × 2.5 = 5,000,000
 ```
 
-Crucially, this is **not** "stake and wait 6 months to reach Premier." It is
-**commit to a ≥6-month lock and you reach Premier after the 24-hour activation
-delay** — the higher tier is granted immediately on the *commitment*, not earned
-by elapsed time. The price of that immediate top tier is that the **500,000 tokens
-are then hard-locked for the full 6 months and cannot be unstaked early**.
+5,000,000 is **not** strictly greater than the `> 5,000,000` bar, so a hair more
+weight (a slightly larger stake or a 24-month lock at 4.0×) crosses it cleanly into
+**State Councilor / Vice Premier**. Crucially, this is **not** "stake and wait 6
+months to climb." It is **commit to the lock and you reach the grade after the
+24-hour activation delay** — the higher grade is granted immediately on the
+*commitment*, not earned by elapsed time. The price is that the tokens are then
+**hard-locked for the full term and cannot be unstaked early**.
 
-So the top tier is **bought with a time-commitment, not with size alone**. A
-flexible or short-locked whale is capped below Premier and earns no dividend; a
-smaller staker who commits a longer lock can out-rank them and take a dividend
-slice. Capital that refuses to lock gets a fee break but not a cut of the
-buyback — the core anti-mercenary property of the ve design, with a deliberate
-flexible lane for market makers.
+**The two capped grades add a second hurdle.** The two top full grades —
+**Minister (Governor)** (the top 26 by effective weight) and **Premier / President
+/ General Secretary** (the single #1) — require not just clearing the threshold but
+**winning a seat**. A whale who clears `> 500,000` but ranks outside the top 26 is
+held at the highest **uncapped** grade they qualify for (Deputy Director-General);
+clearing `> 10,000,000` without being #1 lands at State Councilor / Vice Premier.
+Seats reassign in real time as effective weights move.
+
+So the upper grades are **bought with a time-commitment, not with size alone** —
+and the very top two also demand a **competitive rank**. A flexible or short-locked
+whale is capped low and earns no dividend; a smaller staker who commits a longer
+lock can out-rank them and take a dividend slice. Capital that refuses to lock gets
+a fee break but not a cut of the buyback — the core anti-mercenary property of the
+ve design, with a deliberate flexible lane for market makers.
 
 ### Validators vs delegators
 
@@ -528,10 +603,10 @@ never be undercut — governance can raise them above 24h, never below.
 (24h, when your benefit *turns on*) and the **committed lock duration** (the term
 before you can *exit*) are **independent**:
 
-- A staker who commits a **6-month** lock gets their full (e.g. Premier) discount
-  and full revenue-share weight **24 hours after staking** — they do **not** wait
-  6 months for the benefit. The 6 months is only how long they are **barred from
-  unstaking**.
+- A staker who commits a **6-month** lock gets their full (e.g. State Councilor /
+  Vice Premier) discount and full revenue-share weight **24 hours after staking** —
+  they do **not** wait 6 months for the benefit. The 6 months is only how long they
+  are **barred from unstaking**.
 - A **flexible** (no-lock) staker also activates after 24h, but at **0× weight**:
   the **basic** discount tier only, and **no** revenue-share. This is the
   market-maker lane.
@@ -568,9 +643,10 @@ Two sources, in order of dominance over the chain's life:
    discount but no revenue-share.
 
 So as volume scales, the system transitions from bootstrap-funded to
-revenue-share-funded yield with **no perpetual inflation** — the yield is paid in
-MTF that the protocol bought on the open market. Validators are the conduit, so
-securing the chain and earning the revenue-share are the same act.
+revenue-share-funded yield with **no dilutive emission** — the yield is paid in MTF
+that the protocol bought on the open market, never from the population re-peg.
+Validators are the conduit, so securing the chain and earning the revenue-share are
+the same act.
 
 ## Governance
 
@@ -603,9 +679,12 @@ deterministically by the chain.
 
 ### What governance does NOT control
 
-- It cannot mint MTF beyond the fixed cap (under the recommended fixed-supply
-  model, there is no inflation lever to pull).
-- It cannot seize user balances or positions.
+- It cannot mint or burn MTF arbitrarily. The only supply lever is the **annual
+  population re-peg** — a constrained, two-way adjustment of **treasury** MTF to
+  the year's median population figure (see [Emission & inflation](#emission--inflation))
+  — not a free inflation knob to fund rewards.
+- It cannot seize user balances or positions (the re-peg mint/burn only ever
+  touches the protocol treasury, never user, contributor, or staker balances).
 - It cannot alter past committed state.
 
 Governance is a forward-only parameter-steering mechanism, scoped to the economic
@@ -626,16 +705,27 @@ and risk knobs of the protocol.
 <summary>Show FAQ</summary>
 
 **Q: Is the total supply final?**
-A: Yes. The total supply (**10,000,000,000 MTF**), the three-bucket genesis
-allocation, the fixed-supply emission model, the buyback/burn split, and the ve
-multiplier curve are all **final**. The **utility** of the token (gas, staking
-discount, consensus, governance, buyback-and-burn) is live.
+A: Yes. The genesis total (**1,404,890,000 MTF**, pegged to China's population), the
+three-bucket genesis allocation, the population-pegged emission model, the
+buyback/burn split, and the ve multiplier curve are all **final**. The **utility**
+of the token (gas, staking discount, consensus, governance, buyback-and-burn) is
+live.
+
+**Q: How big is the supply, and is it fixed?**
+A: It starts at **1,404,890,000 MTF** at genesis — **pegged to the population of
+China** — and is **not a fixed cap**. Once a year, validators vote to **mint** (if
+the population grew) or **burn treasury MTF** (if it shrank) to re-peg total supply
+to the year's population figure, taken as the **median across several authoritative
+Chinese central-government data sources**. The re-peg only ever moves **treasury**
+MTF.
 
 **Q: Is MTF inflationary?**
-A: No. The supply is **fixed at 10B with no perpetual inflation** — MTF is never
-minted beyond the cap. Staking rewards are funded from a finite bootstrap budget
-early on and from the buyback revenue-share ongoing. Combined with the burn, the
-design intent is a **net-deflationary** token at steady-state volume.
+A: Not in the dilutive sense. Staking rewards are **never** funded by minting — they
+come from a finite bootstrap budget early on and the buyback revenue-share ongoing.
+The only supply additions are the **annual population re-peg** (a small, two-way
+adjustment that can also **burn**), and it tracks an external figure rather than a
+yield target. Combined with the buyback burn — a **separate, faster** deflationary
+force — the design intent is a **net-deflationary** token at steady-state volume.
 
 **Q: How does fee revenue become token value?**
 A: Net trading fees (after maker rebates are paid off the top) are used to **buy
@@ -659,27 +749,31 @@ A: No. The multiplier is set by the **lock duration you commit to upfront** (1 m
 1.0×, 6 mo = 2.5×, 24 mo = 4.0× cap) and applies in full after the 24h activation.
 Committing a 6-month lock gives you 2.5× immediately — it does not ramp over time.
 
-**Q: If I commit a 6-month lock, do I wait 6 months for the Premier discount?**
+**Q: If I commit a 6-month lock, do I wait 6 months for the top discount?**
 A: No. Your benefit activates after the universal **24-hour** activation delay, not
 after the lock. The 6 months is only how long you are **barred from unstaking**.
 Activation (24h) and the exit lock (your chosen term) are two separate things.
 
-**Q: Can a whale buy the top tier just by staking a lot?**
-A: No. The higher tiers are keyed on **effective weight = amount × time-multiplier**,
-so a large amount with no/short lock is capped below the top tier and earns no
-revenue-share. Reaching Premier requires **committing a long lock** (the worked
-example: 500,000 MTF needs a ≥ ~6-month lock), irrevocable for the term.
+**Q: Can a whale buy the top grade just by staking a lot?**
+A: No. The higher grades are keyed on **effective weight = amount × time-multiplier**,
+so a large amount with no/short lock is capped at a low grade and earns no
+revenue-share. Climbing requires **committing a long lock**. The two top full grades
+add a second hurdle: **Minister (Governor)** is the **top 26 by weight** (26 seats)
+and **Premier / President / General Secretary** is the **single #1** (1 seat) — so
+they demand a winning **rank**, not just size, and reassign in real time as weights
+move.
 
 **Q: Do I have to stake to use the chain?**
 A: No. You need MTF to pay gas on the EVM sidechain, but trading on the perp core
 does not require holding MTF. Staking is **optional** and earns you a taker-fee
 discount, the MTF revenue-share (if locked), a yield, and governance weight.
 
-**Q: How is staking yield paid if there's no inflation?**
-A: From non-inflationary sources — the bootstrap reward budget early on, and the
+**Q: How is staking yield paid if rewards aren't minted?**
+A: From non-dilutive sources — the bootstrap reward budget early on, and the
 **20% buyback revenue-share** (MTF the protocol bought on the open market, routed
 via validators to locked stakers) ongoing. As volume scales, the revenue-share
-increasingly carries the yield.
+increasingly carries the yield. The annual population re-peg does **not** fund
+yield.
 
 **Q: How does the fee discount interact with the burn?**
 A: They reinforce each other. The discount and the revenue-share pull traders into
