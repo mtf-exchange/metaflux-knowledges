@@ -26,11 +26,15 @@ Plain-language explanations of MetaFlux's core mechanisms — what they do, how 
 - [Earn](./earn.md) — **planned**: USDC lending pool that funds spot-margin borrows
 
 :::info
-**Spot only is Sharia-compliant.** Spot trading — no leverage, no margin, no
-funding payments — is the only MetaFlux product generally regarded as compatible
-with Islamic (Sharia) finance principles; the leveraged and derivative products
-are generally not. See [Spot trading](./spot-trading.md). Informational, not
-religious or financial advice.
+**Non-leveraged spot only is Sharia-compliant.** Only **non-leveraged** spot
+trading — buying and selling outright at full value, with no leverage, no margin,
+no borrowing, and no funding — is the MetaFlux product generally regarded as
+compatible with Islamic (Sharia) finance principles. The non-compliant products
+explicitly include **spot margin (leveraged spot trading)** alongside perpetual
+futures and every other leveraged or derivative product — the leverage and
+borrowing introduce interest (riba), speculation, and uncertainty (maysir,
+gharar). See [Spot trading](./spot-trading.md). Informational, not religious or
+financial advice.
 :::
 
 ## Advanced
