@@ -57,12 +57,12 @@ ladder up to **40%** off taker:
 
 | Tier | Taker discount |
 |------|---------------:|
-| Wood     | 5%  |
-| Bronze   | 10% |
-| Silver   | 15% |
-| Gold     | 20% |
-| Platinum | 30% |
-| Diamond  | 40% |
+| Clerk     | 5%  |
+| Section Chief   | 10% |
+| Division Director   | 15% |
+| Bureau Director     | 20% |
+| Minister | 30% |
+| Premier  | 40% |
 
 The discount applies to the **taker rate only** and stacks with the volume-based
 fee tiers and maker-rebate tiers. The **basic** discount tier is available to
@@ -146,8 +146,8 @@ Notes:
   leave ample granularity for ordinary sidechain transactions to cost a clean,
   small fraction of a token.
 - **Staking-ladder scale.** The fee-discount tiers and the time-weighted
-  effective-weight thresholds (Wood…Diamond) are denominated in tokens/weight;
-  against a 10B cap the Diamond threshold is a small fraction of supply,
+  effective-weight thresholds (Clerk…Premier) are denominated in tokens/weight;
+  against a 10B cap the Premier threshold is a small fraction of supply,
   reachable by a serious committed desk, which is the intended signal.
 
 ### Genesis allocation
@@ -364,7 +364,7 @@ is on the dedicated [Staking](./staking.md) page.
 
 | Benefit | Source | Notes |
 |---------|--------|-------|
-| **Taker-fee discount** | Tier ladder by **time-weighted effective weight** | 5%→40% off taker, [Wood→Diamond](./fee-schedule.md#3-staking-discount-tiers-mtf-staked) |
+| **Taker-fee discount** | Tier ladder by **time-weighted effective weight** | 5%→40% off taker, [Clerk→Premier](./fee-schedule.md#3-staking-discount-tiers-mtf-staked) |
 | **MTF revenue-share** | **20% of every buyback**, paid in MTF via your validator | Routed through validators to their delegators; weighted by your time-weighted stake |
 | **Staking yield** | Reward bootstrap (early) + fee-revenue share (ongoing) | Stake-curve APR, observable live |
 | **Consensus weight** | Validator stake / delegation | Secures the chain, slashable |
@@ -428,7 +428,7 @@ the weight immediately, cannot unlock early**:
 
 2. **The benefit goes live after the universal 24-hour activation delay** — the
    same activation delay that applies to all stakers. So a 6-month locker enjoys
-   their (e.g. Diamond) discount and full dividend weight after just **24 hours**.
+   their (e.g. Premier) discount and full dividend weight after just **24 hours**.
 
 3. **The lock is an early-exit constraint.** In exchange for the higher weight you
    **cannot unstake before the committed duration elapses**. The activation delay
@@ -451,50 +451,50 @@ but evaluated on weight:
 
 | Tier | Effective-weight threshold | Taker discount |
 |------|---------------------------:|---------------:|
-| Wood     | `> 10`      | 5%  |
-| Bronze   | `> 100`     | 10% |
-| Silver   | `> 1,000`   | 15% |
-| Gold     | `> 10,000`  | 20% |
-| Platinum | `> 100,000` | 30% |
-| Diamond  | `> 500,000` | 40% |
+| Clerk     | `> 10`      | 5%  |
+| Section Chief   | `> 100`     | 10% |
+| Division Director   | `> 1,000`   | 15% |
+| Bureau Director     | `> 10,000`  | 20% |
+| Minister | `> 100,000` | 30% |
+| Premier  | `> 500,000` | 40% |
 
 Flexible (0×) stakers reach the **basic discount tier** regardless of these
 weight thresholds; the **higher** tiers require a lock so that
 `staked_amount × time_multiplier` clears the threshold. So **raw tokens alone are
 not enough for the top tier** — they must be committed to a long enough lock.
 
-#### Worked example — short / flexible does NOT get Diamond; a ≥6-month lock does
+#### Worked example — short / flexible does NOT get Premier; a ≥6-month lock does
 
 The hard constraint the model is designed to satisfy:
 
 > A whale stakes **500,000 MTF** but does **not** commit a long lock.
 
 A flexible or sub-1-month position contributes **0× dividend weight** and is held
-at the **basic discount tier** — 500,000 raw tokens do **not** clear the Diamond
+at the **basic discount tier** — 500,000 raw tokens do **not** clear the Premier
 weight threshold without a lock multiplier:
 
 ```text
 flexible:  500,000 × 0×   → 0 dividend weight, basic discount tier only
-1-month :  500,000 × 1.0× = 500,000  →  below the Diamond threshold  → Platinum
+1-month :  500,000 × 1.0× = 500,000  →  below the Premier threshold  → Minister
 ```
 
-To unlock **Diamond** (40% taker discount **and** the top dividend slice) with the
+To unlock **Premier** (40% taker discount **and** the top dividend slice) with the
 **same** 500,000 tokens, the whale must **commit a lock of ≥ ~6 months**, where
 the multiplier reaches **2.5×**:
 
 ```text
 effective_weight = 500,000 × time_multiplier(6-month lock) = 500,000 × 2.5 = 1,250,000
-                 ≥ Diamond threshold   → Diamond ✓  (+ full dividend share)
+                 ≥ Premier threshold   → Premier ✓  (+ full dividend share)
 ```
 
-Crucially, this is **not** "stake and wait 6 months to reach Diamond." It is
-**commit to a ≥6-month lock and you reach Diamond after the 24-hour activation
+Crucially, this is **not** "stake and wait 6 months to reach Premier." It is
+**commit to a ≥6-month lock and you reach Premier after the 24-hour activation
 delay** — the higher tier is granted immediately on the *commitment*, not earned
 by elapsed time. The price of that immediate top tier is that the **500,000 tokens
 are then hard-locked for the full 6 months and cannot be unstaked early**.
 
 So the top tier is **bought with a time-commitment, not with size alone**. A
-flexible or short-locked whale is capped below Diamond and earns no dividend; a
+flexible or short-locked whale is capped below Premier and earns no dividend; a
 smaller staker who commits a longer lock can out-rank them and take a dividend
 slice. Capital that refuses to lock gets a fee break but not a cut of the
 buyback — the core anti-mercenary property of the ve design, with a deliberate
@@ -528,7 +528,7 @@ never be undercut — governance can raise them above 24h, never below.
 (24h, when your benefit *turns on*) and the **committed lock duration** (the term
 before you can *exit*) are **independent**:
 
-- A staker who commits a **6-month** lock gets their full (e.g. Diamond) discount
+- A staker who commits a **6-month** lock gets their full (e.g. Premier) discount
   and full revenue-share weight **24 hours after staking** — they do **not** wait
   6 months for the benefit. The 6 months is only how long they are **barred from
   unstaking**.
@@ -659,7 +659,7 @@ A: No. The multiplier is set by the **lock duration you commit to upfront** (1 m
 1.0×, 6 mo = 2.5×, 24 mo = 4.0× cap) and applies in full after the 24h activation.
 Committing a 6-month lock gives you 2.5× immediately — it does not ramp over time.
 
-**Q: If I commit a 6-month lock, do I wait 6 months for the Diamond discount?**
+**Q: If I commit a 6-month lock, do I wait 6 months for the Premier discount?**
 A: No. Your benefit activates after the universal **24-hour** activation delay, not
 after the lock. The 6 months is only how long you are **barred from unstaking**.
 Activation (24h) and the exit lock (your chosen term) are two separate things.
@@ -667,7 +667,7 @@ Activation (24h) and the exit lock (your chosen term) are two separate things.
 **Q: Can a whale buy the top tier just by staking a lot?**
 A: No. The higher tiers are keyed on **effective weight = amount × time-multiplier**,
 so a large amount with no/short lock is capped below the top tier and earns no
-revenue-share. Reaching Diamond requires **committing a long lock** (the worked
+revenue-share. Reaching Premier requires **committing a long lock** (the worked
 example: 500,000 MTF needs a ≥ ~6-month lock), irrevocable for the term.
 
 **Q: Do I have to stake to use the chain?**
