@@ -225,20 +225,22 @@ The **initial snapshot** is an **array** of the recent bars (closed + the open b
 
 ```json
 { "channel": "candles", "data": [
-  { "coin": "BTC", "interval": "1m", "t": 1735689600000, "T": 1735689659999, "o": "6700000000000", "h": "6700500000000", "l": "6699000000000", "c": "6700250000000", "v": "12000000", "n": 8 }
+  { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "12.5", "q": "837843.75", "n": 8 }
 ] }
 ```
 
 Each **push** is a **single bar object** (not the array) — the current open bar for that `(coin, interval)`, re-emitted on every committed block whose fills land in this market:
 
 ```json
-{ "channel": "candles", "data": { "coin": "BTC", "interval": "1m", "t": 1735689600000, "T": 1735689659999, "o": "6700000000000", "h": "6700500000000", "l": "6699000000000", "c": "6700250000000", "v": "12000000", "n": 8 } }
+{ "channel": "candles", "data": { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "12.5", "q": "837843.75", "n": 8 } }
 ```
 
 - `t` / `T` — bar open / close epoch-ms (consensus-derived); the bar covers `[t, T]` and a fill rolls into a new bar when its block timestamp crosses `T`.
-- `o` / `h` / `l` / `c` — open / high / low / close, **raw 1e8-plane** decimal strings (same plane as `l2_book` / `trades` px; per-asset tick scaling is applied downstream in the gateway), NOT the whole-USDC plane `market_info` reports.
-- `v` — base-asset volume folded into the bar (1e8-plane size string). `n` — number of fills in the bar.
-- `coin` — the canonical market symbol; `interval` — the bar size, echoed.
+- `s` — coin / market symbol; `i` — interval bucket token.
+- `o` / `c` / `h` / `l` — open / close / high / low, **decimal USDC** strings (human dollars, e.g. `"67002.50"`).
+- `v` — base-asset volume folded into the bar (coin size). `q` — quote (USD) volume = `Σ price × size` over the bar's fills. `n` — number of fills in the bar.
+
+The series is **gapless**: an interval with no trades emits a flat bar carrying the prior close forward (`o = h = l = c = previous close`, `v = q = 0`, `n = 0`). No bar is emitted before the market's first trade — the series begins at the bucket of the first print.
 
 A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing. On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's `candle` (singular).
 
@@ -317,8 +319,22 @@ re-emits it each committed block.
 
 - `margin_mode` ∈ `cross` / `isolated` / `strict_iso`; `max_trade_size` is the
   OI-cap-derived size ceiling (raw-lot string); fields are identical to the REST
-  [`active_asset_data`](../rest/info.md) read. On the gateway's `/hl/ws` the
-  equivalent channel name is HL's `activeAssetData`.
+  [`active_asset_data`](../rest/info.md) read.
+
+On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's
+`activeAssetData`, and the frame is translated into HL's camelCase shape:
+
+```json
+{ "channel": "activeAssetData", "data": {
+  "user": "0x<address>", "coin": "BTC", "leverage": 7,
+  "maxTradeSzs": ["5.0", "5.0"], "availableToTrade": ["35000.00", "35000.00"] } }
+```
+
+- `user` — the 0x account address; `coin` — the market symbol.
+- `maxTradeSzs` — `[buy, sell]`: the maximum tradeable **size** on each side
+  (base units), as decimal strings.
+- `availableToTrade` — `[buy, sell]`: the **USD** notional available to trade on
+  each side, as decimal strings.
 
 ### `account_state`
 

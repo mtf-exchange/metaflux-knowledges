@@ -45,14 +45,14 @@ This is the master map. **Translation** is always: snake_case → camelCase, int
 | `l2Book` | stub | [`l2_book`](./info.md#l2_book) | node read exists; gateway translation to `{coin,levels,time}` not yet wired — returns HL-empty book |
 | `meta` | stub | — | needs a node list-all-markets / universe read (node `market_info` is per-id); returns `{universe:[],marginTables:[]}` |
 | `allMids` | stub | — | needs the universe read (same blocker as `meta`); returns `{}` |
-| `metaAndAssetCtxs` | stub | — | `[meta, []]` until the universe read + asset-ctx aggregation land |
+| `metaAndAssetCtxs` | **wired** | [`markets`](./info.md#markets) | `[meta, [assetCtx...]]`; per-perp `assetCtx` carries `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, all decimal-USDC strings |
 | `openOrders` | stub | [`open_orders`](./info.md#open_orders) | node read exists; gateway translation not yet wired — returns `[]` |
 | `frontendOpenOrders` | stub | [`open_orders`](./info.md#open_orders) | `openOrders` + UI hints; returns `[]` |
 | `vaultDetails` | stub | [`vault_state`](./info.md#vault_state) | needs a leader-address → `vault_id` registry (node keys by `vault_id`); echoes request `user`, zeroed financials |
 | `subAccounts` | **wired** | [`sub_accounts`](./info.md#sub_accounts) | maps node `{index,address}` → `{subAccountUser,name,master}`; `clearinghouseState` omitted (no per-sub join on the node read) |
 | `referral` | stub | — | referrer is `Action::setReferrer`-set, immutable; returns `referredBy:null` |
 | `spotClearinghouseState` | **wired** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | node `{asset,name,balance}` → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (no hold/cost-basis on the node read) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info.md#spot_meta) | node `pairs` → `universe`; `tokens` registry from node's real per-token `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); spot AssetCtx px/volume zeroed (no node spot-ctx read) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info.md#spot_meta) | node `pairs` → `universe`; `tokens` registry from node's real per-token `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); each spot `assetCtx` carries `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, decimal-USDC strings |
 | `predictedFundings` | stub | — | returns `[]` |
 | `orderStatus` | stub | — | resolves to `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **wired** | [`max_builder_fee`](./info.md#max_builder_fee) | projects node `max_fee_bps` as the bare HL number; unapproved pair → `0` |
@@ -189,7 +189,7 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**Wired** to node [`spot_meta`](./info.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is built from the node's real per-token registry: each entry's `name` / `sz_decimals` / `wei_decimals` map straight onto HL `name` / `szDecimals` / `weiDecimals`; `index` is the token asset id, `tokenId` is the 32-byte hex of the id, and USDC is flagged `isCanonical`. `spotMetaAndAssetCtxs` returns `[spotMeta, [spotAssetCtx]]`; each `spotAssetCtx` carries the pair `coin` with zeroed `markPx`/`midPx`/volume (no node spot-ctx read yet).
+**Wired** to node [`spot_meta`](./info.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is built from the node's real per-token registry: each entry's `name` / `sz_decimals` / `wei_decimals` map straight onto HL `name` / `szDecimals` / `weiDecimals`; `index` is the token asset id, `tokenId` is the 32-byte hex of the id, and USDC is flagged `isCanonical`.
 
 ```json
 {"type":"spotMeta"}
@@ -204,6 +204,31 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 ```
 
 The node's token ids start at `100` (USDC) — see [`spot_meta`](./info.md#spot_meta) for the full registry — so `index` reflects those ids, not HL's `0`-based scheme.
+
+`spotMetaAndAssetCtxs` returns `[spotMeta, [spotAssetCtx...]]`; the second
+element is one `spotAssetCtx` per pair, index-aligned to `spotMeta.universe`.
+Each `spotAssetCtx` carries the pair `coin` plus live context:
+
+```json
+{
+  "coin":              "MTF/USDC",
+  "dayNtlVlm":         "42000.00",
+  "prevDayPx":         "4.95",
+  "markPx":            "5.00",
+  "midPx":             "5.00",
+  "circulatingSupply": "21000000.0"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dayNtlVlm` | decimal string | 24-hour notional volume, in **USD** |
+| `prevDayPx` | decimal string | Price 24h ago, **decimal USDC** |
+| `markPx` | decimal string | Current mark price, **decimal USDC** |
+| `midPx` | decimal string | Current order-book mid, **decimal USDC** |
+| `circulatingSupply` | decimal string | Base-token circulating supply |
+
+All prices are decimal-USDC (human-readable) strings, not raw integers.
 
 #### `maxBuilderFee`
 
@@ -255,7 +280,33 @@ Each `universe` entry (once the node universe read lands): `{"name":"BTC","szDec
 
 #### `metaAndAssetCtxs`
 
-`[meta, [assetCtx...]]` (HL's tuple shape). Each `assetCtx`: `{"funding","openInterest","prevDayPx","markPx","oraclePx","midPx"}` — all decimal strings. Stub: `[{"universe":[],"marginTables":[]}, []]`.
+`[meta, [assetCtx...]]` (HL's tuple shape). The second element is one `assetCtx`
+per perp market, index-aligned to `meta.universe`. Each `assetCtx` is populated
+from live market state:
+
+```json
+{
+  "dayNtlVlm":    "1850000.00",
+  "prevDayPx":    "66800.00",
+  "markPx":       "67042.50",
+  "midPx":        "67042.33",
+  "funding":      "0.0000125",
+  "openInterest": "1250.5",
+  "oraclePx":     "67040.00"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `dayNtlVlm` | decimal string | 24-hour notional volume, in **USD** |
+| `prevDayPx` | decimal string | Price 24h ago, **decimal USDC** |
+| `markPx` | decimal string | Current mark price, **decimal USDC** |
+| `midPx` | decimal string | Current order-book mid, **decimal USDC** |
+| `funding` | decimal string | Current funding rate (per-interval) |
+| `openInterest` | decimal string | Open interest, in base units |
+| `oraclePx` | decimal string | Latest oracle / index price, **decimal USDC** |
+
+All prices are decimal-USDC (human-readable) strings, not raw integers.
 
 #### `allMids`
 
