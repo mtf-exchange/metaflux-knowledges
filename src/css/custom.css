@@ -1,0 +1,724 @@
+/**
+ * MetaFlux docs theme — canonical with ../metaflux-site/DESIGN.md.
+ * "The Honest Instrument": near-black field, one quiet aurora, Liquid Glass panels.
+ * Cormorant Garamond (display/headings) · Geist (body) · Geist Mono (labels/code).
+ * PT Serif italic ONLY for the "Flux" wordmark. Two-voice blue #5BCEFA / rose #F5A9B8.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=PT+Serif:ital@1&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   1 · Fonts & shared scale
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --mtf-sans:  "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mtf-mono:  "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --mtf-serif: "Cormorant Garamond", "Iowan Old Style", Cambria, Georgia, serif;
+  --mtf-serif-flux: "PT Serif", "Iowan Old Style", Cambria, Georgia, serif;
+
+  --mtf-blue:      #5bcefa;
+  --mtf-pink:      #f5a9b8;
+  --mtf-lavender:  #8b7cf6;
+
+  --ifm-font-family-base: var(--mtf-sans);
+  --ifm-font-family-monospace: var(--mtf-mono);
+  --ifm-heading-font-family: var(--mtf-serif);
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.6;
+  --ifm-code-font-size: 0.875em;
+
+  /* Rounded scale (canonical) */
+  --mtf-r-sm: 8px;
+  --mtf-r-md: 16px;
+  --mtf-r-lg: 20px;
+  --mtf-r-xl: 24px;
+
+  /* Type scale — semantic tokens (perfect-fourth-ish for display, tight steps for UI) */
+  --mtf-text-xs:   0.75rem;   /* micro-labels, table cells */
+  --mtf-text-sm:   0.875rem;  /* secondary UI, sidebar links */
+  --mtf-text-base: 1rem;      /* body */
+  --mtf-text-lg:   1.15rem;   /* lede / lead paragraph */
+  --mtf-text-h3:   1.6rem;
+  --mtf-text-h2:   2.15rem;
+  /* The "instrument readout" label voice (Geist Mono, uppercase, tracked) */
+  --mtf-label-tracking: 0.08em;
+  --ifm-container-width-xl: 1380px;
+  --ifm-navbar-height: 64px;
+  --ifm-navbar-item-padding-horizontal: 0.85rem;
+  /* Shared left gutter: navbar brand edge == sidebar link text == 1.5rem */
+  --ifm-navbar-padding-horizontal: 1.5rem;
+  --ifm-spacing-horizontal: 1.75rem;
+  --ifm-leading: 1.4rem;
+  --ifm-link-hover-decoration: none;
+  --ifm-toc-padding-vertical: 0.4rem;
+  --ifm-menu-link-padding-vertical: 0.45rem;
+  --ifm-global-radius: 10px;
+
+  /* Motion — ease-out-quint; calm, no bounce. State-conveying only (product register). */
+  --mtf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --mtf-dur: 180ms;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   2 · Light mode — clean, airy, fully designed (not an afterthought)
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --mtf-bg:        #ffffff;
+  --mtf-surface:   #f7f8fb;
+  --mtf-surface-2: #eef1f7;
+  --mtf-border:    #e6e9f0;
+  --mtf-border-strong: #d4d9e4;
+  --mtf-text:      #0d1117;
+  --mtf-text-mid:  #4a5566;
+  --mtf-text-dim:  #6b7585;   /* was #828d9e (3.36:1) → 4.66:1 AA */
+  --mtf-accent:    #15749f;   /* was #1f8fc4 (3.63:1) → 5.2:1 AA */
+  --mtf-wash:      rgba(31, 143, 196, 0.06);
+  --mtf-wash-rose: rgba(201, 82, 108, 0.06);
+  /* Liquid Glass degrades to clean translucent-white panels in light mode */
+  --mtf-glass-bg:  rgba(255, 255, 255, 0.72);
+  --mtf-glass-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 14px 34px -16px rgba(20, 30, 50, 0.18);
+  --mtf-glass-blur: blur(14px) saturate(135%);
+  --mtf-glow-blue: 0 14px 40px -12px rgba(31, 143, 196, 0.28);
+  --mtf-glow-rose: 0 14px 40px -12px rgba(201, 82, 108, 0.26);
+
+  --ifm-color-primary:          #15749f;   /* was #1f8fc4 — every body link/anchor/active item */
+  --ifm-color-primary-dark:     #1c81b1;
+  --ifm-color-primary-darker:   #1a7aa7;
+  --ifm-color-primary-darkest:  #156489;
+  --ifm-color-primary-light:    #229dd7;
+  --ifm-color-primary-lighter:  #29a5df;
+  --ifm-color-primary-lightest: #44b6ec;
+
+  --ifm-background-color: var(--mtf-bg);
+  --ifm-background-surface-color: var(--mtf-surface);
+  --ifm-color-content: #21262e;
+  --ifm-color-content-secondary: var(--mtf-text-mid);
+  --ifm-heading-color: var(--mtf-text);
+
+  --ifm-navbar-background-color: rgba(255, 255, 255, 0.8);
+  --ifm-footer-background-color: var(--mtf-surface);
+
+  --ifm-toc-border-color: var(--mtf-border);
+  --ifm-hr-background-color: var(--mtf-border);
+  --ifm-table-border-color: var(--mtf-border);
+  --ifm-table-stripe-background: var(--mtf-surface);
+  --ifm-blockquote-color: var(--mtf-text-mid);
+  --ifm-color-emphasis-300: var(--mtf-border-strong);
+
+  --ifm-color-info:    #1c77b0;   /* all four admonition colors lifted to ≥4.5:1 AA */
+  --ifm-color-success: #157f44;
+  --ifm-color-warning: #9a6700;
+  --ifm-color-danger:  #c62f47;
+
+  --docusaurus-highlighted-code-line-bg: rgba(31, 143, 196, 0.10);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3 · Dark mode — mirrors the marketing site
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme='dark'] {
+  --mtf-bg:        #06070b;
+  --mtf-surface:   #0c0e14;
+  --mtf-surface-2: #12151d;
+  --mtf-border:    #1c2130;
+  --mtf-border-strong: #2a3042;
+  --mtf-text:      #f0f3f7;
+  --mtf-text-mid:  #98a3b5;
+  --mtf-text-dim:  #757f92;   /* was #5a6273 (3.2:1) → 4.5+:1 on every dark surface */
+  --mtf-accent:    var(--mtf-blue);
+  --mtf-wash:      rgba(91, 206, 250, 0.10);
+  --mtf-wash-rose: rgba(245, 169, 184, 0.10);
+  /* Liquid Glass: translucent dark + lit top-edge + ambient drop + backdrop blur */
+  --mtf-glass-bg:  rgba(12, 14, 20, 0.55);
+  --mtf-glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 24px 60px -18px rgba(0, 0, 0, 0.6);
+  --mtf-glass-blur: blur(22px) saturate(170%);
+  --mtf-glow-blue: 0 18px 50px -16px rgba(91, 206, 250, 0.35);
+  --mtf-glow-rose: 0 18px 50px -16px rgba(245, 169, 184, 0.32);
+
+  --ifm-color-primary:          #5bcefa;
+  --ifm-color-primary-dark:     #3cc1f9;
+  --ifm-color-primary-darker:   #2dbbf8;
+  --ifm-color-primary-darkest:  #0aa3ec;
+  --ifm-color-primary-light:    #7adbfb;
+  --ifm-color-primary-lighter:  #89e0fc;
+  --ifm-color-primary-lightest: #b6ecfd;
+
+  --ifm-background-color: var(--mtf-bg);
+  --ifm-background-surface-color: var(--mtf-surface);
+  --ifm-color-content: #d7deea;
+  --ifm-color-content-secondary: var(--mtf-text-mid);
+  --ifm-heading-color: var(--mtf-text);
+
+  --ifm-navbar-background-color: rgba(8, 10, 16, 0.72);
+  --ifm-footer-background-color: #07080d;
+
+  --ifm-toc-border-color: var(--mtf-border);
+  --ifm-hr-background-color: var(--mtf-border);
+  --ifm-table-border-color: var(--mtf-border);
+  --ifm-table-stripe-background: rgba(255, 255, 255, 0.02);
+  --ifm-blockquote-color: var(--mtf-text-mid);
+  --ifm-color-emphasis-300: var(--mtf-border-strong);
+
+  --ifm-color-info:    #5bcefa;
+  --ifm-color-success: #6ee7a3;
+  --ifm-color-warning: #e8c06a;
+  --ifm-color-danger:  #ff7a8c;
+
+  --docusaurus-highlighted-code-line-bg: rgba(91, 206, 250, 0.14);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4 · Base
+   ═══════════════════════════════════════════════════════════════════════════ */
+html {
+  font-feature-settings: "ss01", "cv11";
+  font-variant-numeric: lining-nums tabular-nums;
+  font-kerning: normal;
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+::selection { background: var(--mtf-pink); color: #06070b; }
+
+/* Light-on-dark compensation: a hair of tracking so Geist body holds up on the dark field */
+[data-theme='dark'] .markdown p,
+[data-theme='dark'] .markdown li { letter-spacing: 0.008em; }
+
+/* Ambient backdrop as a fixed, full-viewport layer BEHIND content (z-index:-1) —
+   not a body background. This never produces a fixed-height band/cutoff on long pages. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -15%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+  animation: mtf-aurora 32s ease-in-out infinite alternate;
+}
+/* Quiet aurora — blue / rose / lavender / white blooms over the near-black field.
+   The palette is identity, never captioned (The Quiet Signal Rule). */
+[data-theme='dark'] body::before {
+  background:
+    radial-gradient(820px 620px at 14% -6%, rgba(91, 206, 250, 0.10), transparent 58%),
+    radial-gradient(760px 600px at 86% 2%, rgba(245, 169, 184, 0.085), transparent 56%),
+    radial-gradient(900px 760px at 72% 34%, rgba(139, 124, 246, 0.06), transparent 60%),
+    radial-gradient(820px 700px at 24% 82%, rgba(91, 206, 250, 0.05), transparent 60%),
+    radial-gradient(620px 600px at 96% 92%, rgba(245, 169, 184, 0.045), transparent 55%);
+}
+[data-theme='light'] body::before {
+  background:
+    radial-gradient(820px 600px at 90% -8%, rgba(31, 143, 196, 0.05), transparent 60%),
+    radial-gradient(720px 560px at 6% 4%, rgba(201, 82, 108, 0.035), transparent 58%);
+}
+@keyframes mtf-aurora {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1.04); }
+  to   { transform: translate3d(1.5%, 2%, 0) scale(1.1); }
+}
+
+a { color: var(--ifm-color-primary); font-weight: 500; }
+.markdown a:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+/* Headings — Cormorant Garamond display serif: "the serif carries the claim".
+   Low weight, large, tight tracking. h4 is the sans "instrument readout" for contrast. */
+.markdown h1, .markdown h2, .markdown h3 {
+  font-family: var(--mtf-serif);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: break-word;   /* long API tokens never overflow the viewport */
+}
+.markdown h1:first-child {
+  font-size: clamp(2.05rem, 6.2vw, 3.7rem);   /* scales down to ~33px on a 360px phone */
+  line-height: 1.04;
+  letter-spacing: -0.025em;
+  margin-bottom: 1rem;
+}
+.markdown h2 {
+  font-size: var(--mtf-text-h2);
+  line-height: 1.05;
+  margin-top: 2.9rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--mtf-border);
+}
+.markdown h3 { font-size: var(--mtf-text-h3); line-height: 1.1; margin-top: 1.9rem; }
+.markdown h4 {
+  font-family: var(--mtf-sans);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  margin-top: 1.5rem;
+}
+.markdown > p:first-of-type,
+.markdown > .theme-admonition:first-child + p { font-size: var(--mtf-text-lg); line-height: 1.55; color: var(--mtf-text); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   5 · Navbar
+   ═══════════════════════════════════════════════════════════════════════════ */
+.navbar {
+  backdrop-filter: var(--mtf-glass-blur);
+  -webkit-backdrop-filter: var(--mtf-glass-blur);
+  border-bottom: 1px solid var(--mtf-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 40px -24px rgba(0, 0, 0, 0.6);
+}
+.navbar__link {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--mtf-text-mid);
+}
+.navbar__link:hover, .navbar__link--active { color: var(--mtf-text); }
+.navbar__link--active::after { display: none; }
+
+/* Docusaurus always renders an (empty) .navbar__brand when no logo/title is set;
+   its margin-right was pushing our wordmark off the gutter. Kill it so the brand
+   left-aligns exactly with the sidebar/content. */
+.navbar__brand:empty { display: none; }
+
+/* html-injected brand item: flex-center so it never drifts, trim default padding */
+.navbar__items > .navbar__item:has(.mtf-brand) {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  margin: 0 0.7rem 0 0;
+  padding: 0;
+}
+.mtf-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mtf-sans);
+  font-weight: 550;
+  font-size: 1.24rem;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--mtf-text);
+}
+.mtf-brand:hover { color: var(--mtf-text); text-decoration: none; }
+.mtf-brand-mark { height: 23px; width: auto; flex: none; display: block; }
+.mtf-word { display: inline-flex; align-items: baseline; }
+.mtf-word .b-meta { color: var(--mtf-text); }
+.mtf-word .b-flux {
+  font-family: var(--mtf-serif-flux);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.06em;
+  color: var(--mtf-pink);
+}
+[data-theme='light'] .mtf-word .b-flux { color: #c9526c; }
+
+/* Dropdown — Liquid Glass */
+.dropdown__menu {
+  border: 1px solid var(--mtf-border);
+  background: var(--mtf-glass-bg);
+  backdrop-filter: var(--mtf-glass-blur);
+  -webkit-backdrop-filter: var(--mtf-glass-blur);
+  box-shadow: var(--mtf-glass-shadow);
+  border-radius: var(--mtf-r-md);
+}
+.dropdown__link { border-radius: 7px; font-size: 0.88rem; }
+.dropdown__link:hover { background: var(--mtf-wash); color: var(--ifm-color-primary); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 · Sidebar
+   ═══════════════════════════════════════════════════════════════════════════ */
+.theme-doc-sidebar-container { border-right: 1px solid var(--mtf-border); }
+/* menu left-padding(0.75) + menu__link left-padding(default 0.75) == 1.5rem == navbar gutter */
+.menu { padding: 1rem 0.75rem !important; font-weight: 500; }
+.menu__list .menu__list { padding-left: 0.4rem; }
+.menu__link {
+  font-size: 0.875rem;
+  line-height: 1.35;
+  border-radius: 8px;
+  color: var(--mtf-text-mid);
+}
+.menu__link:hover, .menu__list-item-collapsible:hover {
+  background: var(--mtf-wash);
+  color: var(--mtf-text);
+}
+.menu__link--active:not(.menu__link--sublist) {
+  background: var(--mtf-wash);
+  color: var(--ifm-color-primary);
+  font-weight: 650;
+}
+.menu__list-item-collapsible--active { background: transparent; }
+.menu__caret:hover { background: transparent; }
+
+/* Top-level category labels: the Geist Mono "instrument readout" voice */
+.theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link {
+  font-family: var(--mtf-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--mtf-label-tracking);
+  color: var(--mtf-text-dim);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7 · TOC + breadcrumbs + pagination
+   ═══════════════════════════════════════════════════════════════════════════ */
+.table-of-contents { font-size: 0.8rem; border-left: 1px solid var(--mtf-border); }
+.table-of-contents__link { color: var(--mtf-text-mid); }
+.table-of-contents__link:hover { color: var(--mtf-text); }
+.table-of-contents__link--active { color: var(--ifm-color-primary); font-weight: 600; }
+
+.breadcrumbs__link {
+  font-family: var(--mtf-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.01em;
+  color: var(--mtf-text-mid);
+}
+.breadcrumbs__link:hover { color: var(--mtf-text); background: var(--mtf-wash); }
+.theme-doc-breadcrumbs { margin-bottom: 1.3rem; }
+
+.pagination-nav__link {
+  border: 1px solid var(--mtf-border);
+  border-radius: var(--mtf-r-md);
+  background: var(--mtf-glass-bg);
+  backdrop-filter: var(--mtf-glass-blur);
+  -webkit-backdrop-filter: var(--mtf-glass-blur);
+  box-shadow: var(--mtf-glass-shadow);
+  transition: border-color var(--mtf-dur) var(--mtf-ease), transform var(--mtf-dur) var(--mtf-ease), box-shadow var(--mtf-dur) var(--mtf-ease);
+}
+.pagination-nav__link:hover,
+.pagination-nav__link:focus-visible {
+  border-color: var(--ifm-color-primary);
+  transform: translateY(-3px);
+  box-shadow: var(--mtf-glass-shadow), var(--mtf-glow-blue);
+}
+.pagination-nav__link:focus-visible { outline-offset: 4px; }
+.pagination-nav__sublabel { color: var(--mtf-text-dim); }
+.pagination-nav__label { font-weight: 650; font-size: 1.02rem; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   8 · Code
+   ═══════════════════════════════════════════════════════════════════════════ */
+code {
+  font-size: 0.85em;
+  background: var(--mtf-surface-2);
+  border: 1px solid var(--mtf-border);
+  border-radius: var(--mtf-r-sm);
+  padding: 0.1em 0.4em;
+}
+/* Mono renders literally: no coding ligatures merging `=>`/`->`/`!=`, no sans `ss01/cv11`. */
+code, pre, kbd, .theme-code-block {
+  font-variant-ligatures: none;
+  font-feature-settings: normal;
+}
+a code { color: inherit; }
+/* Code frame carries the glass shadow (ring + lit-edge + ambient) but keeps an
+   opaque code surface — drifting aurora behind code text would hurt legibility. */
+.theme-code-block {
+  border-radius: var(--mtf-r-lg);
+  border: 1px solid var(--mtf-border);
+  box-shadow: var(--mtf-glass-shadow);
+}
+.theme-code-block pre { border-radius: var(--mtf-r-lg); }
+pre code { border: 0; background: transparent; padding: 0; font-size: 0.875rem; line-height: 1.7; }
+.theme-code-block-highlighted-line { background: var(--docusaurus-highlighted-code-line-bg); }
+.theme-code-block .buttonGroup button { border-radius: 7px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   9 · Admonitions
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* Full-border tinted callouts (no side-stripe): the border, wash, heading and
+   icon all carry the type color — colour is never the sole signal (icon + label). */
+.theme-admonition {
+  border: 1px solid var(--mtf-border);
+  border-radius: var(--mtf-r-md);
+  background: var(--ifm-background-surface-color);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.theme-admonition .admonitionHeading,
+.theme-admonition [class*='admonitionHeading'] {
+  font-family: var(--mtf-mono);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: var(--mtf-label-tracking);
+  font-weight: 600;
+}
+.theme-admonition-note {
+  border-color: color-mix(in srgb, var(--mtf-text-dim) 35%, var(--mtf-border));
+  background: color-mix(in srgb, var(--mtf-text-dim) 5%, var(--ifm-background-surface-color));
+}
+.theme-admonition-info {
+  border-color: color-mix(in srgb, var(--ifm-color-info) 38%, var(--mtf-border));
+  background: color-mix(in srgb, var(--ifm-color-info) 7%, var(--ifm-background-surface-color));
+}
+.theme-admonition-tip,
+.theme-admonition-success {
+  border-color: color-mix(in srgb, var(--ifm-color-success) 38%, var(--mtf-border));
+  background: color-mix(in srgb, var(--ifm-color-success) 7%, var(--ifm-background-surface-color));
+}
+.theme-admonition-warning {
+  border-color: color-mix(in srgb, var(--ifm-color-warning) 40%, var(--mtf-border));
+  background: color-mix(in srgb, var(--ifm-color-warning) 8%, var(--ifm-background-surface-color));
+}
+.theme-admonition-danger {
+  border-color: color-mix(in srgb, var(--ifm-color-danger) 40%, var(--mtf-border));
+  background: color-mix(in srgb, var(--ifm-color-danger) 8%, var(--ifm-background-surface-color));
+}
+/* Light mode: the 0.7rem mono heading sits on the tinted callout bg, which pulls the
+   type-color below 4.5:1. Darken just the heading label (danger 4.51 already clears). */
+[data-theme='light'] .theme-admonition-info .admonitionHeading,
+[data-theme='light'] .theme-admonition-info [class*='admonitionHeading'] { color: #196699; }
+[data-theme='light'] .theme-admonition-warning .admonitionHeading,
+[data-theme='light'] .theme-admonition-warning [class*='admonitionHeading'] { color: #855900; }
+[data-theme='light'] .theme-admonition-tip .admonitionHeading,
+[data-theme='light'] .theme-admonition-success .admonitionHeading,
+[data-theme='light'] .theme-admonition-tip [class*='admonitionHeading'],
+[data-theme='light'] .theme-admonition-success [class*='admonitionHeading'] { color: #13733d; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   10 · Tables, blockquotes, lists, misc
+   ═══════════════════════════════════════════════════════════════════════════ */
+.markdown table {
+  display: block;            /* restore horizontal scroll (Infima default) */
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;          /* was `overflow: hidden` — THE bug that clipped wide API tables */
+  -webkit-overflow-scrolling: touch;
+  font-size: 0.875rem;
+  border: 1px solid var(--mtf-border);
+  border-radius: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.markdown table th, .markdown table td {
+  padding: 0.6rem 0.9rem;
+  vertical-align: top;
+  border: 0;
+  border-bottom: 1px solid var(--mtf-border);
+}
+.markdown table thead th {
+  background: var(--mtf-surface-2);
+  font-family: var(--mtf-mono);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--mtf-text-dim);
+  border-bottom: 1px solid var(--mtf-border-strong);
+}
+/* thead text is small (0.72rem mono) — needs its own AA-clearing color per theme
+   (the global --mtf-text-dim is tuned against the page bg, not the header surface). */
+[data-theme='dark'] .markdown table thead th { background: rgba(255, 255, 255, 0.045); color: #828ca0; }
+[data-theme='light'] .markdown table thead th { color: #5d6675; }
+.markdown table tbody tr:last-child td { border-bottom: 0; }
+.markdown table tbody tr { background: transparent; }
+.markdown table tbody tr:nth-child(2n) { background: var(--ifm-table-stripe-background); }
+[data-theme='light'] .markdown table tbody tr:nth-child(2n) { background: #f3f5f9; }
+/* dense API field tables: pin code/type columns, let prose wrap cleanly */
+.markdown table th:first-child, .markdown table td:first-child { white-space: nowrap; }
+.markdown table th:nth-child(2), .markdown table td:nth-child(2) { white-space: nowrap; color: var(--mtf-text-mid); }
+.markdown table td { overflow-wrap: anywhere; }
+/* clean inline code inside cells — no chip clutter on code-dense API tables */
+.markdown table code { background: transparent; border: 0; padding: 0 0.1em; font-size: 0.92em; color: var(--mtf-text); }
+.markdown table th code { font-weight: 600; }
+@media (max-width: 996px) { .theme-doc-markdown table { min-width: 640px; } }
+
+.markdown blockquote {
+  border: 1px solid var(--mtf-border);
+  background: var(--mtf-wash);
+  border-radius: var(--mtf-r-md);
+  padding: 0.7rem 1.1rem;
+  color: var(--mtf-text-mid);
+}
+.markdown blockquote > :last-child { margin-bottom: 0; }
+
+.markdown p { margin-bottom: 1.25rem; text-wrap: pretty; }
+.markdown li { margin-top: 0.45rem; line-height: 1.55; }
+.markdown ul ul, .markdown ol ol, .markdown ul ol, .markdown ol ul { margin-top: 0.45rem; }
+.markdown li > p { margin-bottom: 0.4rem; }
+.markdown hr { height: 1px; border: 0; background: var(--mtf-border); margin: 2.4rem 0; }
+.hash-link { color: var(--mtf-accent); }
+
+/* ~70ch measure for prose; wide tables get width via their own overflow-x scroll */
+.theme-doc-markdown { max-width: 46rem; }
+
+/* Tabs */
+.tabs__item { font-weight: 600; font-size: 0.88rem; border-radius: 8px 8px 0 0; }
+.tabs__item--active { border-bottom-color: var(--ifm-color-primary); color: var(--ifm-color-primary); }
+
+/* Buttons */
+.button--primary { font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   11 · Overview hero banner (og.svg on docs/index.md)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.hero-banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 2rem;
+  border-radius: var(--mtf-r-xl);
+  border: 1px solid var(--mtf-border);
+  box-shadow: var(--mtf-glass-shadow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   12 · Polish — colored callouts, anchor offset, focus, scrollbars, cards
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* (Admonition callout styling lives in section 9 — full tinted border, no side-stripe.) */
+
+/* Anchor jumps must clear the sticky 64px navbar */
+.markdown :where(h1, h2, h3, h4, h5, h6) { scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem); }
+
+/* Focus ring + reduced motion + themed scrollbars.
+   Tabs (<li role=tab>) and native <summary> aren't anchors/buttons — list them
+   explicitly or keyboard focus is invisible on them (WCAG 2.4.7). */
+:where(a, button, summary, .tabs__item, .menu__link, .pagination-nav__link):focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--mtf-r-sm);
+}
+.tabs__item:hover { background: var(--mtf-wash); color: var(--mtf-text); }
+.markdown details > summary:hover { color: var(--ifm-color-primary); }
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  body::before { animation: none; will-change: auto; }   /* fully stop the aurora ping-pong */
+}
+.menu, .table-of-contents, .theme-code-block pre, .markdown table {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mtf-border-strong) transparent;
+}
+.menu::-webkit-scrollbar,
+.table-of-contents::-webkit-scrollbar,
+.theme-code-block pre::-webkit-scrollbar,
+.markdown table::-webkit-scrollbar { width: 9px; height: 9px; }
+.menu::-webkit-scrollbar-thumb,
+.table-of-contents::-webkit-scrollbar-thumb,
+.theme-code-block pre::-webkit-scrollbar-thumb,
+.markdown table::-webkit-scrollbar-thumb {
+  background: var(--mtf-border-strong);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.menu::-webkit-scrollbar-thumb:hover,
+.theme-code-block pre::-webkit-scrollbar-thumb:hover,
+.markdown table::-webkit-scrollbar-thumb:hover { background: var(--mtf-text-dim); background-clip: padding-box; }
+.menu::-webkit-scrollbar-track,
+.table-of-contents::-webkit-scrollbar-track,
+.theme-code-block pre::-webkit-scrollbar-track,
+.markdown table::-webkit-scrollbar-track { background: transparent; }
+
+/* TOC active rail + non-clickable-looking active breadcrumb + softer light h2 rule */
+.table-of-contents__link--active {
+  border-left: 2px solid var(--ifm-color-primary);
+  margin-left: -1px;
+  padding-left: calc(var(--ifm-toc-padding-horizontal) - 1px);
+}
+.breadcrumbs__item--active .breadcrumbs__link { background: transparent; font-weight: 650; color: var(--ifm-color-primary); }
+[data-theme='light'] .markdown h2 { border-bottom-color: var(--mtf-surface-2); }
+
+/* Homepage link-card grid. The markdown list inside <div class="mtf-cardgrid">…</div>
+   renders as <ul><li><a> (CommonMark, blank lines around the list keep links locale-aware). */
+.mtf-cardgrid ul {
+  display: grid;
+  /* min() guard so a card never exceeds a narrow container (no horizontal overflow) */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 0.9rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.2rem 0 2rem;
+}
+.mtf-cardgrid li {
+  margin: 0;
+  padding: 1.05rem 1.2rem;
+  border: 1px solid var(--mtf-border);
+  border-radius: var(--mtf-r-lg);
+  background: var(--mtf-glass-bg);
+  backdrop-filter: var(--mtf-glass-blur);
+  -webkit-backdrop-filter: var(--mtf-glass-blur);
+  box-shadow: var(--mtf-glass-shadow);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--mtf-text-mid);
+  transition: border-color var(--mtf-dur) var(--mtf-ease), transform var(--mtf-dur) var(--mtf-ease), box-shadow var(--mtf-dur) var(--mtf-ease);
+}
+.mtf-cardgrid li:hover, .mtf-cardgrid li:focus-within { transform: translateY(-4px); }
+/* Two-Voice Rule: blue and rose alternate as a deliberate call-and-response.
+   :focus-within mirrors the hover so keyboard focus shows the same affordance. */
+.mtf-cardgrid li:nth-child(odd):hover,
+.mtf-cardgrid li:nth-child(odd):focus-within {
+  border-color: var(--mtf-blue);
+  box-shadow: var(--mtf-glass-shadow), var(--mtf-glow-blue);
+}
+.mtf-cardgrid li:nth-child(even):hover,
+.mtf-cardgrid li:nth-child(even):focus-within {
+  border-color: var(--mtf-pink);
+  box-shadow: var(--mtf-glass-shadow), var(--mtf-glow-rose);
+}
+.mtf-cardgrid li a { font-family: var(--mtf-serif); font-size: 1.3rem; font-weight: 600; letter-spacing: -0.01em; }
+.mtf-cardgrid li a:hover { text-decoration: none; }
+.mtf-cardgrid li a:focus-visible { outline: none; }  /* the card carries the focus affordance */
+
+/* Native <details> collapsibles for FAQ / edge-case tails */
+.markdown details {
+  border: 1px solid var(--mtf-border);
+  border-radius: 10px;
+  background: var(--ifm-background-surface-color);
+  padding: 0.4rem 1rem;
+  margin: 0.8rem 0;
+}
+.markdown details > summary { font-weight: 600; cursor: pointer; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   13 · Responsive & input adaptation
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Touch (coarse pointer): grow tap targets toward the 44px minimum + more spacing */
+@media (pointer: coarse) {
+  .menu__link { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .navbar__link { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  .dropdown__link { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .table-of-contents__link { padding: 0.4rem 0; }
+  .breadcrumbs__link { padding: 0.45rem 0.6rem; }
+  .menu__caret { padding: 0.5rem; }
+}
+
+/* Touch (no hover): don't let a tap leave a sticky lifted/glowing state */
+@media (hover: none) {
+  .mtf-cardgrid li:hover,
+  .pagination-nav__link:hover { transform: none; box-shadow: var(--mtf-glass-shadow); }
+}
+
+/* Phones: tighten the display rhythm so big Cormorant headings don't dominate,
+   and trim the aurora's pull a touch. Single-column docs layout is handled by Docusaurus. */
+@media (max-width: 640px) {
+  .markdown h2 { font-size: 1.75rem; margin-top: 2.1rem; }
+  .markdown h3 { font-size: 1.4rem; margin-top: 1.5rem; }
+  .markdown > p:first-of-type,
+  .markdown > .theme-admonition:first-child + p { font-size: 1.05rem; }
+  .mtf-cardgrid li { padding: 0.85rem 1rem; }
+  .mtf-cardgrid li a { font-size: 1.15rem; }
+  .hero-banner { border-radius: var(--mtf-r-lg); margin-bottom: 1.5rem; }
+  body::before { animation: none; will-change: auto; }   /* save battery / release GPU layer */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   14 · Polish — motion-token parity, hover consistency, scrollbar hygiene
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* All nav/label color hovers share ONE tokenized curve (else they fall through to
+   Infima's 200ms easing and the UI mixes two motion curves). Reduced-motion neutralizes it. */
+.navbar__link,
+.dropdown__link,
+.menu__link,
+.menu__list-item-collapsible,
+.table-of-contents__link,
+.breadcrumbs__link {
+  transition: color var(--mtf-dur) var(--mtf-ease),
+              background-color var(--mtf-dur) var(--mtf-ease),
+              border-color var(--mtf-dur) var(--mtf-ease);
+}
+/* Code-block action buttons get the house wash-hover instead of Infima grey */
+.theme-code-block .buttonGroup button:hover { background: var(--mtf-wash); color: var(--ifm-color-primary); }
+/* TOC scrollbar thumb was missing from the hover group */
+.table-of-contents::-webkit-scrollbar-thumb:hover { background: var(--mtf-text-dim); background-clip: padding-box; }
