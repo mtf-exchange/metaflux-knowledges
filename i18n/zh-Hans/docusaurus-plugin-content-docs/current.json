@@ -1,0 +1,70 @@
+{
+  "version.label": {
+    "message": "最新",
+    "description": "The label for version current"
+  },
+  "sidebar.docsSidebar.category.Getting started": {
+    "message": "入门指南",
+    "description": "The label for category 'Getting started' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Concepts": {
+    "message": "概念",
+    "description": "The label for category 'Concepts' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Trading": {
+    "message": "交易",
+    "description": "The label for category 'Trading' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Margin & risk": {
+    "message": "保证金与风险",
+    "description": "The label for category 'Margin & risk' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Spot & earn": {
+    "message": "现货与理财",
+    "description": "The label for category 'Spot & earn' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Account & access": {
+    "message": "账户与访问",
+    "description": "The label for category 'Account & access' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Improvement proposals": {
+    "message": "改进提案",
+    "description": "The label for category 'Improvement proposals' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.API": {
+    "message": "API",
+    "description": "The label for category 'API' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.REST": {
+    "message": "REST",
+    "description": "The label for category 'REST' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.WebSocket": {
+    "message": "WebSocket",
+    "description": "The label for category 'WebSocket' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Reference": {
+    "message": "参考",
+    "description": "The label for category 'Reference' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.EVM": {
+    "message": "EVM",
+    "description": "The label for category 'EVM' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Integration": {
+    "message": "集成",
+    "description": "The label for category 'Integration' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.SDKs": {
+    "message": "SDK",
+    "description": "The label for category 'SDKs' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.doc.Overview": {
+    "message": "概览",
+    "description": "The label for the doc item 'Overview' in sidebar 'docsSidebar', linking to the doc index"
+  },
+  "sidebar.docsSidebar.doc.Bridge": {
+    "message": "跨链桥",
+    "description": "The label for the doc item 'Bridge' in sidebar 'docsSidebar', linking to the doc bridge/index"
+  }
+}
