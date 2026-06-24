@@ -1,56 +1,44 @@
-# Core ↔ EVM 转账
+# Core ↔ EVM 资产转移
 
 :::tip
-**在 devnet 上线。** EVM→Core 的价值转移操作（`SpotSend`、`SendAsset`、
-`UsdClassTransfer`、`VaultTransfer` via CoreWriter）和 Core→EVM 信用
-实现已可运行并已测试。[bridge](../bridge/)（跨链托管）已上线。
+**已在 Devnet 上线。** EVM→Core 资产转移操作（通过 CoreWriter 发起的 `SpotSend`、`SendAsset`、`UsdClassTransfer`、`VaultTransfer`）以及 Core→EVM 的余额充值均已上线并完成测试。[跨链桥](../bridge/)（跨链托管）已同步上线。
 :::
 
-价值在两个方向上的 **Core**（L1 清算所 / 现货账本）和 **EVM**
-端之间流动。两者都是确定性的且账户作用域的。
+资产在 **Core**（L1 清算所 / 现货账本）与 **EVM** 侧之间双向流动，两个方向均为确定性操作，且均以账户为作用域。
 
-## EVM → Core（via CoreWriter）
+## EVM → Core（通过 CoreWriter）
 
-合约通过 [CoreWriter](interacting-with-core.md#writing-to-core--corewriter)（`0x3333…3333`）提交 L1 操作来将价值推入 Core。
-执行账户是调用合约（`msg.sender`）：
+合约通过 [CoreWriter](interacting-with-core.md#writing-to-core--corewriter)（`0x3333…3333`）提交 L1 操作，将资产推送到 Core。操作发起方为调用合约自身（`msg.sender`）：
 
 | 操作 | 效果 |
 |--------|--------|
-| `SpotSend` | 将现货代币转移到 Core 上的另一个账户 |
-| `SendAsset` | 通用资产转移（perp / spot / vault 类） |
-| `UsdClassTransfer` | 在 perp 和 spot 类账户之间移动 USDC |
-| `VaultTransfer` | 存入 / 从保险库中取出 |
+| `SpotSend` | 向 Core 上的另一账户转移现货代币 |
+| `SendAsset` | 通用资产转移（适用于永续合约、现货、金库等资产类别） |
+| `UsdClassTransfer` | 在永续合约账户与现货账户之间划转 USDC |
+| `VaultTransfer` | 向金库充值或从金库提取资产 |
 
-这些操作受 CoreWriter 原子性规则的约束：调用会燃烧 gas + 发出
-`RawAction`；之后任何 L1 端失败都是**无声的**（无 EVM 回滚）。
+上述操作均受 CoreWriter 原子性规则约束：调用将消耗 gas 并触发 `RawAction` 事件；L1 侧的后续处理失败为**静默失败**（不会触发 EVM 回滚）。
 
 ## Core → EVM（系统伪交易）
 
-当 L1 begin-block 效果需要在 EVM 端落地时——例如 recipient 是 EVM 端地址的现货发送，或者桥接入站 mint——它会被排队
-并在**下一个 EVM 区块上实现为确定性系统伪交易**：
+当 L1 区块初始化阶段产生的结算效果需要落地到 EVM 侧时——例如，现货转账的接收方为 EVM 侧地址，或跨链桥入金铸造——该操作将被加入队列，并在**下一个 EVM 区块中以确定性系统伪交易**的形式执行：
 
-| 操作 | 来源 | 金额标度 |
+| 操作 | 来源 | 金额精度 |
 |----|--------|--------------|
-| `SpotCredit` | 记入到 20 字节 EVM recipient 的 L1 现货余额 | `1e8` 定点 |
-| `BridgeMint` | [MetaBridge](../bridge/) 入站 mint（例如 USDC） | `1e6`（USDC 原生） |
+| `SpotCredit` | L1 现货余额充值至 20 字节的 EVM 接收方地址 | `1e8` 定点数 |
+| `BridgeMint` | [MetaBridge](../bridge/) 入金铸造（例如 USDC） | `1e6`（USDC 原生精度） |
 
-排序 + 吞吐量：
+排序与吞吐量说明：
 
-- 由 **L1 轮次** 排队，按升序轮次顺序、轮次内 FIFO 的顺序排出——
-  因此两个验证者以相同的顺序实现相同的操作（确定性）。
-- 每个操作都要计入 **system-gas** 成本，并根据 **弹性
-  per-block system-gas 片段** 排出（它随区块 gas 预算缩放）；剩余操作
-  进入下一个区块。预计 Core→EVM 信用将在几个
-  区块内落地，而不是在触发它们的同一个区块中立即落地。
+- 按 **L1 轮次**入队，依轮次升序依次消费，同一轮次内按先进先出（FIFO）顺序处理——两个验证节点以相同顺序执行相同操作，确保确定性。
+- 每笔操作均计算**系统 gas** 成本，并从**弹性的单区块系统 gas 配额**中扣除（该配额随区块 gas 上限动态调整）；未处理完的操作将顺延至下一区块。Core→EVM 充值预计在数个区块内到账，不会在触发的同一区块内即时生效。
 
-## 跨链（不同的表面）
+## 跨链转账（独立的操作界面）
 
-`CrossChainSend`（CoreWriter 操作 19）**不**将价值转移到本地 EVM——
-它将撤回排队到 [MetaBridge 托管桥接](../bridge/)，在目标链（Base / Solana）上由 ⅔ 验证者共同签名
-在争议窗口后释放。
+`CrossChainSend`（CoreWriter 操作码 19）**不会**将资产转移到本地 EVM——它将提款请求加入 [MetaBridge 托管跨链桥](../bridge/)的队列，目标链（Base / Solana）的资产释放需经过 ⅔ 验证节点联合签名，并须通过一段争议窗口期。
 
-## 另请参阅
+## 参见
 
 - [与 Core 交互](interacting-with-core.md)
 - [交互时序](interaction-timings.md)
-- [Bridge](../bridge/)
+- [跨链桥](../bridge/)

@@ -35,10 +35,14 @@ const config = {
 
   i18n: {
     defaultLocale: 'en',
-    locales: ['en', 'zh-Hans'],
+    locales: ['en', 'zh-Hans', 'ar', 'fr', 'ru', 'es'],
     localeConfigs: {
       en: {label: 'English', htmlLang: 'en'},
       'zh-Hans': {label: '简体中文', htmlLang: 'zh-Hans'},
+      ar: {label: 'العربية', htmlLang: 'ar', direction: 'rtl'},
+      fr: {label: 'Français', htmlLang: 'fr'},
+      ru: {label: 'Русский', htmlLang: 'ru'},
+      es: {label: 'Español', htmlLang: 'es'},
     },
   },
 

@@ -38,7 +38,7 @@ A spot order is just another [`/exchange`](../api/rest/exchange.md) action —
 [`spot_cancel`](../api/rest/exchange.md#spot_cancel) to cancel. Both are
 **sender-authorized** (the recovered signer is the trader; there is no `owner`
 field) and can be signed by the master account or an active
-[agent wallet](./agent-wallets.md).
+[agent wallet](../concepts/agent-wallets.md).
 
 ## What a spot pair is
 
@@ -103,9 +103,18 @@ Fees are charged **from the leg each side receives**:
 
 So a buyer (receiving base) pays its fee in base; a seller (receiving quote) pays
 its fee in quote. Fees accrue to a dedicated spot fee account, separate from the
-perp fee pool. A pair may set its own `taker_fee_bps` / `maker_fee_bps`; when a
-pair leaves them unset, the global spot default applies. See [fees](./fees.md#spot-fees)
-for the schedule.
+perp fee pool.
+
+| Side | Fee taken from | Rate |
+|------|----------------|------|
+| **Taker** | the leg you receive (buyer → base, seller → quote) | pair `taker_fee_bps`, else the global spot default |
+| **Maker** | the leg you receive | pair `maker_fee_bps`, else the global spot default |
+
+Spot fees are **per-pair**: a pair may set its own `taker_fee_bps` /
+`maker_fee_bps`, and when unset the global spot default applies. Spot uses a flat
+per-pair rate — the perp volume / maker-rebate / staking tiers do **not** apply to
+spot. Query the live values in the [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
+response; see [fees](../concepts/fees.md#spot-fees) for the settlement model.
 
 ## Time-in-force
 
@@ -118,7 +127,7 @@ Spot orders carry the same TIF set as perps, with one spot-specific rule:
 | `ioc` | Crosses what it can immediately; the residual is discarded — **never rests**, never escrows |
 
 `aon` is rejected (no core equivalent). Self-trade prevention uses the same
-[`stp_mode`](./order-types.md) set as perps (`cancel_oldest` / `cancel_newest` /
+[`stp_mode`](../concepts/order-types.md) set as perps (`cancel_oldest` / `cancel_newest` /
 `cancel_both`); `reject` is not supported.
 
 :::info
@@ -170,7 +179,7 @@ liquidation. Two planned overlays build on it:
 
 - [**Spot margin**](./spot-margin.md) (planned) — borrow quote against collateral
   to buy spot with leverage, with a maintenance margin and a liquidation price.
-- [**Earn**](./earn.md) (planned) — a USDC lending pool that funds spot-margin
+- [**Earn**](../concepts/earn.md) (planned) — a USDC lending pool that funds spot-margin
   borrows and earns the borrow interest as yield.
 
 Both are **opt-in overlays**; plain spot is unaffected by them.
@@ -178,8 +187,8 @@ Both are **opt-in overlays**; plain spot is unaffected by them.
 ## See also
 
 - [`spot_order`](../api/rest/exchange.md#spot_order) / [`spot_cancel`](../api/rest/exchange.md#spot_cancel) — the wire actions and field tables
-- [Order types](./order-types.md) — TIF and STP semantics shared with perps
-- [Fees](./fees.md#spot-fees) — the spot fee schedule and received-leg charging
+- [Order types](../concepts/order-types.md) — TIF and STP semantics shared with perps
+- [Fees](../concepts/fees.md#spot-fees) — the spot fee schedule and received-leg charging
 - [Spot margin](./spot-margin.md) — the planned leveraged spot track
 - [MIP-1](../mip/mip-1.md) — spot token standard and market deploy
 

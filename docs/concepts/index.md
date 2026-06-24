@@ -19,11 +19,16 @@ Plain-language explanations of MetaFlux's core mechanisms — what they do, how 
 9. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
 10. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
 
-## Spot & earn
+## Earn & related products
 
-- [Spot trading](./spot-trading.md) — **live**: token-for-token CLOB, reserved-balance escrow, no leverage
-- [Spot margin](./spot-margin.md) — **planned**: leveraged spot funded by the Earn pool
+The tradeable markets now live under [Products](../products/index.md) — see
+[Perpetuals](../products/perpetuals.md), [Spot](../products/spot.md), and
+[Spot margin](../products/spot-margin.md). The lending pool that funds spot-margin
+borrows is a concept:
+
 - [Earn](./earn.md) — **planned**: USDC lending pool that funds spot-margin borrows
+- [Spot](../products/spot.md) — **live**: token-for-token CLOB, reserved-balance escrow, no leverage
+- [Spot margin](../products/spot-margin.md) — **devnet preview**: leveraged spot funded by the Earn pool
 
 :::info
 **Non-leveraged spot only is Sharia-compliant.** Only **non-leveraged** spot
@@ -33,7 +38,7 @@ compatible with Islamic (Sharia) finance principles. The non-compliant products
 explicitly include **spot margin (leveraged spot trading)** alongside perpetual
 futures and every other leveraged or derivative product — the leverage and
 borrowing introduce interest (riba), speculation, and uncertainty (maysir,
-gharar). See [Spot trading](./spot-trading.md). Informational, not religious or
+gharar). See [Spot trading](../products/spot.md). Informational, not religious or
 financial advice.
 :::
 

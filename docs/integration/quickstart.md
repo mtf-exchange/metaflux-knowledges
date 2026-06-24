@@ -103,7 +103,7 @@ where `order.json` is the HL-shape envelope you assembled.
 
 ### Spot trading example
 
-[Spot](../concepts/spot-trading.md) is a token-for-token CLOB, separate from
+[Spot](../products/spot.md) is a token-for-token CLOB, separate from
 perps — no leverage, no positions. Place a spot order with the native
 [`spot_order`](../api/rest/exchange.md#spot_order) action: it takes a **spot pair
 id** (not a perp `market`), a `side`, a `limit_px`, a `size`, and a `tif`. A

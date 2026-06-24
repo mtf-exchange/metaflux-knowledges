@@ -41,7 +41,10 @@ And coming soon:
 - **Earn yield on idle USDC** through [Earn](concepts/earn.md), a lending pool
   that pays interest.
 - **Leveraged spot trading** (spot margin), arriving alongside Earn. See
-  [spot margin](concepts/spot-margin.md).
+  [spot margin](products/spot-margin.md).
+
+For the full list of trading products and their status — perpetuals, spot, spot
+margin, and the planned options and CDS tracks — see [Products](products/index.md).
 
 ## The handful of concepts to know
 

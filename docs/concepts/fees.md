@@ -124,7 +124,7 @@ So a spot **buyer** (receiving base) pays its fee in **base**, and a **seller**
 (receiving quote) pays its fee in **quote**. Each spot pair may set its own
 maker/taker rate; when a pair leaves them unset, the global spot default applies.
 See the spot tiers in the [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
-response, and [spot trading](./spot-trading.md#matching-fills-and-fees) for the
+response, and [spot trading](../products/spot.md#matching-fills-and-fees) for the
 settlement model.
 
 ## Fees on liquidation fills

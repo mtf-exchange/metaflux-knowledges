@@ -1765,7 +1765,13 @@ which is not a read-only operation.
 
 ## Node snapshot query types
 
-The following query types expose the node's committed-state snapshot surface. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index).
+The following query types expose the node's committed-state snapshot surface. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index). They are split by trading type below — the [spot / spot-margin / Earn](#spot-spot-margin--earn-query-types) reads first, then the [general](#general-node-snapshot-query-types) (perp & cross-cutting) snapshot reads. Perpetual market reads live in the main [Query types](#query-types) section above, where perps are the default.
+
+## Spot, spot-margin & Earn query types
+
+Read surface for [spot](../../products/spot.md) markets, leveraged
+[spot margin](../../products/spot-margin.md), and the
+[Earn](../../concepts/earn.md) lending pool.
 
 ### `spot_meta`
 
@@ -1860,7 +1866,7 @@ per account (not a full-table walk). State source:
 ### `spot_margin_state`
 
 :::info
-**Available on devnet (preview).** Read surface for leveraged [spot margin](../../concepts/spot-margin.md); see the concept page for the preview caveats.
+**Available on devnet (preview).** Read surface for leveraged [spot margin](../../products/spot-margin.md); see the concept page for the preview caveats.
 :::
 
 Every spot-margin position held by one account. Required: `user` (0x hex).
@@ -1957,6 +1963,12 @@ Response:
 | `pools[*].user_value` | decimal string | **Only with `user`** — `user_shares × share_value` |
 
 Pools are listed in asset-id order. Omitting `user` drops the `user_shares` / `user_value` fields.
+
+## General node snapshot query types
+
+Node snapshot reads that are not specific to one trading product — exchange status,
+frontend / open-order helpers, liquidation, rate limits, vaults, validators,
+multi-sig, and the aggregate `web_data2`.
 
 ### `exchange_status`
 

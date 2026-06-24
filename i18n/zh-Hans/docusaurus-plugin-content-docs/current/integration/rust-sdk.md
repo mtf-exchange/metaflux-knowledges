@@ -1,17 +1,17 @@
 # Rust SDK
 
 :::info
-**预览。** `metaflux-client` crate 在主网前发布；下面的 API 形状已提交。
+**预览版。** `metaflux-client` crate 在主网上线前已发布；以下 API 接口已定稿，不会变动。
 :::
 
-## 快速开始
+## TL;DR
 
 ```toml
 [dependencies]
 metaflux-client = "0.1"
 ```
 
-客户端是 `async` 的，可与任何现代 Rust 异步运行时配合使用。
+客户端为 `async` 模式，兼容所有现代 Rust 异步运行时。
 
 ```rust
 use metaflux_client::{Client, ClientOpts, OrderParams, Side, Tif};
@@ -37,7 +37,7 @@ async fn run() -> anyhow::Result<()> {
 }
 ```
 
-客户端是 `Send + Sync`，可在任何异步上下文中使用。
+客户端实现了 `Send + Sync`，可在任意异步上下文中使用。
 
 ## ClientOpts
 
@@ -65,7 +65,7 @@ pub struct ClientOpts {
 
 ## 模块
 
-客户端公开三个模块：`info`、`exchange`、`ws`。
+客户端提供三个模块：`info`、`exchange`、`ws`。
 
 ### `info`
 
@@ -84,7 +84,7 @@ c.info.agents().await?;
 c.info.user_fees().await?;
 ```
 
-所有函数都返回强类型响应；无需原始 JSON 处理。
+所有方法均返回强类型响应，无需手动处理原始 JSON。
 
 ### `exchange`
 
@@ -122,7 +122,7 @@ c.exchange.fba_order(FbaOrderParams { .. }).await?;
 ```
 
 :::warning
-**保证金控制仅限永续。** `update_leverage`、`update_isolated_margin` 和 `update_margin_mode` 仅适用于永续头寸。现货头寸在 V1 中不支持杠杆或隔离保证金 — 现货交易通过现货订单路径改用保留余额托管模型。
+**保证金控制仅限永续合约。** `update_leverage`、`update_isolated_margin` 和 `update_margin_mode` 仅适用于永续合约仓位。V1 中现货仓位不支持杠杆或逐仓保证金——现货交易通过现货下单路径使用预留余额托管模型。
 :::
 
 ### `ws`
@@ -145,11 +145,11 @@ while let Some(event) = user.next().await {
 }
 ```
 
-WS 客户端返回 `Stream<Item = Result<Event<T>>>`-shaped 订阅句柄。删除句柄以取消订阅。
+WS 客户端返回 `Stream<Item = Result<Event<T>>>` 形式的订阅句柄。丢弃句柄即可取消订阅。
 
 ## 数值类型
 
-公共规范缩放整数（固定点价格/大小、USDC 基础单位）包装在专用类型中，可防止意外的浮点运算：
+公共规范中的定标整数（定点价格/数量、USDC 基础单位）封装在专用类型中，防止误用浮点运算：
 
 ```rust
 pub struct PriceE8(pub u128);     // price × 10^8
@@ -157,7 +157,7 @@ pub struct SizeE8(pub u128);      // size × 10^8
 pub struct UsdcE6(pub u128);      // USDC × 10^6
 ```
 
-在线路层从/到字符串进行转换；对原始 `u128` 进行算术运算：
+在网络传输层与字符串之间互转；直接对原始 `u128` 进行算术运算：
 
 ```rust
 let price = PriceE8::from_str("10050000000")?;
@@ -190,9 +190,9 @@ match result {
 }
 ```
 
-参见 [错误处理](./error-handling.md)。
+详见[错误处理](./error-handling.md)。
 
-## 自定义签名者
+## 自定义签名器
 
 ```rust
 use metaflux_client::Signer;
@@ -231,60 +231,60 @@ agent_client.exchange.order(p).await?;
 
 ## 并发
 
-客户端是 `Send + Sync`，打算包装在 `Arc<Client>` 中以便在任务间共享。内部连接池处理 HTTP 并发；WS 订阅按调用。
+客户端实现了 `Send + Sync`，可封装在 `Arc<Client>` 中跨任务共享。内部连接池自动处理 HTTP 并发；WS 订阅则按调用独立维护。
 
-Nonce 生成是单调的 — 如果您想要跨许多任务真正确定的 nonce，请提供从外部计数器（Redis、原子）拉取的 `nonce_fn`。
+Nonce 生成保证单调递增——如果需要在大量任务中实现完全确定性的 nonce，可提供一个 `nonce_fn`，从外部计数器（Redis、原子变量等）中获取。
 
 ## 日志
 
-该 crate 通过标准结构化日志记录生态系统发出结构化日志。在您的二进制文件中设置订阅者；客户端不锁定后端。
+该 crate 通过标准结构化日志生态系统输出结构化日志。请在你的二进制程序中设置订阅者；客户端本身不绑定任何具体后端。
 
-## 特性
+## 功能特性
 
 ```toml
 [dependencies]
 metaflux-client = { version = "0.1", features = ["ws"] }
 ```
 
-| 特性 | 默认 | 描述 |
+| 特性 | 默认启用 | 说明 |
 |---------|:-------:|-------------|
 | `ws` | yes | WebSocket 支持 |
-| `secp256k1-pure` | yes | 纯 Rust secp256k1（无原生绑定）|
-| `secp256k1-c` | no | 原生绑定（更快，需要 C 工具链）|
-| `tls-pure` | yes | 纯 Rust TLS 后端（默认）|
+| `secp256k1-pure` | yes | 纯 Rust 实现的 secp256k1（无原生绑定） |
+| `secp256k1-c` | no | 原生绑定（速度更快，需要 C 工具链） |
+| `tls-pure` | yes | 纯 Rust TLS 后端（默认） |
 | `tls-native` | no | 系统 TLS 后端 |
 
 ## 示例
 
-存储库位于 `mtf-exchange/metaflux-client-rust`：
+仓库 `mtf-exchange/metaflux-client-rust` 包含以下示例：
 
-- `examples/quickstart.rs` — 下单和取消
-- `examples/market_maker.rs` — 在 BTC 上双向报价
-- `examples/risk_watcher.rs` — [风险观察器](./risk-watcher.md)的模式
-- `examples/agent_rotation.rs` — 完整轮转工作流
+- `examples/quickstart.rs` — 下单与撤单
+- `examples/market_maker.rs` — 在 BTC 双边挂单
+- `examples/risk_watcher.rs` — 参考[风险监控器](./risk-watcher.md)中的模式
+- `examples/agent_rotation.rs` — 完整的代理轮换流程
 
-## 另请参阅
+## 参见
 
-- [快速开始](./quickstart.md)
-- [签名](./signing.md)
-- [代理钱包操作指南](./agent-wallets-howto.md)
+- [快速入门](./quickstart.md)
+- [签名机制](./signing.md)
+- [代理钱包使用指南](./agent-wallets-howto.md)
 - [TypeScript SDK](./typescript-sdk.md)
 
 ## 常见问题
 
 <details>
-<summary>显示常见问题</summary>
+<summary>展开常见问题</summary>
 
-**Q: SDK 是否与 no-std 兼容？**
-A: V1 中不是。它需要异步运行时和 HTTP/WS 客户端。如果有需求，签名层可以提升到 `no_std`-friendly crate。
+**Q：SDK 是否支持 no-std 环境？**
+A：V1 暂不支持。它依赖异步运行时以及 HTTP/WS 客户端。如果有需求，签名层可以单独拆出，封装为兼容 `no_std` 的 crate。
 
-**Q: 二进制影响有多大？**
-A: 使用默认特性，发布二进制文件增加 `~1.5 MB`。`secp256k1-c` 节省约 200 KB。
+**Q：对二进制文件体积的影响有多大？**
+A：使用默认特性时，release 构建体积约增加 `~1.5 MB`。启用 `secp256k1-c` 可减少约 200 KB。
 
-**Q: 它支持 WASM 吗？**
-A: 部分支持 — 信息/交换通过 WASM 兼容 HTTP 后端在 WASM 中工作。WS 支持取决于目标的 WebSocket 原语。浏览器 WASM：计划中。
+**Q：是否支持 WASM？**
+A：部分支持——`info` 和 `exchange` 模块可通过 WASM 兼容的 HTTP 后端在 WASM 中使用。WS 支持取决于目标环境的 WebSocket 原语。浏览器 WASM 支持：计划中。
 
-**Q: 我可以从 EVM 合约中使用它吗？**
-A: 不能。这是一个链下客户端。链上桥接交互通过 [bridge](../bridge/) 原语进行。
+**Q：能否在 EVM 合约中调用此 SDK？**
+A：不能。这是一个链下客户端。链上桥接交互需通过[桥接](../bridge/)原语完成。
 
 </details>

@@ -1,54 +1,54 @@
-# MIP-3 — 无权限衍生品市场部署
+# MIP-3 — 无许可永续合约市场部署
 
 :::info
 **已实施。**
 :::
 
-任何开发者都可以通过链上燃气费拍卖在 MetaFlux 上部署新的永续合约市场。没有协议团队的门槛控制，没有审核委员会，没有白名单。拍卖价格加上最小押金是唯一的障碍。（无权限**现货**市场部署是姊妹提案，[MIP-1](./mip-1.md)。）
+任何开发者均可通过链上 Gas 竞拍，在 MetaFlux 上部署新的永续合约市场，无需经过协议团队审批，无需评审委员会，也无需白名单准入。唯一的门槛是竞拍价加上最低保证金存款。（无许可**现货**市场部署的姊妹提案，请参见 [MIP-1](./mip-1.md)。）
 
-## 为什么存在此提案
+## 设计初衷
 
-核心的差异化轴线。中心化交易所管理上市；MetaFlux 让上市流程本身成为协议的一部分。想要为某个利基资产创建市场的开发者不需要获得许可 — 他们需要赢得拍卖并提供种子参数。
+这是 MetaFlux 的核心差异化方向。中心化交易所依赖人工筛选上币；MetaFlux 则将上币流程本身纳入协议层。想为某种小众资产创建市场的开发者无需任何人的许可——只需赢得竞拍并提供初始参数。
 
-这是 MetaFlux 对先进的链上衍生品协议所开创的无权限市场部署设计的改进，保持以下等价性和调整：
+MetaFlux 在借鉴主流链上永续合约平台无许可市场部署设计的基础上进行了适配与调整，主要对应关系如下：
 
-- 三个不同的燃气费拍卖流（`perp_deploy_gas_auction`、`spot_pair_deploy_gas_auction`、`register_token_gas_auction`）— 与 HL 结构相同。衍生品部署是 MIP-3；现货流支持 [MIP-1](./mip-1.md)。
-- 拍卖参数（衰减、退款窗口、槽位间隔）由治理配置
-- 初始维护率、最大杠杆、资金费用上限 — 随部署竞价提交，受治理设定的范围限制
+- 三条独立的 Gas 竞拍通道（`perp_deploy_gas_auction`、`spot_pair_deploy_gas_auction`、`register_token_gas_auction`）——结构与 HL 相同。永续合约部署对应 MIP-3；现货通道参见 [MIP-1](./mip-1.md)。
+- 竞拍参数（衰减率、退款窗口、槽间隔）可通过治理配置
+- 初始维持保证金比率、最大杠杆倍数、资金费率上限——随竞拍报价一同提交，须在治理设定的范围内
 
 ## 部署流程
 
 ```mermaid
 flowchart TD
-    A["开发者 — submitGasAuctionBid<br/>(register_token 流，如果资产是新的)"] --> B["拍卖赢得槽位"]
-    B --> C["开发者 — perpDeploy { RegisterAsset }<br/>+ 生命周期子变体 (SetOracle, SetLeverage, ...)"]
-    C --> D["AssetId 已分配"]
+    A["builder — submitGasAuctionBid<br/>(register_token stream, if the asset is new)"] --> B["auction wins slot"]
+    B --> C["builder — perpDeploy { RegisterAsset }<br/>+ lifecycle sub-variants (SetOracle, SetLeverage, ...)"]
+    C --> D["AssetId allocated"]
     D --> E["perpDeploy { ActivateMarket }"]
-    E --> F["市场上线，第一个区块<br/>下一个区块接受订单"]
+    E --> F["market live, first block<br/>accepts orders next block"]
 ```
 
-衍生品部署是 `perpDeploy` 操作，由 `PerpDeployKind` 子变体分发，涵盖完整的市场生命周期（8 个子变体）：
+永续合约部署使用 `perpDeploy` 操作，通过 `PerpDeployKind` 子变体覆盖市场完整生命周期，共 8 个子变体：
 
-1. **`RegisterAsset`** — 注册新的永续合约资产；分配一个 `AssetId`。（如果令牌符号还没有注册，需要先通过 `register_token_gas_auction` 流注册。）
-2. **`SetOracle`** — 绑定 / 轮换资产的预言机来源子集。
+1. **`RegisterAsset`** — 注册新的永续合约资产，分配 `AssetId`。（若代币符号尚未注册，须先通过 `register_token_gas_auction` 通道完成注册。）
+2. **`SetOracle`** — 绑定或切换该资产的预言机来源子集。
 3. **`SetLeverage`** — 设置最大杠杆上限。
-4. **`SetFeeTier`** — 设置做市商 / 交易者费用等级（基点，受单个市场限制的上限）。
-5. **`SetMakerRebate`** — 设置做市商返佣（基点，≤ 2）。
-6. **`SetMinSize`** — 设置市场的最小订单规模。
-7. **`ActivateMarket`** — 激活市场（允许交易；需要完整配置）。
-8. **`DeactivateMarket`** — 关闭新订单（现有头寸保留）。
+4. **`SetFeeTier`** — 设置挂单方/吃单方手续费档位（单位 bps，受每市场限额约束）。
+5. **`SetMakerRebate`** — 设置挂单方返佣（单位 bps，上限 ≤ 2）。
+6. **`SetMinSize`** — 设置该市场的最小下单数量。
+7. **`ActivateMarket`** — 激活市场（开放交易；需完成全部配置）。
+8. **`DeactivateMarket`** — 停止接受新订单（已有持仓继续有效）。
 
-赢得部署槽位需要通过燃气费拍卖进行：开发者针对相关流调用 **`submitGasAuctionBid { auction_kind, bid_amount, ... }`**。每个竞价包括：
-- 一个 USDC 金额，在提交时托管，失败时退款（减去小额费用）。
-- 市场规格 — 初始杠杆、维护保证金率、资金费用参数、预言机源配置。
+赢得部署槽位需通过 Gas 竞拍完成：开发者调用 **`submitGasAuctionBid { auction_kind, bid_amount, ... }`** 向对应通道发起报价。每笔报价包含：
+- 一笔 USDC 金额，提交时锁入托管，竞拍失败后退还（扣除少量手续费）。
+- 市场规格参数——初始杠杆、维持保证金比率、资金费率参数、预言机来源配置。
 
-拍卖在区块边界处结算 — 每个槽位的最高出价者获胜，支付金额被销毁（不支付给任何人），规格参数成为已部署市场的参数。
+竞拍在区块边界结算——每个槽位最高出价者胜出，中标金额销毁（不归任何人所有），规格参数成为所部署市场的正式参数。
 
-## 竞价托管与退款
+## 报价托管与退款
 
-竞价在拍卖运行期间被托管。失败时，竞价被返还给开发者账户，减去小额拍卖费。成功时，获胜金额在槽位结束时被销毁（不支付给任何人）。
+竞拍进行期间，报价资金锁入托管。竞拍失败时，报价金额退回开发者账户，扣除少量竞拍手续费。竞拍胜出时，中标金额在槽位关闭时销毁（不归任何人所有）。
 
-活跃竞价可通过以下方式查看：
+可通过以下接口查看当前有效报价：
 
 ```json
 POST /info { "type": "mip3_active_bids" }
@@ -56,37 +56,37 @@ POST /info { "type": "mip3_active_bids" }
 
 ## 参数范围
 
-治理设置了竞价规格参数必须遵循的范围：
+治理机制设定报价规格参数须满足的边界条件：
 
-- 初始杠杆在 `[1, max_leverage]` 内（默认 `max_leverage = 50`）
-- 维护保证金率 ≥ `min_maintenance_ratio`（默认 1%）
-- 资金费用上限 ≤ `max_funding_per_hour`（默认 0.5%）
-- 预言机源来自批准列表
+- 初始杠杆范围 `[1, max_leverage]`（默认 `max_leverage = 50`）
+- 维持保证金比率 ≥ `min_maintenance_ratio`（默认 1%）
+- 资金费率上限 ≤ `max_funding_per_hour`（默认 0.5%）
+- 预言机来源须在已批准列表内
 
-具有超出范围参数的竞价在提交时被拒绝。
+超出范围的报价将在提交时被直接拒绝。
 
-## 拍卖参数
+## 竞拍参数
 
-每个流（衍生品 / 现货 / 令牌注册），拍卖具有：
+每条通道（永续合约 / 现货 / 代币注册）的竞拍具有以下参数：
 
-- **槽位间隔** — 新拍卖结算的频率（治理，默认 1 小时）
-- **衰减** — 如果槽位未被认领，最小竞价如何下降（治理，默认在 24 小时内线性下降）
-- **退款窗口** — 槽位关闭后失败竞价者可以申请退款的时长（治理，默认 7 天）
+- **槽间隔** — 每次竞拍结算的时间频率（治理配置，默认 1 小时）
+- **衰减率** — 槽位无人认领时最低出价的下降方式（治理配置，默认 24 小时线性衰减）
+- **退款窗口** — 槽位关闭后竞拍失败者可申请退款的期限（治理配置，默认 7 天）
 
-所有三个都可通过 `SetGlobal` 操作由治理更改（MIP-3 开发者治理全局变量：`SetGasAuctionDuration`、`SetMinDeployStake`、`SetGasAuctionMinBid`、`SetDeployerFeeCap`、`SetPerMarketLimits`、`SetEnableMip3`）。
+以上三项均可通过 `SetGlobal` 操作由治理修改（MIP-3 开发者治理全局参数：`SetGasAuctionDuration`、`SetMinDeployStake`、`SetGasAuctionMinBid`、`SetDeployerFeeCap`、`SetPerMarketLimits`、`SetEnableMip3`）。
 
 ## 部署后
 
-新市场从下一个区块开始存在于规范资产注册表中。流动性是开发者的问题；协议不提供种子订单。
+新市场从下一个区块起进入正式资产注册表。流动性由开发者自行负责，协议不提供任何初始挂单。
 
-开发者通常通过将 MIP-3 部署与同一市场上的流动性来源相结合来引导深度 — [MIP-2 元流动性](./mip-2.md)、由开发者费用返佣吸引的外部做市商，或用户创建的金库。
+开发者通常会结合同一市场上的流动性来源来引导深度——例如 [MIP-2 Metaliquidity](./mip-2.md)、通过开发者手续费返佣吸引的外部做市商，或用户自建的资金库。
 
 ## MIP-4
 
-参见 [MIP-4 — 衍生品流动性聚合器 / 内部化器](mip-4.md)了解补充无权限部署的 MetaFlux 运营的聚合器。
+有关 MetaFlux 运营的、与无许可部署互补的聚合器，请参见 [MIP-4 — 永续合约流动性聚合器 / 内化器](mip-4.md)。
 
-## 另见
+## 另请参阅
 
-- [MIP-1 — 现货令牌标准 + 市场部署](./mip-1.md) — 无权限部署的现货姊妹提案
-- [分级清算](../concepts/tiered-liquidation.md) — 适用于 MIP-3 已部署的市场，就像协议列出的市场一样
-- [组合保证金](../concepts/portfolio-margin.md) — MIP-3 市场通过标准情景包含选择加入 PM
+- [MIP-1 — 现货代币标准 + 市场部署](./mip-1.md) — 无许可部署的现货版本
+- [分层清算](../concepts/tiered-liquidation.md) — 同样适用于 MIP-3 部署的市场
+- [组合保证金](../concepts/portfolio-margin.md) — MIP-3 市场通过标准场景纳入，即可启用组合保证金

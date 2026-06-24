@@ -211,4 +211,4 @@ collected fees fund the MTF buyback that is burned and distributed to stakers.
 
 - [Fees](./fees.md) — fee mechanics, buyback-and-distribute flow, referral and builder credits
 - [Staking](./staking.md) — stake MTF to unlock the taker discount tiers
-- [Spot trading](./spot-trading.md) — spot fills carry their own per-pair rates
+- [Spot trading](../products/spot.md) — spot fills carry their own per-pair rates

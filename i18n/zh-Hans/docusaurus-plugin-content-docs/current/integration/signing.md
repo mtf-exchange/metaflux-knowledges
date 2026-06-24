@@ -1,18 +1,19 @@
-# 签名演练
+# 签名流程概览
 
 :::info
-**本页已移动。** `/exchange` 操作使用 **结构化 EIP-712 类型数据** (`eth_signTypedData_v4`) 签署。这是唯一的签名方案。端到端演练——域、各操作类型字符串、摘要、实际工作示例和本地验证——现已移至 [**类型数据签名**](./typed-data-signing.md)。
+**本页已迁移。** `/exchange` 操作使用 **EIP-712 结构化类型数据**（`eth_signTypedData_v4`）进行签名，这是唯一的签名方案。完整的端到端说明——包括域定义、各操作的类型字符串、摘要计算、示例演示及本地验证方法——现已移至
+[**类型化数据签名**](./typed-data-signing.md)。
 :::
 
-每个 `/exchange` 请求都是一个 EIP-712 类型数据签名：钱包按名称呈现每个操作字段，服务器从 `action.type` + `action.params` 重建类型化结构，重新计算摘要，并恢复签署者（帐户或其已批准的 [代理](../concepts/agent-wallets.md)）。没有第二种方案可供选择。
+每个 `/exchange` 请求均采用 EIP-712 类型化数据签名：钱包按字段名逐一呈现每个操作字段，服务端根据 `action.type` 与 `action.params` 重建类型化结构体，重新计算摘要，并还原出签名方（即账户本身，或其授权的[代理钱包](../concepts/agent-wallets.md)）。此处不存在第二种可供选择的签名方案。
 
-有关完整规范和可复制的 TypeScript / Python 示例，请转到 [**类型数据签名**](./typed-data-signing.md)。
+完整规范及可直接复用的 TypeScript / Python 示例，请前往[**类型化数据签名**](./typed-data-signing.md)。
 
-## 另请参阅
+## 参见
 
-- [类型数据签名](./typed-data-signing.md) — 签名方案，端到端
-- [`POST /exchange`](../api/rest/exchange.md) — 端点
-- [代理钱包](../concepts/agent-wallets.md) — 多签署者设置
-- [幂等性](./idempotency.md) — nonce 策略 + 重试
-- [错误](../api/errors.md) — 签名推出过程中可能遇到的每个错误
-- [网络](../networks.md) — 每个网络的 chainId
+- [类型化数据签名](./typed-data-signing.md) — 签名方案的完整端到端说明
+- [`POST /exchange`](../api/rest/exchange.md) — 该端点的接口文档
+- [代理钱包](../concepts/agent-wallets.md) — 多签名者配置
+- [幂等性](./idempotency.md) — nonce 策略与重试机制
+- [错误码](../api/errors.md) — 签名接入过程中可能遇到的所有错误
+- [网络](../networks.md) — 各网络对应的 chainId
