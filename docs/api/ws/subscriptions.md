@@ -14,7 +14,7 @@ The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**
 { "method": "subscribe", "subscription": { "type": "<channel>", "coin": "<coin>" } }
 ```
 
-and receive an ack (`subscriptionResponse`), an initial snapshot (`isSnapshot: true`), then live change-driven `{"channel":...,"data":...}` pushes (`isSnapshot: false`). A push lands only when that channel's state actually changed since the last commit; an unchanged channel emits nothing. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
+and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: true`), then live change-driven `{"channel":...,"data":...}` pushes (`is_snapshot: false`). A push lands only when that channel's state actually changed since the last commit; an unchanged channel emits nothing. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
 
 ## Channel status at a glance
 
@@ -74,7 +74,7 @@ Initial snapshot and every push share this shape:
 - Each side is capped at **20 aggregated levels**.
 - `time` is the book's `last_trade_ms` (consensus-derived); `0` until the book has traded.
 
-Each push is a **full snapshot of the top 20 levels**, not a partial diff. The frame envelope carries an `isSnapshot` boolean — `true` on the initial on-subscribe snapshot, `false` on the subsequent change-driven pushes — but the **body is the full top-20 book either way**, so the field is informational: keep replacing your local book on each frame and you stay correct.
+Each push is a **full snapshot of the top 20 levels**, not a partial diff. The frame envelope carries an `is_snapshot` boolean — `true` on the initial on-subscribe snapshot, `false` on the subsequent change-driven pushes — but the **body is the full top-20 book either way**, so the field is informational: keep replacing your local book on each frame and you stay correct.
 
 Frequency: change-driven — a frame is sent only when the book actually changed since the last commit; a commit that leaves this book untouched emits nothing. If the coin maps to no known market, you still get the ack but the snapshot body is the empty book (`"levels": [[], []]`, `"time": 0`) and no pushes follow.
 
@@ -528,7 +528,7 @@ The following channels appeared in earlier drafts but are **not implemented** on
 
 Also not implemented today:
 
-- **Diff-based `l2_book`** (partial `updates` frames) — current `l2_book` always sends full top-20 bodies. The frame does carry an `isSnapshot` flag (`true` on the initial snapshot, `false` on change-driven pushes), but every body is a full snapshot — there are no partial-diff `updates` frames.
+- **Diff-based `l2_book`** (partial `updates` frames) — current `l2_book` always sends full top-20 bodies. The frame does carry an `is_snapshot` flag (`true` on the initial snapshot, `false` on change-driven pushes), but every body is a full snapshot — there are no partial-diff `updates` frames.
 - **`seq` / `resume` / resume tokens** — every (re)subscribe starts from a fresh snapshot.
 - **Auth-at-subscribe envelope** for private channels — use `post` with a signed action for authenticated operations.
 

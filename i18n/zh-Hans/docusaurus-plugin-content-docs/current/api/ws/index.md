@@ -30,9 +30,9 @@ sequenceDiagram
     node-->>client: 101 Switching Protocols
     client->>node: {"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}
     node-->>client: {"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}} (ack)
-    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":true} (initial snapshot)
-    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":false} (push, on change)
-    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":false} (push, on change)
+    node-->>client: {"channel":"l2_book","data":{...},"is_snapshot":true} (initial snapshot)
+    node-->>client: {"channel":"l2_book","data":{...},"is_snapshot":false} (push, on change)
+    node-->>client: {"channel":"l2_book","data":{...},"is_snapshot":false} (push, on change)
     Note over client,node: ...
     client->>node: {"method":"ping"}
     node-->>client: {"channel":"pong"}
@@ -115,10 +115,11 @@ sequenceDiagram
 实时数据帧共享一个信封：
 
 ```json
-{ "channel": "<channel>", "data": { /* channel-specific */ }, "isSnapshot": false }
+{ "channel": "<channel>", "data": { /* channel-specific */ }, "is_snapshot": false }
 ```
 
-- `isSnapshot` 是一个布尔值：在初始订阅帧（完整快照）上为 `true`，在之后按变化驱动的推送上为 `false`。**无论哪种情况，每个帧的主体都是完整快照**（例如 `l2_book` 是完整的前 20 档，`all_mids` 是完整的映射，`account_state` 是完整的账户状态）—— `isSnapshot` 只是信息性的，并不是"这是差异"的标志。一个在每帧上简单替换本地状态的客户端始终保持正确，可以忽略此字段。
+- `is_snapshot` 是一个布尔值：在初始订阅帧（完整快照）上为 `true`，在之后按变化驱动的推送上为 `false`。**无论哪种情况，每个帧的主体都是完整快照**（例如 `l2_book` 是完整的前 20 档，`all_mids` 是完整的映射，`account_state` 是完整的账户状态）—— `is_snapshot` 只是信息性的，并不是"这是差异"的标志。一个在每帧上简单替换本地状态的客户端始终保持正确，可以忽略此字段。
+- 信封的快照标志是 **方言感知的**，正如频道 `type` 名称一样：在此原生 `/ws` 接口上它是 snake_case `is_snapshot`；在 HL 兼容的 `/hl/ws` 接口上，同一帧字段是 camelCase `isSnapshot`。
 - 帧上 **没有** `seq`、`ts` 或 `sub_id` 字段。按 `channel` 和 `data` 内的 `coin` 进行分解（对于按市场的频道）。
 
 更新是 **按变化驱动的**：每次提交后，节点 **仅在某个被订阅频道的已提交状态相比上一次提交确实发生变化时** 才为该频道发布一帧。一次未改动某被观看频道的提交不会为其发出任何帧 —— 所以您收到的帧数少于区块数，且永不重复推送未变化的数据（参见[按订阅者推送](#per-subscriber-push)）。
