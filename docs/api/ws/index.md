@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `fills`, `user_events`, and `candles` (rolling OHLCV bars, per `(coin, interval)`) — all push real committed data per block — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md) for the per-channel shapes.
+**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `fills`, `user_events`, and `candles` (rolling OHLCV bars, per `(coin, interval)`) — all push real committed data, change-driven (a channel emits a frame only when its state changed since the last commit) — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md) for the per-channel shapes.
 :::
 
 :::info
@@ -30,9 +30,9 @@ sequenceDiagram
     node-->>client: 101 Switching Protocols
     client->>node: {"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}
     node-->>client: {"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}} (ack)
-    node-->>client: {"channel":"l2_book","data":{"coin":"BTC","levels":[[...],[...]],"time":...}} (initial snapshot)
-    node-->>client: {"channel":"l2_book","data":{...}} (push, per commit)
-    node-->>client: {"channel":"l2_book","data":{...}} (push)
+    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":true} (initial snapshot)
+    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":false} (push, on change)
+    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":false} (push, on change)
     Note over client,node: ...
     client->>node: {"method":"ping"}
     node-->>client: {"channel":"pong"}
@@ -115,10 +115,13 @@ Causes include: malformed JSON, missing `method`, missing `subscription` / `subs
 Live data frames share one envelope:
 
 ```json
-{ "channel": "<channel>", "data": { /* channel-specific */ } }
+{ "channel": "<channel>", "data": { /* channel-specific */ }, "isSnapshot": false }
 ```
 
-There is **no** `seq`, `ts`, or `sub_id` field on the frame. Demultiplex on `channel` (and, for per-market channels, the `coin` inside `data`). Updates are emitted **per committed block**: after each commit the node publishes a fresh frame for every market that has at least one live subscriber (see [Per-subscriber push](#per-subscriber-push)).
+- `isSnapshot` is a boolean: `true` on the initial on-subscribe frame (the full snapshot), `false` on the subsequent change-driven pushes. **Every frame body is a full snapshot regardless** (e.g. `l2_book` is the full top-20 levels, `all_mids` the full map, `account_state` the full account state) — `isSnapshot` is informational, not a "this is a diff" flag. A client that simply replaces its local state on every frame stays correct and can ignore the field.
+- There is **no** `seq`, `ts`, or `sub_id` field on the frame. Demultiplex on `channel` (and, for per-market channels, the `coin` inside `data`).
+
+Updates are **change-driven**: after each commit the node publishes a frame for a subscribed channel **only when that channel's committed state actually changed** since the previous commit. A commit that leaves a watched channel untouched emits nothing for it — so you receive fewer frames than there are blocks, never a redundant re-push of unchanged data (see [Per-subscriber push](#per-subscriber-push)).
 
 ### `post` (request/response over WS)
 
@@ -172,10 +175,11 @@ A subscriber keyed by `"BTC"` and one keyed by the numeric id `"0"` (if BTC is a
 
 ## Per-subscriber push
 
-Pushes are **subscriber-gated and per-market**. After each committed block the node, for each market, checks `has_receivers(channel, coin)` — an O(1) lookup — and only then aggregates and broadcasts that market's book. Consequences:
+Pushes are **subscriber-gated, per-market, and change-driven**. After each committed block the node, for each market, checks `has_receivers(channel, coin)` — an O(1) lookup — and only then aggregates that market's book, and broadcasts it **only if it changed** since the previous commit. Consequences:
 
 - A market nobody is watching costs only the O(1) check; no book is built.
 - A `BTC` subscriber never triggers an `ETH` book build.
+- A market whose book is unchanged on a commit broadcasts nothing for it that commit — no redundant re-push.
 - Frames are delivered to **every** current subscriber of that `(channel, coin)` bucket.
 
 ## Backpressure & lag
