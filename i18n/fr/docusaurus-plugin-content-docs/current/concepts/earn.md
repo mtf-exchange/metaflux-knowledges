@@ -65,7 +65,7 @@ l'**identifiant de l'actif de cotation prêtable** (la clé du pool — la cotat
 et `amount` / `shares` sont des décimaux envoyés sous forme de chaînes JSON. Le pool
 **se crée automatiquement au premier dépôt** pour tout actif prêtable. Confirmez les parts émises /
 restantes et les totaux du pool via
-[`/info` `earn_state`](../api/rest/info.md#earn_state).
+[`/info` `earn_state`](../api/rest/info/spot.md#earn_state).
 
 ```json
 // supply 5,000 USDC into the Earn pool for asset 100

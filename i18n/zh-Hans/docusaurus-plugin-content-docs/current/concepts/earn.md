@@ -59,7 +59,7 @@ depositor_APY  ≈ borrow_APR × utilisation × (1 − protocol_fee)
 
 ## 存款 / 提款
 
-两种操作均通过发送方签名授权，在公开的 [`/exchange`](../api/rest/exchange.md#spot-margin--earn) 接口提交；`asset` 为**可出借的计价资产 ID**（即资金池键 — 已注册现货交易对的报价资产），`amount` / `shares` 以 JSON 字符串形式传入十进制数。资金池会在**任何可出借资产的首次存款时自动创建**。可通过 [`/info` `earn_state`](../api/rest/info.md#earn_state) 查询已铸造份额、剩余份额及资金池总量。
+两种操作均通过发送方签名授权，在公开的 [`/exchange`](../api/rest/exchange.md#spot-margin--earn) 接口提交；`asset` 为**可出借的计价资产 ID**（即资金池键 — 已注册现货交易对的报价资产），`amount` / `shares` 以 JSON 字符串形式传入十进制数。资金池会在**任何可出借资产的首次存款时自动创建**。可通过 [`/info` `earn_state`](../api/rest/info/spot.md#earn_state) 查询已铸造份额、剩余份额及资金池总量。
 
 ```json
 // supply 5,000 USDC into the Earn pool for asset 100

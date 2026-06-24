@@ -59,7 +59,7 @@ La calculadora de mark y la agregación de oráculos operan íntegramente en el 
 
 El **componente C3 del mark es un conjunto de feeds separado** — puntos medios de perpetuos de los **5 mercados de perpetuos** (Binance, OKX, Bybit, Gate, MEXC), no la tabla del oráculo de spot. Consulte **[Precios del oráculo](./oracle-prices.md)** para ver la composición completa, las reglas de fiabilidad, las sobreescrituras por símbolo y la lectura de `oracle_sources`.
 
-La lectura [`market_info`](../api/rest/info.md#market_info) expone `mark_source` (el descriptor `"MedianOfOraclesAndMid"`) y los campos compuestos `mark_px` / `oracle_px`; los componentes individuales C1/C2/C3 y la lista de fuentes ponderadas no se desglosan como campos en el wire.
+La lectura [`market_info`](../api/rest/info/perpetuals.md#market_info) expone `mark_source` (el descriptor `"MedianOfOraclesAndMid"`) y los campos compuestos `mark_px` / `oracle_px`; los componentes individuales C1/C2/C3 y la lista de fuentes ponderadas no se desglosan como campos en el wire.
 
 ## Mark vs. oráculo — por qué divergen
 
@@ -119,7 +119,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-La lectura [`market_info`](../api/rest/info.md#market_info) reporta `mark_px` y
+La lectura [`market_info`](../api/rest/info/perpetuals.md#market_info) reporta `mark_px` y
 `oracle_px` en el **plano de USDC entero** (p. ej. `"67042.335"`), más el
 descriptor `mark_source`:
 
@@ -139,7 +139,7 @@ Los tres componentes internos `C1`/`C2`/`C3` (oráculo+ancla EMA / mediana del
 libro interno / mediana ponderada de perpetuos externos) y el estado de banda (`Ok` / `Banded` /
 `Frozen`) residen dentro de la calculadora de mark; **no** se detallan como campos wire de `market_info` en la actualidad — solo se publica el `mark_px` compuesto. Banded significa que la banda limitó el candidato en este bloque; Frozen significa que todas las fuentes fallaron y el protocolo mantiene el mark anterior.
 
-Un canal WS dedicado `mark` está en la [hoja de ruta de WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (aún no disponible en streaming); por ahora consulte [`market_info`](../api/rest/info.md#market_info) para obtener `mark_px`.
+Un canal WS dedicado `mark` está en la [hoja de ruta de WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (aún no disponible en streaming); por ahora consulte [`market_info`](../api/rest/info/perpetuals.md#market_info) para obtener `mark_px`.
 
 ## Casos extremos
 

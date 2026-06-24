@@ -46,7 +46,7 @@ batch t+1:      open
 | أزواج السبوت | CLOB المستمر | الممارسة المعتادة |
 | المنتجات المركَّبة / المهيكَلة | FBA | التسعير المركَّب يحتاج تسوية متزامنة |
 
-وضع المطابقة لكل سوق موجود في [`market_info.fba_enabled`](../api/rest/info.md#market_info). الأسواق التي تعمل بـ FBA تقبل كلاً من `FbaOrder` (الدفعة المستهدفة) و[`submit_order`](../api/rest/exchange.md#submit_order) (يُعامَل كأمر FBA للدفعة التالية). انظر [كتالوج إجراءات `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` هو نقيصة معروفة غير مُعيَّنة حالياً.
+وضع المطابقة لكل سوق موجود في [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). الأسواق التي تعمل بـ FBA تقبل كلاً من `FbaOrder` (الدفعة المستهدفة) و[`submit_order`](../api/rest/exchange.md#submit_order) (يُعامَل كأمر FBA للدفعة التالية). انظر [كتالوج إجراءات `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` هو نقيصة معروفة غير مُعيَّنة حالياً.
 
 ## فترة الدفعة
 
@@ -70,7 +70,7 @@ batch t+1:      open
 }
 ```
 
-يُحدِّد `batch_id` الدفعة التي ينضم إليها الأمر. معرف الدفعة الحالية موجود في [`market_info`](../api/rest/info.md#market_info) تحت `fba_current_batch_id`. الأوامر ذات `batch_id < current` تُرفَض (`{"error":"batch already closed"}`); الأوامر ذات `batch_id` > current تُصطَف لتلك الدفعة المستقبلية.
+يُحدِّد `batch_id` الدفعة التي ينضم إليها الأمر. معرف الدفعة الحالية موجود في [`market_info`](../api/rest/info/perpetuals.md#market_info) تحت `fba_current_batch_id`. الأوامر ذات `batch_id < current` تُرفَض (`{"error":"batch already closed"}`); الأوامر ذات `batch_id` > current تُصطَف لتلك الدفعة المستقبلية.
 
 احذف `batch_id` لاستهداف الدفعة التالية — يختار الخادم الدفعة التي تقبل الأوامر حالياً.
 
@@ -202,7 +202,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 - [أنواع الأوامر](./order-types.md)
 - [كتالوج إجراءات `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` (نقيصة معروفة غير مُعيَّنة حالياً)
 - [MIP-3](../mip/mip-3.md) — الأسواق تشترك في FBA عند النشر
-- [`market_info`](../api/rest/info.md#market_info) — تحقق من `fba_enabled` لكل سوق
+- [`market_info`](../api/rest/info/perpetuals.md#market_info) — تحقق من `fba_enabled` لكل سوق
 
 ## الأسئلة الشائعة
 

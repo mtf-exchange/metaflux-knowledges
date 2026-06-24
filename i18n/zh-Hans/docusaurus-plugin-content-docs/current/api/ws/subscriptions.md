@@ -121,7 +121,7 @@
 
 ### `active_asset_ctx`
 
-某一市场的实时行情上下文——标记价 / 预言机价、资金费率及未平仓量——有变更时推送。**必须传入 `coin`。** 消息体的字段及单位与 REST [`market_info`](../rest/info.md#market_info) 接口一致：`mark_px` / `oracle_px` 为**整 USDC 单位**，并按市场价格刻度截断对齐；`funding` 字段块与 `market_info.funding` 保持完全一致。该频道与 REST 接口共用同一套每市场记录构建逻辑，因此 WS 推送的行情上下文永远不会与 `market_info` 产生偏差。
+某一市场的实时行情上下文——标记价 / 预言机价、资金费率及未平仓量——有变更时推送。**必须传入 `coin`。** 消息体的字段及单位与 REST [`market_info`](../rest/info/perpetuals.md#market_info) 接口一致：`mark_px` / `oracle_px` 为**整 USDC 单位**，并按市场价格刻度截断对齐；`funding` 字段块与 `market_info.funding` 保持完全一致。该频道与 REST 接口共用同一套每市场记录构建逻辑，因此 WS 推送的行情上下文永远不会与 `market_info` 产生偏差。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_ctx", "coin": "BTC" } }
@@ -159,7 +159,7 @@
 
 ### `all_mids`
 
-全局中间价映射——每个市场的标记价，有变更时推送。以币种为键，值为 REST [`markets`](../rest/info.md#markets) 接口返回的经价格刻度截断的整 USDC 标记价。无需传入 `coin` 参数。
+全局中间价映射——每个市场的标记价，有变更时推送。以币种为键，值为 REST [`markets`](../rest/info/perpetuals.md#markets) 接口返回的经价格刻度截断的整 USDC 标记价。无需传入 `coin` 参数。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "all_mids" } }

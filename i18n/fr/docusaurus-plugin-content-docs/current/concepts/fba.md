@@ -46,7 +46,7 @@ Le prix d'exécution est **uniforme** pour tous les participants du lot — pers
 | Paires au comptant | CLOB continu | Convention |
 | Index / produits structurés | FBA | La tarification composite nécessite une liquidation synchrone |
 
-Le mode de matching de chaque marché est indiqué dans [`market_info.fba_enabled`](../api/rest/info.md#market_info). Les marchés avec FBA activé acceptent à la fois les `FbaOrder` (ciblant un lot spécifique) et [`submit_order`](../api/rest/exchange.md#submit_order) (traités comme des ordres FBA pour le prochain lot). Consultez le [catalogue d'actions `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` est un stub reconnu mais non mappé à ce jour.
+Le mode de matching de chaque marché est indiqué dans [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Les marchés avec FBA activé acceptent à la fois les `FbaOrder` (ciblant un lot spécifique) et [`submit_order`](../api/rest/exchange.md#submit_order) (traités comme des ordres FBA pour le prochain lot). Consultez le [catalogue d'actions `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` est un stub reconnu mais non mappé à ce jour.
 
 ## Intervalle de lot
 
@@ -70,7 +70,7 @@ Des intervalles plus courts réduisent l'attente mais augmentent le coût de cal
 }
 ```
 
-`batch_id` indique le lot que l'ordre rejoint. L'identifiant du lot en cours est disponible dans [`market_info`](../api/rest/info.md#market_info) sous `fba_current_batch_id`. Les ordres avec `batch_id < current` sont rejetés (`{"error":"batch already closed"}`) ; les ordres avec un `batch_id` > current sont mis en file d'attente pour ce lot futur.
+`batch_id` indique le lot que l'ordre rejoint. L'identifiant du lot en cours est disponible dans [`market_info`](../api/rest/info/perpetuals.md#market_info) sous `fba_current_batch_id`. Les ordres avec `batch_id < current` sont rejetés (`{"error":"batch already closed"}`) ; les ordres avec un `batch_id` > current sont mis en file d'attente pour ce lot futur.
 
 Omettre `batch_id` pour cibler le prochain lot — le serveur sélectionne automatiquement celui qui accepte actuellement des ordres.
 
@@ -202,7 +202,7 @@ Les prix et tailles sont des chaînes d'entiers en **virgule fixe 1e8** brutes (
 - [Types d'ordres](./order-types.md)
 - [Catalogue d'actions `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` (stub reconnu mais non mappé à ce jour)
 - [MIP-3](../mip/mip-3.md) — les marchés activent le FBA au déploiement
-- [`market_info`](../api/rest/info.md#market_info) — vérifier `fba_enabled` par marché
+- [`market_info`](../api/rest/info/perpetuals.md#market_info) — vérifier `fba_enabled` par marché
 
 ## FAQ
 

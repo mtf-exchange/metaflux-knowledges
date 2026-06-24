@@ -171,7 +171,7 @@ short 0.5 BTC:
 | base interest | `0.0000125/h` (`0.01 %/8h`) | protocol-fixed |
 | `funding_rate_multiplier` | `1.0` | per-asset, auto-driven by dynamic risk |
 
-The per-asset `funding_rate_multiplier` is MTF's differentiation over HL's governance-static value: it's auto-driven from 30-day realized volatility by the dynamic-risk engine, scaling the premium sample before it enters the EMA.
+The per-asset `funding_rate_multiplier` is MTF's improvement over HL's governance-static value: it's auto-driven from 30-day realized volatility by the dynamic-risk engine, scaling the premium sample before it enters the EMA.
 
 ## Funding history
 
@@ -186,7 +186,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 ```
 
 Returns the ordered ring of `(ts_ms, premium)` samples (see
-[`funding_history`](../api/rest/info.md#funding_history)):
+[`funding_history`](../api/rest/info/perpetuals.md#funding_history)):
 
 ```json
 {
@@ -201,7 +201,7 @@ Returns the ordered ring of `(ts_ms, premium)` samples (see
 }
 ```
 
-A dedicated `fundingTicks` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available); poll [`funding_history`](../api/rest/info.md#funding_history) meanwhile.
+A dedicated `fundingTicks` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available); poll [`funding_history`](../api/rest/info/perpetuals.md#funding_history) meanwhile.
 
 ## What funding doesn't do
 

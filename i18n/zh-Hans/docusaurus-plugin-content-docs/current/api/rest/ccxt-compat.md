@@ -24,9 +24,9 @@ https://<gateway>/ccxt/<path>
 
 | CCXT 方法 | 路由 | 鉴权 | 状态 | 节点 MTF 原生来源 |
 |------------|------|------|------|-------------------|
-| `fetchMarkets` | `GET /ccxt/markets` | 否 | 格式已生效；静态创世固定数据 | [`markets`](./info.md#markets) |
-| `fetchTicker` | `GET /ccxt/ticker?symbol=` | 否 | 格式已生效；价格为占位存根 | [`market_info`](./info.md#market_info) + 中间价 |
-| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | 否 | 格式已生效；订单簿为空 | [`l2_book`](./info.md#l2_book) |
+| `fetchMarkets` | `GET /ccxt/markets` | 否 | 格式已生效；静态创世固定数据 | [`markets`](./info/perpetuals.md#markets) |
+| `fetchTicker` | `GET /ccxt/ticker?symbol=` | 否 | 格式已生效；价格为占位存根 | [`market_info`](./info/perpetuals.md#market_info) + 中间价 |
+| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | 否 | 格式已生效；订单簿为空 | [`l2_book`](./info/perpetuals.md#l2_book) |
 | `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | 否 | 暂未提供 | OHLCV 历史——网关索引器（规划中） |
 | `createOrder` | `POST /ccxt/orders` | Bearer | 格式已生效 | → [`/exchange`](./exchange.md) |
 | `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | 格式已生效 | → [`/exchange`](./exchange.md) |
@@ -38,7 +38,7 @@ https://<gateway>/ccxt/<path>
 图例：**格式已生效** = 路由已挂载，返回 CCXT 正确格式，货币字段为占位存根，待读取回传通道上线 · **节点数据已接入** = 底层节点读取已正常运行 · **暂未提供** = 尚无节点数据支撑，由网关索引器提供（规划中）。
 
 :::warning
-**接口功能有意保持精简。** CCXT 定义但网关尚未挂载的方法——`fetchTickers`、`fetchTrades`（公开成交记录）、`fetchOrder`、`fetchOpenOrders`、`fetchClosedOrders`、`fetchOHLCV`（超出存根范围）、`setLeverage`、`setMarginMode`、`fetchFundingRate`、`cancelAllOrders`——均返回 404。随着读取回传通道的扩展，这些方法将陆续挂载到 `/ccxt/` 下。`fetchOpenOrders` / `fetchOrder` 将从节点 [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) 读取数据转换而来；`fetchTrades` 将从节点 [`recent_trades`](./info.md#recent_trades) 成交记录转换而来；`fetchOHLCV` / `fetchClosedOrders` 暂未提供（网关索引器规划中）。
+**接口功能有意保持精简。** CCXT 定义但网关尚未挂载的方法——`fetchTickers`、`fetchTrades`（公开成交记录）、`fetchOrder`、`fetchOpenOrders`、`fetchClosedOrders`、`fetchOHLCV`（超出存根范围）、`setLeverage`、`setMarginMode`、`fetchFundingRate`、`cancelAllOrders`——均返回 404。随着读取回传通道的扩展，这些方法将陆续挂载到 `/ccxt/` 下。`fetchOpenOrders` / `fetchOrder` 将从节点 [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) 读取数据转换而来；`fetchTrades` 将从节点 [`recent_trades`](./info/perpetuals.md#recent_trades) 成交记录转换而来；`fetchOHLCV` / `fetchClosedOrders` 暂未提供（网关索引器规划中）。
 :::
 
 ## Symbol 格式
@@ -50,7 +50,7 @@ BTC/USDC:USDC      # perpetual, settled in USDC
 ETH/USDC:USDC
 ```
 
-现货市场（待现货品种上线后）使用 `"BASE/QUOTE"` 格式，不带 `:SETTLE` 后缀。目前市场注册表为**静态创世固定数据**（`with_genesis_markets`——即创世永续合约品种）；待读取回传通道上线后，将替换为从节点 [`markets`](./info.md#markets) 实时刷新的 gRPC 驱动注册表。Symbol 解析**真实有效**：格式错误的 symbol → 返回 400，未知 symbol → 返回 400。
+现货市场（待现货品种上线后）使用 `"BASE/QUOTE"` 格式，不带 `:SETTLE` 后缀。目前市场注册表为**静态创世固定数据**（`with_genesis_markets`——即创世永续合约品种）；待读取回传通道上线后，将替换为从节点 [`markets`](./info/perpetuals.md#markets) 实时刷新的 gRPC 驱动注册表。Symbol 解析**真实有效**：格式错误的 symbol → 返回 400，未知 symbol → 返回 400。
 
 ## 时间周期
 
@@ -148,7 +148,7 @@ curl 'https://gateway/ccxt/ticker?symbol=BTC/USDC:USDC'
 }
 ```
 
-货币字段目前均为 `"0.0"` 占位存根；读取回传通道上线后，将从节点中间价 / [`market_info`](./info.md#market_info) 填入真实数据。CCXT 格式字节级正确，客户端现在即可正常反序列化，后续获取真实数值时无需任何改动。
+货币字段目前均为 `"0.0"` 占位存根；读取回传通道上线后，将从节点中间价 / [`market_info`](./info/perpetuals.md#market_info) 填入真实数据。CCXT 格式字节级正确，客户端现在即可正常反序列化，后续获取真实数值时无需任何改动。
 
 ### 查询订单簿
 
@@ -160,7 +160,7 @@ curl 'https://gateway/ccxt/orderbook?symbol=BTC/USDC:USDC&limit=50'
 { "symbol": "BTC/USDC:USDC", "bids": [], "asks": [], "timestamp": 0, "nonce": 0 }
 ```
 
-`bids` / `asks` 为 `[[price, amount], …]` 数组（CCXT 格式）。从 [`l2_book`](./info.md#l2_book) 获取真实深度数据后，`limit` 截断将自动生效。
+`bids` / `asks` 为 `[[price, amount], …]` 数组（CCXT 格式）。从 [`l2_book`](./info/perpetuals.md#l2_book) 获取真实深度数据后，`limit` 截断将自动生效。
 
 ### 下单
 

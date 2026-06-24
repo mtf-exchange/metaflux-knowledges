@@ -6,7 +6,7 @@
 
 ## En bref
 
-Les positions perpétuelles accumulent un paiement de financement continu (réglé toutes les **8 s** on-chain) proportionnel à la **prime du contrat perpétuel par rapport à l'oracle** — mesurée à partir du **prix d'impact** pondéré par la profondeur de carnet, et non à partir d'une seule transaction — plus un terme d'**intérêt** de référence. Les positions longues paient les positions courtes lorsque le perpétuel s'échange au-dessus de l'oracle ; les courtes paient les longues lorsqu'il s'échange en dessous. Le résultat est plafonné à une valeur par défaut de **`±4 % / heure`** par marché, et le règlement s'effectue contre **l'oracle**.
+Les positions sur contrats perpétuels accumulent un paiement de financement continu (réglé toutes les **8 s** en chaîne), proportionnel à la **prime du contrat perpétuel par rapport à l'oracle** — mesurée à partir du **prix d'impact** pondéré par la profondeur, et non d'une seule transaction — plus un terme de **taux d'intérêt** de base. Les acheteurs (positions longues) paient les vendeurs (positions courtes) lorsque le contrat perpétuel s'échange au-dessus de l'oracle ; les positions courtes paient les positions longues dans le cas inverse. Le résultat est plafonné à une valeur par défaut de **`±4 % / heure`** par marché, et le règlement s'effectue contre l'**oracle**.
 
 ## Pourquoi le financement existe
 
@@ -186,7 +186,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 ```
 
 Renvoie l'anneau ordonné d'échantillons `(ts_ms, premium)` (voir
-[`funding_history`](../api/rest/info.md#funding_history)) :
+[`funding_history`](../api/rest/info/perpetuals.md#funding_history)) :
 
 ```json
 {
@@ -201,7 +201,7 @@ Renvoie l'anneau ordonné d'échantillons `(ts_ms, premium)` (voir
 }
 ```
 
-Un canal WS dédié `fundingTicks` figure dans la [feuille de route WS](../api/ws/subscriptions.md#roadmap--not-yet-available) ; en attendant, interrogez [`funding_history`](../api/rest/info.md#funding_history).
+Un canal WS dédié `fundingTicks` figure dans la [feuille de route WS](../api/ws/subscriptions.md#roadmap--not-yet-available) ; en attendant, interrogez [`funding_history`](../api/rest/info/perpetuals.md#funding_history).
 
 ## Ce que le financement ne fait pas
 

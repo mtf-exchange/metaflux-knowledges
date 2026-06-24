@@ -121,7 +121,7 @@
 
 ### `active_asset_ctx`
 
-السياق الخاص بسوق واحدة — سعر Mark / Oracle والتمويل والفائدة المفتوحة — يُدفع عند تغيُّره. **يتطلب `coin`.** يحمل المحتوى الحقول والوحدات ذاتها التي يُعيدها الطلب REST [`market_info`](../rest/info.md#market_info): `mark_px` / `oracle_px` بوحدة **USDC كاملة** مُقرَّبة بمقياس السعر (مقطوعة إلى تدرج السعر للسوق)، وكتلة `funding` تعكس `market_info.funding`. مبنيٌّ على منشئ السجل ذاته المستخدم في قراءة REST، لذلا يختلف إطار WS ctx أبداً عن `market_info`.
+السياق الخاص بسوق واحدة — سعر Mark / Oracle والتمويل والفائدة المفتوحة — يُدفع عند تغيُّره. **يتطلب `coin`.** يحمل المحتوى الحقول والوحدات ذاتها التي يُعيدها الطلب REST [`market_info`](../rest/info/perpetuals.md#market_info): `mark_px` / `oracle_px` بوحدة **USDC كاملة** مُقرَّبة بمقياس السعر (مقطوعة إلى تدرج السعر للسوق)، وكتلة `funding` تعكس `market_info.funding`. مبنيٌّ على منشئ السجل ذاته المستخدم في قراءة REST، لذلا يختلف إطار WS ctx أبداً عن `market_info`.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_ctx", "coin": "BTC" } }
@@ -159,7 +159,7 @@
 
 ### `all_mids`
 
-خريطة Mid العالمية — سعر Mark لكل سوق، يُدفع عند تغيُّر الأسعار. مفهرَسة بالعملة؛ القيم هي سعر Mark بوحدة USDC كاملة مُقرَّبة بمقياس السعر الذي تُبلِّغ عنه قراءة REST [`markets`](../rest/info.md#markets). لا تحتاج إلى معامل `coin`.
+خريطة Mid العالمية — سعر Mark لكل سوق، يُدفع عند تغيُّر الأسعار. مفهرَسة بالعملة؛ القيم هي سعر Mark بوحدة USDC كاملة مُقرَّبة بمقياس السعر الذي تُبلِّغ عنه قراءة REST [`markets`](../rest/info/perpetuals.md#markets). لا تحتاج إلى معامل `coin`.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "all_mids" } }

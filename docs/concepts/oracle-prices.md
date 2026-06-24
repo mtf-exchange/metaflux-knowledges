@@ -63,7 +63,7 @@ The composed `oracle_px` is published **once per block**, derived from the conse
 
 ## Querying
 
-The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`market_info`](../api/rest/info.md#market_info) read, alongside `mark_px`:
+The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`market_info`](../api/rest/info/perpetuals.md#market_info) read, alongside `mark_px`:
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \

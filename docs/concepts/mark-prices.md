@@ -59,7 +59,7 @@ The mark computer and the oracle aggregation operate entirely in the **`Decimal`
 
 The mark's **C3 component is a separate feed set** — perp mids from the **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC), not the spot oracle table. See **[Oracle prices](./oracle-prices.md)** for the full composition, reliability rules, per-symbol overrides, and the `oracle_sources` read.
 
-The [`market_info`](../api/rest/info.md#market_info) read surfaces `mark_source` (the descriptor `"MedianOfOraclesAndMid"`) and the composed `mark_px` / `oracle_px`; the individual C1/C2/C3 components and the weighted source list are not broken out as wire fields.
+The [`market_info`](../api/rest/info/perpetuals.md#market_info) read surfaces `mark_source` (the descriptor `"MedianOfOraclesAndMid"`) and the composed `mark_px` / `oracle_px`; the individual C1/C2/C3 components and the weighted source list are not broken out as wire fields.
 
 ## Mark vs oracle — why they diverge
 
@@ -119,7 +119,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-The [`market_info`](../api/rest/info.md#market_info) read reports `mark_px` and
+The [`market_info`](../api/rest/info/perpetuals.md#market_info) read reports `mark_px` and
 `oracle_px` on the **whole-USDC plane** (e.g. `"67042.335"`), plus the
 `mark_source` descriptor:
 
@@ -142,7 +142,7 @@ median / external-perp weighted median) and the band-state (`Ok` / `Banded` /
 `mark_px` is published. Banded means the band clamped the candidate this block;
 Frozen means all sources failed and the protocol is holding prior mark.
 
-A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available) (not yet streaming); poll [`market_info`](../api/rest/info.md#market_info) for `mark_px` meanwhile.
+A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available) (not yet streaming); poll [`market_info`](../api/rest/info/perpetuals.md#market_info) for `mark_px` meanwhile.
 
 ## Edge cases
 

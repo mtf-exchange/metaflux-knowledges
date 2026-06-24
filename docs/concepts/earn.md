@@ -70,7 +70,7 @@ Both actions are sender-authorized on the public
 and `amount` / `shares` are decimals sent as JSON strings. The pool
 **auto-creates on the first deposit** for any lendable asset. Confirm minted /
 remaining shares and pool totals via
-[`/info` `earn_state`](../api/rest/info.md#earn_state).
+[`/info` `earn_state`](../api/rest/info/spot.md#earn_state).
 
 ```json
 // supply 5,000 USDC into the Earn pool for asset 100

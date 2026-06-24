@@ -90,7 +90,7 @@ Définitions des termes utilisés dans l'ensemble de la documentation. Renvois c
 
 ## L
 
-**Carnet L2 (L2 book).** Le carnet d'ordres à une profondeur donnée (N premiers niveaux par côté). Voir [`l2_book` info](../api/rest/info.md#l2_book).
+**Carnet L2 (L2 book).** Le carnet d'ordres à une profondeur donnée (N premiers niveaux par côté). Voir [`l2_book` info](../api/rest/info/perpetuals.md#l2_book).
 
 **Palier de liquidation (Liquidation tier).** Étape de [l'échelle par paliers](./tiered-liquidation.md) : T0 carton jaune, T1 partielle, T2 complète, T3 filet de sécurité, T4 ADL.
 

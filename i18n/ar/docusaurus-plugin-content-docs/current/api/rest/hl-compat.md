@@ -39,24 +39,24 @@ POST  https://<gateway>/hl/exchange
 | `clearinghouseState` / `userState` | **مربوط** | [`account_state`](./info.md#account_state) | `marginSummary` من `balance_quote` في العقدة؛ `assetPositions:[]` حتى تُظهر العقدة حالة كل مركز على حدة |
 | `delegations` | **مربوط** | [`staking_state`](./info.md#staking_state) | العقدة مُفهرسة بـ `account_id` المضغوط؛ عنوان keccak حقيقي بلا معرف مضغوط يُعيد خطأ صادقًا (وليس قائمة فارغة مزيفة) |
 | `userFees` | **مربوط** | [`fee_schedule`](./info.md#fee_schedule) | `feeSchedule` حي؛ `activeReferrer`/`userVolumes`/`dailyUserVlm` تنتظر قراءتَي `user_referrer`/`user_volume` من العقدة |
-| `l2Book` | نموذج أولي | [`l2_book`](./info.md#l2_book) | قراءة العقدة موجودة؛ ترجمة البوابة إلى `{coin,levels,time}` غير مربوطة بعد — يُعيد دفتر فارغًا بصيغة HL |
+| `l2Book` | نموذج أولي | [`l2_book`](./info/perpetuals.md#l2_book) | قراءة العقدة موجودة؛ ترجمة البوابة إلى `{coin,levels,time}` غير مربوطة بعد — يُعيد دفتر فارغًا بصيغة HL |
 | `meta` | نموذج أولي | — | يحتاج إلى قراءة قائمة بجميع الأسواق/الكون من العقدة (قراءة `market_info` في العقدة تخص معرفًا واحدًا)؛ يُعيد `{universe:[],marginTables:[]}` |
 | `allMids` | نموذج أولي | — | يحتاج إلى قراءة الكون (نفس عائق `meta`)؛ يُعيد `{}` |
-| `metaAndAssetCtxs` | **مربوط** | [`markets`](./info.md#markets) | `[meta, [assetCtx...]]`؛ كل `assetCtx` للعقد الدائمة يحمل `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`، جميعها سلاسل USDC عشرية |
+| `metaAndAssetCtxs` | **مربوط** | [`markets`](./info/perpetuals.md#markets) | `[meta, [assetCtx...]]`؛ كل `assetCtx` للعقد الدائمة يحمل `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`، جميعها سلاسل USDC عشرية |
 | `openOrders` | نموذج أولي | [`open_orders`](./info.md#open_orders) | قراءة العقدة موجودة؛ ترجمة البوابة غير مربوطة بعد — يُعيد `[]` |
 | `frontendOpenOrders` | نموذج أولي | [`open_orders`](./info.md#open_orders) | `openOrders` + تلميحات واجهة المستخدم؛ يُعيد `[]` |
 | `vaultDetails` | نموذج أولي | [`vault_state`](./info.md#vault_state) | يحتاج إلى سجل عنوان القائد ← `vault_id` (العقدة مُفهرسة بـ `vault_id`)؛ يُرجع `user` من الطلب مع أرقام مالية معدومة |
 | `subAccounts` | **مربوط** | [`sub_accounts`](./info.md#sub_accounts) | يُعيّن `{index,address}` من العقدة إلى `{subAccountUser,name,master}`؛ `clearinghouseState` محذوف (لا ربط لحالة كل حساب فرعي في قراءة العقدة) |
 | `referral` | نموذج أولي | — | المحيل يُضبط بـ `Action::setReferrer` وهو دائم؛ يُعيد `referredBy:null` |
-| `spotClearinghouseState` | **مربوط** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | `{asset,name,balance}` من العقدة → `{coin,token,total}`؛ `hold:"0"` / `entryNtl:null` (لا توجد قراءة للاحتجاز/أساس التكلفة في العقدة) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **مربوط** | [`spot_meta`](./info.md#spot_meta) | `pairs` من العقدة → `universe`؛ سجل `tokens` من الاسم الفعلي لكل رمز `name` / `szDecimals` / `weiDecimals` (USDC تحمل `isCanonical`)؛ كل `assetCtx` فوري يحمل `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply` كسلاسل USDC عشرية |
+| `spotClearinghouseState` | **مربوط** | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) | `{asset,name,balance}` من العقدة → `{coin,token,total}`؛ `hold:"0"` / `entryNtl:null` (لا توجد قراءة للاحتجاز/أساس التكلفة في العقدة) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **مربوط** | [`spot_meta`](./info/spot.md#spot_meta) | `pairs` من العقدة → `universe`؛ سجل `tokens` من الاسم الفعلي لكل رمز `name` / `szDecimals` / `weiDecimals` (USDC تحمل `isCanonical`)؛ كل `assetCtx` فوري يحمل `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply` كسلاسل USDC عشرية |
 | `predictedFundings` | نموذج أولي | — | يُعيد `[]` |
 | `orderStatus` | نموذج أولي | — | يُحلَّل إلى `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **مربوط** | [`max_builder_fee`](./info.md#max_builder_fee) | يُسقط `max_fee_bps` من العقدة كرقم HL مجرد؛ الزوج غير المعتمد → `0` |
 | `userRateLimit` | **مربوط** | [`user_rate_limit`](./info.md#user_rate_limit) | `lifetime_count` من العقدة → `nRequestsUsed`، قاعدة `nRequestsCap`؛ `cumVlm:"0.0"` (لا حجم في قراءة الحد الخاصة بالعقدة) |
 | `userNonFundingLedgerUpdates` | نموذج أولي | — | يُعيد `[]` |
 | `userFunding` / `userFundings` | غير مُقدَّم | — | سجل مدفوعات التمويل لكل مستخدم — يُقدَّم بواسطة مُفهرس البوابة (خارطة طريق) |
-| `fundingHistory` | **مربوط** | [`funding_history`](./info.md#funding_history) | عينات العلاوة/المعدل المُحقَّق لكل عملة عبر نافذة زمنية، من متتبع التمويل الحي في العقدة |
+| `fundingHistory` | **مربوط** | [`funding_history`](./info/perpetuals.md#funding_history) | عينات العلاوة/المعدل المُحقَّق لكل عملة عبر نافذة زمنية، من متتبع التمويل الحي في العقدة |
 | `userFills` | **مربوط** | [`user_fills`](./info.md#user_fills) | سجل الصفقات المفصّل، من شريط الصفقات الملتزمة لكل حساب |
 | `userFillsByTime` | **مربوط** | [`user_fills_by_time`](./info.md#user_fills_by_time) | `userFills` مُرشَّح بنافذة زمنية، من نفس شريط الصفقات الملتزمة |
 | `historicalOrders` | غير مُقدَّم | — | قائمة الأوامر في الحالة النهائية — يُقدَّم بواسطة مُفهرس البوابة (خارطة طريق) |
@@ -174,7 +174,7 @@ POST  https://<gateway>/hl/exchange
 
 #### `spotClearinghouseState`
 
-**مربوط** بعقدة [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) (عبر `address` بصيغة 0x). `{asset, name, balance}` من العقدة → `{coin, token, total, hold, entryNtl}` بصيغة HL: `coin` من `name` في العقدة، `token` من معرف `asset` في العقدة، `total` من `balance` في العقدة. `hold` قيمتها `"0"` و`entryNtl` قيمتها `null` — قراءة العقدة لا تتضمن احتجازًا لكل رصيد أو أساس تكلفة.
+**مربوط** بعقدة [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (عبر `address` بصيغة 0x). `{asset, name, balance}` من العقدة → `{coin, token, total, hold, entryNtl}` بصيغة HL: `coin` من `name` في العقدة، `token` من معرف `asset` في العقدة، `total` من `balance` في العقدة. `hold` قيمتها `"0"` و`entryNtl` قيمتها `null` — قراءة العقدة لا تتضمن احتجازًا لكل رصيد أو أساس تكلفة.
 
 ```json
 {"type":"spotClearinghouseState","user":"0x..."}
@@ -186,7 +186,7 @@ POST  https://<gateway>/hl/exchange
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**مربوط** بعقدة [`spot_meta`](./info.md#spot_meta). يُعيَّن كل زوج من العقدة إلى إدخال `universe` (`tokens:[base,quote]`، `index` = معرف الزوج، `isCanonical` = `active` في العقدة). يُبنى سجل `tokens` من سجل الرموز الحقيقي لكل رمز في العقدة: `name` / `sz_decimals` / `wei_decimals` لكل إدخال تُعيَّن مباشرة إلى `name` / `szDecimals` / `weiDecimals` بصيغة HL؛ `index` هو معرف الأصل للرمز، `tokenId` هو تمثيل hex بطول 32 بايت للمعرف، ويُعلَّم USDC بـ `isCanonical`.
+**مربوط** بعقدة [`spot_meta`](./info/spot.md#spot_meta). يُعيَّن كل زوج من العقدة إلى إدخال `universe` (`tokens:[base,quote]`، `index` = معرف الزوج، `isCanonical` = `active` في العقدة). يُبنى سجل `tokens` من سجل الرموز الحقيقي لكل رمز في العقدة: `name` / `sz_decimals` / `wei_decimals` لكل إدخال تُعيَّن مباشرة إلى `name` / `szDecimals` / `weiDecimals` بصيغة HL؛ `index` هو معرف الأصل للرمز، `tokenId` هو تمثيل hex بطول 32 بايت للمعرف، ويُعلَّم USDC بـ `isCanonical`.
 
 ```json
 {"type":"spotMeta"}
@@ -200,7 +200,7 @@ POST  https://<gateway>/hl/exchange
 }
 ```
 
-تبدأ معرفات الرموز في العقدة من `100` (USDC) — انظر [`spot_meta`](./info.md#spot_meta) للاطلاع على السجل الكامل — لذا يعكس `index` تلك المعرفات لا مخطط HL القائم على الأساس `0`.
+تبدأ معرفات الرموز في العقدة من `100` (USDC) — انظر [`spot_meta`](./info/spot.md#spot_meta) للاطلاع على السجل الكامل — لذا يعكس `index` تلك المعرفات لا مخطط HL القائم على الأساس `0`.
 
 تُعيد `spotMetaAndAssetCtxs` القيمة `[spotMeta, [spotAssetCtx...]]`؛ العنصر الثاني هو
 `spotAssetCtx` واحد لكل زوج، مُحاذًى بالفهرس مع `spotMeta.universe`.
@@ -261,7 +261,7 @@ POST  https://<gateway>/hl/exchange
 }
 ```
 
-`levels` هي توبل `[bids, asks]` (بصيغة HL)؛ كل مستوى هو `{"px":"...","sz":"...","n":N}`. يعتمد على عقدة [`l2_book`](./info.md#l2_book) حين تُربط الترجمة.
+`levels` هي توبل `[bids, asks]` (بصيغة HL)؛ كل مستوى هو `{"px":"...","sz":"...","n":N}`. يعتمد على عقدة [`l2_book`](./info/perpetuals.md#l2_book) حين تُربط الترجمة.
 
 #### `meta`
 

@@ -42,24 +42,24 @@ This is the master map. **Translation** is always: snake_case → camelCase, int
 | `clearinghouseState` / `userState` | **wired** | [`account_state`](./info.md#account_state) | `marginSummary` from node `balance_quote`; `assetPositions:[]` until node surfaces per-position state |
 | `delegations` | **wired** | [`staking_state`](./info.md#staking_state) | node is keyed by compact `account_id`; a real keccak address with no compact id returns an honest error (not a fake empty) |
 | `userFees` | **wired** | [`fee_schedule`](./info.md#fee_schedule) | `feeSchedule` is live; `activeReferrer`/`userVolumes`/`dailyUserVlm` await node `user_referrer`/`user_volume` reads |
-| `l2Book` | stub | [`l2_book`](./info.md#l2_book) | node read exists; gateway translation to `{coin,levels,time}` not yet wired — returns HL-empty book |
+| `l2Book` | stub | [`l2_book`](./info/perpetuals.md#l2_book) | node read exists; gateway translation to `{coin,levels,time}` not yet wired — returns HL-empty book |
 | `meta` | stub | — | needs a node list-all-markets / universe read (node `market_info` is per-id); returns `{universe:[],marginTables:[]}` |
 | `allMids` | stub | — | needs the universe read (same blocker as `meta`); returns `{}` |
-| `metaAndAssetCtxs` | **wired** | [`markets`](./info.md#markets) | `[meta, [assetCtx...]]`; per-perp `assetCtx` carries `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, all decimal-USDC strings |
+| `metaAndAssetCtxs` | **wired** | [`markets`](./info/perpetuals.md#markets) | `[meta, [assetCtx...]]`; per-perp `assetCtx` carries `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, all decimal-USDC strings |
 | `openOrders` | stub | [`open_orders`](./info.md#open_orders) | node read exists; gateway translation not yet wired — returns `[]` |
 | `frontendOpenOrders` | stub | [`open_orders`](./info.md#open_orders) | `openOrders` + UI hints; returns `[]` |
 | `vaultDetails` | stub | [`vault_state`](./info.md#vault_state) | needs a leader-address → `vault_id` registry (node keys by `vault_id`); echoes request `user`, zeroed financials |
 | `subAccounts` | **wired** | [`sub_accounts`](./info.md#sub_accounts) | maps node `{index,address}` → `{subAccountUser,name,master}`; `clearinghouseState` omitted (no per-sub join on the node read) |
 | `referral` | stub | — | referrer is `Action::setReferrer`-set, immutable; returns `referredBy:null` |
-| `spotClearinghouseState` | **wired** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | node `{asset,name,balance}` → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (no hold/cost-basis on the node read) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info.md#spot_meta) | node `pairs` → `universe`; `tokens` registry from node's real per-token `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); each spot `assetCtx` carries `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, decimal-USDC strings |
+| `spotClearinghouseState` | **wired** | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) | node `{asset,name,balance}` → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (no hold/cost-basis on the node read) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **wired** | [`spot_meta`](./info/spot.md#spot_meta) | node `pairs` → `universe`; `tokens` registry from node's real per-token `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); each spot `assetCtx` carries `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, decimal-USDC strings |
 | `predictedFundings` | stub | — | returns `[]` |
 | `orderStatus` | stub | — | resolves to `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **wired** | [`max_builder_fee`](./info.md#max_builder_fee) | projects node `max_fee_bps` as the bare HL number; unapproved pair → `0` |
 | `userRateLimit` | **wired** | [`user_rate_limit`](./info.md#user_rate_limit) | node `lifetime_count` → `nRequestsUsed`, baseline `nRequestsCap`; `cumVlm:"0.0"` (no node volume on this read) |
 | `userNonFundingLedgerUpdates` | stub | — | returns `[]` |
 | `userFunding` / `userFundings` | not served | — | per-user funding-payment history — served by the gateway indexer (roadmap) |
-| `fundingHistory` | **wired** | [`funding_history`](./info.md#funding_history) | per-coin premium/realized-rate samples over a window, from the live node funding tracker |
+| `fundingHistory` | **wired** | [`funding_history`](./info/perpetuals.md#funding_history) | per-coin premium/realized-rate samples over a window, from the live node funding tracker |
 | `userFills` | **wired** | [`user_fills`](./info.md#user_fills) | itemized fill log, from the committed per-account fill tape |
 | `userFillsByTime` | **wired** | [`user_fills_by_time`](./info.md#user_fills_by_time) | time-windowed `userFills`, same committed fill tape |
 | `historicalOrders` | not served | — | terminal-state order list — served by the gateway indexer (roadmap) |
@@ -177,7 +177,7 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 
 #### `spotClearinghouseState`
 
-**Wired** to node [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) (by 0x `address`). Node `{asset, name, balance}` → HL `{coin, token, total, hold, entryNtl}`: `coin` from node `name`, `token` from node `asset` id, `total` from node `balance`. `hold` is `"0"` and `entryNtl` is `null` — the node read has no per-balance hold or cost basis.
+**Wired** to node [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (by 0x `address`). Node `{asset, name, balance}` → HL `{coin, token, total, hold, entryNtl}`: `coin` from node `name`, `token` from node `asset` id, `total` from node `balance`. `hold` is `"0"` and `entryNtl` is `null` — the node read has no per-balance hold or cost basis.
 
 ```json
 {"type":"spotClearinghouseState","user":"0x..."}
@@ -189,7 +189,7 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**Wired** to node [`spot_meta`](./info.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is built from the node's real per-token registry: each entry's `name` / `sz_decimals` / `wei_decimals` map straight onto HL `name` / `szDecimals` / `weiDecimals`; `index` is the token asset id, `tokenId` is the 32-byte hex of the id, and USDC is flagged `isCanonical`.
+**Wired** to node [`spot_meta`](./info/spot.md#spot_meta). Each node pair maps onto a `universe` entry (`tokens:[base,quote]`, `index` = pair id, `isCanonical` = node `active`). The `tokens` registry is built from the node's real per-token registry: each entry's `name` / `sz_decimals` / `wei_decimals` map straight onto HL `name` / `szDecimals` / `weiDecimals`; `index` is the token asset id, `tokenId` is the 32-byte hex of the id, and USDC is flagged `isCanonical`.
 
 ```json
 {"type":"spotMeta"}
@@ -203,7 +203,7 @@ Once the node surfaces per-position state, `assetPositions[]` fills with HL's sh
 }
 ```
 
-The node's token ids start at `100` (USDC) — see [`spot_meta`](./info.md#spot_meta) for the full registry — so `index` reflects those ids, not HL's `0`-based scheme.
+The node's token ids start at `100` (USDC) — see [`spot_meta`](./info/spot.md#spot_meta) for the full registry — so `index` reflects those ids, not HL's `0`-based scheme.
 
 `spotMetaAndAssetCtxs` returns `[spotMeta, [spotAssetCtx...]]`; the second
 element is one `spotAssetCtx` per pair, index-aligned to `spotMeta.universe`.
@@ -264,7 +264,7 @@ These return HL's exact shape with zeroed/empty contents. The node read exists f
 }
 ```
 
-`levels` is a `[bids, asks]` tuple (HL shape); each level is `{"px":"...","sz":"...","n":N}`. Backs onto node [`l2_book`](./info.md#l2_book) once the translation is wired.
+`levels` is a `[bids, asks]` tuple (HL shape); each level is `{"px":"...","sz":"...","n":N}`. Backs onto node [`l2_book`](./info/perpetuals.md#l2_book) once the translation is wired.
 
 #### `meta`
 

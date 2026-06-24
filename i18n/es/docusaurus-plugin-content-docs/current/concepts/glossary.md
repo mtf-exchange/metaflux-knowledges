@@ -90,7 +90,7 @@ Términos definidos que se utilizan a lo largo de la documentación. Con referen
 
 ## L
 
-**Libro L2.** El libro de órdenes a una profundidad determinada (top-N niveles por lado). Véase [`l2_book` info](../api/rest/info.md#l2_book).
+**Libro L2.** El libro de órdenes a una profundidad determinada (top-N niveles por lado). Véase [`l2_book` info](../api/rest/info/perpetuals.md#l2_book).
 
 **Nivel de liquidación (Liquidation tier).** Etapa en la [escalera escalonada](./tiered-liquidation.md): T0 tarjeta amarilla, T1 parcial, T2 completa, T3 backstop, T4 ADL.
 

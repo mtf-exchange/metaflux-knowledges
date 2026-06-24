@@ -65,7 +65,7 @@ Ambas acciones están autorizadas por el remitente en la ruta pública
 y `amount` / `shares` son decimales enviados como cadenas JSON. El fondo
 **se crea automáticamente en el primer depósito** para cualquier activo prestable. Confirma las participaciones emitidas /
 restantes y los totales del fondo mediante
-[`/info` `earn_state`](../api/rest/info.md#earn_state).
+[`/info` `earn_state`](../api/rest/info/spot.md#earn_state).
 
 ```json
 // supply 5,000 USDC into the Earn pool for asset 100

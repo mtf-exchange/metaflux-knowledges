@@ -186,7 +186,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 ```
 
 Возвращает упорядоченное кольцо образцов `(ts_ms, premium)` (см.
-[`funding_history`](../api/rest/info.md#funding_history)):
+[`funding_history`](../api/rest/info/perpetuals.md#funding_history)):
 
 ```json
 {
@@ -201,7 +201,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 }
 ```
 
-Выделенный канал WS `fundingTicks` включён в [план развития WS](../api/ws/subscriptions.md#roadmap--not-yet-available); пока используйте опрос [`funding_history`](../api/rest/info.md#funding_history).
+Выделенный канал WS `fundingTicks` включён в [план развития WS](../api/ws/subscriptions.md#roadmap--not-yet-available); пока используйте опрос [`funding_history`](../api/rest/info/perpetuals.md#funding_history).
 
 ## Чем финансирование не является
 

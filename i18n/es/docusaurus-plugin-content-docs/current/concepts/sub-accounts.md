@@ -193,9 +193,9 @@ Cada sub-cuenta también puede consultarse como cuenta de primera clase a travé
 ```mermaid
 flowchart LR
     master["master (cold-storage key)"]
-    sub0["sub_0 &quot;market-maker&quot; (hot key in MM container)"]
-    sub1["sub_1 &quot;vol-arb&quot; (hot key on vol-arb container)"]
-    sub2["sub_2 &quot;scalp&quot; (hot key on scalp container)"]
+    sub0["sub_0 &quot;market-maker&quot — (hot key in MM container)"]
+    sub1["sub_1 &quot;vol-arb&quot — (hot key on vol-arb container)"]
+    sub2["sub_2 &quot;scalp&quot — (hot key on scalp container)"]
     master --> sub0
     master --> sub1
     master --> sub2
@@ -208,7 +208,7 @@ Cada estrategia tiene su propia clave de agente, su propio límite de liquidaci�
 ```mermaid
 flowchart LR
     master["master (main book)"]
-    sub0["sub_0 &quot;exotic&quot; (risky MIP-3 listings, strict-iso)"]
+    sub0["sub_0 &quot;exotic&quot — (risky MIP-3 listings, strict-iso)"]
     master --> sub0
 ```
 
@@ -219,8 +219,8 @@ El libro principal captura todo el potencial alcista; la pérdida total de sub_0
 ```mermaid
 flowchart LR
     master["master (treasury, parked, no trading)"]
-    sub0["sub_0 &quot;model_A&quot; ($100k allocated; runs model A)"]
-    sub1["sub_1 &quot;model_B&quot; ($100k allocated; runs model B)"]
+    sub0["sub_0 &quot;model_A&quot — ($100k allocated — runs model A)"]
+    sub1["sub_1 &quot;model_B&quot — ($100k allocated — runs model B)"]
     master --> sub0
     master --> sub1
 ```
@@ -251,9 +251,9 @@ sequenceDiagram
     Note over sub_0: T+1 sub_0 active
     master->>sub_0: T+1 master transfers 1000 USDC into it
     master->>sub_0: T+2 signs ApproveAgent { agent: hot_key, ... } AS sub_0
-    Note over sub_0,hot_key: T+3 approval committed; hot_key can sign for sub_0
+    Note over sub_0,hot_key: T+3 approval committed — hot_key can sign for sub_0
     hot_key->>sub_0: T+4 places first order on sub_0
-    Note over sub_0: T+5 order admits; fills; sub_0 has a position
+    Note over sub_0: T+5 order admits — fills — sub_0 has a position
 ```
 
 ## Véase también

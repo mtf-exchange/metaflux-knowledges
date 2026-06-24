@@ -22,7 +22,7 @@ flowchart TD
     POST --> R4xx["4xx/5xx"]
     POST --> RDROP["network drop"]
     R2xx --> ADM["admitted to mempool"]
-    R4xx --> REJ["synchronous rejection; consume the nonce? see table below"]
+    R4xx --> REJ["synchronous rejection — consume the nonce? see table below"]
     RDROP --> UNK["unknown — did it land?"]
     ADM --> COMMIT{"committed?"}
     COMMIT --> OK["commit ok (state changed)"]
@@ -72,8 +72,8 @@ flowchart TD
     A1["attempt 1: send cloid=X, lose network, no response"]
     A2["attempt 2: send cloid=X again (same params)"]
     A1 --> A2
-    A2 --> RESTING["if resting/oid=N: first try never landed; this one did"]
-    A2 --> DUP["if error duplicate cloid: first try landed; this one is dedup'd"]
+    A2 --> RESTING["if resting/oid=N: first try never landed — this one did"]
+    A2 --> DUP["if error duplicate cloid: first try landed — this one is dedup'd"]
     RESTING --> RESULT["in both cases: there is exactly one order with cloid=X on the book"]
     DUP --> RESULT
 ```
@@ -140,8 +140,8 @@ sequenceDiagram
     Note over C,S: T=2s (no response — network drop)
     C->>S: T=2s attempt 2: POST /exchange Order { cloid: X } (same params, NEW nonce)
     S-->>C: T=2.1s response: error nonce_too_small → original was admitted! the new nonce is needed but the order itself is already in place.
-    S-->>C: OR response: resting/oid=N → original never landed; this one did
-    S-->>C: OR response: error duplicate cloid → original landed too; we're already dedup'd
+    S-->>C: OR response: resting/oid=N → original never landed — this one did
+    S-->>C: OR response: error duplicate cloid → original landed too — we're already dedup'd
     C->>S: T=2.2s query openOrders by cloid: confirm presence
 ```
 

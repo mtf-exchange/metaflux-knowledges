@@ -25,7 +25,7 @@ Le collatéral ne **finance pas** l'achat — c'est l'emprunt qui le fait. Le co
 
 ### Surface d'action
 
-Les six actions [`/exchange`](../api/rest/exchange.md#spot-margin--earn) (toutes autorisées par l'émetteur) pilotent la boucle. Confirmez l'état validé via [`/info` `spot_margin_state`](../api/rest/info.md#spot_margin_state).
+Les six actions [`/exchange`](../api/rest/exchange.md#spot-margin--earn) (toutes autorisées par l'émetteur) pilotent la boucle. Confirmez l'état validé via [`/info` `spot_margin_state`](../api/rest/info/spot.md#spot_margin_state).
 
 | Action | Effet |
 |---|---|
@@ -80,7 +80,7 @@ Une position avec marge au comptant comporte trois charges distinctes :
 | **Intérêts d'emprunt** | en continu, sur l'encours de l'emprunt en USDC | `spot_borrow_rate_bps` — par paire, annualisé, accumulé à chaque bloc ; reversé au pool [Earn](../concepts/earn.md) en tant que rendement des prêteurs |
 | **Frais de liquidation** | uniquement lors d'une clôture forcée | un petit frais par paire qui capitalise le fonds d'assurance du protocole |
 
-L'ouverture et la clôture sont des remplissages IOC au comptant ordinaires, donc ils appliquent le barème de frais **au comptant**, et non les paliers des perpétuels. Les intérêts d'emprunt constituent le coût spécifique à la marge au comptant — ils correspondent exactement au rendement reçu par les fournisseurs [Earn](../concepts/earn.md). Tous les taux sont des paramètres de gouvernance par paire ; interrogez-les via [`/info spot_margin_state`](../api/rest/info.md#spot_margin_state) et le [`fee_schedule`](../api/rest/info.md#fee_schedule) au comptant.
+L'ouverture et la clôture sont des remplissages IOC au comptant ordinaires, donc ils appliquent le barème de frais **au comptant**, et non les paliers des perpétuels. Les intérêts d'emprunt constituent le coût spécifique à la marge au comptant — ils correspondent exactement au rendement reçu par les fournisseurs [Earn](../concepts/earn.md). Tous les taux sont des paramètres de gouvernance par paire ; interrogez-les via [`/info spot_margin_state`](../api/rest/info/spot.md#spot_margin_state) et le [`fee_schedule`](../api/rest/info.md#fee_schedule) au comptant.
 
 ## Portée du collatéral
 

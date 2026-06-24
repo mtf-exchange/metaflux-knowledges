@@ -94,7 +94,12 @@ const sidebars = {
           label: 'REST',
           items: [
             'api/rest/exchange',
-            'api/rest/info',
+            {
+              type: 'category',
+              label: 'info',
+              link: {type: 'doc', id: 'api/rest/info'},
+              items: ['api/rest/info/perpetuals', 'api/rest/info/spot'],
+            },
             'api/rest/faucet',
             'api/rest/hl-compat',
             'api/rest/ccxt-compat',

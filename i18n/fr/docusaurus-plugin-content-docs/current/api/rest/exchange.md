@@ -209,7 +209,7 @@ modèle conceptuel complet.
 **Disponible sur devnet (préversion).** Le spot à effet de levier ([marge spot](../../products/spot-margin.md)) et le côté prêteur ([Earn](../../concepts/earn.md)) fonctionnent de bout en bout sur **devnet aujourd'hui** : déposer du collatéral, emprunter dans le pool Earn, acheter la base en IOC avec effet de levier, et clôturer pour rembourser. Considérez cela comme une **préversion** — le règlement de liquidation forcée n'est pas encore câblé (une clôture forcée ne réalise pas le PnL ni ne décrémente l'intérêt ouvert), et les ratios de maintenance par paire sont des paramètres de gouvernance encore en cours de calibration. Ne présumez pas d'une sécurité en production à grande échelle.
 :::
 
-Une position spot à effet de levier est **isolée par `(compte, paire)`** : le collatéral quote déposé est un pur tampon contre les pertes, l'achat est financé à 100 % par un emprunt en quote tiré du pool Earn de la paire, et la base achetée est détenue **séparément** sur le compte de marge (jamais dans vos soldes disponibles). Earn est l'autre face — les fournisseurs déposent la quote prêtable contre des parts du pool, et les intérêts d'emprunt payés par les traders de marge spot valorisent chaque part. Les six actions sont **autorisées par le signataire** (le signataire est l'acteur ; il n'y a pas d'`owner`). `amount` / `shares` / `borrow` sont des décimaux envoyés comme chaînes JSON ; `size` / `limit_px` sont des `u64` sur les plans `1e8` / lots bruts comme pour un [`spot_order`](#spot_order). Chacune renvoie l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) (pas d'`oid` synchrone) ; observez le résultat commis via [`/info` `spot_margin_state`](./info.md#spot_margin_state) et [`earn_state`](./info.md#earn_state).
+Une position spot à effet de levier est **isolée par `(compte, paire)`** : le collatéral quote déposé est un pur tampon contre les pertes, l'achat est financé à 100 % par un emprunt en quote tiré du pool Earn de la paire, et la base achetée est détenue **séparément** sur le compte de marge (jamais dans vos soldes disponibles). Earn est l'autre face — les fournisseurs déposent la quote prêtable contre des parts du pool, et les intérêts d'emprunt payés par les traders de marge spot valorisent chaque part. Les six actions sont **autorisées par le signataire** (le signataire est l'acteur ; il n'y a pas d'`owner`). `amount` / `shares` / `borrow` sont des décimaux envoyés comme chaînes JSON ; `size` / `limit_px` sont des `u64` sur les plans `1e8` / lots bruts comme pour un [`spot_order`](#spot_order). Chacune renvoie l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) (pas d'`oid` synchrone) ; observez le résultat commis via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) et [`earn_state`](./info/spot.md#earn_state).
 
 | `type` | Finalité | Signataire | Idempotent |
 |--------|---------|-----------|-----------|
@@ -859,7 +859,7 @@ Dépose du collatéral en quote (USDC) dans votre compte de marge `(account, pai
 
 **Conditions d'accès.** La marge doit être **activée pour la paire** — la paire doit disposer de paramètres de risque par paire, un paramètre de gouvernance encore en cours de calibrage. Un dépôt sur une paire sans ces paramètres est rejeté (`spot margin not enabled for pair`). Une paire inconnue, un `amount` non positif, ou un montant supérieur à votre solde en quote disponible sont tous rejetés à l'admission.
 
-**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) (pas un `oid` synchrone). Confirmez le collatéral crédité via [`/info` `spot_margin_state`](./info.md#spot_margin_state). Voir [marge au comptant](../../products/spot-margin.md).
+**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) (pas un `oid` synchrone). Confirmez le collatéral crédité via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state). Voir [marge au comptant](../../products/spot-margin.md).
 
 ---
 
@@ -885,7 +885,7 @@ Déplace le collatéral libre de votre compte de marge `(account, pair)` vers vo
 
 **Conditions d'accès.** Rejeté si aucun compte de marge n'existe pour la paire, si `amount` dépasse le collatéral déposé, ou (avec une position ouverte) si le collatéral restant tomberait en dessous de l'exigence de marge initiale, ou s'il n'existe pas de prix de référence pour valoriser la base détenue.
 
-**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission). Confirmez via [`/info` `spot_margin_state`](./info.md#spot_margin_state).
+**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission). Confirmez via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state).
 
 ---
 
@@ -915,7 +915,7 @@ Ouvre un long avec effet de levier : emprunte `borrow` en quote depuis le pool E
 
 **Conditions d'accès.** Rejeté si la marge n'est pas activée pour la paire, s'il n'existe pas de compte de marge (déposez d'abord du collatéral), si une position est déjà ouverte sur la paire, si la liquidité disponible du pool Earn est inférieure à `borrow`, si le trading au comptant est suspendu, ou sur un `size` nul / un `borrow` non positif.
 
-**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) (pas un `oid` synchrone — l'exécution de l'IOC interne est un effet définitif). Observez les valeurs `borrowed` / `base_held` résultantes via [`/info` `spot_margin_state`](./info.md#spot_margin_state) ; le `total_borrowed` du pool Earn évolue sur [`earn_state`](./info.md#earn_state). Voir [marge au comptant](../../products/spot-margin.md).
+**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) (pas un `oid` synchrone — l'exécution de l'IOC interne est un effet définitif). Observez les valeurs `borrowed` / `base_held` résultantes via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) ; le `total_borrowed` du pool Earn évolue sur [`earn_state`](./info/spot.md#earn_state). Voir [marge au comptant](../../products/spot-margin.md).
 
 ---
 
@@ -943,7 +943,7 @@ Clôture la position : **vend en IOC** la base détenue à un prix minimum de `l
 
 **Conditions d'accès.** Rejeté s'il n'existe pas de compte de marge, s'il n'y a pas de position ouverte (rien de détenu), ou si la position porte une dette mais que le pool Earn de la paire est manquant.
 
-**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission). Confirmez la clôture totale ou partielle et le montant remboursé via [`/info` `spot_margin_state`](./info.md#spot_margin_state) (un compte supprimé n'apparaît plus) ; les effets côté fournisseur sont visibles sur [`earn_state`](./info.md#earn_state).
+**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission). Confirmez la clôture totale ou partielle et le montant remboursé via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) (un compte supprimé n'apparaît plus) ; les effets côté fournisseur sont visibles sur [`earn_state`](./info/spot.md#earn_state).
 
 ---
 
@@ -969,7 +969,7 @@ Fournit de la quote dans un pool de prêt et reçoit des **parts de pool** valor
 
 **Conditions d'accès.** Rejeté sur un `amount` non positif, si le solde disponible est inférieur à `amount`, ou si `asset` n'est pas prêtable (n'est la quote d'aucune paire et ne dispose d'aucun pool existant). Un dépôt si faible qu'il minterait zéro parts est rejeté.
 
-**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission). Confirmez les parts mintées / votre participation via [`/info` `earn_state`](./info.md#earn_state) (passez `user` pour inclure vos `user_shares` / `user_value`). Voir [Earn](../../concepts/earn.md).
+**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission). Confirmez les parts mintées / votre participation via [`/info` `earn_state`](./info/spot.md#earn_state) (passez `user` pour inclure vos `user_shares` / `user_value`). Voir [Earn](../../concepts/earn.md).
 
 ---
 
@@ -995,7 +995,7 @@ Rachète des parts de pool en quote, versée sur votre solde disponible. Le paie
 
 **Conditions d'accès.** Rejeté si le pool n'existe pas, sur des `shares` non positifs, si `shares` dépasse ce que vous possédez, si le pool est insolvable (VNI nulle avec des parts en circulation), ou si le pool a **zéro liquidité disponible** (tout est actuellement prêté — attendez que les emprunteurs remboursent). Un rachat qui se quantifie à zéro est rejeté.
 
-**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) ; le nombre de parts brûlées peut être **inférieur à la demande** lorsque le paiement a été limité par la liquidité disponible. Confirmez la participation restante et les totaux du pool via [`/info` `earn_state`](./info.md#earn_state). Voir [Earn](../../concepts/earn.md).
+**Réponse.** Retourne l'enveloppe d'admission [`202 Accepted`](#202-accepted--non-order-admission) ; le nombre de parts brûlées peut être **inférieur à la demande** lorsque le paiement a été limité par la liquidité disponible. Confirmez la participation restante et les totaux du pool via [`/info` `earn_state`](./info/spot.md#earn_state). Voir [Earn](../../concepts/earn.md).
 
 ---
 

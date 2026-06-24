@@ -59,7 +59,7 @@ MTF 使用**两套不同的数值平面**来表示价格——这是造成量纲
 
 标记价格的 **C3 分量使用独立的数据集**——来自**5 家永续合约交易所**（Binance、OKX、Bybit、Gate、MEXC）的永续合约中间价，而非现货预言机表。完整的数据来源、可靠性规则、逐交易对覆盖及 `oracle_sources` 查询详见**[预言机价格](./oracle-prices.md)**。
 
-[`market_info`](../api/rest/info.md#market_info) 接口暴露 `mark_source`（描述符 `"MedianOfOraclesAndMid"`）以及合成后的 `mark_px` / `oracle_px`；C1/C2/C3 各分量及加权数据源列表目前不作为独立的接口字段输出。
+[`market_info`](../api/rest/info/perpetuals.md#market_info) 接口暴露 `mark_source`（描述符 `"MedianOfOraclesAndMid"`）以及合成后的 `mark_px` / `oracle_px`；C1/C2/C3 各分量及加权数据源列表目前不作为独立的接口字段输出。
 
 ## 标记价格与预言机价格的差异原因
 
@@ -119,7 +119,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-[`market_info`](../api/rest/info.md#market_info) 接口返回的 `mark_px` 和
+[`market_info`](../api/rest/info/perpetuals.md#market_info) 接口返回的 `mark_px` 和
 `oracle_px` 均在**整数 USDC 平面**（例如 `"67042.335"`），并附带
 `mark_source` 描述符：
 
@@ -138,7 +138,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 三个内部分量 `C1`/`C2`/`C3`（预言机+EMA 锚定 / 内部盘口中位数 / 外部永续合约加权中位数）以及区间状态（`Ok` / `Banded` /
 `Frozen`）保存在标记价格计算器内部，目前**不**作为 `market_info` 的独立接口字段暴露——仅发布合成后的 `mark_px`。`Banded` 表示本区块候选价格被区间约束；`Frozen` 表示所有来源均失效，协议维持上一标记价格。
 
-专用 `mark` WebSocket 频道列于 [WS 路线图](../api/ws/subscriptions.md#roadmap--not-yet-available)（尚未上线流式推送）；目前请通过轮询 [`market_info`](../api/rest/info.md#market_info) 获取 `mark_px`。
+专用 `mark` WebSocket 频道列于 [WS 路线图](../api/ws/subscriptions.md#roadmap--not-yet-available)（尚未上线流式推送）；目前请通过轮询 [`market_info`](../api/rest/info/perpetuals.md#market_info) 获取 `mark_px`。
 
 ## 边界场景
 

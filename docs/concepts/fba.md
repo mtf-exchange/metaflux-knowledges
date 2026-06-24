@@ -46,7 +46,7 @@ The fill price is **uniform** across all participants in the batch — no one is
 | Spot pairs | Continuous CLOB | Convention |
 | Index / structured products | FBA | Composite pricing needs synchronous clearing |
 
-Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info.md#market_info). Markets with FBA on accept both `FbaOrder` (batch-targeted) and [`submit_order`](../api/rest/exchange.md#submit_order) (treated as FBA orders for the next batch). See the [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` is a recognized-but-unmapped stub today.
+Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Markets with FBA on accept both `FbaOrder` (batch-targeted) and [`submit_order`](../api/rest/exchange.md#submit_order) (treated as FBA orders for the next batch). See the [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` is a recognized-but-unmapped stub today.
 
 ## Batch interval
 
@@ -70,7 +70,7 @@ Faster intervals reduce the wait but increase computational cost. The 1-second d
 }
 ```
 
-`batch_id` selects which batch the order joins. The current batch id is in [`market_info`](../api/rest/info.md#market_info) under `fba_current_batch_id`. Orders with `batch_id < current` are rejected (`{"error":"batch already closed"}`); orders with `batch_id` > current are queued for that future batch.
+`batch_id` selects which batch the order joins. The current batch id is in [`market_info`](../api/rest/info/perpetuals.md#market_info) under `fba_current_batch_id`. Orders with `batch_id < current` are rejected (`{"error":"batch already closed"}`); orders with `batch_id` > current are queued for that future batch.
 
 Omit `batch_id` to target the next batch — the server selects the one currently accepting orders.
 
@@ -206,7 +206,7 @@ Prices / sizes are raw **1e8 fixed-point** integer strings (the book / order pla
 - [Order types](./order-types.md)
 - [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` (recognized-but-unmapped stub today)
 - [MIP-3](../mip/mip-3.md) — markets opt into FBA at deploy
-- [`market_info`](../api/rest/info.md#market_info) — check `fba_enabled` per market
+- [`market_info`](../api/rest/info/perpetuals.md#market_info) — check `fba_enabled` per market
 
 ## FAQ
 

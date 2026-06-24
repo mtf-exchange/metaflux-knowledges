@@ -65,7 +65,7 @@ depositor_APY  ≈ borrow_APR × utilisation × (1 − protocol_fee)
 а `amount` / `shares` — десятичные числа, передаваемые как строки JSON. Пул
 **создаётся автоматически при первом депозите** для любого допустимого актива. Проверьте выпущенные /
 оставшиеся доли и итоги пула через
-[`/info` `earn_state`](../api/rest/info.md#earn_state).
+[`/info` `earn_state`](../api/rest/info/spot.md#earn_state).
 
 ```json
 // supply 5,000 USDC into the Earn pool for asset 100

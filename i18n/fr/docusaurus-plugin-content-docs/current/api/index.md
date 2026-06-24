@@ -1,22 +1,23 @@
 ---
-description: Surface REST et WebSocket — trois familles de protocoles, toutes adossées à la même chaîne.
+description: "Surface REST et WebSocket — trois familles de protocoles, toutes adossées à la même chaîne."
 ---
 
 # Référence API
 
-Trois familles de protocoles, toutes servies par la même passerelle d'entrée
-(`https://<net>-gateway.mtf.exchange`) — le choix du format de communication côté client est simplement un choix de chemin.
+Trois familles de protocoles, toutes desservies par la même passerelle d'entrée
+(`https://<net>-gateway.mtf.exchange`) — le choix du format d'échange côté client n'est
+qu'un choix de chemin.
 
 | Famille | Emplacement | À utiliser quand |
-|--------|-------|----------|
-| **MTF-native** | Chemin **par défaut** de la passerelle : `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | Nouveaux clients. Format compact en snake_case. Expose toutes les fonctionnalités, y compris les différenciateurs MTF (RFQ, FBA, inscription PM, cross-chain). |
-| **HL-compat** | Passerelle sous `/hl/*` : `POST /hl/exchange`, `POST /hl/info`, `GET /hl/ws` | Migration d'un client HL existant. Les formats JSON correspondent exactement à HL. Aucune modification de code pour `order`, `cancel` (d'autres variantes seront disponibles au fil du temps). |
-| **CCXT-compat** | Passerelle sous `/ccxt/*` | Frameworks quants fonctionnant déjà avec CCXT. Sous-ensemble REST minimal disponible ; CCXT Pro WS à venir. |
+|---------|-------------|------------------|
+| **MTF-native** | Chemin **par défaut** de la passerelle : `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | Nouveaux clients. Format compact en snake_case. Expose toutes les fonctionnalités, y compris les fonctionnalités avancées de MTF (RFQ, FBA, inscription PM, cross-chain). |
+| **HL-compat** | Passerelle sous `/hl/*` : `POST /hl/exchange`, `POST /hl/info`, `GET /hl/ws` | Migration d'un client HL existant. Les formats JSON correspondent exactement à ceux de HL. Aucun changement de code requis pour `order`, `cancel` (d'autres variantes seront disponibles au fil du temps). |
+| **CCXT-compat** | Passerelle sous `/ccxt/*` | Frameworks quants utilisant déjà CCXT. Sous-ensemble REST minimal disponible ; CCXT Pro WS à venir. |
 
 > La passerelle constitue le point d'entrée unifié — MTF-native est le chemin par défaut
 > (`/info`, `/exchange`), HL-compat est accessible sous `/hl/*`, CCXT sous
-> `/ccxt/*`. Vous exécutez le nœud vous-même ? Il expose la même surface native
-> directement à l'adresse `http://localhost:8080`.
+> `/ccxt/*`. Vous exécutez le nœud vous-même ? Il expose directement la même
+> surface native sur `http://localhost:8080`.
 
 ## REST
 
@@ -30,10 +31,10 @@ Trois familles de protocoles, toutes servies par la même passerelle d'entrée
 - [Protocole WS](./ws/index.md) — cycle de vie de la connexion, trames, authentification, reprise
 - [Abonnements](./ws/subscriptions.md) — catalogue complet des canaux
 
-## Transversal
+## Aspects transversaux
 
-- [Erreurs](./errors.md) — catalogue complet des erreurs avec remédiation
-- [Limites de débit](./rate-limits.md) — budgets de poids par IP et de QPS par compte
+- [Erreurs](./errors.md) — catalogue complet des erreurs avec mesures correctives
+- [Limites de débit](./rate-limits.md) — quotas de poids par IP et de QPS par compte
 
 ## Voir aussi
 

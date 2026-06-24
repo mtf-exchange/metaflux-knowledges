@@ -97,7 +97,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A["inner_with_nonce = { ...inner_action.params, 'nonce': &lt;multisig_outer_nonce&gt; }"]
+    A["inner_with_nonce = { ...inner_action.params, 'nonce': &lt;multisig_outer_nonce&gt — }"]
     B["inner_msgpack = msgpack({ type: inner_action.type, params: inner_with_nonce })"]
     C["inner_hash = keccak256( 0x1901 || domain_sep || keccak256(inner_msgpack) )"]
     D["signer_sig = secp256k1.sign(inner_hash, signer_private_key)"]
@@ -186,15 +186,15 @@ sequenceDiagram
     participant S2 as signer s2
     participant C as coordinator
     participant Chain as chain
-    Note over S1: T-1 prepares inner_action = Order{...}<br/>computes inner_hash; signs → sig_s1
+    Note over S1: T-1 prepares inner_action = Order{...}<br/>computes inner_hash — signs → sig_s1
     S1->>C: sends inner_action + sig_s1 to coordinator
-    Note over S2: T-2 receives inner_action via coordinator<br/>verifies inner_hash; signs → sig_s2
+    Note over S2: T-2 receives inner_action via coordinator<br/>verifies inner_hash — signs → sig_s2
     S2->>C: sends sig_s2 to coordinator
-    Note over C: T-3 coordinator (any signer or service):<br/>assembles MultiSig{ inner_action, signatures: [sig_s1, sig_s2], nonce }<br/>wraps in outer envelope; signs outer with own key
+    Note over C: T-3 coordinator (any signer or service):<br/>assembles MultiSig{ inner_action, signatures: [sig_s1, sig_s2], nonce }<br/>wraps in outer envelope — signs outer with own key
     C->>Chain: POST /exchange
     Note over Chain: T-4 chain admits:<br/>verify outer sig<br/>verify both inner sigs ≥ threshold(2)<br/>dispatch Order → admit to mempool
     Chain-->>C: return 202
-    Note over Chain: T+commit inner Order applied; orderEvents fires;<br/>multi-sig account now has the new resting order
+    Note over Chain: T+commit inner Order applied — orderEvents fires;<br/>multi-sig account now has the new resting order
 ```
 
 ## 参见

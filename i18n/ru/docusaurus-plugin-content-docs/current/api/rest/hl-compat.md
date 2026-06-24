@@ -39,24 +39,24 @@ POST  https://<gateway>/hl/exchange
 | `clearinghouseState` / `userState` | **подключён** | [`account_state`](./info.md#account_state) | `marginSummary` из `balance_quote` ноды; `assetPositions:[]` до тех пор, пока нода не предоставит состояние позиций |
 | `delegations` | **подключён** | [`staking_state`](./info.md#staking_state) | нода индексирована по компактному `account_id`; реальный keccak-адрес без компактного id вернёт честную ошибку (не сфабрикованный пустой ответ) |
 | `userFees` | **подключён** | [`fee_schedule`](./info.md#fee_schedule) | `feeSchedule` актуален; `activeReferrer`/`userVolumes`/`dailyUserVlm` ожидают read-запросов `user_referrer`/`user_volume` ноды |
-| `l2Book` | заглушка | [`l2_book`](./info.md#l2_book) | read-запрос ноды существует; трансляция шлюза в `{coin,levels,time}` ещё не подключена — возвращает пустую книгу HL |
+| `l2Book` | заглушка | [`l2_book`](./info/perpetuals.md#l2_book) | read-запрос ноды существует; трансляция шлюза в `{coin,levels,time}` ещё не подключена — возвращает пустую книгу HL |
 | `meta` | заглушка | — | требует read-запроса ноды для получения списка всех рынков / вселенной (нодовый `market_info` привязан к конкретному id); возвращает `{universe:[],marginTables:[]}` |
 | `allMids` | заглушка | — | требует того же read-запроса вселенной (тот же блокировщик, что и `meta`); возвращает `{}` |
-| `metaAndAssetCtxs` | **подключён** | [`markets`](./info.md#markets) | `[meta, [assetCtx...]]`; каждый `assetCtx` бессрочного контракта содержит `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx` — все в виде десятичных USDC-строк |
+| `metaAndAssetCtxs` | **подключён** | [`markets`](./info/perpetuals.md#markets) | `[meta, [assetCtx...]]`; каждый `assetCtx` бессрочного контракта содержит `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx` — все в виде десятичных USDC-строк |
 | `openOrders` | заглушка | [`open_orders`](./info.md#open_orders) | read-запрос ноды существует; трансляция шлюза ещё не подключена — возвращает `[]` |
 | `frontendOpenOrders` | заглушка | [`open_orders`](./info.md#open_orders) | `openOrders` + UI-подсказки; возвращает `[]` |
 | `vaultDetails` | заглушка | [`vault_state`](./info.md#vault_state) | требует реестра leader-адрес → `vault_id` (нода индексируется по `vault_id`); возвращает запрошенного `user`, финансовые показатели обнулены |
 | `subAccounts` | **подключён** | [`sub_accounts`](./info.md#sub_accounts) | преобразует `{index,address}` ноды → `{subAccountUser,name,master}`; `clearinghouseState` опущен (join состояния аккаунта на уровне под-аккаунта в read-запросе ноды отсутствует) |
 | `referral` | заглушка | — | реферер устанавливается через `Action::setReferrer` иммутабельно; возвращает `referredBy:null` |
-| `spotClearinghouseState` | **подключён** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | `{asset,name,balance}` ноды → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (удержание/себестоимость в read-запросе ноды отсутствуют) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **подключён** | [`spot_meta`](./info.md#spot_meta) | `pairs` ноды → `universe`; реестр `tokens` из реальных данных ноды по каждому токену: `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); каждый спотовый `assetCtx` содержит `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply` — десятичные USDC-строки |
+| `spotClearinghouseState` | **подключён** | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) | `{asset,name,balance}` ноды → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (удержание/себестоимость в read-запросе ноды отсутствуют) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **подключён** | [`spot_meta`](./info/spot.md#spot_meta) | `pairs` ноды → `universe`; реестр `tokens` из реальных данных ноды по каждому токену: `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`); каждый спотовый `assetCtx` содержит `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply` — десятичные USDC-строки |
 | `predictedFundings` | заглушка | — | возвращает `[]` |
 | `orderStatus` | заглушка | — | разрешается в `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **подключён** | [`max_builder_fee`](./info.md#max_builder_fee) | возвращает `max_fee_bps` ноды как bare-число HL; для неодобренной пары → `0` |
 | `userRateLimit` | **подключён** | [`user_rate_limit`](./info.md#user_rate_limit) | `lifetime_count` ноды → `nRequestsUsed`, базовый `nRequestsCap`; `cumVlm:"0.0"` (объём в данном read-запросе ноды отсутствует) |
 | `userNonFundingLedgerUpdates` | заглушка | — | возвращает `[]` |
 | `userFunding` / `userFundings` | не обслуживается | — | история платежей по ставке финансирования пользователя — будет обслуживаться индексатором шлюза (дорожная карта) |
-| `fundingHistory` | **подключён** | [`funding_history`](./info.md#funding_history) | выборки премии/реализованной ставки по монете за период, из живого трекера ставки финансирования ноды |
+| `fundingHistory` | **подключён** | [`funding_history`](./info/perpetuals.md#funding_history) | выборки премии/реализованной ставки по монете за период, из живого трекера ставки финансирования ноды |
 | `userFills` | **подключён** | [`user_fills`](./info.md#user_fills) | детализированный журнал исполнений, из подтверждённой ленты исполнений аккаунта |
 | `userFillsByTime` | **подключён** | [`user_fills_by_time`](./info.md#user_fills_by_time) | `userFills` с фильтрацией по времени, из той же подтверждённой ленты исполнений |
 | `historicalOrders` | не обслуживается | — | список ордеров в конечном состоянии — будет обслуживаться индексатором шлюза (дорожная карта) |
@@ -174,7 +174,7 @@ POST  https://<gateway>/hl/exchange
 
 #### `spotClearinghouseState`
 
-**Подключён** к [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) ноды (по `address` в формате 0x). `{asset, name, balance}` ноды → HL `{coin, token, total, hold, entryNtl}`: `coin` из `name` ноды, `token` из id `asset` ноды, `total` из `balance` ноды. `hold` равен `"0"`, `entryNtl` равен `null` — read-запрос ноды не содержит удержания или себестоимости по балансу.
+**Подключён** к [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) ноды (по `address` в формате 0x). `{asset, name, balance}` ноды → HL `{coin, token, total, hold, entryNtl}`: `coin` из `name` ноды, `token` из id `asset` ноды, `total` из `balance` ноды. `hold` равен `"0"`, `entryNtl` равен `null` — read-запрос ноды не содержит удержания или себестоимости по балансу.
 
 ```json
 {"type":"spotClearinghouseState","user":"0x..."}
@@ -186,7 +186,7 @@ POST  https://<gateway>/hl/exchange
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**Подключён** к [`spot_meta`](./info.md#spot_meta) ноды. Каждая пара ноды отображается на запись `universe` (`tokens:[base,quote]`, `index` = id пары, `isCanonical` = `active` ноды). Реестр `tokens` строится из реального реестра токенов ноды: `name` / `sz_decimals` / `wei_decimals` каждой записи напрямую соответствуют HL-полям `name` / `szDecimals` / `weiDecimals`; `index` является id ресурса токена, `tokenId` — 32-байтовым hex этого id, USDC помечается флагом `isCanonical`.
+**Подключён** к [`spot_meta`](./info/spot.md#spot_meta) ноды. Каждая пара ноды отображается на запись `universe` (`tokens:[base,quote]`, `index` = id пары, `isCanonical` = `active` ноды). Реестр `tokens` строится из реального реестра токенов ноды: `name` / `sz_decimals` / `wei_decimals` каждой записи напрямую соответствуют HL-полям `name` / `szDecimals` / `weiDecimals`; `index` является id ресурса токена, `tokenId` — 32-байтовым hex этого id, USDC помечается флагом `isCanonical`.
 
 ```json
 {"type":"spotMeta"}
@@ -200,7 +200,7 @@ POST  https://<gateway>/hl/exchange
 }
 ```
 
-Id токенов в ноде начинаются с `100` (USDC) — см. [`spot_meta`](./info.md#spot_meta) для полного реестра — поэтому `index` отражает эти id, а не `0`-based-схему HL.
+Id токенов в ноде начинаются с `100` (USDC) — см. [`spot_meta`](./info/spot.md#spot_meta) для полного реестра — поэтому `index` отражает эти id, а не `0`-based-схему HL.
 
 `spotMetaAndAssetCtxs` возвращает `[spotMeta, [spotAssetCtx...]]`; второй
 элемент — один `spotAssetCtx` для каждой пары, индекс которого совпадает с
@@ -261,7 +261,7 @@ Id токенов в ноде начинаются с `100` (USDC) — см. [`s
 }
 ```
 
-`levels` — кортеж `[bids, asks]` (формат HL); каждый уровень: `{"px":"...","sz":"...","n":N}`. Будет подключён к [`l2_book`](./info.md#l2_book) ноды после реализации трансляции.
+`levels` — кортеж `[bids, asks]` (формат HL); каждый уровень: `{"px":"...","sz":"...","n":N}`. Будет подключён к [`l2_book`](./info/perpetuals.md#l2_book) ноды после реализации трансляции.
 
 #### `meta`
 

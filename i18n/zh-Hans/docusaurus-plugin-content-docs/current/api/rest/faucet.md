@@ -65,7 +65,7 @@ curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
 | `mtf` | uint64 | 发放的 MTF 现货代币数量（整数，固定为 10） |
 | `status` | `"queued"` | 资金已**暂存至下一个区块**，尚未提交 |
 
-`"queued"` 是字面意思：发放操作为两个由验证者注入的系统动作（USDC 对应 `SystemUserModify{AdjustCrossAccountValue}`，MTF 对应 `SystemSpotSend`），会被预置到下一个待提议区块中。约 1 个区块后，可通过轮询 [`account_state`](./info.md#account_state)（或 [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state)）查看余额到账情况：
+`"queued"` 是字面意思：发放操作为两个由验证者注入的系统动作（USDC 对应 `SystemUserModify{AdjustCrossAccountValue}`，MTF 对应 `SystemSpotSend`），会被预置到下一个待提议区块中。约 1 个区块后，可通过轮询 [`account_state`](./info.md#account_state)（或 [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)）查看余额到账情况：
 
 ```json
 // account_state after the credit commits:

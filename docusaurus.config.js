@@ -18,6 +18,15 @@ const config = {
   projectName: 'metaflux-knowledges',
   trailingSlash: false,
 
+  // Build-speed: Rspack bundler + SWC loader/minifier + Lightning CSS (Docusaurus 3.6).
+  // Requires the @docusaurus/faster package. Cuts cold build time substantially.
+  future: {
+    v4: {
+      removeLegacyPostBuildHeadAttribute: true,
+    },
+    faster: true,
+  },
+
   // 'warn' not 'throw': the machine-translated zh-Hans locale inevitably has some
   // relative-link / heading-anchor drift (e.g. bare `../bridge` links that don't carry
   // the locale prefix). The English locale builds clean; don't let zh drift block deploys.

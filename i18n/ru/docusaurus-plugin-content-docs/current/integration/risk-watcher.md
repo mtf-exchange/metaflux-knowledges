@@ -17,7 +17,7 @@
 ```mermaid
 flowchart TD
     bot["trading bot<br/>places + manages orders<br/>shares signing key with risk-watcher (or uses sep)"]
-    watcher["risk-watcher<br/>WS subscribe: marginEvents { user }<br/>on tier ≥ T0: take action<br/>on health &lt; 1.2: pre-emptive top-up<br/>on tier T1+: emergency unwind"]
+    watcher["risk-watcher<br/>WS subscribe: marginEvents { user }<br/>on tier ≥ T0: take action<br/>on health &lt — 1.2: pre-emptive top-up<br/>on tier T1+: emergency unwind"]
     exchange["POST /exchange"]
 
     bot -->|"runs in same process or sidecar"| watcher
@@ -135,16 +135,16 @@ needed = (1,5 - 1,0) × 10 = 5 USDC.
 ```mermaid
 sequenceDiagram
     Note over Watcher: T = 0  health = 1.6 (Safe)
-    Note over Watcher: T = 1s  mark drops 1%; health = 1.4 → sample drop
-    Note over Watcher: T = 2s  mark drops 0.5%; health = 1.3 → 2nd drop
+    Note over Watcher: T = 1s  mark drops 1% — health = 1.4 → sample drop
+    Note over Watcher: T = 2s  mark drops 0.5% — health = 1.3 → 2nd drop
     Note over Watcher: T = 3s  ... → 3rd
     Note over Watcher: T = 4s  ... → 4th
-    Note over Watcher: T = 5s  health = 1.0 → 5 samples falling; pre-empt
+    Note over Watcher: T = 5s  health = 1.0 → 5 samples falling — pre-empt
     Note over Watcher: T = 5s  compute needed = (1.8 - 1.0) × maint = 0.8 × maint
     Watcher->>Exchange: T = 5.1s  submit UpdateIsolatedMargin deposit
     Exchange-->>Watcher: T = 5.2s  202 admitted
-    Note over Exchange: T = 5.3s  commit; health = 1.8 → Safe
-    Exchange-->>Watcher: T = 5.3s  marginEvents push: tier=Safe; reaction loop continues
+    Note over Exchange: T = 5.3s  commit — health = 1.8 → Safe
+    Exchange-->>Watcher: T = 5.3s  marginEvents push: tier=Safe — reaction loop continues
 ```
 
 ## Сценарии отказов

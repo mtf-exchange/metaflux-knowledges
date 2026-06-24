@@ -160,7 +160,7 @@ domain_separator = keccak256(
 **在 devnet 上可用（预览版）。** 杠杆现货（[现货保证金](../../products/spot-margin.md)）及其借贷供给端（[Earn](../../concepts/earn.md)）目前已在 **devnet** 上端到端运行：存入抵押品、从 Earn 池借款、IOC 买入基础资产加杠杆，并平仓还款。请将其视为**预览版**——强制清算结算尚未接入（强制平仓不实现 PnL 或扣减未平仓量），各交易对的维持保证金比率仍为治理参数，尚在校准中。请勿在大规模生产环境中依赖其安全性。
 :::
 
-杠杆现货持仓对每个 `(账户, 交易对)` **隔离**：挂出的报价抵押品为纯亏损缓冲，买入资金 100% 来自从该交易对 Earn 池借出的报价借款，买入的基础资产**隔离**保存在保证金账户中（不计入可用余额）。Earn 是另一侧——供给方将可借贷的报价资产存入池中换取份额，现货保证金交易者支付的借款利息提升每份份额的价值。以上六个操作均为**发送者授权**（签名者即为操作者；无 `owner`）。`amount` / `shares` / `borrow` 为以 JSON 字符串发送的十进制数；`size` / `limit_px` 与 [`spot_order`](#spot_order) 相同，在 `1e8` / 原始手数平面上为 `u64`。每个操作均返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封（而非同步的 `oid`）；通过 [`/info` `spot_margin_state`](./info.md#spot_margin_state) 和 [`earn_state`](./info.md#earn_state) 观察已提交结果。
+杠杆现货持仓对每个 `(账户, 交易对)` **隔离**：挂出的报价抵押品为纯亏损缓冲，买入资金 100% 来自从该交易对 Earn 池借出的报价借款，买入的基础资产**隔离**保存在保证金账户中（不计入可用余额）。Earn 是另一侧——供给方将可借贷的报价资产存入池中换取份额，现货保证金交易者支付的借款利息提升每份份额的价值。以上六个操作均为**发送者授权**（签名者即为操作者；无 `owner`）。`amount` / `shares` / `borrow` 为以 JSON 字符串发送的十进制数；`size` / `limit_px` 与 [`spot_order`](#spot_order) 相同，在 `1e8` / 原始手数平面上为 `u64`。每个操作均返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封（而非同步的 `oid`）；通过 [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) 和 [`earn_state`](./info/spot.md#earn_state) 观察已提交结果。
 
 | `type` | 用途 | 签名者 | 幂等性 |
 |--------|---------|-----------|-----------|
@@ -745,7 +745,7 @@ N 笔撤单由一个已签名信封承载。每条条目均为
 
 **准入条件。** 保证金必须**对该交易对启用**——该交易对需要已配置每对风险参数，该参数为仍在校准中的治理设置。对未配置风险参数的交易对存款将被拒绝（`spot margin not enabled for pair`）。未知的交易对、非正数的 `amount`，或超出可用报价代币余额的金额，均会在准入阶段被拒绝。
 
-**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封（非同步 `oid`）。通过 [`/info` `spot_margin_state`](./info.md#spot_margin_state) 确认已入账的抵押品。参见[现货保证金](../../products/spot-margin.md)。
+**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封（非同步 `oid`）。通过 [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) 确认已入账的抵押品。参见[现货保证金](../../products/spot-margin.md)。
 
 ---
 
@@ -771,7 +771,7 @@ N 笔撤单由一个已签名信封承载。每条条目均为
 
 **准入条件。** 以下情况将被拒绝：该交易对不存在保证金账户、`amount` 超过已存抵押品、（有未平仓头寸时）提款后剩余抵押品低于初始保证金要求，或无标记价格可供对持仓基础代币估值。
 
-**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封。通过 [`/info` `spot_margin_state`](./info.md#spot_margin_state) 确认。
+**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封。通过 [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) 确认。
 
 ---
 
@@ -801,7 +801,7 @@ N 笔撤单由一个已签名信封承载。每条条目均为
 
 **准入条件。** 以下情况将被拒绝：该交易对未启用保证金、不存在保证金账户（请先存入抵押品）、该交易对已有未平仓头寸、Earn 资金池的可用流动性低于 `borrow`、现货交易已暂停，或 `size` 为零 / `borrow` 为非正数。
 
-**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封（非同步 `oid`——内部 IOC 的成交为已提交效果）。通过 [`/info` `spot_margin_state`](./info.md#spot_margin_state) 观察 `borrowed` / `base_held` 的变化；Earn 资金池的 `total_borrowed` 变化体现在 [`earn_state`](./info.md#earn_state) 中。参见[现货保证金](../../products/spot-margin.md)。
+**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封（非同步 `oid`——内部 IOC 的成交为已提交效果）。通过 [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) 观察 `borrowed` / `base_held` 的变化；Earn 资金池的 `total_borrowed` 变化体现在 [`earn_state`](./info/spot.md#earn_state) 中。参见[现货保证金](../../products/spot-margin.md)。
 
 ---
 
@@ -829,7 +829,7 @@ N 笔撤单由一个已签名信封承载。每条条目均为
 
 **准入条件。** 以下情况将被拒绝：不存在保证金账户、不存在未平仓头寸（无持仓），或头寸有债务但该交易对的 Earn 资金池缺失。
 
-**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封。通过 [`/info` `spot_margin_state`](./info.md#spot_margin_state) 确认完全平仓还是部分平仓及已偿还金额（已清除的账户不再显示）；供给方的影响体现在 [`earn_state`](./info.md#earn_state) 中。
+**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封。通过 [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) 确认完全平仓还是部分平仓及已偿还金额（已清除的账户不再显示）；供给方的影响体现在 [`earn_state`](./info/spot.md#earn_state) 中。
 
 ---
 
@@ -855,7 +855,7 @@ N 笔撤单由一个已签名信封承载。每条条目均为
 
 **准入条件。** 以下情况将被拒绝：`amount` 为非正数、可用余额低于 `amount`，或 `asset` 不可借出（既非任何交易对的报价代币，也无现有资金池）。存款金额过小导致铸造份额为零时将被拒绝。
 
-**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封。通过 [`/info` `earn_state`](./info.md#earn_state) 确认已铸造份额及您的权益（传入 `user` 以包含您的 `user_shares` / `user_value`）。参见 [Earn](../../concepts/earn.md)。
+**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封。通过 [`/info` `earn_state`](./info/spot.md#earn_state) 确认已铸造份额及您的权益（传入 `user` 以包含您的 `user_shares` / `user_value`）。参见 [Earn](../../concepts/earn.md)。
 
 ---
 
@@ -881,7 +881,7 @@ N 笔撤单由一个已签名信封承载。每条条目均为
 
 **准入条件。** 以下情况将被拒绝：资金池不存在、`shares` 为非正数、`shares` 超过您持有的数量、资金池已资不抵债（有未偿份额但 NAV 为零），或资金池**可用流动性为零**（全部资金当前已借出——请等待借款方还款）。赎回数量量化后为零时将被拒绝。
 
-**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封；当支付金额受可用流动性限制时，实际销毁的份额数量**可能少于请求数量**。通过 [`/info` `earn_state`](./info.md#earn_state) 确认剩余权益及资金池总量。参见 [Earn](../../concepts/earn.md)。
+**响应。** 返回 [`202 Accepted`](#202-accepted--non-order-admission) 准入信封；当支付金额受可用流动性限制时，实际销毁的份额数量**可能少于请求数量**。通过 [`/info` `earn_state`](./info/spot.md#earn_state) 确认剩余权益及资金池总量。参见 [Earn](../../concepts/earn.md)。
 
 ---
 

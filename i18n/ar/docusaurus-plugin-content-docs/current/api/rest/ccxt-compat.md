@@ -24,9 +24,9 @@ https://<gateway>/ccxt/<path>
 
 | طريقة CCXT | المسار | المصادقة | الحالة | مصدر قراءة عقدة MTF |
 |-------------|--------|-----------|--------|----------------------|
-| `fetchMarkets` | `GET /ccxt/markets` | لا | الشكل حي؛ بيانات genesis ثابتة | [`markets`](./info.md#markets) |
-| `fetchTicker` | `GET /ccxt/ticker?symbol=` | لا | الشكل حي؛ الأسعار مُثبَّتة | [`market_info`](./info.md#market_info) + سعر mid |
-| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | لا | الشكل حي؛ دفتر أوامر فارغ | [`l2_book`](./info.md#l2_book) |
+| `fetchMarkets` | `GET /ccxt/markets` | لا | الشكل حي؛ بيانات genesis ثابتة | [`markets`](./info/perpetuals.md#markets) |
+| `fetchTicker` | `GET /ccxt/ticker?symbol=` | لا | الشكل حي؛ الأسعار مُثبَّتة | [`market_info`](./info/perpetuals.md#market_info) + سعر mid |
+| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | لا | الشكل حي؛ دفتر أوامر فارغ | [`l2_book`](./info/perpetuals.md#l2_book) |
 | `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | لا | غير مُخدَّم | سجل OHLCV — مُفهرس البوابة (خارطة الطريق) |
 | `createOrder` | `POST /ccxt/orders` | Bearer | الشكل حي | ← [`/exchange`](./exchange.md) |
 | `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | الشكل حي | ← [`/exchange`](./exchange.md) |
@@ -38,7 +38,7 @@ https://<gateway>/ccxt/<path>
 **دليل المصطلحات:** **الشكل حي** = المسار مُركَّب، يُعاد الشكل الصحيح لـ CCXT، والحقول النقدية مُثبَّتة مؤقتاً ريثما يكتمل مسار القراءة · **مدعوم من العقدة** = قراءة العقدة المقابلة حيّة · **غير مُخدَّم** = لا دعم من العقدة بعد، سيُخدَّم من مُفهرس البوابة (خارطة الطريق).
 
 :::warning
-**الواجهة مقصودٌ بها أن تكون في حدها الأدنى.** الطرق التي يُعرِّفها CCXT لكن البوابة **لم تُركِّبها** بعد — `fetchTickers`، و`fetchTrades` (الشريط العام)، و`fetchOrder`، و`fetchOpenOrders`، و`fetchClosedOrders`، و`fetchOHLCV` بما يتجاوز النموذج المُثبَّت، و`setLeverage`، و`setMarginMode`، و`fetchFundingRate`، و`cancelAllOrders` — تُعيد 404. ستُضاف تحت `/ccxt/` مع توسّع مسار القراءة. ستترجم `fetchOpenOrders` / `fetchOrder` من قراءات [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) بالعقدة؛ وستترجم `fetchTrades` من شريط [`recent_trades`](./info.md#recent_trades)؛ أما `fetchOHLCV` / `fetchClosedOrders` فغير مُخدَّمتان بعد (خارطة طريق مُفهرس البوابة).
+**الواجهة مقصودٌ بها أن تكون في حدها الأدنى.** الطرق التي يُعرِّفها CCXT لكن البوابة **لم تُركِّبها** بعد — `fetchTickers`، و`fetchTrades` (الشريط العام)، و`fetchOrder`، و`fetchOpenOrders`، و`fetchClosedOrders`، و`fetchOHLCV` بما يتجاوز النموذج المُثبَّت، و`setLeverage`، و`setMarginMode`، و`fetchFundingRate`، و`cancelAllOrders` — تُعيد 404. ستُضاف تحت `/ccxt/` مع توسّع مسار القراءة. ستترجم `fetchOpenOrders` / `fetchOrder` من قراءات [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) بالعقدة؛ وستترجم `fetchTrades` من شريط [`recent_trades`](./info/perpetuals.md#recent_trades)؛ أما `fetchOHLCV` / `fetchClosedOrders` فغير مُخدَّمتان بعد (خارطة طريق مُفهرس البوابة).
 :::
 
 ## صيغة الرمز
@@ -50,7 +50,7 @@ BTC/USDC:USDC      # عقد دائم، يُسوَّى بـ USDC
 ETH/USDC:USDC
 ```
 
-تستخدم أسواق الفوري (عند إطلاق كون الفوري) الصيغة `"BASE/QUOTE"` دون لاحقة `:SETTLE`. سجل الأسواق اليوم هو **بيانات genesis ثابتة** (`with_genesis_markets` — عقود genesis الدائمة)؛ سيحلّ محلّه سجلٌ مدعوم بـ gRPC يتجدَّد من قراءة [`markets`](./info.md#markets) بالعقدة فور اكتمال مسار القراءة. تحليل الرمز **حقيقي**: الرموز المشوَّهة → 400، والرموز المجهولة → 400.
+تستخدم أسواق الفوري (عند إطلاق كون الفوري) الصيغة `"BASE/QUOTE"` دون لاحقة `:SETTLE`. سجل الأسواق اليوم هو **بيانات genesis ثابتة** (`with_genesis_markets` — عقود genesis الدائمة)؛ سيحلّ محلّه سجلٌ مدعوم بـ gRPC يتجدَّد من قراءة [`markets`](./info/perpetuals.md#markets) بالعقدة فور اكتمال مسار القراءة. تحليل الرمز **حقيقي**: الرموز المشوَّهة → 400، والرموز المجهولة → 400.
 
 ## الأطر الزمنية
 
@@ -148,7 +148,7 @@ curl 'https://gateway/ccxt/ticker?symbol=BTC/USDC:USDC'
 }
 ```
 
-الحقول النقدية مُثبَّتة حالياً على `"0.0"`؛ سيملؤها مسار القراءة من سعر mid بالعقدة / [`market_info`](./info.md#market_info). شكل CCXT صحيح بايت بايت كي يتمكن العملاء من إلغاء تسلسله الآن وتلقِّي الأرقام الحقيقية تلقائياً لاحقاً.
+الحقول النقدية مُثبَّتة حالياً على `"0.0"`؛ سيملؤها مسار القراءة من سعر mid بالعقدة / [`market_info`](./info/perpetuals.md#market_info). شكل CCXT صحيح بايت بايت كي يتمكن العملاء من إلغاء تسلسله الآن وتلقِّي الأرقام الحقيقية تلقائياً لاحقاً.
 
 ### جلب دفتر الأوامر
 
@@ -160,7 +160,7 @@ curl 'https://gateway/ccxt/orderbook?symbol=BTC/USDC:USDC&limit=50'
 { "symbol": "BTC/USDC:USDC", "bids": [], "asks": [], "timestamp": 0, "nonce": 0 }
 ```
 
-`bids` / `asks` مصفوفات بصيغة `[[price, amount], …]` (شكل CCXT). سيُطبَّق تقليص `limit` عند وصول المستويات الحقيقية من [`l2_book`](./info.md#l2_book).
+`bids` / `asks` مصفوفات بصيغة `[[price, amount], …]` (شكل CCXT). سيُطبَّق تقليص `limit` عند وصول المستويات الحقيقية من [`l2_book`](./info/perpetuals.md#l2_book).
 
 ### تقديم أمر
 

@@ -153,7 +153,7 @@ flowchart TD
 
     C5 --> B5["backoff & retry<br/>— operator side<br/>recovers, do not<br/>burn nonces<br/>on retry"]
 
-    CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted; the failure<br/>is at execution"]
+    CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted — the failure<br/>is at execution"]
 ```
 
 ## 参见

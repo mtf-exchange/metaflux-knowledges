@@ -77,7 +77,7 @@ curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
 `"queued"` es literal: la concesión consiste en dos acciones de sistema inyectadas por el validador
 (`SystemUserModify{AdjustCrossAccountValue}` para USDC + `SystemSpotSend` para MTF)
 que se anteponen al siguiente bloque propuesto. Consulta [`account_state`](./info.md#account_state)
-(o [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state)) ~1 bloque
+(o [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)) ~1 bloque
 después para ver el saldo:
 
 ```json
