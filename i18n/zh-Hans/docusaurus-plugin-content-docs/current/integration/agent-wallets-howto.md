@@ -1,20 +1,20 @@
 # 代理钱包实战
 
 :::tip
-**稳定版**。
+**稳定版。**
 :::
 
-具体代码、端到端、演示审批、交易和轮换。有关概念背景，请参阅[代理钱包](../concepts/agent-wallets.md)。
+完整的端到端代码，涵盖授权、交易和密钥轮换。概念背景请参阅[代理钱包](../concepts/agent-wallets.md)。
 
-## 摘要
+## 快速概览
 
 1. 在本地生成代理密钥对。
-2. 从主账户，提交 `ApproveAgent { agent, expires_at_ms }`。
+2. 从主账户提交 `ApproveAgent { agent, expires_at_ms }`。
 3. 等待一个区块。
-4. 使用代理密钥签署每个操作；以 `sender = master_addr` 提交。
-5. 在到期前，用新代理重复，让旧代理过期。
+4. 用代理密钥对每个操作签名；提交时设置 `sender = master_addr`。
+5. 到期前，用新代理重复上述流程，让旧代理自然过期。
 
-## 第 1 步 — 生成代理密钥
+## 第一步 — 生成代理密钥
 
 ```typescript
 import { randomBytes } from 'crypto';
@@ -26,7 +26,7 @@ const agentAddress    = publicKeyToEvmAddress(agentPublicKey);
 console.log('agent address:', agentAddress);
 ```
 
-将代理的私钥存储在您的机器人主机中（环境变量、密钥管理器、HSM — 由您选择）。不要记录它。
+将代理私钥存储在机器人所在的主机上（环境变量、密钥管理器、HSM——按需选择）。切勿将其写入日志。
 
 ```python
 import secrets
@@ -40,9 +40,9 @@ agent_addr = to_checksum_address('0x' + sha3.keccak_256(agent_pk).hexdigest()[-4
 print('agent address:', agent_addr)
 ```
 
-## 第 2 步 — 从主账户批准
+## 第二步 — 从主账户授权
 
-主账户必须签署此操作 — 这是**唯一**一次主账户签署（每个会话）。
+主账户必须对此签名——这是主账户在每个会话中**唯一一次**需要签名的操作。
 
 ```typescript
 import { MetaFluxClient } from '@metaflux/sdk';
@@ -62,7 +62,7 @@ const result = await master.exchange.approveAgent({
 console.log('approved at action hash:', result.actionHash);
 ```
 
-在原始 curl 中，操作体是：
+使用原始 curl 时，操作体如下：
 
 ```json
 {
@@ -75,9 +75,9 @@ console.log('approved at action hash:', result.actionHash);
 }
 ```
 
-## 第 3 步 — 等待一个区块
+## 第三步 — 等待一个区块
 
-代理批准在**提交后一个区块后**生效。在批准区块提交后提交您的第一个代理签署请求。
+代理授权在**提交后的下一个区块**才生效。请在授权所在区块确认后，再发送第一个由代理签名的请求。
 
 ```typescript
 // confirm the approval is on-chain
@@ -93,9 +93,9 @@ async function waitForApproval(c: MetaFluxClient, masterAddr: string, agentAddr:
 await waitForApproval(master, master.address, agentAddress);
 ```
 
-备选方案：订阅 `userEvents` 并查找 `{ kind: "agentApproved" }`。
+也可以订阅 `userEvents`，监听 `{ kind: "agentApproved" }` 事件。
 
-## 第 4 步 — 从代理交易
+## 第四步 — 用代理账户进行交易
 
 ```typescript
 // initialise an SDK client with the agent's key, but the master's address
@@ -113,7 +113,7 @@ await agent.exchange.order({
 });
 ```
 
-SDK 的 `signerAddress / senderAddress` 区分是它如何知道填充 `sender = master` 同时用代理密钥签署的。手动方式：
+SDK 通过 `signerAddress / senderAddress` 的区分，在用代理密钥签名的同时将 `sender` 填写为主账户地址。手动实现方式如下：
 
 ```typescript
 const sig = signEip712(action, agentPrivateKey, chainId);
@@ -128,9 +128,9 @@ await fetch('https://devnet-gateway.mtf.exchange/exchange', {
 });
 ```
 
-## 第 5 步 — 轮换
+## 第五步 — 密钥轮换
 
-在旧代理过期之前，准备一个新代理：
+在旧代理到期之前，预先部署新代理：
 
 ```typescript
 async function rotateAgent(
@@ -162,11 +162,11 @@ async function rotateAgent(
 }
 ```
 
-通过 cron / systemd 计时器每天 / 每周安排轮换。多主机舰队：一次轮换一个主机，由健康检查把关。
+建议通过 cron 任务或 systemd 定时器按天或按周自动触发轮换。对于多主机集群，每次轮换一台主机，并以健康检查作为放行条件。
 
-## 多主机舰队
+## 多主机集群
 
-每个主机有自己的代理。它们可以并发提交，因为它们共享主账户的随机数空间并使用 `Date.now()`：
+每台主机拥有独立的代理。由于所有代理共享主账户的 nonce 空间并使用 `Date.now()`，它们可以并发提交：
 
 ```
 master account (0xMASTER)
@@ -180,21 +180,21 @@ each host runs:
    ... places orders concurrently ...
 ```
 
-随机数冲突很少见（亚毫秒分辨率），冲突的请求得到 `nonce_too_small`；机器人会提高并重试。对于每个主机的非常高吞吐量，使用共享单调计数器（Redis `INCR`）以主账户为键。
+Nonce 冲突极少发生（毫秒以下精度），冲突的请求会收到 `nonce_too_small` 错误，机器人重新递增后重试即可。对于单台主机吞吐量极高的场景，可使用以主账户为键的共享单调计数器（如 Redis `INCR`）。
 
-## 检测妥协
+## 检测密钥泄露
 
-| 信号 | 可能原因 | 操作 |
+| 信号 | 可能原因 | 处置措施 |
 |--------|--------------|--------|
-| 来自您的主账户的意外订单 | 泄露的代理密钥（或主密钥） | 收紧旧代理的到期时间至过去；调查 |
-| 来自应该有效的代理的 401 错误 | 批准过期或被撤销；或代理密钥错误 | 通过 `/info agents` 验证；如需要重新批准 |
-| 突然大量您未授权的订单 | 代理被入侵 | 立即提交 `ApproveAgent { agent: X, expires_at_ms: 0 }` 以退役 X；由主账户从冷存储签署此操作 |
+| 主账户出现非预期订单 | 代理密钥或主密钥泄露 | 将旧代理有效期设为过去时间，立即展开调查 |
+| 本应有效的代理收到 401 | 授权已过期或被撤销；或使用了错误的代理密钥 | 通过 `/info agents` 核实状态；必要时重新授权 |
+| 出现未经授权的大量订单 | 代理被攻陷 | 立即从冷存储的主账户提交 `ApproveAgent { agent: X, expires_at_ms: 0 }` 以吊销 X |
 
-链存储每个批准、每个到期、每个操作的恢复签名者。事件后的取证是机械性的。
+链上存储了每次授权记录、每次过期时间以及每个操作的签名者。事后取证可完全通过机械化流程完成。
 
 ## 子账户代理
 
-子账户可以有自己的代理集（独立于主账户）：
+子账户可以拥有独立的代理集合（与主账户的代理集合分开管理）：
 
 ```typescript
 // master signs ApproveAgent AS the sub
@@ -207,11 +207,11 @@ await subClient.exchange.approveAgent({
 });
 ```
 
-主账户签署；`sender = sub_addr`；链会接受，因为主账户对其子账户拥有委托权限。从那时起，`subAgentKey` 签署该子账户的所有操作。
+由主账户签名；`sender = sub_addr`；链上校验通过，因为主账户对其子账户拥有委托权限。此后，`subAgentKey` 对该子账户的所有操作进行签名。
 
-这是机构模式：主账户在冷存储中；每个（子账户 × 主机）组合一个代理；清洁撤销表面。
+这是机构场景下的标准模式：主账户冷存储；每个（子账户 × 主机）组合分配一个代理；撤销边界清晰。
 
-## 序列 — 完整设置
+## 时序 — 完整流程
 
 ```
 T=0    generate agent keypair on host
@@ -228,30 +228,30 @@ T+29d  scheduled rotation kicks in
 T+29d+1h  old agent expires; bot has fully migrated
 ```
 
-## 另见
+## 参见
 
-- [代理钱包](../concepts/agent-wallets.md) — 概念
+- [代理钱包](../concepts/agent-wallets.md) — 概念介绍
 - [`POST /exchange approve_agent`](../api/rest/exchange.md#approve_agent)
-- [签署演练](./signing.md) — SDK 内部执行的操作
-- [幂等性](./idempotency.md) — 并发代理的随机数语义
-- [子账户](../concepts/sub-accounts.md) — 子级代理设置
-- [风险监视器](./risk-watcher.md) — 专用监视器代理的典型用途
+- [签名流程详解](./signing.md) — SDK 内部实现原理
+- [幂等性](./idempotency.md) — 并发代理的 nonce 语义
+- [子账户](../concepts/sub-accounts.md) — 子账户级别的代理配置
+- [风险监控器](./risk-watcher.md) — 专用监控代理的典型用法
 
 ## 常见问题
 
 <details>
-<summary>显示常见问题</summary>
+<summary>展开常见问题</summary>
 
-**问：代理可以批准另一个代理吗？**
-答：否。`ApproveAgent` 仅由主账户操作。这可防止密钥增殖级联。
+**问：代理可以授权另一个代理吗？**
+答：不可以。`ApproveAgent` 仅限主账户执行，以防止密钥无限级联扩散。
 
-**问：我如何轮换主账户本身？**
-答：V1 没有主账户轮换原语。支持的模式：转换为多签，包括新密钥，然后更新多签集以删除旧密钥。请参阅[多签](../concepts/multi-sig.md)。
+**问：如何轮换主账户本身？**
+答：V1 没有主账户轮换的原语。推荐方案是：将账户转为多签，并在多签集合中纳入新密钥，再从多签集合中移除旧密钥。详见[多签](../concepts/multi-sig.md)。
 
-**问：如果代理的主机在途中崩溃会怎样？**
-答：待处理请求要么已提交（在 `userEvents` / openOrders 上可见），要么未提交（无事件）。在主机重启时使用[协调模式](./error-handling.md#reconciliation-pattern)。
+**问：代理所在主机在请求进行中崩溃了怎么办？**
+答：待处理的请求要么已提交（可在 `userEvents` 或 openOrders 中查到），要么未提交（无事件记录）。主机重启后，请使用[对账模式](./error-handling.md#reconciliation-pattern)进行恢复。
 
-**问：不同的代理可以交易不同的市场吗？**
-答：不能通过协议。协议为主账户授权代理以执行完整的交易操作表面。如果您需要按市场分离，使用子账户（每个子账户有自己的代理集）。
+**问：不同的代理可以分别交易不同的市场吗？**
+答：协议层面不支持。协议对代理的授权覆盖主账户全部的交易操作权限。如需按市场隔离，请使用子账户（每个子账户拥有独立的代理集合）。
 
 </details>

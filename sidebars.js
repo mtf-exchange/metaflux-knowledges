@@ -17,6 +17,19 @@ const sidebars = {
 
     {
       type: 'category',
+      label: 'Products',
+      link: {type: 'doc', id: 'products/index'},
+      items: [
+        'products/perpetuals',
+        'products/spot',
+        'products/spot-margin',
+        'products/options',
+        'products/cds',
+      ],
+    },
+
+    {
+      type: 'category',
       label: 'Concepts',
       link: {type: 'doc', id: 'concepts/index'},
       items: [
@@ -47,11 +60,6 @@ const sidebars = {
         },
         {
           type: 'category',
-          label: 'Spot & earn',
-          items: ['concepts/spot-trading', 'concepts/spot-margin', 'concepts/earn'],
-        },
-        {
-          type: 'category',
           label: 'Account & access',
           items: [
             'concepts/sub-accounts',
@@ -61,6 +69,7 @@ const sidebars = {
             'concepts/vaults',
           ],
         },
+        'concepts/earn',
         'concepts/tokenomics',
         'concepts/glossary',
       ],

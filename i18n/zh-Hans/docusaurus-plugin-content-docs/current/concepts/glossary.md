@@ -1,191 +1,191 @@
 # 术语表
 
 :::tip
-**稳定版。** 每个协议扩展时添加新术语。
+**稳定版本。** 每次协议扩展时会新增术语。
 :::
 
-整个文档中使用的定义术语。如果主题有自己的页面，则交叉链接。
+本文档中使用的术语定义。凡有专属页面的概念，均附交叉链接。
 
 ## A
 
-**ADL — Auto-deleverage。** 损失互助机制，当保险池无法覆盖 T3 清算缺口时，从盈利交易对手那里收回未实现 PnL。参见 [ADL](./adl.md)。
+**ADL — 自动减仓。** 当保险池无法弥补 T3 清算缺口时，从盈利对手方追回未实现盈亏的损失共担机制。参见 [ADL](./adl.md)。
 
-**Agent wallet。** 经主账户批准代表其行动的签名密钥，**无**提取权限。参见 [agent wallets](./agent-wallets.md)。
+**代理钱包（Agent wallet）。** 由主账户授权、代表主账户执行操作的签名密钥，**不具备**提款权限。参见[代理钱包](./agent-wallets.md)。
 
-**ALO — Add-Limit-Only。** 订单 TIF，如果任何部分会穿越挂单簿，则完全拒绝该订单。保证做市商。参见 [order types](./order-types.md#time-in-force)。
+**ALO — 仅限挂单（Add-Limit-Only）。** 一种订单有效期（TIF）类型，若订单有任何部分会与当前挂单簿撮合，则整笔订单直接拒绝。保证以挂单方身份成交。参见[订单类型](./order-types.md#time-in-force)。
 
-**Asset ID。** 市场的规范整数标识符。在不同网络上不同；通过 `meta` 信息查找。
+**资产 ID（Asset ID）。** 市场的规范整数标识符。不同网络上的值各不相同，可通过 `meta` 接口查询。
 
-**Action。** 对 `POST /exchange` 的状态改变调用。标记变体联合，约有 30 种类型。参见 [exchange.md](../api/rest/exchange.md#action-catalog)。
+**动作（Action）。** 对 `POST /exchange` 的状态变更调用，是带标签的变体联合体，共约 30 种类型。参见 [exchange.md](../api/rest/exchange.md#action-catalog)。
 
 ## B
 
-**Backstop (T3)。** 清算层级，协议将低于阈值的账户头寸收归保险池。参见 [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark)。
+**兜底机制（T3）。** 当账户资产低于阈值时，协议将其仓位没收至保险池的清算层级。参见[分级清算](./tiered-liquidation.md#t3-backstop--netting-at-mark)。
 
-**Band, mark-price。** 每个区块对标记价格移动幅度的限制。防御预言机/中点操纵。参见 [mark prices](./mark-prices.md#sanity-bands)。
+**标记价格波动限幅（Band, mark-price）。** 每个区块内对标记价格涨跌幅的限制，防止预言机或中间价被操纵。参见[标记价格](./mark-prices.md#sanity-bands)。
 
-**Batch ID。** FBA 市场的拍卖批次标识符。参见 [FBA](./fba.md)。
+**批次 ID（Batch ID）。** FBA 市场的拍卖批次标识符。参见 [FBA](./fba.md)。
 
-**bps — Basis point。** 0.01%（= `1e-4`）。费率以 bps 计算；`5 bps` = 0.05%。
+**基点（bps）。** 0.01%（= `1e-4`）。费率以基点计价，`5 bps` = 0.05%。
 
-**Builder rebate。** 费用分成，支付给发起订单的地址（前端、聚合器、自动化服务）。参见 [fees](./fees.md#builder-rebate)。
+**构建者返佣（Builder rebate）。** 支付给发起订单的地址（前端、聚合器、自动化服务）的费用分成。参见[费率](./fees.md#builder-rebate)。
 
 ## C
 
-**CCTP — Cross-Chain Transfer Protocol。** Circle 的跨链转移协议。MetaFlux **不**使用 CCTP；而是通过 [MetaBridge](../bridge/)（验证者签名的托管桥）桥接 USDC。
+**CCTP — 跨链转账协议。** Circle 的跨链转账协议。MetaFlux **不使用** CCTP；USDC 通过 [MetaBridge](../bridge/)（基于验证者签名的托管跨链桥）进行跨链。
 
-**chainId。** EIP-712 域字段，选择网络。`31337` devnet，`114514` testnet，`8964` mainnet。参见 [networks](../networks.md)。
+**chainId。** EIP-712 域字段，用于指定网络：`31337` 为开发网，`114514` 为测试网，`8964` 为主网。参见[网络](../networks.md)。
 
-**Cloid — Client Order ID。** 16 字节标识符，由客户端设置；启用 `CancelByCloid` 和订单幂等性。参见 [exchange.md `submit_order`](../api/rest/exchange.md#submit_order)。
+**客户端订单 ID（Cloid）。** 由客户端设置的 16 字节标识符，用于支持 `CancelByCloid` 和订单幂等性。参见 [exchange.md `submit_order`](../api/rest/exchange.md#submit_order)。
 
-**Clearing price (FBA)。** FBA 批次结算的单一统一价格。参见 [FBA](./fba.md)。
+**清算价格（FBA）。** FBA 批次以统一单一价格结算的成交价。参见 [FBA](./fba.md)。
 
-**Cross margin。** 边际模式，其中所有头寸共享账户范围内的抵押品。资本效率高；非隔离。参见 [margin modes](./margin-modes.md)。
+**全仓保证金（Cross margin）。** 所有仓位共享账户全部抵押品的保证金模式，资本效率高，非逐仓模式。参见[保证金模式](./margin-modes.md)。
 
 ## D
 
-**Delegation (staking)。** 委托人的 MTF 权益分配给验证者的池。赚取奖励，面临削减风险。参见 [staking](./staking.md)。
+**委托（staking）。** 委托人将 MTF 质押分配至验证者质押池，可获得奖励，同时承担被惩罚的风险。参见[质押](./staking.md)。
 
-**Domain separator。** EIP-712 32 字节常数，每个网络一个；签名哈希的输入之一。参见 [signing](../integration/signing.md)。
+**域分隔符（Domain separator）。** 每个网络专属的 EIP-712 32 字节常量，是签名哈希的输入之一。参见[签名](../integration/signing.md)。
 
 ## E
 
-**EIP-712。** 用于类型化结构签名数据的以太坊标准。MetaFlux 签名使用 EIP-712 封装（`0x1901 || domain || hash`）。参见 [signing](../integration/signing.md)。
+**EIP-712。** 以太坊结构化数据签名标准。MetaFlux 签名使用 EIP-712 封装格式（`0x1901 || domain || hash`）。参见[签名](../integration/signing.md)。
 
-**EMA — Exponential Moving Average。** 用于中点价格平滑以计算标记价格。参见 [mark prices](./mark-prices.md)。
+**EMA — 指数移动平均。** 用于标记价格计算中的中间价平滑处理。参见[标记价格](./mark-prices.md)。
 
 ## F
 
-**FBA — Frequent Batch Auction。** 连续 CLOB 的离散时间匹配替代方案。参见 [FBA](./fba.md)。
+**FBA — 频繁批量拍卖（Frequent Batch Auction）。** 连续撮合 CLOB 的离散时间替代方案。参见 [FBA](./fba.md)。
 
-**FIFO — First-In-First-Out。** 连续 CLOB 中相同价格水平的订单匹配优先级。
+**FIFO — 先进先出（First-In-First-Out）。** 连续 CLOB 中同一价格层级的订单撮合优先级规则。
 
-**FOK — Fill-or-Kill。** TIF，填充整个订单或取消所有订单。参见 [order types](./order-types.md#time-in-force)。
+**FOK — 全部成交或全部取消（Fill-or-Kill）。** 一种 TIF 类型，要求订单全部成交，否则全部撤销。参见[订单类型](./order-types.md#time-in-force)。
 
-**Funding rate。** 每小时用户间支付，将永续价格钉住基础预言机。参见 [funding rates](./funding-rates.md)。
+**资金费率（Funding rate）。** 每小时用户之间相互支付的费用，用于将永续合约价格锚定至底层预言机价格。参见[资金费率](./funding-rates.md)。
 
 ## G
 
-**Grouping。** `Order` 参数，将腿链接到 OCO 族（`NormalTpsl`）或头寸附加支架（`PositionTpsl`）。参见 [order types](./order-types.md#grouping)。
+**组合（Grouping）。** `Order` 参数，用于将多个订单腿关联为 OCO 组合（`NormalTpsl`）或仓位附属止盈止损对（`PositionTpsl`）。参见[订单类型](./order-types.md#grouping)。
 
-**GTC — Good-Till-Cancelled。** 默认 TIF；订单无限期地停留在挂单簿上。参见 [order types](./order-types.md#time-in-force)。
+**GTC — 撤销前有效（Good-Till-Cancelled）。** 默认 TIF 类型，订单在撤销前持续挂单。参见[订单类型](./order-types.md#time-in-force)。
 
 ## H
 
-**Health ratio。** `account_value / maint_margin`。驱动 [tiered liquidation](./tiered-liquidation.md) 梯队。
+**健康度（Health ratio）。** `account_value / maint_margin`。驱动[分级清算](./tiered-liquidation.md)阶梯。
 
-**High-water mark。** 保险库的最高历史份额价格，用于控制表现费的应计。参见 [vaults](./vaults.md)。
+**最高水位线（High-water mark）。** 金库历史最高份额净值，用于门控绩效费累计。参见[金库](./vaults.md)。
 
-**HL-compat。** 网关的协议表面，镜像 HL 的连线形状（URL、JSON、签名）。参见 [hl-compat](../api/rest/hl-compat.md)。
+**HL 兼容层（HL-compat）。** 网关协议接口层，与 HL 的接口形态（URL、JSON、签名）保持一致。参见 [hl-compat](../api/rest/hl-compat.md)。
 
 ## I
 
-**IOC — Immediate-Or-Cancel。** TIF；匹配可用的，取消任何未填充的余额。参见 [order types](./order-types.md#time-in-force)。
+**IOC — 立即成交或取消（Immediate-Or-Cancel）。** TIF 类型，立即撮合可成交部分，未成交部分直接撤销。参见[订单类型](./order-types.md#time-in-force)。
 
-**Idempotency。** 属性，重试请求会导致相同的可观测效果。参见 [idempotency](../integration/idempotency.md)。
+**幂等性（Idempotency）。** 重复发送同一请求产生相同可观测结果的特性。参见[幂等性](../integration/idempotency.md)。
 
-**Insurance pool。** MFlux Vault 的子集，预留用于 T3 backstop 覆盖。参见 [vaults](./vaults.md#insurance-pool)。
+**保险池（Insurance pool）。** MFlux Vault 中专用于 T3 兜底赔付的资金子集。参见[金库](./vaults.md#insurance-pool)。
 
-**Isolated margin。** 边际模式，其中按资产的桶对该资产的损失设置上限。参见 [margin modes](./margin-modes.md)。
+**逐仓保证金（Isolated margin）。** 每个资产设有独立保证金仓，亏损上限以该仓保证金为限。参见[保证金模式](./margin-modes.md)。
 
 ## L
 
-**L2 book。** 给定深度的挂单簿（每侧前 N 个水平面）。参见 [`l2_book` info](../api/rest/info.md#l2_book)。
+**L2 订单簿（L2 book）。** 指定深度（每侧前 N 档）的订单簿快照。参见 [`l2_book` info](../api/rest/info.md#l2_book)。
 
-**Liquidation tier。** [tiered ladder](./tiered-liquidation.md) 中的阶段：T0 黄牌、T1 部分、T2 完全、T3 backstop、T4 ADL。
+**清算层级（Liquidation tier）。** [分级清算阶梯](./tiered-liquidation.md)中的各阶段：T0 黄牌警告、T1 部分清算、T2 全额清算、T3 兜底、T4 ADL 自动减仓。
 
-**Lock-up (staking / vault)。** 解除质押/提取信号和资金可用性之间所需的时间。参见 [staking](./staking.md)、[vaults](./vaults.md)。
+**锁定期（Lock-up，质押/金库）。** 从发出解质押/提款信号到资金可用之间所需等待的时间。参见[质押](./staking.md)、[金库](./vaults.md)。
 
 ## M
 
-**Maintenance margin。** 保持头寸开放所需的最低抵押品。Health = `account_value / maint_margin`。参见 [margin modes](./margin-modes.md)。
+**维持保证金（Maintenance margin）。** 保持仓位开立所需的最低抵押品。健康度 = `account_value / maint_margin`。参见[保证金模式](./margin-modes.md)。
 
-**Maker / Taker。** Maker 提供流动性（停留订单）；Taker 移除流动性（穿越订单）。不同的费率。参见 [fees](./fees.md)。
+**挂单方 / 吃单方（Maker / Taker）。** 挂单方提供流动性（挂单），吃单方消耗流动性（吃单成交），两者适用不同费率。参见[费率](./fees.md)。
 
-**Mark price。** 协议用于保证金/清算的权威价格。中点 + 预言机 + EMA 的中位数合成。参见 [mark prices](./mark-prices.md)。
+**标记价格（Mark price）。** 协议用于计算保证金和清算的权威价格，由中间价、预言机价格和 EMA 的中位数合成。参见[标记价格](./mark-prices.md)。
 
-**Master account。** 其状态被操作改变的账户；可以由自身签名或由已批准的代理签名。参见 [agent wallets](./agent-wallets.md)。
+**主账户（Master account）。** 动作执行时状态发生变更的账户，可由账户自身或已授权的代理钱包签名。参见[代理钱包](./agent-wallets.md)。
 
-**MFlux Vault。** 协议运营的保险 + 做市池。参见 [vaults](./vaults.md#mflux-vault)。
+**MFlux Vault。** 协议运营的保险与做市资金池。参见[金库](./vaults.md#mflux-vault)。
 
-**MIP — Market Improvement Proposal。** 编号的协议改进（类似于成熟的链上永续协议使用的改进提案方案）。参见 [MIP](../mip/)。
+**MIP — 市场改进提案（Market Improvement Proposal）。** 编号式协议改进提案（类似成熟链上永续合约协议采用的改进提案机制）。参见 [MIP](../mip/)。
 
-**msgpack。** 二进制序列化格式。操作的签名负载是 msgpack 字节。参见 [signing](../integration/signing.md)。
+**msgpack。** 二进制序列化格式。动作的签名载荷为 msgpack 字节。参见[签名](../integration/signing.md)。
 
-**MTF。** MetaFlux 协议代币。用于质押、治理、费用销毁。
+**MTF。** MetaFlux 协议代币，用于质押、治理及费用销毁。
 
-**Multi-sig。** M-of-N 签名要求账户。参见 [multi-sig](./multi-sig.md)。
+**多签（Multi-sig）。** 账户的 M-of-N 签名要求。参见[多签](./multi-sig.md)。
 
 ## N
 
-**Nonce。** 每个发送者严格单调的 uint64，包含在每个操作中；重放保护。参见 [idempotency](../integration/idempotency.md)。
+**Nonce。** 每个发送方严格单调递增的 uint64，包含在每个动作中，用于防止重放攻击。参见[幂等性](../integration/idempotency.md)。
 
 ## O
 
-**Oid — Order ID。** 服务器分配的 uint64；在 `Order` 响应和 `userEvents`/`orderEvents` 中返回。参见 [exchange.md](../api/rest/exchange.md)。
+**订单 ID（Oid）。** 服务端分配的 uint64，在 `Order` 响应及 `userEvents`/`orderEvents` 中返回。参见 [exchange.md](../api/rest/exchange.md)。
 
-**Oracle。** 由 CEX 价格组成的外部价格源，通过 TWA。标记价格 + 融资费的输入。参见 [mark prices](./mark-prices.md#the-oracle-c1-anchor)。
+**预言机（Oracle）。** 通过时间加权平均从中心化交易所价格合成的外部价格源，作为标记价格和资金费率的输入。参见[标记价格](./mark-prices.md#the-oracle-c1-anchor)。
 
 ## P
 
-**PnL。** 损益。未实现（开仓头寸的按市价计算）与已实现（在平仓填充处平仓）。
+**PnL。** 盈亏。分为未实现盈亏（持仓按标记价格盯市）和已实现盈亏（平仓成交后确认）。
 
-**Portfolio margin (PM)。** 跨资产情景基础边际模型；对冲账簿资本效率高。参见 [portfolio margin](./portfolio-margin.md)。
+**组合保证金（PM，Portfolio margin）。** 跨资产情景压力测试保证金模型，对对冲组合的资本利用率更高。参见[组合保证金](./portfolio-margin.md)。
 
-**Premium index。** `mid - oracle` 的 EMA；融资费的输入。参见 [funding rates](./funding-rates.md)。
+**溢价指数（Premium index）。** `mid - oracle` 的 EMA，作为资金费率的计算输入。参见[资金费率](./funding-rates.md)。
 
 ## R
 
-**Reduce-only。** 订单标志，如果订单会增加头寸规模，则在入场时拒绝该订单。参见 [order types](./order-types.md#reduce-only)。
+**只减仓（Reduce-only）。** 订单标志，若下单时会扩大仓位则直接拒绝。参见[订单类型](./order-types.md#reduce-only)。
 
-**RFQ — Request for Quote。** 做市商报价工作流程，用于不想在公共挂单簿上宣传的规模。参见 [RFQ](./rfq.md)。
+**询价（RFQ — Request for Quote）。** 针对大额交易、不希望在公开订单簿上暴露的做市商报价流程。参见 [RFQ](./rfq.md)。
 
 ## S
 
-**Sender。** 其状态在 `POST /exchange` 请求中改变的地址。可以由自身签名或由已批准的代理签名。
+**发送方（Sender）。** 在 `POST /exchange` 请求中状态发生变更的地址，可由地址本身或已授权的代理钱包签名。
 
-**Share (vault)。** 保险库参与的单位；在当前 `share_price` 处的存款时铸币，在当前 `share_price` 处的提取时销毁。参见 [vaults](./vaults.md)。
+**份额（Share，金库）。** 参与金库的计量单位；存款时按当前 `share_price` 铸造，提款时按当前 `share_price` 销毁。参见[金库](./vaults.md)。
 
-**Slashing。** 验证者因双签或停机时间而受到的惩罚；减少验证者（和委托人）的权益。参见 [staking](./staking.md#slashing)。
+**惩罚（Slashing）。** 验证者因双重签名或宕机而受到的惩处，将扣减验证者（及委托人）的质押量。参见[质押](./staking.md#slashing)。
 
-**STP — Self-Trade Prevention。** 订单参数，选择新订单与自己停留的订单匹配时会发生的情况。参见 [order types](./order-types.md#self-trade-prevention)。
+**STP — 自成交预防（Self-Trade Prevention）。** 订单参数，用于设定当新订单与自身挂单发生撮合时的处理方式。参见[订单类型](./order-types.md#self-trade-prevention)。
 
-**Strict-Iso。** 边际模式，类似于隔离，具有额外属性，即头寸被排除在任何投资组合-边际净额计算之外。参见 [margin modes](./margin-modes.md)。
+**严格逐仓（Strict-Iso）。** 类似逐仓保证金模式，但额外将该仓位排除在任何组合保证金轧差之外。参见[保证金模式](./margin-modes.md)。
 
-**Sub-account。** 主账户下的衍生账户；隔离的头寸和订单，仅与主账户共享存款/提取。参见 [sub-accounts](./sub-accounts.md)。
+**子账户（Sub-account）。** 主账户下派生的账户，仓位与订单相互隔离，仅与主账户共享充值/提款通道。参见[子账户](./sub-accounts.md)。
 
 ## T
 
-**Taker。** 流动性移除者；穿越挂单簿一侧的填充方。
+**吃单方（Taker）。** 流动性消耗方，即触发撮合、穿越订单簿的一侧。
 
-**Tick size。** 市场的最小价格增量。订单必须对齐。
+**最小价格变动单位（Tick size）。** 市场价格的最小变动幅度，订单报价须与之对齐。
 
-**TIF — Time-In-Force。** 订单参数：GTC / IOC / ALO / FOK。参见 [order types](./order-types.md#time-in-force)。
+**TIF — 有效期类型（Time-In-Force）。** 订单参数：GTC / IOC / ALO / FOK。参见[订单类型](./order-types.md#time-in-force)。
 
-**TPSL — Take-Profit / Stop-Loss。** 触发订单分组以保护支架。参见 [order types](./order-types.md#triggers)。
+**TPSL — 止盈止损（Take-Profit / Stop-Loss）。** 用于设置保护性止盈止损对的触发订单组合。参见[订单类型](./order-types.md#triggers)。
 
-**TVL — Total Value Locked。** 所有存款人的保险库 NAV 总和。
+**TVL — 总锁仓量（Total Value Locked）。** 所有存款人在金库中的净资产总和。
 
-**TWAP — Time-Weighted Average Price。** 订单原语，在一段时间内分割大订单。参见 [order types](./order-types.md#twap)。
+**TWAP — 时间加权平均价格（Time-Weighted Average Price）。** 将大额订单按时间拆分执行的订单类型。参见[订单类型](./order-types.md#twap)。
 
 ## U
 
-**Universe。** 协议上活跃市场列表（永续 + 现货）。由 `meta` 信息返回。
+**市场列表（Universe）。** 协议当前活跃市场（永续合约 + 现货）的完整列表，由 `meta` 接口返回。
 
-**Unrealised PnL。** 开仓头寸的按市价计算损益。尚未通过平仓实现。
+**未实现盈亏（Unrealised PnL）。** 持仓按标记价格盯市计算的盈亏，尚未通过平仓实现。
 
-**USDC。** MetaFlux 市场的报价货币；通过 [MetaBridge](../bridge/) 桥接进出。
+**USDC。** MetaFlux 市场的计价货币，通过 [MetaBridge](../bridge/) 进行跨链充提。
 
 ## V
 
-**Validator。** 共识参与者；提议区块并投票。赚取委托人奖励的佣金；需要承担削减风险。
+**验证者（Validator）。** 共识参与者，负责提议区块并投票，从委托人奖励中抽取佣金，同时承担被惩罚的风险。
 
-**Vault。** USDC 池，在经理的签名权限下，具有铸币/销毁份额语义。参见 [vaults](./vaults.md)。
+**金库（Vault）。** 由管理者签名权限控制的 USDC 资金池，采用份额铸造/销毁语义。参见[金库](./vaults.md)。
 
 ## W
 
-**Withdrawable。** 可以离开账户的自由余额（不被持有作为开仓头寸的边际、不在隔离桶中、不被保险库锁定）。
+**可提现余额（Withdrawable）。** 可从账户转出的空闲余额（不包括：作为持仓保证金占用的资金、逐仓仓位中锁定的资金、金库锁定的资金）。
 
 ## Y
 
-**Yellow card (T0)。** 第一个清算层级。ALO 订单被取消；头寸未受影响；客户端通知。参见 [tiered liquidation](./tiered-liquidation.md#why-a-yellow-card)。
+**黄牌警告（T0）。** 第一清算层级。ALO 订单被取消，仓位保持不变，客户端收到通知。参见[分级清算](./tiered-liquidation.md#why-a-yellow-card)。

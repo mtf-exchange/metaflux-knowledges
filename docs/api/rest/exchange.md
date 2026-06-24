@@ -166,7 +166,13 @@ Each variant is a tagged object `{ "type": "<snake_case_tag>", <flat body> }`. T
 body keys are **flat under the action object** (there is no PascalCase `type` and
 no universal `params` wrapper) — e.g. `submit_order` carries an `order` object,
 `cancel_order` carries a `cancel` object, and the sender-authorized actions carry
-a `params` object. Click through for the field-level table.
+a `params` object. Click through for the field-level table. The overview tables
+below group every action by category; the **full field-level definitions that
+follow are split by trading type** — [Perpetual order actions](#perpetual-order-actions),
+[Spot trading actions](#spot-trading-actions),
+[Spot margin & Earn actions](#spot-margin--earn-actions),
+[Perpetual margin & risk actions](#perpetual-margin--risk-actions), and
+[Account, staking, vaults & bridge actions](#account-staking-vaults--bridge-actions).
 
 :::warning
 **`px` / `size` are unsigned fixed-point `u64` on the native wire**, sent as JSON
@@ -199,7 +205,7 @@ into a **reserved balance**: a `bid` reserves **quote** (its notional at the
 limit price), an `ask` reserves the **base** it offers. Order size is **clamped
 at admission** to what your balance funds, and fees are taken from the leg each
 side receives. Both actions are **sender-authorized** (the signer is the trader;
-there is no `owner`). See [spot trading](../../concepts/spot-trading.md) for the
+there is no `owner`). See [spot trading](../../products/spot.md) for the
 full conceptual model.
 
 | `type` | Purpose | Signed-by | Idempotent |
@@ -210,7 +216,7 @@ full conceptual model.
 ### Spot margin & Earn
 
 :::info
-**Available on devnet (preview).** Leveraged spot ([spot margin](../../concepts/spot-margin.md)) and its lending supply side ([Earn](../../concepts/earn.md)) run end-to-end on **devnet today**: deposit collateral, borrow from the Earn pool, IOC-buy base on leverage, and close to repay. Treat it as a **preview** — forced-liquidation settlement is not yet wired (a forced close does not realize PnL or decrement open interest), and per-pair maintenance ratios are governance parameters still being calibrated. Do not assume production safety at scale.
+**Available on devnet (preview).** Leveraged spot ([spot margin](../../products/spot-margin.md)) and its lending supply side ([Earn](../../concepts/earn.md)) run end-to-end on **devnet today**: deposit collateral, borrow from the Earn pool, IOC-buy base on leverage, and close to repay. Treat it as a **preview** — forced-liquidation settlement is not yet wired (a forced close does not realize PnL or decrement open interest), and per-pair maintenance ratios are governance parameters still being calibrated. Do not assume production safety at scale.
 :::
 
 A leveraged spot position is **isolated per `(account, pair)`**: posted quote collateral is a pure loss buffer, the buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All six actions are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info.md#spot_margin_state) and [`earn_state`](./info.md#earn_state).
@@ -317,6 +323,14 @@ disposition of each.
 | (encrypted submit alt) | `encrypted_order_submit` | Stub; use [`submit_encrypted_order`](#submit_encrypted_order) instead |
 
 ---
+
+## Perpetual order actions
+
+Order placement and lifecycle on **perpetual** markets (a perp `market` id). These
+use the shared CLOB; the [spot](#spot-trading-actions) and
+[spot margin](#spot-margin--earn-actions) trading actions are separate sections
+below. Perp leverage and margin controls are under
+[Perpetual margin & risk actions](#perpetual-margin--risk-actions).
 
 ### `submit_order`
 
@@ -742,6 +756,11 @@ Cancel a running TWAP parent. Already-filled slices stay filled; future slices s
 
 ---
 
+## Spot trading actions
+
+Token-for-token [spot](../../products/spot.md) actions — no leverage, no positions,
+with books and balances entirely separate from perps.
+
 ### `spot_order`
 
 Place a single order on a **spot** market. Spot trades are a token-for-token
@@ -829,6 +848,13 @@ by the spot halt, so you can always exit a resting order and reclaim escrow.
 
 ---
 
+## Spot margin & Earn actions
+
+Leveraged [spot margin](../../products/spot-margin.md) and its
+[Earn](../../concepts/earn.md) lending supply side. **Available on devnet
+(preview).** All actions here are sender-authorized and return the
+[`202 Accepted`](#202-accepted--non-order-admission) admission envelope.
+
 ### `spot_margin_deposit`
 
 :::info
@@ -851,7 +877,7 @@ Post quote (USDC) collateral into your `(account, pair)` margin account, debited
 
 **Gating.** Margin must be **enabled for the pair** — the pair needs per-pair risk parameters present, which are a governance setting still being calibrated. A deposit on a pair without them is rejected (`spot margin not enabled for pair`). An unknown pair, a non-positive `amount`, or an amount above your spendable quote balance are all rejected at admission.
 
-**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`). Confirm the credited collateral via [`/info` `spot_margin_state`](./info.md#spot_margin_state). See [spot margin](../../concepts/spot-margin.md).
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`). Confirm the credited collateral via [`/info` `spot_margin_state`](./info.md#spot_margin_state). See [spot margin](../../products/spot-margin.md).
 
 ---
 
@@ -907,7 +933,7 @@ Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC
 
 **Gating.** Rejected if margin is not enabled for the pair, if there is no margin account (deposit collateral first), if a position is already open on the pair, if the Earn pool's idle liquidity is below `borrow`, if spot trading is halted, or on a zero `size` / non-positive `borrow`.
 
-**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid` — the inner IOC's fill is a committed effect). Observe the resulting `borrowed` / `base_held` via [`/info` `spot_margin_state`](./info.md#spot_margin_state); the Earn pool's `total_borrowed` moves on [`earn_state`](./info.md#earn_state). See [spot margin](../../concepts/spot-margin.md).
+**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid` — the inner IOC's fill is a committed effect). Observe the resulting `borrowed` / `base_held` via [`/info` `spot_margin_state`](./info.md#spot_margin_state); the Earn pool's `total_borrowed` moves on [`earn_state`](./info.md#earn_state). See [spot margin](../../products/spot-margin.md).
 
 ---
 
@@ -991,6 +1017,12 @@ Redeem pool shares back to quote, paid to your spendable balance. The payout is 
 
 ---
 
+## Perpetual margin & risk actions
+
+Leverage, isolated-margin, and portfolio-margin controls for **perpetual**
+positions. See [margin modes](../../concepts/margin-modes.md) and
+[portfolio margin](../../concepts/portfolio-margin.md) for the models.
+
 ### `update_leverage`
 
 Set per-asset leverage and, optionally, flip the asset to isolated mode.
@@ -1066,6 +1098,12 @@ Enroll or unenroll the account in portfolio margin.
 Requires account equity ≥ `pm_min_equity` (governance parameter). See [portfolio margin](../../concepts/portfolio-margin.md).
 
 ---
+
+## Account, staking, vaults & bridge actions
+
+Cross-cutting actions that are not specific to one trading product — agent wallets,
+display name, referrer, multi-sig, sub-accounts, position mode, staking and
+abstraction, encrypted orders, vaults / Metaliquidity, and bridge withdrawals.
 
 ### `approve_agent`
 

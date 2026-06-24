@@ -2,7 +2,7 @@
 
 :::info
 **Available on devnet (preview).** A USDC lending pool that earns yield from
-[spot-margin](./spot-margin.md) borrowers. Supply, share-pricing, idle-bounded
+[spot-margin](../products/spot-margin.md) borrowers. Supply, share-pricing, idle-bounded
 redemption AND the automatic spot-margin liquidator that protects the pool all
 run end-to-end on **devnet today** (see the
 [action surface](#deposit--withdraw) below). Treat it as a **preview**:
@@ -11,7 +11,7 @@ per-pair maintenance ratios are still being calibrated.
 
 ## TL;DR
 
-Deposit USDC into the **Earn pool** and earn yield. The pool lends USDC to [spot-margin](./spot-margin.md) borrowers, who pay interest; that interest accrues to the pool and lifts the value of your **shares**. There is **no claim step** — yield compounds continuously into your share value, and you realise it when you withdraw.
+Deposit USDC into the **Earn pool** and earn yield. The pool lends USDC to [spot-margin](../products/spot-margin.md) borrowers, who pay interest; that interest accrues to the pool and lifts the value of your **shares**. There is **no claim step** — yield compounds continuously into your share value, and you realise it when you withdraw.
 
 ## How it works — share / NAV model
 
@@ -96,12 +96,12 @@ under-collateralized.
 
 ## Risk
 
-Earn is **not risk-free**. If a [spot-margin](./spot-margin.md) position is closed
+Earn is **not risk-free**. If a [spot-margin](../products/spot-margin.md) position is closed
 at a loss that the borrower's collateral cannot cover, the **shortfall is socialized
 to suppliers**: the pool's `total_supplied` is reduced (floored at zero), which
 lowers `share_value`. The pool's protection is the **automatic liquidator** (live
 on devnet): every block, underwater margin accounts are
-[forced-closed](./spot-margin.md#liquidation) at the maintenance floor, so a
+[forced-closed](../products/spot-margin.md#liquidation) at the maintenance floor, so a
 position is unwound while there is normally still enough value to repay the loan.
 The conservative per-pair maintenance ratio (still being calibrated) sizes that
 buffer; an insurance-buffer waterfall ahead of suppliers is planned but not yet
@@ -110,7 +110,7 @@ so a fully-utilised pool cannot be exited until borrowers repay.
 
 ## See also
 
-- [Spot margin](./spot-margin.md) — the borrowers whose interest is your yield
+- [Spot margin](../products/spot-margin.md) — the borrowers whose interest is your yield
 - [Tiered liquidation](./tiered-liquidation.md) — the insurance waterfall that protects the pool
 - [Vaults](./vaults.md) — a different yield product (strategy-traded LP capital), not a lending pool
 

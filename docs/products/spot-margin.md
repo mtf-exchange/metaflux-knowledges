@@ -2,7 +2,7 @@
 
 :::info
 **Available on devnet (preview).** Leveraged spot trading funded by the
-[Earn](./earn.md) lending pool. [Plain spot](./spot-trading.md) is balance-only
+[Earn](../concepts/earn.md) lending pool. [Plain spot](./spot.md) is balance-only
 (no leverage); spot margin is the overlay that adds borrow + leverage on top.
 The full deposit → borrow → leveraged-buy → close loop AND automatic
 [forced liquidation](#liquidation) run end-to-end on **devnet today** (see the
@@ -13,7 +13,7 @@ Leverage works on devnet; do not assume production safety at scale.
 
 ## TL;DR
 
-Spot margin lets you **borrow quote (USDC) against collateral to buy spot with leverage**, instead of paying 100% upfront. The borrowed USDC comes from the [Earn](./earn.md) pool, you pay **interest** on it, and the position carries a **maintenance margin** and a **liquidation price** like a perp.
+Spot margin lets you **borrow quote (USDC) against collateral to buy spot with leverage**, instead of paying 100% upfront. The borrowed USDC comes from the [Earn](../concepts/earn.md) pool, you pay **interest** on it, and the position carries a **maintenance margin** and a **liquidation price** like a perp.
 
 In the first release spot margin is **isolated per pair** — each leveraged spot position posts its own margin and is liquidated on its own, separate from your perp cross account.
 
@@ -78,7 +78,7 @@ calibrated risk parameters rejects every spot-margin action for it
 
 ### Interest
 
-Borrowed USDC accrues interest at a per-pair rate (`spot_borrow_rate_bps`, annualised, accrued every block). Interest flows to the [Earn](./earn.md) pool, lifting its per-share value — that is the lenders' yield. In the first release the rate is **fixed**; a utilisation-based curve is a later upgrade.
+Borrowed USDC accrues interest at a per-pair rate (`spot_borrow_rate_bps`, annualised, accrued every block). Interest flows to the [Earn](../concepts/earn.md) pool, lifting its per-share value — that is the lenders' yield. In the first release the rate is **fixed**; a utilisation-based curve is a later upgrade.
 
 ### Liquidation
 
@@ -94,7 +94,7 @@ The forced close runs through the **same settled path as a voluntary close**
 — the held base is IOC-sold on the spot book, the Earn pool is repaid
 principal + interest, the remainder (minus a small **liquidation fee**, which
 capitalizes the protocol's insurance fund) is returned, and the account closes.
-Two anti-cascade properties mirror the [perp forced close](./tiered-liquidation.md#how-a-forced-close-executes-the-price-floor):
+Two anti-cascade properties mirror the [perp forced close](../concepts/tiered-liquidation.md#how-a-forced-close-executes-the-price-floor):
 
 - **Price floor.** The forced sell is a LIMIT bounded at
   `mark × (1 − floor)` (default: half the maintenance ratio, per-pair
@@ -113,6 +113,23 @@ pool's supplied total is reduced (floored at zero), which lowers share value.
 The conservative per-pair maintenance ratio and the automatic liquidator exist
 to make that shortfall rare.
 
+## Fees
+
+A spot-margin position carries three distinct charges:
+
+| Charge | When | Rate |
+|---|---|---|
+| **Trading fee** | on the open and close IOC fills | the pair's [spot maker/taker rate](./spot.md#matching-fills-and-fees) (spot margin trades the spot book) |
+| **Borrow interest** | continuously, on the outstanding USDC borrow | `spot_borrow_rate_bps` — per-pair, annualised, accrued every block; flows to the [Earn](../concepts/earn.md) pool as lender yield |
+| **Liquidation fee** | only on a forced close | a small per-pair fee that capitalizes the protocol's insurance fund |
+
+The open and close are ordinary spot IOC fills, so they pay the **spot** fee
+schedule, not the perp tiers. The borrow interest is the spot-margin-specific cost
+— it is exactly the yield [Earn](../concepts/earn.md) suppliers receive. All rates
+are per-pair governance parameters; query them via
+[`/info spot_margin_state`](../api/rest/info.md#spot_margin_state) and the spot
+[`fee_schedule`](../api/rest/info.md#fee_schedule).
+
 ## Collateral scope
 
 | Release | Collateral | Liquidation blast radius |
@@ -124,13 +141,13 @@ Isolated-per-pair keeps the first release contained: a leveraged spot blow-up ca
 
 ## Relationship to Earn
 
-Spot-margin borrowers are the **demand side**; [Earn](./earn.md) depositors are the **supply side**. Borrow interest paid by spot-margin traders is exactly the yield Earn depositors receive. See [Earn](./earn.md) for the yield calculation.
+Spot-margin borrowers are the **demand side**; [Earn](../concepts/earn.md) depositors are the **supply side**. Borrow interest paid by spot-margin traders is exactly the yield Earn depositors receive. See [Earn](../concepts/earn.md) for the yield calculation.
 
 ## See also
 
-- [Earn](./earn.md) — the lending pool that funds spot-margin borrows, and how yield is computed
-- [Margin modes](./margin-modes.md) — margin model shared with perps
-- [Tiered liquidation](./tiered-liquidation.md) — the liquidation ladder + insurance waterfall
+- [Earn](../concepts/earn.md) — the lending pool that funds spot-margin borrows, and how yield is computed
+- [Margin modes](../concepts/margin-modes.md) — margin model shared with perps
+- [Tiered liquidation](../concepts/tiered-liquidation.md) — the liquidation ladder + insurance waterfall
 
 ## FAQ
 
@@ -144,7 +161,7 @@ A: No. Buying spot with 100% of your own balance works exactly as before — spo
 A: Not in the first release — spot margin is isolated per pair. Cross collateral is a later, opt-in upgrade.
 
 **Q: Where does the borrowed USDC come from?**
-A: The [Earn](./earn.md) lending pool. Borrows are capped at the pool's available (un-lent) liquidity.
+A: The [Earn](../concepts/earn.md) lending pool. Borrows are capped at the pool's available (un-lent) liquidity.
 
 **Q: What rate do I pay?**
 A: A fixed per-pair annualised rate in the first release, accrued every block. Utilisation-based pricing comes later.

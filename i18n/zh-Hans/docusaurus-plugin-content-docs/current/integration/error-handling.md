@@ -4,9 +4,9 @@
 **稳定版。**
 :::
 
-为生产客户端提供的决策树。完整的错误字符串目录在[错误](../api/errors.md)中；本页告诉您如何**处理**每个类别。
+本文为生产环境客户端提供决策流程。完整的错误字符串目录见 [错误](../api/errors.md)；本页重点说明每类错误的**处理方式**。
 
-## 三层失败机制
+## 三个故障层
 
 ```mermaid
 flowchart TD
@@ -19,13 +19,13 @@ flowchart TD
     N --> N2["no response<br/>(drop)"]
 ```
 
-| 层 | 何时触发 | 如何表现 |
+| 层级 | 触发时机 | 呈现方式 |
 |-------|-----------|--------------|
-| 准入层 | 在 `/exchange` 请求时 | HTTP 状态 + 响应体 |
-| 提交层 | 在块提交时，准入后 | `userEvents` / `orderEvents` WS 推送，或可见于 `userFills` / `openOrders` |
-| 网络层 | 任何地方 | TCP 错误、超时、部分响应 |
+| 准入层 | `/exchange` 请求时 | HTTP 状态码 + 响应体 |
+| 提交层 | 准入后，区块提交时 | `userEvents` / `orderEvents` WS 推送，或可在 `userFills` / `openOrders` 中查询 |
+| 网络层 | 任意环节 | TCP 错误、超时、响应截断 |
 
-每层具有不同的语义。混淆它们是最常见的生产错误。
+每一层的语义各不相同。混淆这三层是生产环境中最常见的 Bug。
 
 ## 决策树
 
@@ -40,19 +40,19 @@ flowchart TD
     S -->|429| R429["backoff per retry_after_ms"]
 ```
 
-## 第 1 层 - 准入错误
+## 第一层 — 准入错误
 
-请求已解析，但在准入时被拒绝。状态 `400`、`401`、`404`、`405`、`422`。
+请求已被解析，但在准入阶段被拒绝。状态码为 `400`、`401`、`404`、`405`、`422`。
 
 | 类别 | 示例 | 重试规则 |
 |-------|----------|------------|
-| **客户端错误** | `400 invalid_msgpack`、`400 unknown_action_variant`、`400 missing_field` | 不要重试 — 修复代码 |
-| **签名错误** | `401 signer_not_sender`、`401 unknown_chainId` | 不要重试 — 验证 chainId / 密钥 / 代理状态 |
-| **随机数错误** | `400 nonce_must_increase` | 增加随机数；重试 |
-| **逻辑错误** | `422 price_not_tick_aligned`、`422 reduce_only_would_grow` | 计算正确值；重试 |
-| **状态错误** | `422 liquidation_tier_blocks_action`、`422 insufficient_balance` | 充值 / 等待层级转变；重试 |
-| **认证状态** | `401 agent_not_yet_effective` | 等待一个块；重试 |
-| **未找到** | `404 order_not_found`、`404 account_not_found` | 不重试；检查资源 |
+| **客户端 Bug** | `400 invalid_msgpack`、`400 unknown_action_variant`、`400 missing_field` | 禁止重试 — 修复代码 |
+| **签名 Bug** | `401 signer_not_sender`、`401 unknown_chainId` | 禁止重试 — 检查 chainId / 密钥 / Agent 状态 |
+| **Nonce Bug** | `400 nonce_must_increase` | 递增 nonce 后重试 |
+| **逻辑错误** | `422 price_not_tick_aligned`、`422 reduce_only_would_grow` | 重新计算正确的值后重试 |
+| **状态错误** | `422 liquidation_tier_blocks_action`、`422 insufficient_balance` | 补充保证金 / 等待等级切换后重试 |
+| **Auth 状态** | `401 agent_not_yet_effective` | 等待一个区块后重试 |
+| **资源不存在** | `404 order_not_found`、`404 account_not_found` | 不要重试；检查对应资源是否存在 |
 
 ```typescript
 async function handleAdmissionResponse(r: Response) {
@@ -91,19 +91,19 @@ async function handleAdmissionResponse(r: Response) {
 }
 ```
 
-## 第 2 层 - 提交错误
+## 第二层 — 提交错误
 
-操作已被准入（`202`）但在提交时失败。您只能通过事件流了解它。
+该操作已通过准入（`202`），但在提交阶段失败。此类错误只能通过事件流获知。
 
-| 错误 | 原因 | 重试？ |
+| 错误 | 原因 | 可重试？ |
 |-------|-------|--------|
-| `reduce_only_violation_post_admit` | 在准入和分发之间仓位发生变化 | 如果意图仍然适用则是 |
-| `stp_rejected` | 自交易防止杀死了订单 | 否 — 调用者的另一个订单先匹配 |
-| `mark_price_band_violation` | 订单价格在分发时离标记价格太远 | 否 — 重新评估价格并重新挂单 |
-| `evicted_under_cap_pressure` | 已准入但在块前从内存池中被驱逐 | 是（带退避） |
-| `liquidation_pre_empted` | 在准入和分发之间账户移至 T1+ | 否 — 先修复保证金 |
+| `reduce_only_violation_post_admit` | 准入与派发之间仓位发生变化 | 若意图仍有效则可重试 |
+| `stp_rejected` | 自成交防护机制撤销了该订单 | 否 — 调用方的另一笔订单已先行成交 |
+| `mark_price_band_violation` | 派发时订单价格偏离标记价格过远 | 否 — 重新评估价格后再下单 |
+| `evicted_under_cap_pressure` | 已准入但在出块前被逐出内存池 | 是（需退避） |
+| `liquidation_pre_empted` | 准入与派发之间账户进入 T1+ 清算档位 | 否 — 先补足保证金 |
 
-订阅 [`userEvents` WS](../api/ws/subscriptions.md#userevents)（订单生命周期事件在该频道上）并按事件类型分发：
+订阅 [`userEvents` WS](../api/ws/subscriptions.md#userevents)（订单生命周期事件通过该通道推送），并按事件类型分发处理：
 
 ```typescript
 ws.subscribe('orderEvents', { user: address }, (event) => {
@@ -119,19 +119,19 @@ ws.subscribe('orderEvents', { user: address }, (event) => {
 });
 ```
 
-## 第 3 层 - 网络错误
+## 第三层 — 网络错误
 
-最模糊的类别。服务器是否收到了请求？操作是否提交了？
+这类错误最难判断：服务器是否已收到请求？操作是否已提交？
 
-| 症状 | 操作 |
+| 现象 | 处理方式 |
 |---------|--------|
-| TCP RST 在响应前 | 协调：查询状态以确定结果 |
-| 响应超时（您设置的超时） | 相同 — 协调 |
-| 部分 / 截断响应 | 相同 — 协调 |
-| 连接被拒绝 | 服务器端不可用；以指数退避重试 |
-| DNS 失败 | 网络 / DNS 问题；以指数退避重试 |
+| 收到响应前出现 TCP RST | 对账：查询状态以确认结果 |
+| 响应超时（超时时间由调用方设置） | 同上 — 执行对账 |
+| 响应截断 | 同上 — 执行对账 |
+| 连接被拒绝 | 服务端不可用；指数退避后重试 |
+| DNS 解析失败 | 网络或 DNS 问题；指数退避后重试 |
 
-### 协调模式
+### 对账模式
 
 ```mermaid
 flowchart TD
@@ -148,13 +148,13 @@ flowchart TD
     L -->|not visible after 10 attempts| D4["action never made it;<br/>safe to retry with new nonce"]
 ```
 
-cloid-on-orders 模式（见[幂等性](./idempotency.md)）使这变得便宜：查询未平仓订单，查看您的 cloid 是否在那里。
+cloid 挂单查询模式（详见 [幂等性](./idempotency.md)）可使对账成本极低：查询挂单列表，检查自己的 cloid 是否存在即可。
 
-对于非订单操作，匹配 `action_hash`（从您的本地 msgpack 编码确定）。`userEvents` WS 提要在每个事件上都包含 `action_hash`。
+对于非订单类操作，通过 `action_hash` 进行匹配（由本地 msgpack 编码确定性生成）。`userEvents` WS 推送的每条事件均包含 `action_hash`。
 
-## 生产方案
+## 生产实践示例
 
-### 带重试的订单下单
+### 带重试的下单
 
 ```typescript
 async function placeOrderSafely(client: Client, order: Order, maxAttempts = 3) {
@@ -187,7 +187,7 @@ async function placeOrderSafely(client: Client, order: Order, maxAttempts = 3) {
 }
 ```
 
-### 带幂等安全的取消
+### 幂等撤单
 
 ```typescript
 async function cancelSafely(client: Client, asset: number, oid: number) {
@@ -207,7 +207,7 @@ async function cancelSafely(client: Client, asset: number, oid: number) {
 }
 ```
 
-### WS 提交协调
+### WS 提交对账
 
 ```typescript
 const pendingByHash = new Map<string, PendingAction>();
@@ -233,34 +233,34 @@ async function submit(action: Action) {
 ## 边界情况
 
 <details>
-<summary>显示边界情况</summary>
+<summary>展开边界情况</summary>
 
-- **网关返回 5xx 但操作实际上已提交。** 如果网关的准入后回复丢失，可能会发生。处理方式类似网络丢弃：通过 cloid/action_hash 协调。
-- **WS 提要落后于实际状态。** 恢复缓冲区可能在您重新连接时驱逐了事件。在恢复时重新轮询 `/info` 以确定锚点；切换到 WS 以获取实时尾部。
-- **相同随机数提交两次 — 一次成功。** 服务器强制随机数单调性；第二个尝试看到 `nonce_too_small` 并且您学到第一个是实时的。使用此信号。
-- **时间炸弹逻辑错误。** 一个 `Trigger` 订单今天准入但永远不会触发，因为其触发条件永远不成立。没有错误；只是一个挂在那里的止损订单。定期协调您的未平仓订单集与您的机器人预期集合。
+- **网关返回 5xx，但操作实际已提交。** 若网关在准入后的回复丢失，就可能发生此情况。处理方式与网络丢包相同：通过 cloid/action_hash 执行对账。
+- **WS 推送落后于实际状态。** 断线重连期间，重放缓冲区可能已丢弃相关事件。重连后先用 `/info` 轮询确认当前状态，再切换到 WS 接收实时数据。
+- **相同 nonce 提交两次，其中一次成功。** 服务端强制要求 nonce 单调递增；第二次尝试会收到 `nonce_too_small`，由此可判断第一次已生效。善用这一信号。
+- **延迟触发的逻辑错误。** 触发型（`Trigger`）订单今天准入，但因触发条件始终不满足而永不执行——不会报错，只是一笔长期挂着的委托。请定期将挂单集与 Bot 的预期委托集进行核对。
 
 </details>
 
-## 另见
+## 另请参阅
 
-- [错误](../api/errors.md) — 完整目录
-- [幂等性](./idempotency.md) — 随机数 + cloid 机制
+- [错误](../api/errors.md) — 完整错误目录
+- [幂等性](./idempotency.md) — nonce 与 cloid 机制
 - [WS 订阅](../api/ws/subscriptions.md) — 提交时事件
-- [速率限制](../api/rate-limits.md) — 控制重试速度
+- [频率限制](../api/rate-limits.md) — 重试节奏控制
 
 ## 常见问题
 
 <details>
-<summary>显示常见问题</summary>
+<summary>展开常见问题</summary>
 
-**问：我应该将提交时错误视为异常还是数据？**
-答：数据。它们是常规订单结果 — 因 STP 被 `cancelled`，因准入后 reduce-only 而 `error`。根据业务逻辑进行记录 + 处理；不要在它们上崩溃。
+**Q: 提交时错误应作为异常抛出，还是作为数据处理？**
+A: 作为数据处理。这些都是正常的订单结果——因 STP 被 `cancelled`，或因准入后 reduce-only 检查失败而 `error`。按业务逻辑记录并处理即可，不要因此崩溃程序。
 
-**问：是否有理由忽略准入错误？**
-答：对于纯幂等流（不存在的订单的取消），`404` 可以忽略。对于其他所有情况，以 INFO+ 级别记录并要么重试要么上报给操作员。
+**Q: 什么情况下可以忽略准入错误？**
+A: 对于纯幂等流程（撤销一笔不存在的订单），`404` 可以静默吞掉。其他情况下，请以 INFO 或更高级别记录日志，并选择重试或通知运维人员。
 
-**问：我如何限制重试次数？**
-答：每个逻辑操作的时间预算。对于订单下单，5 秒很慷慨；对于取消，2 秒。超过这个时间，上报给操作员或您的风险监视器。
+**Q: 如何限制重试次数？**
+A: 按每个逻辑操作设置时钟预算。下单操作 5 秒已经足够宽裕；撤单操作 2 秒即可。超出预算后，交由运维人员或风控模块处理。
 
 </details>

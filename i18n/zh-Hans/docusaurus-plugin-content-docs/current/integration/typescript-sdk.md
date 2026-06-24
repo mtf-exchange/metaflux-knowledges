@@ -1,10 +1,10 @@
 # TypeScript SDK
 
 :::info
-**预览版。** `@metaflux/sdk` 包在主网上线前发布；以下 API 形状已锁定。
+**预览版。** `@metaflux/sdk` 包在主网上线前已发布，以下 API 结构已锁定。
 :::
 
-## 快速开始
+## 快速上手
 
 ```bash
 npm install @metaflux/sdk
@@ -30,23 +30,23 @@ await c.exchange.order({
 new MetaFluxClient(opts: ClientOpts)
 ```
 
-| 字段 | 类型 | 必需 | 描述 |
+| 字段 | 类型 | 是否必填 | 说明 |
 |-------|------|----------|-------------|
-| `privateKey` | hex 字符串或 `Uint8Array` | 是（除非设置了 `signer`） | 32 字节 secp256k1 私钥 |
-| `signer` | `Signer` | 是（除非设置了 `privateKey`） | 自定义签名器（HSM / WalletConnect / Ledger） |
-| `senderAddress` | hex 地址 | 可选 | 如果设置，用作 `sender`；签名器的地址用作恢复的签名器。用于 [agent-wallet 模式](./agent-wallets-howto.md)。 |
-| `baseUrl` | 字符串 | 是 | 网关前端 (`https://<net>-gateway.mtf.exchange`)。SDK 使用 MTF-native，这是网关的默认路径 (`/info` · `/exchange` · `/ws`)；HL-compat 位于 `/hl/*` 下。自己运行节点？指向 `http://localhost:8080`。参见 [networks](../networks.md)。 |
-| `chainId` | 数字 | 是 | 每个网络 — 参见 [networks](../networks.md) |
-| `timeoutMs` | 数字 | 可选（默认 5000） | HTTP 超时 |
-| `nonceFn` | `() => number` | 可选（默认 `Date.now`） | 自定义 nonce 生成器 |
+| `privateKey` | 十六进制字符串或 `Uint8Array` | 是（未设置 `signer` 时） | 32 字节 secp256k1 私钥 |
+| `signer` | `Signer` | 是（未设置 `privateKey` 时） | 自定义签名器（HSM / WalletConnect / Ledger） |
+| `senderAddress` | 十六进制地址 | 可选 | 若设置，将作为 `sender` 使用；签名器地址用于恢复签名方。适用于[代理钱包模式](./agent-wallets-howto.md)。 |
+| `baseUrl` | string | 是 | 网关入口（`https://<net>-gateway.mtf.exchange`）。SDK 使用 MTF-native 协议，对应网关默认路径（`/info` · `/exchange` · `/ws`）；HL 兼容接口位于 `/hl/*`。自行运行节点时请指向 `http://localhost:8080`。详见[网络列表](../networks.md)。 |
+| `chainId` | number | 是 | 各网络对应的 Chain ID，详见[网络列表](../networks.md) |
+| `timeoutMs` | number | 可选（默认 5000） | HTTP 超时时间（毫秒） |
+| `nonceFn` | `() => number` | 可选（默认 `Date.now`） | 自定义 nonce 生成函数 |
 
 ## 模块
 
-客户端公开三个模块：`info`、`exchange`、`ws`。
+客户端暴露三个模块：`info`、`exchange`、`ws`。
 
 ### `info`
 
-所有 `POST /info` 查询类型。方法返回类型化响应。
+所有 `POST /info` 查询类型，方法返回带类型的响应数据。
 
 ```typescript
 c.info.meta();
@@ -101,12 +101,12 @@ c.exchange.fbaOrder(p: FbaOrderParams): Promise<OrderResult>;
 ```
 
 :::warning
-**保证金控制仅适用于永续合约。** `updateLeverage`、`updateIsolatedMargin` 和 `updateMarginMode` 仅适用于永续头寸。现货头寸在 V1 中不支持杠杆或隔离保证金 — 现货交易改为通过现货订单路径使用预留余额托管模型。
+**保证金控制仅适用于永续合约。** `updateLeverage`、`updateIsolatedMargin` 和 `updateMarginMode` 仅作用于永续合约仓位。V1 中现货仓位不支持杠杆或逐仓保证金——现货交易通过现货下单路径使用预留余额托管模型。
 :::
 
 ### `ws`
 
-返回多路复用订阅的 `MetaFluxWs` 实例。
+返回一个 `MetaFluxWs` 实例，用于复用多路订阅。
 
 ```typescript
 const ws = c.ws();
@@ -129,15 +129,15 @@ await sub1.unsubscribe();
 ws.close();
 ```
 
-WebSocket 客户端处理：
-- 自动重连，指数退避
-- 每个订阅的 `seq` 跟踪和重连时恢复
-- 私有订阅的身份验证刷新（滑动窗口）
-- Ping/pong 保活
+WebSocket 客户端内置以下能力：
+- 指数退避自动重连
+- 每路订阅的 `seq` 追踪与断线恢复时的 `resume` 机制
+- 私有订阅的鉴权自动刷新（滑动窗口）
+- Ping/Pong 保活
 
 ## 错误处理
 
-SDK 抛出类型化错误：
+SDK 抛出带类型的错误：
 
 ```typescript
 try {
@@ -151,7 +151,7 @@ try {
 }
 ```
 
-参见 [错误处理](./error-handling.md) 了解决策树。
+完整决策树详见[错误处理](./error-handling.md)。
 
 ## 自定义签名器（HSM / 硬件钱包）
 
@@ -172,11 +172,11 @@ const c = new MetaFluxClient({
 });
 ```
 
-SDK 将已哈希的 `signed_hash` 传递给 `Signer.sign` — 你的 HSM 无需了解 EIP-712 编码。
+SDK 将已哈希的 `signed_hash` 直接传递给 `Signer.sign`——你的 HSM 无需了解 EIP-712 编码细节。
 
-## 配置 agent-signing 客户端
+## 配置代理签名客户端
 
-对于 [agent-wallets 模式](./agent-wallets-howto.md)：
+适用于[代理钱包模式](./agent-wallets-howto.md)：
 
 ```typescript
 const agent = new MetaFluxClient({
@@ -191,9 +191,9 @@ const agent = new MetaFluxClient({
 //   signature = signed by agentPrivKey
 ```
 
-## 常见模式
+## 常用模式
 
-### 下单 + 确认
+### 下单并确认
 
 ```typescript
 const cloid = '0x' + randomBytes(16).toString('hex');
@@ -216,7 +216,7 @@ const filled = new Promise((resolve) => {
 await filled;
 ```
 
-### 全部取消
+### 撤销所有订单
 
 ```typescript
 const orders = await c.info.openOrders();
@@ -232,11 +232,11 @@ c.ws().subscribe('userFills', { user: c.address }, (e) => {
 });
 ```
 
-## 数字处理
+## 数值处理
 
-所有定点整数和 USDC 基础单位字段在输入和输出中都是 `string`。SDK 不强制转换为 `number`，因为 IEEE-754 在超过 2^53 后会默认丢失精度。
+所有定点整数字段和 USDC 基础单位字段，在输入和输出中均为 `string` 类型。SDK 不会强制转换为 `number`，因为 IEEE-754 在超过 2^53 时会静默丢失精度。
 
-对于算术运算，使用大整数库（`bigint`、`bignumber.js` 等）：
+数学运算请使用大整数库（`bigint`、`bignumber.js` 等）：
 
 ```typescript
 const priceE8 = BigInt('10050000000');     // 100.50 × 10^8
@@ -246,38 +246,38 @@ const notional = priceE8 * sizeE8 / 10n**8n;  // 100.5
 
 ## 日志
 
-在构造函数中传递 `logger: console`（或任何 `{ debug, info, warn, error }` 形式）以捕获 SDK 的内部跟踪：
+向构造函数传入 `logger: console`（或任何符合 `{ debug, info, warn, error }` 接口的对象），即可捕获 SDK 内部追踪日志：
 
 ```typescript
 const c = new MetaFluxClient({ ..., logger: console });
 ```
 
-日志级别：`debug`（所有内容）、`info`（admit + WS 连接）、`warn`（重试）、`error`（终端故障）。
+日志级别说明：`debug`（全量输出）、`info`（请求接入与 WebSocket 连接）、`warn`（重试）、`error`（不可恢复的错误）。
 
-## 另请参见
+## 参考链接
 
-- [快速开始](./quickstart.md) — 5 分钟端到端
-- [签名](./signing.md) — SDK 内部操作
-- [Agent wallets howto](./agent-wallets-howto.md)
-- [`POST /exchange`](../api/rest/exchange.md) — 完整操作表面
-- [WS 订阅](../api/ws/subscriptions.md) — 频道目录
+- [快速入门](./quickstart.md) — 5 分钟端到端演示
+- [签名机制](./signing.md) — SDK 内部签名原理
+- [代理钱包操作指南](./agent-wallets-howto.md)
+- [`POST /exchange`](../api/rest/exchange.md) — 完整操作接口列表
+- [WebSocket 订阅](../api/ws/subscriptions.md) — 频道目录
 - [Rust SDK](./rust-sdk.md)
 
 ## 常见问题
 
 <details>
-<summary>显示常见问题</summary>
+<summary>展开常见问题</summary>
 
-**问：SDK 是否支持浏览器？**
-答：是的 — ES2020 构建，包含 `secp256k1` 和 `keccak256` 的浏览器友好 polyfills。如果你的打包器不能 tree-shake Node 端导入，从 `@metaflux/sdk/browser` 拉取。
+**Q：SDK 支持浏览器环境吗？**
+A：支持——提供 ES2020 构建版本，内置对 `secp256k1` 和 `keccak256` 的浏览器兼容 polyfill。如果你的打包工具无法 tree-shake 掉 Node 端导入，请从 `@metaflux/sdk/browser` 引入。
 
-**问：安装有多重？**
-答：约 150 KB 缩小（不包括加密原语，可 tree-shake）。加密层增加约 50 KB。
+**Q：安装包体积有多大？**
+A：压缩后约 150 KB（不含加密原语，加密部分支持 tree-shaking）。加密层额外增加约 50 KB。
 
-**问：依赖树是什么？**
-答：`ethereum-cryptography`（或 `@noble/*` 等效）、`@msgpack/msgpack`、`ws`（仅 Node）。全部 MIT 许可。无具有非许可证许可的传递依赖。
+**Q：依赖树是怎样的？**
+A：依赖 `ethereum-cryptography`（或等效的 `@noble/*`）、`@msgpack/msgpack`、`ws`（仅 Node 环境）。全部采用 MIT 许可证，无传递性非宽松许可依赖。
 
-**问：我可以插入自己的 HTTP 传输（axios、undici）吗？**
-答：是的 — 在构造函数中传递 `transport: { request: async (req) => ... }`。
+**Q：可以接入自定义 HTTP 传输层（axios、undici）吗？**
+A：可以——在构造函数中传入 `transport: { request: async (req) => ... }` 即可。
 
 </details>
