@@ -1,7 +1,7 @@
 # WS 订阅频道
 
 :::info
-**状态。** `l2_book`、`bbo`、`trades`、`active_asset_ctx`、`all_mids`、`fills`、`user_events`、`candles`、`order_updates`、`notifications`、`ledger_updates`、`active_asset_data`、`user_fundings`、`user_twap_slice_fills`、`user_twap_history`、`account_state`、`spot_state` 和 `web_data2` 已上线，并按区块推送真实已提交数据。[路线图](#roadmap--not-yet-available)下的其他所有内容都未连接。连接生命周期和帧格式在 [WS README](./index.md) 中。按市场频道（`l2_book`、`bbo`、`trades`、`active_asset_ctx`）需要 `coin`；`candles` 需要 `coin` **和** `interval`；按账户频道（`fills`、`user_events`）需要 `user`（0x 地址）；`active_asset_data` 需要 **both** `user` 和 `coin`；`all_mids` 都不需要。
+**状态。** `l2_book`、`bbo`、`trades`、`active_asset_ctx`、`all_mids`、`fills`、`user_events`、`candles`、`order_updates`、`notifications`、`ledger_updates`、`active_asset_data`、`user_fundings`、`user_twap_slice_fills`、`user_twap_history`、`account_state`、`spot_state` 和 `web_data2` 已上线，推送真实已提交数据 —— 采用按变化驱动：某个频道仅在其状态相比上一次提交确实发生变化时才发出一帧。[路线图](#roadmap--not-yet-available)下的其他所有内容都未连接。连接生命周期和帧格式在 [WS README](./index.md) 中。按市场频道（`l2_book`、`bbo`、`trades`、`active_asset_ctx`）需要 `coin`；`candles` 需要 `coin` **和** `interval`；按账户频道（`fills`、`user_events`）需要 `user`（0x 地址）；`active_asset_data` 需要 **both** `user` 和 `coin`；`all_mids` 都不需要。
 :::
 
 :::info
@@ -14,30 +14,30 @@
 { "method": "subscribe", "subscription": { "type": "<channel>", "coin": "<coin>" } }
 ```
 
-您会收到一个 ack（`subscriptionResponse`）、一个初始快照，然后是实时的 `{"channel":...,"data":...}` 推送。`coin` 对于按市场频道（`l2_book`、`bbo`）是**必需的**；请参阅 [Coin 参数](./index.md#coin-parameter)了解它如何被规范化（数字资产 id 或符号 → 资产-id 键）。
+您会收到一个 ack（`subscriptionResponse`）、一个初始快照（`isSnapshot: true`），然后是实时的按变化驱动的 `{"channel":...,"data":...}` 推送（`isSnapshot: false`）。某帧仅在该频道的状态相比上一次提交确实发生变化时才到达；未变化的频道什么都不发。`coin` 对于按市场频道（`l2_book`、`bbo`）是**必需的**；请参阅 [Coin 参数](./index.md#coin-parameter)了解它如何被规范化（数字资产 id 或符号 → 资产-id 键）。
 
 ## 频道状态一览
 
 | Channel | Status | key | Live source |
 |---------|--------|:-------:|-------------|
-| `l2_book` | **live** | `coin`（必需） | 已提交账本，每次提交 |
-| `bbo` | **live** | `coin`（必需） | 已提交账本，每次提交 |
-| `trades` | **live** | `coin`（必需） | 已提交区块成交，每次提交 |
-| `active_asset_ctx` | **live** | `coin`（必需） | 按市场标记/预言机/融资/OI，每次提交 |
-| `all_mids` | **live** | 无 | 按市场标记，每次提交 |
+| `l2_book` | **live** | `coin`（必需） | 已提交账本，变化时 |
+| `bbo` | **live** | `coin`（必需） | 已提交账本，变化时 |
+| `trades` | **live** | `coin`（必需） | 已提交区块成交，有新成交时 |
+| `active_asset_ctx` | **live** | `coin`（必需） | 按市场标记/预言机/融资/OI，变化时 |
+| `all_mids` | **live** | 无 | 按市场标记，变化时 |
 | `fills` | **live** | `user`/`address`（必需） | 该账户的已提交区块成交 |
 | `user_events` | **live** | `user`/`address`（必需） | 该账户的已提交区块成交（更多事件类型即将推出） |
-| `candles` | **live** | `coin` + `interval`（都必需） | 已提交区块成交折叠为 OHLCV 条形，每次提交 |
-| `order_updates` | **live** | `user`/`address`（必需） | 按账户订单生命周期（下单/成交/取消/拒绝），每次提交 |
-| `notifications` | **live** | `user`/`address`（必需） | 按账户保证金/清算通知，每次提交 |
-| `ledger_updates` | **live** | `user`/`address`（必需） | 按账户资金流动（存入/提出/转账），每次提交 |
-| `active_asset_data` | **live** | `user` **和** `coin`（都必需） | 按（用户、币种）杠杆/保证金模式/最大交易上下文，每次提交 |
-| `user_fundings` | **live** | `user`/`address`（必需） | 按账户已实现融资支付，每次提交 |
-| `user_twap_slice_fills` | **live** | `user`/`address`（必需） | 按账户 TWAP 片段成交（`{fill, twapId}`），每次提交 |
-| `user_twap_history` | **live** | `user`/`address`（必需） | 按账户 TWAP 生命周期（`{time, state, status}`：已激活/已完成/已终止），每次提交 |
-| `account_state` | **live** | `user`/`address`（必需） | 按账户永续清算所状态 — 保证金标量、头寸、余额 — 每次提交 |
-| `spot_state` | **live** | `user`/`address`（必需） | 按账户现货清算所状态 — 按代币余额 — 每次提交 |
-| `web_data2` | **live** | `user`/`address`（必需） | 按账户复合 UI 快照 — 清算所 + 现货余额 + 开仓订单 + 金库权益 + 交易所状态 — 每次提交 |
+| `candles` | **live** | `coin` + `interval`（都必需） | 已提交区块成交折叠为 OHLCV 条形，变化时 |
+| `order_updates` | **live** | `user`/`address`（必需） | 按账户订单生命周期（下单/成交/取消/拒绝），变化时 |
+| `notifications` | **live** | `user`/`address`（必需） | 按账户保证金/清算通知，变化时 |
+| `ledger_updates` | **live** | `user`/`address`（必需） | 按账户资金流动（存入/提出/转账），变化时 |
+| `active_asset_data` | **live** | `user` **和** `coin`（都必需） | 按（用户、币种）杠杆/保证金模式/最大交易上下文，变化时 |
+| `user_fundings` | **live** | `user`/`address`（必需） | 按账户已实现融资支付，变化时 |
+| `user_twap_slice_fills` | **live** | `user`/`address`（必需） | 按账户 TWAP 片段成交（`{fill, twapId}`），变化时 |
+| `user_twap_history` | **live** | `user`/`address`（必需） | 按账户 TWAP 生命周期（`{time, state, status}`：已激活/已完成/已终止），变化时 |
+| `account_state` | **live** | `user`/`address`（必需） | 按账户永续清算所状态 — 保证金标量、头寸、余额 — 变化时 |
+| `spot_state` | **live** | `user`/`address`（必需） | 按账户现货清算所状态 — 按代币余额 — 变化时 |
+| `web_data2` | **live** | `user`/`address`（必需） | 按账户复合 UI 快照 — 清算所 + 现货余额 + 开仓订单 + 金库权益 + 交易所状态 — 变化时 |
 
 订阅任何其他 `type` 会返回 `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -74,9 +74,9 @@
 - 每一侧上限是 **20 个聚合档位**。
 - `time` 是账本的 `last_trade_ms`（共识衍生）；`0` 直到账本有交易。
 
-每次推送是前 20 档的**完整快照**，不是差异 — 没有 `is_snapshot` / `updates` / 差异帧。在每帧上替换您的本地账本。
+每次推送是前 20 档的**完整快照**，不是局部差异。帧信封带有一个 `isSnapshot` 布尔值 —— 初始订阅快照上为 `true`，之后按变化驱动的推送上为 `false` —— 但**无论哪种情况，主体都是完整的前 20 档账本**，所以该字段只是信息性的：继续在每帧上替换您的本地账本即可保持正确。
 
-频率：在该市场有实时订阅者的每个已提交区块中一帧。如果币种映射到无已知市场，您仍会得到 ack，但快照体是空账本（`"levels": [[], []]`、`"time": 0`），之后不会有推送。
+频率：按变化驱动 —— 只有账本相比上一次提交确实发生变化时才发出一帧；一次未改动此账本的提交什么都不发。如果币种映射到无已知市场，您仍会得到 ack，但快照体是空账本（`"levels": [[], []]`、`"time": 0`），之后不会有推送。
 
 ### `bbo`
 
@@ -103,13 +103,13 @@
 - `bbo` 是 `[best_bid, best_ask]`。每个条目是一个 `{ px, sz, n }` 档位，或当该侧为空时 `null`。
 - `time` 是 `last_trade_ms`，与 `l2_book` 相同。
 
-频率：在该市场有实时订阅者的每个已提交区块中一帧。
+频率：按变化驱动 —— 只有最优报价相比上一次提交确实发生变化时才发出一帧；此次提交未变化的账本什么都不发。
 
 ---
 
 ### `trades`
 
-一个市场的公开交易记录 — 每次提交该市场的每笔成交一条记录。`px`/`sz` 是原始 **1e8 平面**整数字符串；`side` 是接盘方的一侧（`"B"` 买入 / `"A"` 卖出）；`time` 是共识区块时间戳（毫秒）；`tid` 是确定性交易 id；`users` 是 `[taker, maker]`（接盘方优先，激进方）。
+一个市场的公开交易记录 — 该市场的每笔成交一条记录，在该市场确实有成交的那些提交上发出。`px`/`sz` 是原始 **1e8 平面**整数字符串；`side` 是接盘方的一侧（`"B"` 买入 / `"A"` 卖出）；`time` 是共识区块时间戳（毫秒）；`tid` 是确定性交易 id；`users` 是 `[taker, maker]`（接盘方优先，激进方）。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "trades", "coin": "BTC" } }
@@ -121,7 +121,7 @@
 
 ### `active_asset_ctx`
 
-一个市场的按市场上下文 — 标记/预言机价格、融资和开仓利息 — 每次提交推送。**需要 `coin`。** 主体携带与 REST [`market_info`](../rest/info.md#market_info) 读相同的字段和单位：`mark_px` / `oracle_px` 是**整数 USDC**，tick 对齐（截断到市场的价格 tick），`funding` 区块镜像 `market_info.funding`。由与 REST 读相同的按市场记录构建器构建，所以 WS ctx 推送永不偏离 `market_info`。
+一个市场的按市场上下文 — 标记/预言机价格、融资和开仓利息 — 变化时推送。**需要 `coin`。** 主体携带与 REST [`market_info`](../rest/info.md#market_info) 读相同的字段和单位：`mark_px` / `oracle_px` 是**整数 USDC**，tick 对齐（截断到市场的价格 tick），`funding` 区块镜像 `market_info.funding`。由与 REST 读相同的按市场记录构建器构建，所以 WS ctx 推送永不偏离 `market_info`。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_ctx", "coin": "BTC" } }
@@ -149,7 +149,7 @@
 - `funding` — `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`，与 REST `market_info.funding` 块相同（对于未知市场为 `null` — 见下文）。`rate_per_hr` 是最新的每小时融资利率样本（上限前）和 `cap_per_hr` 按市场利率上限，两者都是**基点字符串**，向零截断（例如 `"400"` = 0.04/小时）；`interval_ms` 是融资节奏（`3600000` = 1h）；`next_payment_ts` 是纪元毫秒，`0` 直到市场有其第一个融资样本。
 - `open_interest` — 当前开仓利息，定点字符串（无账本时 `"0"`）。
 
-频率：在该市场有实时订阅者的每个已提交区块中一帧。
+频率：按变化驱动 —— 只有此市场的 ctx 相比上一次提交确实发生变化时才发出一帧；此次提交未变化的 ctx 什么都不发。
 
 如果币种映射到无已知市场，您仍会得到 ack，但快照是**坦诚-空的**主体 — 零价格 / OI 和 `null` 融资块 — 之后不会有推送（所以客户端反序列化固定 ctx 结构永不破裂）：
 
@@ -159,7 +159,7 @@
 
 ### `all_mids`
 
-全局中点映射 — 每个市场的标记价格，每次提交推送。按币种键入；值是 REST [`markets`](../rest/info.md#markets) 读报告的 tick 对齐整数 USDC 标记。无 `coin` 参数。
+全局中点映射 — 每个市场的标记价格，mids 变化时推送。按币种键入；值是 REST [`markets`](../rest/info.md#markets) 读报告的 tick 对齐整数 USDC 标记。无 `coin` 参数。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "all_mids" } }
@@ -293,7 +293,7 @@
 
 ### `active_asset_data`
 
-按（用户、币种）交易上下文 — 杠杆、保证金模式和当前最大交易大小上限一个账户在一个市场。需要 **both** `user`（0x）和 `coin`。初始快照是实时上下文（账户没有头寸时为零配置默认值），不是空数组；推送在每个已提交区块上重新发出。
+按（用户、币种）交易上下文 — 杠杆、保证金模式和当前最大交易大小上限一个账户在一个市场。需要 **both** `user`（0x）和 `coin`。初始快照是实时上下文（账户没有头寸时为零配置默认值），不是空数组；推送仅在该上下文变化时重新发出。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_data", "user": "0x<address>", "coin": "BTC" } }
@@ -321,7 +321,7 @@
 
 ### `account_state`
 
-按账户**永续**清算所状态 — 保证金摘要、开仓头寸和一个账户的余额 — 每次提交推送。需要 `user`（0x 地址；`address` 也被接受）— 不是 `coin`。主体由与 REST 焦点账户读相同的记录构建器构建，所以 WS 推送永不偏离该读。初始快照是实时状态（对于无资金账户为零），不是空数组。
+按账户**永续**清算所状态 — 保证金摘要、开仓头寸和一个账户的余额 — 变化时推送。需要 `user`（0x 地址；`address` 也被接受）— 不是 `coin`。主体由与 REST 焦点账户读相同的记录构建器构建，所以 WS 推送永不偏离该读。初始快照是实时状态（对于无资金账户为零），不是空数组。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "account_state", "user": "0x<address>" } }
@@ -348,7 +348,7 @@
 - `positions[]` — 每个开放永续头寸一项：`asset`（数字 id）、`size`（签名的 1e8 平面字符串）、`entry` / `upnl`（整数 USDC）、`isolated`、`lev` 和 `side`（`long` / `short`，在套期保值模式下呈现）。
 - `balances` — `{usdc, spot}`：`usdc` 是报价抵押品（整数 USDC）；`spot` 映射代币 → `{total, hold}`。
 
-频率：账户有实时订阅者时每个已提交区块一帧。
+频率：按变化驱动 —— 只有账户状态相比上一次提交确实发生变化时才发出一帧；此次提交未变化的账户什么都不发。
 
 :::warning
 `account_state` 是按账户数据，但目前**没有身份验证** — 任何连接都可以订阅任何地址。在身份验证-在-订阅门落地前不要将其视为私密。
@@ -356,7 +356,7 @@
 
 ### `spot_state`
 
-按账户**现货**清算所状态 — 一个账户的按代币现货余额 — 每次提交推送。需要 `user`。初始快照是实时余额集（对于无现货持有的账户为 `[]`）。
+按账户**现货**清算所状态 — 一个账户的按代币现货余额 — 变化时推送。需要 `user`。初始快照是实时余额集（对于无现货持有的账户为 `[]`）。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "spot_state", "user": "0x<address>" } }
@@ -377,11 +377,11 @@
 
 - `balances[]` — 每个持有的现货代币一项：`asset`（数字 id）、`name`（代币符号）、`total`（整数代币十进制字符串）、`hold`（待成交现货订单保留金额）。与 REST 现货余额读相同。
 
-频率：账户有实时订阅者时每个已提交区块一帧。
+频率：按变化驱动 —— 只有现货余额相比上一次提交确实发生变化时才发出一帧；此次提交未变化的账户什么都不发。
 
 ### `web_data2`
 
-按账户**复合**"前端的一切" 快照 — 永续清算所摘要、现货余额、开仓订单、金库权益和一个账户的全球交易所状态，全部在一帧中，每次提交推送。需要 `user`（0x 地址；`address` 也被接受）— 不是 `coin`。主体是 REST [`web_data2`](../rest/info.md#web_data2) 读返回的字节相同复合（它组成相同的子读取器），所以 WS 推送永不偏离该读。初始快照是实时复合（当账户无资金/头寸/订单时为零配置默认值），不是空数组。
+按账户**复合**"前端的一切" 快照 — 永续清算所摘要、现货余额、开仓订单、金库权益和一个账户的全球交易所状态，全部在一帧中，变化时推送。需要 `user`（0x 地址；`address` 也被接受）— 不是 `coin`。主体是 REST [`web_data2`](../rest/info.md#web_data2) 读返回的字节相同复合（它组成相同的子读取器），所以 WS 推送永不偏离该读。初始快照是实时复合（当账户无资金/头寸/订单时为零配置默认值），不是空数组。
 
 ```json
 { "method": "subscribe", "subscription": { "type": "web_data2", "user": "0x<address>" } }
@@ -431,7 +431,7 @@
 - `vault_equities` — 来自 REST `user_vault_equities` 的 `equities` 数组：账户在其中有份额的每个金库一项，`{vault_id, vault_address, shares, equity}`（`equity` 是整数 USDC，`shares` 是原始整数字符串）。账户不跟随金库时为空。
 - `exchange_status` — 全球交易状态标量（与 REST `exchange_status` 相同主体）：`{spot_disabled, post_only_until_time_ms, post_only_until_height, scheduled_freeze_height, mip3_enabled, frozen, replay_complete}`。这个块对于给定提交上的每个订阅者是相同的。
 
-频率：账户有实时订阅者时每个已提交区块一帧。在每个提交上，当前复合为每个已订阅账户重新发出。
+频率：按变化驱动 —— 只有该复合相比上一次提交确实发生变化时才发出一帧；一次未改动此账户复合的提交什么都不发。
 
 :::warning
 `web_data2` 是按账户数据，但目前**没有身份验证** — 任何连接都可以订阅任何地址。在身份验证-在-订阅门落地前不要将其视为私密；对于已认证读使用 `post` 和签名的行为。
@@ -460,7 +460,7 @@
 
 同样今天未实现：
 
-- **基于差异的 `l2_book`**（`is_snapshot` / `updates` 帧）— 当前 `l2_book` 总是发送完整前 20 档快照。
+- **基于差异的 `l2_book`**（局部 `updates` 帧）— 当前 `l2_book` 总是发送完整的前 20 档主体。帧确实带有一个 `isSnapshot` 标志（初始快照上为 `true`，按变化驱动的推送上为 `false`），但每个主体都是完整快照 —— 没有局部差异的 `updates` 帧。
 - **`seq` / `resume` / 恢复代币** — 每个（重新）订阅从新鲜快照开始。
 - **私有频道的身份验证-在-订阅信封** — 使用 `post` 和签名的行为进行已认证操作。
 
@@ -468,9 +468,9 @@
 
 ## 排序与交付
 
-- **按订阅**，帧以提交顺序到达（每个触及观看市场的已提交区块一帧）。没有 `seq`；排序隐含在单一套接字上的到达顺序中。
+- **按订阅**，帧以提交顺序到达（仅在被观看频道的状态发生变化的那些提交上发出一帧）。没有 `seq`；排序隐含在单一套接字上的到达顺序中。
 - **跨订阅**，没有排序保证 — 交错是任意的。在 `channel` + `data` 内的 `coin` 上解复用。
-- 交付是**最多一次每提交**且**不为恢复缓冲**：落后超过 256 帧的订阅被掉落用 `lagged` 错误帧（参见[背压与滞后](./index.md#backpressure--lag)）。重新订阅恢复；您获得新鲜快照。
+- 交付是**最多一次每变化**且**不为恢复缓冲**：落后超过 256 帧的订阅被掉落用 `lagged` 错误帧（参见[背压与滞后](./index.md#backpressure--lag)）。重新订阅恢复；您获得新鲜快照。
 
 ## 另见
 

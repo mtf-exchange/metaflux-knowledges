@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**状态。** 目前在节点上线，支持 `l2_book`、`bbo`（成交簿/最优报价）、`trades`、`active_asset_ctx`（每个市场的标记价格/预言机价格/资金费率/未平仓头寸）、`all_mids`、`fills`、`user_events` 和 `candles`（滚动 OHLCV K 线，按 `(coin, interval)`）— 所有都是每个区块推送真实已提交数据 — 加上 `post`（WS 上的请求/响应）和 `ping`/`pong`。参见[订阅](./subscriptions.md)了解每个频道的数据结构。
+**状态。** 目前在节点上线，支持 `l2_book`、`bbo`（成交簿/最优报价）、`trades`、`active_asset_ctx`（每个市场的标记价格/预言机价格/资金费率/未平仓头寸）、`all_mids`、`fills`、`user_events` 和 `candles`（滚动 OHLCV K 线，按 `(coin, interval)`）— 所有都推送真实已提交数据，按变化驱动（某个频道仅在其状态相比上一次提交发生变化时才发出一帧）— 加上 `post`（WS 上的请求/响应）和 `ping`/`pong`。参见[订阅](./subscriptions.md)了解每个频道的数据结构。
 :::
 
 :::info
@@ -30,9 +30,9 @@ sequenceDiagram
     node-->>client: 101 Switching Protocols
     client->>node: {"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}
     node-->>client: {"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"l2_book","coin":"BTC"}}} (ack)
-    node-->>client: {"channel":"l2_book","data":{"coin":"BTC","levels":[[...],[...]],"time":...}} (initial snapshot)
-    node-->>client: {"channel":"l2_book","data":{...}} (push, per commit)
-    node-->>client: {"channel":"l2_book","data":{...}} (push)
+    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":true} (initial snapshot)
+    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":false} (push, on change)
+    node-->>client: {"channel":"l2_book","data":{...},"isSnapshot":false} (push, on change)
     Note over client,node: ...
     client->>node: {"method":"ping"}
     node-->>client: {"channel":"pong"}
@@ -115,10 +115,13 @@ sequenceDiagram
 实时数据帧共享一个信封：
 
 ```json
-{ "channel": "<channel>", "data": { /* channel-specific */ } }
+{ "channel": "<channel>", "data": { /* channel-specific */ }, "isSnapshot": false }
 ```
 
-帧上 **没有** `seq`、`ts` 或 `sub_id` 字段。按 `channel` 和 `data` 内的 `coin` 进行分解（对于按市场的频道）。更新 **按已提交块** 发出：每次提交后，节点为每个至少有一个实时订阅者的市场发布一个新帧（参见[按订阅者推送](#per-subscriber-push)）。
+- `isSnapshot` 是一个布尔值：在初始订阅帧（完整快照）上为 `true`，在之后按变化驱动的推送上为 `false`。**无论哪种情况，每个帧的主体都是完整快照**（例如 `l2_book` 是完整的前 20 档，`all_mids` 是完整的映射，`account_state` 是完整的账户状态）—— `isSnapshot` 只是信息性的，并不是"这是差异"的标志。一个在每帧上简单替换本地状态的客户端始终保持正确，可以忽略此字段。
+- 帧上 **没有** `seq`、`ts` 或 `sub_id` 字段。按 `channel` 和 `data` 内的 `coin` 进行分解（对于按市场的频道）。
+
+更新是 **按变化驱动的**：每次提交后，节点 **仅在某个被订阅频道的已提交状态相比上一次提交确实发生变化时** 才为该频道发布一帧。一次未改动某被观看频道的提交不会为其发出任何帧 —— 所以您收到的帧数少于区块数，且永不重复推送未变化的数据（参见[按订阅者推送](#per-subscriber-push)）。
 
 ### `post`（WS 上的请求/响应）
 
@@ -172,10 +175,11 @@ sequenceDiagram
 
 ## 按订阅者推送
 
-推送是 **订阅者门控和按市场的**。在每个已提交块后，节点对每个市场检查 `has_receivers(channel, coin)` — 一个 O(1) 查找 — 只有这样才会聚合和广播该市场的 book。后果：
+推送是 **订阅者门控、按市场且按变化驱动的**。在每个已提交块后，节点对每个市场检查 `has_receivers(channel, coin)` — 一个 O(1) 查找 — 只有这样才会聚合该市场的 book，并 **仅在它相比上一次提交发生变化时** 广播。后果：
 
 - 没有人在看的市场只花费 O(1) 检查；不构建任何 book。
 - 一个 `BTC` 订阅者永远不会触发 `ETH` book 构建。
+- 某市场的 book 在一次提交上未变化时，该次提交不为其广播任何内容 —— 无重复推送。
 - 帧被传递到 **每个** 该 `(channel, coin)` 桶的当前订阅者。
 
 ## 背压和滞后

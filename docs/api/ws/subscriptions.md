@@ -1,7 +1,7 @@
 # WS subscription channels
 
 :::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, and `web_data2` are live and push real committed data per block. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, and `web_data2` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
 :::
 
 :::info
@@ -14,30 +14,30 @@ The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**
 { "method": "subscribe", "subscription": { "type": "<channel>", "coin": "<coin>" } }
 ```
 
-and receive an ack (`subscriptionResponse`), an initial snapshot, then live `{"channel":...,"data":...}` pushes. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
+and receive an ack (`subscriptionResponse`), an initial snapshot (`isSnapshot: true`), then live change-driven `{"channel":...,"data":...}` pushes (`isSnapshot: false`). A push lands only when that channel's state actually changed since the last commit; an unchanged channel emits nothing. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
 
 ## Channel status at a glance
 
 | Channel | Status | key | Live source |
 |---------|--------|:-------:|-------------|
-| `l2_book` | **live** | `coin` (required) | committed book, per commit |
-| `bbo` | **live** | `coin` (required) | committed book, per commit |
-| `trades` | **live** | `coin` (required) | committed-block fills, per commit |
-| `active_asset_ctx` | **live** | `coin` (required) | per-market mark / oracle / funding / OI, per commit |
-| `all_mids` | **live** | none | per-market mark, per commit |
+| `l2_book` | **live** | `coin` (required) | committed book, on change |
+| `bbo` | **live** | `coin` (required) | committed book, on change |
+| `trades` | **live** | `coin` (required) | committed-block fills, on new fills |
+| `active_asset_ctx` | **live** | `coin` (required) | per-market mark / oracle / funding / OI, on change |
+| `all_mids` | **live** | none | per-market mark, on change |
 | `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
-| `candles` | **live** | `coin` + `interval` (both required) | committed-block fills folded into OHLCV bars, per commit |
-| `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), per commit |
-| `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, per commit |
-| `ledger_updates` | **live** | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), per commit |
-| `active_asset_data` | **live** | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, per commit |
-| `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, per commit |
-| `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), per commit |
-| `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`: activated / finished / terminated), per commit |
-| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — per commit |
-| `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — per commit |
-| `web_data2` | **live** | `user`/`address` (required) | per-account composite UI snapshot — clearinghouse + spot balances + open orders + vault equities + exchange status — per commit |
+| `candles` | **live** | `coin` + `interval` (both required) | committed-block fills folded into OHLCV bars, on change |
+| `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
+| `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, on change |
+| `ledger_updates` | **live** | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), on change |
+| `active_asset_data` | **live** | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, on change |
+| `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, on change |
+| `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), on change |
+| `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`: activated / finished / terminated), on change |
+| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change |
+| `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — on change |
+| `web_data2` | **live** | `user`/`address` (required) | per-account composite UI snapshot — clearinghouse + spot balances + open orders + vault equities + exchange status — on change |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -74,9 +74,9 @@ Initial snapshot and every push share this shape:
 - Each side is capped at **20 aggregated levels**.
 - `time` is the book's `last_trade_ms` (consensus-derived); `0` until the book has traded.
 
-Each push is a **full snapshot of the top 20 levels**, not a diff — there are no `is_snapshot` / `updates` / diff frames. Replace your local book on each frame.
+Each push is a **full snapshot of the top 20 levels**, not a partial diff. The frame envelope carries an `isSnapshot` boolean — `true` on the initial on-subscribe snapshot, `false` on the subsequent change-driven pushes — but the **body is the full top-20 book either way**, so the field is informational: keep replacing your local book on each frame and you stay correct.
 
-Frequency: one frame per committed block in which this market has a live subscriber. If the coin maps to no known market, you still get the ack but the snapshot body is the empty book (`"levels": [[], []]`, `"time": 0`) and no pushes follow.
+Frequency: change-driven — a frame is sent only when the book actually changed since the last commit; a commit that leaves this book untouched emits nothing. If the coin maps to no known market, you still get the ack but the snapshot body is the empty book (`"levels": [[], []]`, `"time": 0`) and no pushes follow.
 
 ### `bbo`
 
@@ -103,13 +103,13 @@ Top-of-book best bid / offer for one market. A thinner `l2_book`. **Requires `co
 - `bbo` is `[best_bid, best_ask]`. Each entry is a `{ px, sz, n }` level, or `null` when that side is empty.
 - `time` is `last_trade_ms`, same as `l2_book`.
 
-Frequency: one frame per committed block in which this market has a live subscriber.
+Frequency: change-driven — a frame is sent only when the top-of-book actually changed since the last commit; an unchanged book emits nothing this commit.
 
 ---
 
 ### `trades`
 
-Public trade tape for one market — one record per fill on that market each commit. `px`/`sz` are raw **1e8-plane** integer strings; `side` is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms); `tid` is a deterministic trade id; `users` is `[taker, maker]` (taker first, the aggressor).
+Public trade tape for one market — one record per fill on that market, emitted on the commits where that market actually traded. `px`/`sz` are raw **1e8-plane** integer strings; `side` is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms); `tid` is a deterministic trade id; `users` is `[taker, maker]` (taker first, the aggressor).
 
 ```json
 { "method": "subscribe", "subscription": { "type": "trades", "coin": "BTC" } }
@@ -122,7 +122,7 @@ Public trade tape for one market — one record per fill on that market each com
 ### `active_asset_ctx`
 
 Per-market context for one market — mark / oracle price, funding, and open
-interest — pushed each commit. **Requires `coin`.** The body carries the same
+interest — pushed when it changes. **Requires `coin`.** The body carries the same
 fields and units as the REST [`market_info`](../rest/info.md#market_info) read:
 `mark_px` / `oracle_px` are **whole-USDC**, tick-snapped (truncated to the market's
 price tick), and the `funding` block mirrors `market_info.funding`. Built from the
@@ -155,7 +155,7 @@ from `market_info`.
 - `funding` — `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block (`null` for an unknown market — see below). `rate_per_hr` is the latest hourly funding-rate sample (pre-cap) and `cap_per_hr` the per-market rate cap, both **bps strings** truncated toward zero (e.g. `"400"` = 0.04/hr); `interval_ms` is the funding cadence (`3600000` = 1h); `next_payment_ts` is epoch-ms, `0` until the market has its first funding sample.
 - `open_interest` — current open interest, fixed-point string (`"0"` when no book).
 
-Frequency: one frame per committed block in which this market has a live subscriber.
+Frequency: change-driven — a frame is sent only when this market's ctx actually changed since the last commit; an unchanged ctx emits nothing this commit.
 
 If the coin maps to no known market you still get the ack, but the snapshot is the
 **honest-empty** body — zeroed prices / OI and a `null` funding block — and no
@@ -167,7 +167,7 @@ pushes follow (so a client deserializing a fixed ctx struct never breaks):
 
 ### `all_mids`
 
-Global mid map — every market's mark price, pushed each commit. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info.md#markets) read reports. No `coin` parameter.
+Global mid map — every market's mark price, pushed when the mids change. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info.md#markets) read reports. No `coin` parameter.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "all_mids" } }
@@ -305,7 +305,7 @@ Per-(user, coin) trading context — leverage, margin mode, and the current
 max-trade-size ceiling for one account on one market. Requires **both** `user`
 (0x) and `coin`. The initial snapshot is the live context (zeroed-config
 defaults when the account has no position), not an empty array; a push
-re-emits it each committed block.
+re-emits it only when that context changes.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_data", "user": "0x<address>", "coin": "BTC" } }
@@ -339,7 +339,7 @@ On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's
 ### `account_state`
 
 Per-account **PERP** clearinghouse state — the margin summary, open positions,
-and balances for one account — pushed each commit. Requires `user` (the 0x
+and balances for one account — pushed when it changes. Requires `user` (the 0x
 address; `address` is also accepted) — NOT a `coin`. The body is built from the
 same record builder as the REST focused account read, so a WS push never drifts
 from that read. The initial snapshot is the live state (zeroed for an account
@@ -377,7 +377,7 @@ with no funds), not an empty array.
 - `balances` — `{usdc, spot}`: `usdc` is the quote collateral (whole-USDC); `spot`
   maps token → `{total, hold}`.
 
-Frequency: one frame per committed block while the account has a live subscriber.
+Frequency: change-driven — a frame is sent only when the account's state actually changed since the last commit; an unchanged account emits nothing this commit.
 
 :::warning
 `account_state` is per-account data but currently has **no authentication** — any
@@ -388,7 +388,7 @@ auth-at-subscribe gate lands.
 ### `spot_state`
 
 Per-account **SPOT** clearinghouse state — the per-token spot balances for one
-account — pushed each commit. Requires `user`. The initial snapshot is the live
+account — pushed when they change. Requires `user`. The initial snapshot is the live
 balance set (`[]` for an account with no spot holdings).
 
 ```json
@@ -412,13 +412,13 @@ balance set (`[]` for an account with no spot holdings).
   (token symbol), `total` (whole-token decimal string), `hold` (amount reserved
   by resting spot orders). Identical to the REST spot-balances read.
 
-Frequency: one frame per committed block while the account has a live subscriber.
+Frequency: change-driven — a frame is sent only when the spot balances actually changed since the last commit; an unchanged account emits nothing this commit.
 
 ### `web_data2`
 
 Per-account **composite** "everything for the frontend" snapshot — the perp
 clearinghouse summary, spot balances, open orders, vault equities, and the global
-exchange status for one account, all in one frame, pushed each commit. Requires
+exchange status for one account, all in one frame, pushed when it changes. Requires
 `user` (the 0x address; `address` is also accepted) — NOT a `coin`. The body is
 the byte-identical composite the REST [`web_data2`](../rest/info.md#web_data2)
 read returns (it composes the same sub-readers), so a WS push never drifts from
@@ -496,8 +496,7 @@ sub-reader, so the shapes never drift from the standalone reads):
   replay_complete}`. This block is identical for every subscriber on a given
   commit.
 
-Frequency: one frame per committed block while the account has a live subscriber.
-On each commit the current composite is re-emitted for every subscribed account.
+Frequency: change-driven — a frame is sent only when the composite actually changed since the last commit; a commit that leaves this account's composite untouched emits nothing.
 
 :::warning
 `web_data2` is per-account data but currently has **no authentication** — any
@@ -529,7 +528,7 @@ The following channels appeared in earlier drafts but are **not implemented** on
 
 Also not implemented today:
 
-- **Diff-based `l2_book`** (`is_snapshot` / `updates` frames) — current `l2_book` always sends full top-20 snapshots.
+- **Diff-based `l2_book`** (partial `updates` frames) — current `l2_book` always sends full top-20 bodies. The frame does carry an `isSnapshot` flag (`true` on the initial snapshot, `false` on change-driven pushes), but every body is a full snapshot — there are no partial-diff `updates` frames.
 - **`seq` / `resume` / resume tokens** — every (re)subscribe starts from a fresh snapshot.
 - **Auth-at-subscribe envelope** for private channels — use `post` with a signed action for authenticated operations.
 
@@ -537,9 +536,9 @@ Also not implemented today:
 
 ## Ordering & delivery
 
-- **Per subscription**, frames arrive in commit order (one frame per committed block that touches a watched market). There is no `seq`; ordering is implicit in arrival order on the single socket.
+- **Per subscription**, frames arrive in commit order (a frame is emitted only on the commits where the watched channel's state changed). There is no `seq`; ordering is implicit in arrival order on the single socket.
 - **Across subscriptions**, there is no ordering guarantee — interleave is arbitrary. Demux on `channel` + the `coin` inside `data`.
-- Delivery is **at-most-once per commit** and **not buffered for resume**: a subscription that lags more than 256 frames behind is dropped with a `lagged` error frame (see [Backpressure & lag](./index.md#backpressure--lag)). Re-subscribe to recover; you get a fresh snapshot.
+- Delivery is **at-most-once per change** and **not buffered for resume**: a subscription that lags more than 256 frames behind is dropped with a `lagged` error frame (see [Backpressure & lag](./index.md#backpressure--lag)). Re-subscribe to recover; you get a fresh snapshot.
 
 ## See also
 
