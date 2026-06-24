@@ -63,7 +63,7 @@
 
 ## الاستعلام
 
-تُبلَّغ `oracle_px` المُركَّبة على **مستوى USDC الكامل** (مثلًا `"67042.335"`) عبر استعلام [`market_info`](../api/rest/info.md#market_info) إلى جانب `mark_px`:
+تُبلَّغ `oracle_px` المُركَّبة على **مستوى USDC الكامل** (مثلًا `"67042.335"`) عبر استعلام [`market_info`](../api/rest/info/perpetuals.md#market_info) إلى جانب `mark_px`:
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \

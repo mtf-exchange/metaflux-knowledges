@@ -31,7 +31,7 @@ sequenceDiagram
     makers->>taker: quote
     makers-->>taker: WS rfqEvents { quotes:[…] }
     taker->>makers: POST /exchange RfqAccept (chooses one quote)
-    Note over taker,makers: settle at quote price; notify maker (filled); expire other quotes
+    Note over taker,makers: settle at quote price — notify maker (filled) — expire other quotes
     makers-->>taker: WS userEvents { kind: "fill" }
 ```
 
@@ -192,13 +192,13 @@ sequenceDiagram
     participant makerB as "maker B"
     participant makerC as "maker C"
     Note over taker: T = 0 — taker sends RfqRequest, ttl=5000ms
-    Note over taker,makerC: T = 0.1s — commit; rfq_id broadcast to makers
+    Note over taker,makerC: T = 0.1s — commit — rfq_id broadcast to makers
     makerA->>taker: T = 0.3s — quotes 10049
     makerB->>taker: T = 0.5s — quotes 10048 (best)
     makerC->>taker: T = 0.7s — quotes 10050
     Note over taker: T = 1.0s — taker sees the three quotes, picks B
-    taker->>makerB: T = 1.1s — commit RfqAccept; settle 10000000000 @ 10048
-    Note over taker,makerC: taker fills long 100 @ 10048; maker B fills short 100 @ 10048; quotes from A, C expire; public trade tape: "100 BTC @ 10048 rfq"
+    taker->>makerB: T = 1.1s — commit RfqAccept — settle 10000000000 @ 10048
+    Note over taker,makerC: taker fills long 100 @ 10048 — maker B fills short 100 @ 10048 — quotes from A, C expire — public trade tape: "100 BTC @ 10048 rfq"
 ```
 
 ## Voir aussi

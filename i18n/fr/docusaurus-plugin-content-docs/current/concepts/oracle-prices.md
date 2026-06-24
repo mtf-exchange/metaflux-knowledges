@@ -63,7 +63,7 @@ Le `oracle_px` composé est publié **une fois par bloc**, dérivé de l'horodat
 
 ## Interrogation
 
-Le `oracle_px` composé est renvoyé dans le **plan USDC entier** (ex. `"67042.335"`) par la lecture [`market_info`](../api/rest/info.md#market_info), aux côtés de `mark_px` :
+Le `oracle_px` composé est renvoyé dans le **plan USDC entier** (ex. `"67042.335"`) par la lecture [`market_info`](../api/rest/info/perpetuals.md#market_info), aux côtés de `mark_px` :
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \

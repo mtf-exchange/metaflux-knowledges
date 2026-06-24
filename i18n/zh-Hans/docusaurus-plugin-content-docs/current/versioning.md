@@ -53,7 +53,7 @@ MAJOR 变更的发布流程如下：
 
 ```mermaid
 flowchart TD
-    D90["day -90: announcement; new shape available on testnet"]
+    D90["day -90: announcement — new shape available on testnet"]
     D60["day -60: new shape available on mainnet alongside old"]
     D30["day -30: old shape begins emitting deprecation warnings in responses"]
     D0["day 0: new shape becomes the only accepted shape"]

@@ -69,7 +69,7 @@ curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
 `"queued"` est littéral : l'attribution correspond à deux actions système injectées par le validateur
 (`SystemUserModify{AdjustCrossAccountValue}` pour USDC + `SystemSpotSend` pour MTF)
 prépendées au prochain bloc proposé. Interrogez [`account_state`](./info.md#account_state)
-(ou [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state)) ~1 bloc
+(ou [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)) ~1 bloc
 plus tard pour consulter le solde :
 
 ```json

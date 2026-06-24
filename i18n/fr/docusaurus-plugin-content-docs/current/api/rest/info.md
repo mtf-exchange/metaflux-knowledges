@@ -1,12 +1,20 @@
-# `POST /info` — chemin de lecture (natif MTF)
+---
+description: "Le point de terminaison de lecture POST /info — types de requêtes, enveloppe et conventions. Les requêtes sur les marchés perpétuels et sur le comptant/marge disposent de leurs propres pages."
+---
+
+# `POST /info` — point de terminaison de lecture et de requête
 
 :::info
-**Statut.** Forme **stable**. De nouveaux types de requêtes sont ajoutés au fil du temps ; l'enveloppe est figée.
+**Statut.** Forme **stable**. Des types de requêtes sont ajoutés progressivement ; l'enveloppe est figée.
 :::
 
-## En résumé
+## En bref
 
-Un seul point d'entrée, multi-type. Le dispatch s'effectue sur le champ `type` du corps de la requête. Lecture seule — ne modifie jamais l'état, ne nécessite aucune signature.
+Un seul point de terminaison, multi-type. Le routage s'effectue sur le champ `type` du corps de la requête. Lecture seule — ne modifie jamais l'état, ne nécessite jamais de signature.
+
+:::tip
+**Séparation par produit.** Les requêtes de lecture sur les marchés perpétuels se trouvent sur [requêtes perpétuelles](./info/perpetuals.md) ; les requêtes de lecture sur le comptant, le comptant sur marge et Earn se trouvent sur [requêtes comptant & marge](./info/spot.md). Cette page couvre l'enveloppe, les conventions, les lectures compte/gouvernance/coffre/validateur, ainsi que le tableau des alias hl-compat.
+:::
 
 ## URL
 
@@ -16,11 +24,11 @@ POST  https://<net>-gateway.mtf.exchange/info
 
 | Chemin | Format wire |
 |------|-----------|
-| `POST /info` (gateway par défaut) | Natif MTF (ce document) |
-| `POST /hl/info` (gateway, sous `/hl`) | **Compatible HL** — voir [hl-compat.md](./hl-compat.md) |
+| `POST /info` (gateway par défaut) | MTF natif (ce document) |
+| `POST /hl/info` (gateway, sous `/hl`) | **HL-compat** — voir [hl-compat.md](./hl-compat.md) |
 
-Le format natif MTF est le chemin par défaut du gateway ; le format compatible HL est accessible sous `/hl/*`.
-Si vous opérez le nœud vous-même, le même `/info` natif est exposé directement à
+Le format MTF natif est le chemin par défaut du gateway ; HL-compat est exposé sous l'espace de nommage `/hl/*`.
+Si vous exploitez le nœud vous-même, le même `/info` natif est servi directement à l'adresse
 `http://localhost:8080`.
 
 ## Enveloppe
@@ -38,13 +46,13 @@ Réponse :
 ```
 
 En cas de `type` inconnu : `400 Bad Request` avec `{"error":"unknown info type: <X>"}`.
-En cas de ressource inconnue (ex. identifiant de coffre inconnu) : `404 Not Found` avec `{"error":"<resource> not found"}`.
+En cas de ressource inconnue (par ex. identifiant de coffre inconnu) : `404 Not Found` avec `{"error":"<resource> not found"}`.
 
 ## Types de requêtes
 
 ### `node_info`
 
-Identité statique du nœud + version du protocole. Aucun paramètre.
+Identité statique du nœud et version du protocole. Aucun paramètre.
 
 ```json
 { "type": "node_info" }
@@ -70,16 +78,16 @@ Réponse :
 
 | Champ | Type | Description |
 |-------|------|-------------|
-| `network` | `"devnet" \| "testnet" \| "mainnet"` | Variante du réseau, déduite du `chain_id` (`31337`=devnet, `114514`=testnet, `8964`=mainnet) |
-| `chain_id` | uint64 | Identifiant de chaîne EIP-712 — valeur identique à celle que le domaine de signature `/exchange` doit utiliser |
+| `network` | `"devnet" \| "testnet" \| "mainnet"` | Variante réseau, déduite du `chain_id` (`31337`=devnet, `114514`=testnet, `8964`=mainnet) |
+| `chain_id` | uint64 | Identifiant de chaîne EIP-712 — la MÊME valeur que doit utiliser le domaine de signature `/exchange` |
 | `protocol_version` | chaîne semver | Version du protocole wire |
-| `validator_index` | uint32 \| null | Index de ce nœud dans l'ensemble de validateurs actifs ; **MARQUÉ :** `null` tant que le runtime n'a pas appelé `set_validator_index` |
-| `build_commit` | chaîne hex | Identifiant de build publié par l'opérateur ; **MARQUÉ :** `"unknown"` tant qu'il n'est pas publié |
-| `version` | chaîne semver | Version logicielle du nœud, inscrite à la compilation. Une version partage un même `version` entre ses binaires — `build_commit` est le discriminant par build |
-| `freeze_halt_supported` | bool | Toujours `true` pour ce binaire — indicateur de capacité : le nœud respecte [`exchange_status.scheduled_freeze_height`](#exchange_status) et s'arrête proprement avec le code de sortie `77` dès que la hauteur de gel est validée, permettant au superviseur de déployer la version suivante |
-| `uptime_seconds` | uint64 | Durée de fonctionnement du processus ; **MARQUÉ :** `0` tant que le runtime n'a pas appelé `set_uptime_seconds` |
+| `validator_index` | uint32 \| null | Indice de ce nœud dans l'ensemble de validateurs actifs ; **INDICATEUR :** `null` tant que le runtime n'a pas appelé `set_validator_index` |
+| `build_commit` | chaîne hex | Identifiant de build publié par l'opérateur ; **INDICATEUR :** `"unknown"` jusqu'à publication |
+| `version` | chaîne semver | Version de publication du logiciel nœud, intégrée à la compilation. Une release partage un même `version` entre ses binaires — `build_commit` est le discriminant par build |
+| `freeze_halt_supported` | bool | Toujours `true` pour ce binaire — indicateur de capacité : le nœud respecte [`exchange_status.scheduled_freeze_height`](#exchange_status), s'arrêtant proprement avec le code de sortie `77` dès que la hauteur de gel est validée, afin qu'un superviseur de nœud puisse charger la release suivante |
+| `uptime_seconds` | uint64 | Temps de fonctionnement du processus ; **INDICATEUR :** `0` tant que le runtime n'a pas appelé `set_uptime_seconds` |
 
-Ces champs sont **propres au nœud** (identité / runtime), et non à l'état du consensus ; ils peuvent donc légitimement différer d'un nœud à l'autre.
+Ces champs sont **par nœud** (identité du nœud / runtime), PAS de l'état de consensus, et peuvent donc légitimement différer d'un nœud à l'autre.
 
 ### `account_state`
 
@@ -89,14 +97,14 @@ Instantané par compte.
 { "type": "account_state", "address": "0x<addr>" }
 ```
 
-| Arg | Type | Requis |
+| Argument | Type | Requis |
 |-----|------|----------|
 | `address` | adresse hex | oui |
 
-Une **adresse inconnue** (jamais vue on-chain) renvoie un **200** avec un enregistrement entièrement à zéro
-(`account_value:"0"`, `positions` / `balances.spot` vides), et non un `404`.
+Une **adresse inconnue** (jamais vue on-chain) retourne **200** avec un enregistrement entièrement nul
+(`account_value:"0"`, `positions` / `balances.spot` vides), et NON un `404`.
 
-Réponse (compte alimenté par un faucet, sans position) :
+Réponse (un compte alimenté par le faucet, sans positions) :
 
 ```json
 {
@@ -120,14 +128,15 @@ Réponse (compte alimenté par un faucet, sans position) :
 }
 ```
 
-Chaque jeton dans `balances.spot` est un objet `{total, hold}` (parité HL) : `hold` est
-le montant bloqué par un ordre spot en attente (séquestre), `total` est le solde complet ;
-le montant disponible est `total − hold`. Un jeton entièrement séquestré
-apparaît quand même. Pour une lecture **légère** des scalaires de marge uniquement (sans parcours de `positions`, sans
-scan des soldes — l'appel approprié pour une vérification périodique de la santé de liquidation), utilisez
+Chaque token de `balances.spot` est un objet `{total, hold}` (parité HL) : `hold` est
+le montant bloqué en garantie derrière un ordre spot en attente (séquestre), `total` est le solde
+complet ; le montant disponible est `total − hold`. Un token entièrement bloqué
+apparaît quand même. Pour une
+lecture **légère** portant uniquement sur les scalaires de marge (sans parcours de `positions`, sans
+analyse des soldes — l'appel approprié pour un sondage de santé de liquidation), utilisez
 [`margin_summary`](#margin_summary).
 
-Un compte positionné ajoute des entrées sous `positions` :
+Un compte avec des positions ajoute des entrées sous `positions` :
 
 ```json
 {
@@ -147,34 +156,34 @@ Un compte positionné ajoute des entrées sous `positions` :
 
 | Champ | Type | Description |
 |-------|------|-------------|
-| `account_value` | Chaîne décimale | Capitaux propres incluant le PnL réglé, **plan USDC entier** (`"3000"` = 3000 USDC, NOT en unités de base) |
-| `free_collateral` | Chaîne décimale | Capitaux propres moins la marge initiale retenue par les positions ouvertes |
-| `maint_margin` | Chaîne décimale | Σ de la marge de maintenance utilisée par actif |
-| `init_margin` | Chaîne décimale | Exigence de marge initiale retenue |
+| `account_value` | Chaîne décimale | Capitaux propres incl. PnL réalisé, **plan USDC entier** (`"3000"` = 3000 USDC, PAS en unités de base) |
+| `free_collateral` | Chaîne décimale | Capitaux propres moins la marge initiale immobilisée par les positions ouvertes |
+| `maint_margin` | Chaîne décimale | Σ marge de maintenance utilisée par actif |
+| `init_margin` | Chaîne décimale | Exigence de marge initiale immobilisée |
 | `health` | Chaîne décimale | `account_value − maint_margin` (signé ; peut être négatif) |
-| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (tranche BOLE du ratio `account_value / maint_margin` ; `"Safe"` en l'absence de marge de maintenance) — voir [liquidation par paliers](../../concepts/tiered-liquidation.md) |
+| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (bande BOLE de `account_value / maint_margin` ; `"Safe"` en l'absence de marge de maintenance) — voir [liquidation par paliers](../../concepts/tiered-liquidation.md) |
 | `mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` (déduit des positions ouvertes du compte) |
 | `pm_enabled` | bool | État d'activation de la marge de portefeuille |
 | `positions[*].asset` | uint32 | Identifiant d'actif |
-| `positions[*].size` | chaîne i128 | Taille de position signée en **lots bruts** — `size / 10^sz_decimals` = unités entières (`sz_decimals` est la précision de taille du marché, ex. 5 pour BTC). Il s'agit du plan TAILLE, orthogonal au plan prix 1e8. |
-| `positions[*].entry` | Chaîne décimale | Prix d'entrée par unité entière = `\|entry_notional\| / \|real size\|`, **plan USDC entier** |
-| `positions[*].upnl` | Chaîne décimale | PnL mark-to-market = `real size × mark − signed entry_notional`, **plan USDC entier** (signé) |
+| `positions[*].size` | chaîne i128 | Taille de position signée en **lots bruts** — `size / 10^sz_decimals` = unités entières (`sz_decimals` est la précision de taille du marché, ex. 5 pour BTC). Il s'agit du plan SIZE, orthogonal au plan de prix 1e8. |
+| `positions[*].entry` | Chaîne décimale | Prix d'entrée par unité entière = `\|entry_notional\| / \|taille réelle\|`, **plan USDC entier** |
+| `positions[*].upnl` | Chaîne décimale | PnL mark-to-market = `taille réelle × mark − entry_notional signé`, **plan USDC entier** (signé) |
 | `positions[*].isolated` | bool | `true` sauf si la position est en marge croisée |
-| `positions[*].lev` | uint8 | Levier maximum de la position |
-| `positions[*].liq` | Chaîne décimale | Prix (USDC entier) auquel cette position seule amènerait le compte à la maintenance — approximation croisée à position unique ; `"0"` lorsque la taille / le levier est nul (pas de prix de liquidation fini) |
-| `positions[*].roe` | Chaîne décimale | `upnl / initial_margin` en fraction décimale (`initial_margin = \|entry_notional\| / leverage`) ; `"0"` à levier / notionnel nul |
-| `positions[*].funding` | Chaîne décimale | Financement accumulé non réglé pour la jambe, **USDC entier** (signé) ; `real_size × (cumulative_funding − funding_entry)` — même forme que le règlement du financement |
-| `positions[*].margin` | Chaîne décimale | Marge de maintenance apportée par la jambe, **USDC entier** : `\|entry_notional\| × maint_margin_ratio` |
-| `positions[*].notional` | Chaîne décimale | Notionnel de la position au mark, **USDC entier** (signé) : `real_size × mark_px` |
-| `positions[*].side` | enum \| absent | **[Mode couverture](../../concepts/hedge-mode.md) uniquement** — `"long"` / `"short"`, la jambe que décrit cet objet. **Absent sur un compte unidirectionnel** (une seule position *nette* dont `size` peut être négative). Un compte en couverture détenant les deux jambes sur un actif renvoie **deux** objets, un par côté. |
-| `balances.usdc` | Chaîne décimale | **Miroir de `account_value`** (le collatéral USDC croisé), et NON un solde USDC spot distinct |
-| `balances.spot` | objet | Soldes de jetons spot hors USDC, indexés par **nom de jeton** (ex. `"MTF"`) ; chaque valeur est un objet `{total, hold}` (`hold` = séquestre bloqué par des ordres spot en attente ; disponible = `total − hold`) ; vide si inexistant |
+| `positions[*].lev` | uint8 | Effet de levier maximum de la position |
+| `positions[*].liq` | Chaîne décimale | Prix (USDC entier) auquel cette position seule amènerait le compte à la maintenance — approximation croisée mono-position ; `"0"` quand la taille / le levier est nul (aucun prix de liquidation fini) |
+| `positions[*].roe` | Chaîne décimale | `upnl / marge_initiale` en fraction décimale (`marge_initiale = \|entry_notional\| / levier`) ; `"0"` à levier / notionnel nul |
+| `positions[*].funding` | Chaîne décimale | Financement couru non réglé pour la jambe, **USDC entier** (signé) ; `taille_réelle × (cumulative_funding − funding_entry)` — la même formule que le règlement de financement applique |
+| `positions[*].margin` | Chaîne décimale | Marge de maintenance que la jambe contribue, **USDC entier** : `\|entry_notional\| × taux_marge_maintenance` |
+| `positions[*].notional` | Chaîne décimale | Notionnel de la position au mark, **USDC entier** (signé) : `taille_réelle × mark_px` |
+| `positions[*].side` | enum \| absent | **[Mode couverture](../../concepts/hedge-mode.md) uniquement** — `"long"` / `"short"`, la jambe que cet objet décrit. **Absent sur un compte unidirectionnel** (une seule position *nette* dont `size` peut être négative). Un compte en couverture détenant les deux jambes sur un actif retourne **deux** objets, un par côté. |
+| `balances.usdc` | Chaîne décimale | **Reflète `account_value`** (la garantie USDC croisée), PAS un solde USDC comptant distinct |
+| `balances.spot` | objet | Soldes de tokens comptant non-USDC, indexés par **nom de token** (ex. `"MTF"`) ; chaque valeur est un objet `{total, hold}` (`hold` = séquestre bloqué derrière des ordres comptant en attente ; disponible = `total − hold`) ; vide si aucun |
 
 ### `margin_summary`
 
 Les **scalaires de marge uniquement** — `account_state` sans le parcours de `positions[]` ni
-le scan des soldes spot. L'appel approprié pour une vérification fréquente de la santé de liquidation (un
-bot de surveillance du risque, un rechargement automatique de marge) lorsque le détail des positions et des soldes
+l'analyse des soldes comptant. L'appel approprié pour un sondage fréquent de santé de liquidation (un
+bot de surveillance du risque, un rechargement automatique de marge) quand le détail des positions/soldes
 n'est pas nécessaire. Requis : `address` (hex 0x).
 
 ```json
@@ -183,150 +192,9 @@ n'est pas nécessaire. Requis : `address` (hex 0x).
 
 Réponse (`data`) : `address`, `account_value`, `free_collateral`,
 `maint_margin`, `init_margin`, `health`, `tier`, `mode`, `pm_enabled` —
-sémantique de champ identique aux champs homonymes de
-[`account_state`](#account_state) (calculés par le même utilitaire partagé, donc les deux
+sémantique de champ identique aux champs de même nom sur
+[`account_state`](#account_state) (calculés par le même helper partagé, de sorte que les deux
 ne divergent jamais).
-
-### `market_info`
-
-Métadonnées par marché.
-
-```json
-{ "type": "market_info", "asset_id": 0 }
-```
-
-Ou par nom :
-
-```json
-{ "type": "market_info", "coin": "BTC" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "market_info",
-  "data": {
-    "asset_id":        0,
-    "name":            "BTC",
-    "kind":            "perp",
-    "sz_decimals":     5,
-    "mark_px":         "67079.265",
-    "oracle_px":       "67073.35",
-    "mid_px":          "67079.27",
-    "premium":         "0.0015",
-    "tick_size":       "1000000",
-    "step_size":       "1",
-    "min_order":       "1",
-    "max_leverage":    50,
-    "maint_margin_ratio": "300",
-    "init_margin_ratio":  "200",
-    "funding": {
-      "rate_per_hr":  "0",
-      "cap_per_hr":   "400",
-      "interval_ms":     3600000,
-      "next_payment_ts": 0
-    },
-    "mark_source": "MedianOfOraclesAndMid",
-    "fba_enabled": false,
-    "open_interest": "0"
-  }
-}
-```
-
-:::info
-**Plan de reporting des prix.** Dans cette lecture, `mark_px` et `oracle_px` sont dans le
-**plan décimal USDC entier** (dollars lisibles — `"67079.265"` / `"67073.35"`), la même
-unité que le mark des positions de compte. `mark_px` est le mark sur carnet ramené depuis
-la représentation interne en virgule fixe 1e8 du moteur, avec repli sur le prix oracle
-si le carnet n'a pas encore de mark ; `oracle_px` est le dernier prix d'index validé.
-L'un ou l'autre vaut `"0"` s'il n'est pas défini. Notez que **le plan de soumission des ordres/carnets reste en virgule fixe 1e8** — les niveaux de prix dans `l2_book` et les `limit_px` des ordres ne sont PAS en USDC entier ; MTF maintient ces deux plans d'échelle distincts, et seules les lectures orientées utilisateur (`market_info`,
-`markets`, positions) reportent les prix en USDC entier. La sémantique des champs pour le reste de
-l'enregistrement se trouve dans le tableau [`markets`](#markets) ci-dessous.
-:::
-
-:::info
-**Précision des prix vs `sz_decimals`.** `mark_px` et `oracle_px` sont **arrrondis au tick de prix
-du marché** (`tick_size`, tronqué vers zéro), de sorte qu'une lecture ne montre jamais de bruit sous le tick — avec un tick à `$0.01` (`tick_size: "1000000"` dans le plan 1e8),
-`66735.255` est reporté comme `"66735.25"`. Notez que `sz_decimals` est la précision de la **TAILLE**
-(granularité de la quantité des ordres — `5` ⇒ `0.00001` unités), il ne régit **pas** les décimales de prix ; c'est le tick de prix qui les régit. Les deux axes sont indépendants (même séparation qu'utilise HL).
-:::
-
-### `markets`
-
-Tous les marchés à contrat perpétuel MIP-3 enregistrés, en un seul appel. Aucun paramètre.
-
-```json
-{ "type": "markets" }
-```
-
-Le contenu `data` est un **tableau** du même enregistrement riche par marché que
-[`market_info`](#market_info) renvoie pour un actif unique. Les enregistrements sont ordonnés
-de façon déterministe par `asset_id` croissant (le nœud itère le
-`BTreeMap` `mip3_market_specs`). Un univers vide renvoie `"data": []`.
-
-Réponse :
-
-```json
-{
-  "type": "markets",
-  "data": [
-    {
-      "asset_id":        0,
-      "name":            "BTC",
-      "kind":            "perp",
-      "sz_decimals":     5,
-      "mark_px":         "67042.335",
-      "oracle_px":       "67042.335",
-      "mid_px":          "67042.33",
-      "premium":         "0.0015",
-      "tick_size":       "1000000",
-      "step_size":       "1",
-      "min_order":       "1",
-      "max_leverage":    50,
-      "maint_margin_ratio": "300",
-      "init_margin_ratio":  "200",
-      "funding": {
-        "rate_per_hr":  "0",
-        "cap_per_hr":   "400",
-        "interval_ms":     3600000,
-        "next_payment_ts": 0
-      },
-      "mark_source": "MedianOfOraclesAndMid",
-      "fba_enabled": false,
-      "open_interest": "0"
-    }
-  ]
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `asset_id` | uint32 | Identifiant d'actif canonique (clé de tri) |
-| `name` | string | Symbole du marché, ex. `"BTC"` |
-| `kind` | `"perp"` | Type de marché (minuscules) |
-| `sz_decimals` | uint8 | Décimales d'affichage de la taille (issues du registre de jetons spot sous-jacent ; `0` si aucune spécification de jeton) |
-| `mark_px` | Chaîne décimale | Mark sur carnet, **plan USDC entier** (mark du carnet ramené depuis 1e8, repli oracle ; `"0"` si non défini) |
-| `oracle_px` | Chaîne décimale | Prix d'index, **plan USDC entier** (`"0"` si non défini) |
-| `mid_px` | Chaîne décimale \| null | Milieu réel du carnet d'ordres `(meilleur bid + meilleur ask) / 2`, **plan USDC entier** (arrondi au tick) ; `null` si le carnet est unilatéral / vide |
-| `premium` | Chaîne décimale \| null | Dernier échantillon de prime de financement validé (signé) ; `null` si aucun échantillon n'existe |
-| `tick_size` | chaîne i128 | Incrément de prix minimum, **virgule fixe 1e8** (plan de soumission des ordres/carnets) |
-| `step_size` | chaîne u128 | Incrément de taille minimum (taille de lot), en virgule fixe |
-| `min_order` | chaîne u128 | Taille minimale d'un ordre |
-| `max_leverage` | uint8 | Levier maximum |
-| `maint_margin_ratio` | chaîne bps | Ratio de marge de maintenance, en bps décimaux |
-| `init_margin_ratio` | chaîne bps | Ratio de marge initiale (`1 / max_leverage`), en bps décimaux |
-| `funding.rate_per_hr` | chaîne bps | Dernier échantillon de prime de financement, en bps décimaux |
-| `funding.cap_per_hr` | chaîne bps | Plafond du taux de financement par heure, en bps décimaux |
-| `funding.interval_ms` | uint64 | Cadence du financement (1h = `3600000`) |
-| `funding.next_payment_ts` | uint64 | Horodatage du prochain paiement de financement (`0` tant qu'aucun échantillon n'existe) |
-| `mark_source` | string | Descripteur du prix mark (`"MedianOfOraclesAndMid"`) |
-| `fba_enabled` | bool | Enchère par lot fréquente activée pour ce marché |
-| `open_interest` | chaîne u128 | Intérêt ouvert actuel, en virgule fixe |
-
-Chaque élément est identique octet pour octet à l'objet `data` de la réponse `market_info` pour l'actif unique correspondant — les deux sont construits à partir du même constructeur d'enregistrement par marché, de sorte que les formes unitaire et groupée ne divergent jamais. Voir [`market_info`](#market_info) pour
-la sémantique au niveau des champs et les notes sur les proxies MARQUÉS (`mark_source`,
-`next_payment_ts`).
 
 ### `vault_state`
 
@@ -408,11 +276,11 @@ Réponse :
 }
 ```
 
-Les taux de frais sont exprimés en **points de base** décimaux sous forme de chaînes (`"2.0"` = 2 pbs = 0,02 %). `burn_ratio` est une fraction décimale (`"0.30"` = 30 % des frais brûlés). Voir [frais](../../concepts/fees.md).
+Les taux de frais sont exprimés en **points de base** décimaux sous forme de chaînes (`"2.0"` = 2 pdb = 0,02 %). `burn_ratio` est une fraction décimale (`"0.30"` = 30 % des frais brûlés). Voir [frais](../../concepts/fees.md).
 
 ### `open_orders`
 
-Ordres en attente associés à un compte, sur l'ensemble des carnets de perps.
+Ordres en attente au carnet, portée par compte, sur tous les carnets perpétuels.
 
 ```json
 { "type": "open_orders", "account_id": 42 }
@@ -420,10 +288,10 @@ Ordres en attente associés à un compte, sur l'ensemble des carnets de perps.
 
 | Argument | Type | Requis |
 |-----|------|----------|
-| `account_id` | uint64 | l'un des deux : `account_id` / `address` |
-| `address` | adresse hex | l'un des deux : `account_id` / `address` |
+| `account_id` | uint64 | l'un de `account_id` / `address` |
+| `address` | adresse hex | l'un de `account_id` / `address` |
 
-`account_id` (u64) ou `address` (hex préfixé 0x) identifient le compte. Lorsque la
+`account_id` (u64) ou `address` (hex 0x) identifie le compte. Lorsque la
 requête fournit `account_id`, celui-ci est renvoyé dans `data.account_id`.
 
 Réponse :
@@ -451,183 +319,20 @@ Réponse :
 
 | Champ | Type | Description |
 |-------|------|-------------|
-| `address` | adresse hex | Adresse du compte résolue |
-| `account_id` | uint64 | Renvoyé uniquement si la requête utilisait `account_id` |
-| `orders[*].oid` | uint64 | Identifiant d'ordre côté serveur |
-| `orders[*].market_id` | uint32 | Identifiant d'actif / de marché sur lequel l'ordre repose |
+| `address` | adresse hex | Adresse de compte résolue |
+| `account_id` | uint64 | Renvoyé uniquement lorsque la requête utilisait `account_id` |
+| `orders[*].oid` | uint64 | Identifiant d'ordre serveur |
+| `orders[*].market_id` | uint32 | Identifiant d'actif / marché sur lequel l'ordre est en attente |
 | `orders[*].side` | `"bid"` / `"ask"` | Côté de l'ordre |
-| `orders[*].px` | chaîne i128 | Prix en attente, chaîne décimale à virgule fixe |
-| `orders[*].size` | chaîne u128 | Taille résiduelle, chaîne décimale à virgule fixe |
-| `orders[*].cloid` | chaîne hex \| null | Identifiant d'ordre client utilisé lors du placement (`0x` + 32 caractères hex) ; `null` si aucun n'a été fourni |
-| `orders[*].inserted_at_ms` | uint64 | Horodatage de placement / d'insertion (ms consensus) |
-
-### `l2_book`
-
-Niveaux bid/ask agrégés pour un marché donné.
-
-```json
-{ "type": "l2_book", "market_id": 0 }
-```
-
-| Argument | Type | Requis |
-|-----|------|----------|
-| `market_id` | uint32 | oui |
-
-Réponse :
-
-```json
-{
-  "type": "l2_book",
-  "data": {
-    "market_id": 0,
-    "bids": [ { "px": "99000", "size": "700", "n_orders": 1 } ],
-    "asks": [ { "px": "101000", "size": "750", "n_orders": 2 } ]
-  }
-}
-```
-
-Les bids sont triés du meilleur au moins bon (prix décroissant), les asks en ordre croissant. Chaque niveau agrège la `size` cumulée et le nombre d'ordres en attente `n_orders`. Un marché inconnu ou vide renvoie des tableaux `bids` / `asks` vides.
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `market_id` | uint32 | Identifiant de marché renvoyé |
-| `bids[*].px` / `asks[*].px` | chaîne i128 | Prix du niveau, chaîne décimale à virgule fixe |
-| `bids[*].size` / `asks[*].size` | chaîne u128 | Taille cumulée au niveau |
-| `bids[*].n_orders` / `asks[*].n_orders` | uint64 | Ordres en attente au niveau |
-
-### `recent_trades`
-
-Historique public des transactions pour un marché, servi directement depuis l'état engagé du nœud
-(un anneau de transactions par marché borné, intégré dans l'AppHash — sans indexeur externe).
-
-```json
-{ "type": "recent_trades", "market_id": 0 }
-```
-
-| Argument | Type | Requis | Description |
-|-----|------|----------|-------------|
-| `market_id` | uint32 | oui | Identifiant d'actif / de marché |
-| `limit` | uint32 | non | Limite le nombre d'enregistrements **les plus récents** retournés ; absent / `0` ⇒ anneau complet |
-
-Réponse :
-
-```json
-{
-  "type": "recent_trades",
-  "data": {
-    "market_id":      0,
-    "last_trade_ms":  1700000000555,
-    "trades": [
-      {
-        "coin":  0,
-        "side":  "B",
-        "px":    "67042.50",
-        "sz":    "0.125",
-        "time":  1700000000555,
-        "tid":   90123,
-        "block": 562,
-        "hash":  "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c"
-      }
-    ]
-  }
-}
-```
-
-Les enregistrements sont triés du plus ancien au plus récent. L'anneau étant borné, il s'agit d'une
-fenêtre récente, et non de l'historique complet. Un marché inconnu ou sans transactions renvoie
-`"trades": []` et `last_trade_ms: 0`.
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `market_id` | uint32 | Identifiant de marché renvoyé |
-| `last_trade_ms` | uint64 | Horodatage de la dernière transaction (`0` si aucune) |
-| `trades[*].coin` | uint32 | Identifiant d'actif / de marché sur lequel la transaction a été exécutée |
-| `trades[*].side` | `"B"` / `"A"` | Jeton de côté de l'aggresseur — `"B"` = achat, `"A"` = vente |
-| `trades[*].px` | Chaîne décimale | Prix d'exécution, **USDC décimal** (lisible par l'humain) |
-| `trades[*].sz` | Chaîne décimale | Taille exécutée, **unités de base** (entières) |
-| `trades[*].time` | uint64 | Horodatage de la transaction (ms consensus) |
-| `trades[*].tid` | uint64 | Identifiant de transaction déterministe (partagé par les deux jambes du print) |
-| `trades[*].block` | uint64 | Hauteur de bloc engagé dans lequel la transaction a été réglée (localisateur on-chain) |
-| `trades[*].hash` | chaîne hex | Hash de la transaction de l'ordre d'origine, hex préfixé `0x` — permet de retracer un print on-chain |
-
-### `candle`
-
-Bougies OHLCV historiques pour `(coin, interval)` sur une fenêtre temporelle. Équivalent REST
-du canal WS live [`candles`](../ws/subscriptions.md#candles) — le WS pousse la bougie en cours
-de formation au fil des transactions, cette lecture renvoie l'historique des bougies clôturées.
-
-```json
-{ "type": "candle", "coin": "BTC", "interval": "1m" }
-```
-
-| Argument | Type | Requis | Description |
-|-----|------|----------|-------------|
-| `coin` | string | oui | Symbole de marché, ex. `"BTC"` |
-| `interval` | string | oui | Jeton de bucket — l'un des suivants : `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
-| `start_time` | uint64 | non | Début de la fenêtre (ms) ; filtre sur l'ouverture de la bougie. Défaut `0` |
-| `end_time` | uint64 | non | Fin de la fenêtre (ms) ; filtre sur l'ouverture de la bougie. Défaut non borné |
-
-Les arguments peuvent être passés à plat (ci-dessus) ou imbriqués sous un objet `req` ; `start_time` /
-`end_time` acceptent aussi l'orthographe camelCase `startTime` / `endTime`. `coin` ou `interval` manquant → `400 {"error":"missing field <name>"}`.
-
-Réponse :
-
-```json
-{
-  "type": "candle",
-  "data": [
-    {
-      "t": 1700000040000,
-      "T": 1700000099999,
-      "s": "BTC",
-      "i": "1m",
-      "o": "67000.00",
-      "c": "67042.50",
-      "h": "67080.00",
-      "l": "66990.00",
-      "v": "12.5",
-      "q": "837843.75",
-      "n": 37
-    }
-  ]
-}
-```
-
-Les bougies sont triées de la plus ancienne à la plus récente par `t` (heure d'ouverture) ; le dernier élément est la bougie en cours de formation. Un tableau vide est la réponse honnête pour un jeton `interval` non supporté, un marché sans transactions indexées, ou un déploiement sans indexeur configuré.
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `t` | uint64 | Horodatage d'**ouverture** de la bougie (ms, aligné sur le bucket) |
-| `T` | uint64 | Horodatage de **clôture** de la bougie (ms) — `t + interval − 1` |
-| `s` | string | Symbole de coin / de marché |
-| `i` | string | Jeton de bucket d'intervalle |
-| `o` / `c` / `h` / `l` | Chaîne décimale | Prix d'**o**uverture / de **c**lôture / **h**aut / **b**as, **USDC décimal** (en dollars, ex. `"67042.50"`) |
-| `v` | Chaîne décimale | **Volume en actif de base** — Σ taille échangée dans la bougie (taille en coin, PAS en notionnel) |
-| `q` | Chaîne décimale | **Volume en quote (USD)** — `Σ prix × taille` sur les exécutions de la bougie |
-| `n` | uint64 | Nombre de transactions (exécutions) dans la bougie |
-
-:::info
-**La série est sans lacunes.** Un intervalle **sans transactions** émet quand même une bougie plate
-reprenant la clôture de la bougie précédente : `o = h = l = c = clôture précédente`, et
-`v = q = 0`, `n = 0`. Les consommateurs obtiennent une série continue de bougies par intervalle, sans
-trous à interpoler. **Aucune bougie n'est émise avant la première transaction du marché** — la
-série commence au bucket de la première exécution ; un tableau vide signifie que le marché
-n'a jamais été échangé (ou qu'aucun historique n'est configuré), et non que les premiers buckets ont été supprimés.
-:::
-
-:::info
-**Ce type est servi par la passerelle, pas par le nœud.** Les bougies sont des données d'affichage
-dérivées du flux de transactions public — elles ne constituent **pas** un état de chaîne engagé,
-n'entrent jamais dans l'app-hash et ne bénéficient d'aucune garantie de consensus. La
-passerelle répond aux requêtes `candle` depuis son propre store en mémoire ; un nœud nu interrogé
-directement renvoie `unknown info type: candle`. Réponse honnêtement vide (`"data": []`) si
-la passerelle ne possède pas encore d'historique de transactions pour ce marché.
-:::
+| `orders[*].px` | chaîne i128 | Prix en attente, chaîne décimale en virgule fixe |
+| `orders[*].size` | chaîne u128 | Taille restante, chaîne décimale en virgule fixe |
+| `orders[*].cloid` | chaîne hex \| null | Identifiant d'ordre client avec lequel l'ordre a été passé (`0x` + 32 caractères hex) ; `null` si l'ordre n'en avait pas |
+| `orders[*].inserted_at_ms` | uint64 | Horodatage de placement / insertion (ms consensus) |
 
 ### `user_fills`
 
-Historique des exécutions d'un compte, servi directement depuis l'état engagé du nœud (un
-anneau d'exécutions par compte borné, intégré dans l'AppHash — sans indexeur externe).
+Historique des exécutions par compte, servi directement depuis l'état on-node validé (un
+anneau d'exécutions borné par compte, intégré dans l'AppHash — pas d'indexeur externe).
 
 ```json
 { "type": "user_fills", "account_id": 42 }
@@ -635,11 +340,11 @@ anneau d'exécutions par compte borné, intégré dans l'AppHash — sans indexe
 
 | Argument | Type | Requis | Description |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | l'un des deux : `account_id` / `address` | Identifiant interne du compte |
-| `address` | adresse hex | l'un des deux : `account_id` / `address` | Adresse du compte |
-| `limit` | uint32 | non | Limite le nombre d'enregistrements **les plus récents** retournés ; absent / `0` ⇒ anneau complet |
+| `account_id` | uint64 | l'un de `account_id` / `address` | Identifiant de compte interne |
+| `address` | adresse hex | l'un de `account_id` / `address` | Adresse du compte |
+| `limit` | uint32 | non | Limite le nombre d'enregistrements **les plus récents** retournés ; absent / `0` ⇒ l'anneau complet |
 
-`account_id` (u64) ou `address` (hex préfixé 0x) identifient le compte. Lorsque la
+`account_id` (u64) ou `address` (hex 0x) identifie le compte. Lorsque la
 requête fournit `account_id`, celui-ci est renvoyé dans `data.account_id`.
 
 Réponse :
@@ -671,42 +376,40 @@ Réponse :
 }
 ```
 
-Les enregistrements sont triés du plus ancien au plus récent. L'anneau étant borné, il s'agit d'une
-fenêtre récente, et non de l'historique complet. Un compte sans exécutions renvoie
+Les enregistrements sont triés du plus ancien au plus récent (le plus récent en dernier). L'anneau est borné, il s'agit donc d'une fenêtre récente et non de l'historique complet. Un compte sans exécution retourne
 `"fills": []`.
 
 | Champ | Type | Description |
 |-------|------|-------------|
-| `address` | adresse hex | Adresse du compte résolue |
-| `account_id` | uint64 | Renvoyé uniquement si la requête utilisait `account_id` |
-| `fills[*].coin` | uint32 | Identifiant d'actif / de marché sur lequel l'exécution a eu lieu |
-| `fills[*].side` | `"B"` / `"A"` | Jeton de côté de cette jambe — `"B"` = achat/bid, `"A"` = vente/ask |
+| `address` | adresse hex | Adresse de compte résolue |
+| `account_id` | uint64 | Renvoyé uniquement lorsque la requête utilisait `account_id` |
+| `fills[*].coin` | uint32 | Identifiant d'actif / marché sur lequel l'exécution a eu lieu |
+| `fills[*].side` | `"B"` / `"A"` | Côté de cette jambe — `"B"` = achat/bid, `"A"` = vente/ask |
 | `fills[*].px` | Chaîne décimale | Prix d'exécution, **USDC décimal** (lisible par l'humain) |
-| `fills[*].sz` | Chaîne décimale | Taille exécutée, **unités de base** (entières) |
+| `fills[*].sz` | Chaîne décimale | Taille exécutée, **unités de base** (unité entière) |
 | `fills[*].time` | uint64 | Horodatage de l'exécution (ms consensus) |
 | `fills[*].oid` | uint64 | Identifiant d'ordre de cette partie |
-| `fills[*].tid` | uint64 | Identifiant de transaction déterministe (partagé par les deux jambes du print) |
+| `fills[*].tid` | uint64 | Identifiant de trade déterministe (partagé par les deux jambes de la transaction) |
 | `fills[*].fee` | Chaîne décimale | Frais payés par cette partie, **USDC décimal** |
 | `fills[*].closed_pnl` | Chaîne décimale | PnL réalisé sur la portion clôturée, **USDC décimal** (signé) |
-| `fills[*].dir` | string | Libellé de direction, ex. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
-| `fills[*].start_position` | Chaîne décimale | Taille signée de la jambe AVANT l'exécution, **unités de base** (entières, signée) |
-| `fills[*].block` | uint64 | Hauteur de bloc engagé dans lequel l'exécution a été réglée (localisateur on-chain) |
-| `fills[*].hash` | chaîne hex | Hash de la transaction de l'ordre d'origine, hex préfixé `0x` — permet de retracer l'exécution on-chain |
+| `fills[*].dir` | chaîne | Libellé de direction, ex. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
+| `fills[*].start_position` | Chaîne décimale | Taille de jambe signée AVANT l'exécution, **unités de base** (unité entière, signée) |
+| `fills[*].block` | uint64 | Hauteur de bloc validée dans laquelle l'exécution a été réglée (localisateur on-chain) |
+| `fills[*].hash` | chaîne hex | Hash de transaction de l'ordre d'origine, hex préfixé `0x` — permet de tracer l'exécution on-chain |
 
 ### `user_fills_by_time`
 
-Similaire à [`user_fills`](#user_fills), mais filtré sur une fenêtre temporelle basée sur le
-`time` consensus de chaque enregistrement. Même structure d'enregistrement d'exécution.
+Identique à [`user_fills`](#user_fills), mais filtré sur une fenêtre temporelle appliquée au champ consensus `time` de chaque enregistrement. La structure des enregistrements de transaction est identique.
 
 ```json
 { "type": "user_fills_by_time", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
 ```
 
-| Argument | Type | Requis | Description |
+| Arg | Type | Requis | Description |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | l'un des deux : `account_id` / `address` | Identifiant interne du compte |
-| `address` | adresse hex | l'un des deux : `account_id` / `address` | Adresse du compte |
-| `start_time` | uint64 | non | Début de la fenêtre (ms, inclusif) ; filtre sur le `time` de l'exécution. Absent ⇒ borne inférieure ouverte |
+| `account_id` | uint64 | l'un de `account_id` / `address` | Identifiant interne du compte |
+| `address` | hex address | l'un de `account_id` / `address` | Adresse du compte |
+| `start_time` | uint64 | non | Début de la fenêtre (ms, inclusif) ; filtre sur le champ `time` de la transaction. Absent ⇒ borne inférieure ouverte |
 | `end_time` | uint64 | non | Fin de la fenêtre (ms, inclusif). Absent ⇒ borne supérieure ouverte |
 
 Réponse :
@@ -719,46 +422,43 @@ Réponse :
     "account_id": 42,
     "start_time": 1700000000000,
     "end_time":   1700003600000,
-    "fills": [ /* même structure d'enregistrement que user_fills */ ]
+    "fills": [ /* same record shape as user_fills */ ]
   }
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `address` | adresse hex | Adresse du compte résolue |
-| `account_id` | uint64 | Renvoyé uniquement si la requête utilisait `account_id` |
-| `start_time` | uint64 \| null | Début de fenêtre renvoyé (`null` si omis) |
-| `end_time` | uint64 \| null | Fin de fenêtre renvoyée (`null` si omis) |
-| `fills` | array | Enregistrements d'exécution dans la fenêtre (même structure par exécution que [`user_fills`](#user_fills)), du plus ancien au plus récent |
+| `address` | hex address | Adresse du compte résolue |
+| `account_id` | uint64 | Renvoyé en écho uniquement si la requête utilisait `account_id` |
+| `start_time` | uint64 \| null | Début de fenêtre renvoyé en écho (`null` si omis) |
+| `end_time` | uint64 \| null | Fin de fenêtre renvoyée en écho (`null` si omis) |
+| `fills` | array | Enregistrements de transactions dans la fenêtre (même structure par transaction que [`user_fills`](#user_fills)), triés du plus ancien au plus récent |
 
 ### `order_status`
 
-Recherche du cycle de vie d'un ordre unique par `oid` (identifiant d'ordre serveur) **ou** `cloid` (identifiant
-d'ordre client). Consulte les carnets en cours, le registre des triggers et l'anneau d'exécutions engagé —
-tout en état engagé sur le nœud.
+Recherche du cycle de vie d'un ordre unique par `oid` (identifiant serveur) **ou** `cloid` (identifiant client). Consulte les carnets d'ordres actifs, le registre des ordres déclencheurs et l'anneau de transactions validées — tout cela en état engagé sur le nœud.
 
 ```json
 { "type": "order_status", "oid": 12345 }
 ```
 
-Ou par identifiant d'ordre client :
+Ou par identifiant client :
 
 ```json
 { "type": "order_status", "cloid": "0x000000000000000000000000cafef00d" }
 ```
 
-| Argument | Type | Requis | Description |
+| Arg | Type | Requis | Description |
 |-----|------|----------|-------------|
-| `oid` | uint64 | l'un des deux : `oid` / `cloid` | Identifiant d'ordre serveur |
-| `cloid` | chaîne hex | l'un des deux : `oid` / `cloid` | Identifiant d'ordre client — `0x` + 32 caractères hex |
+| `oid` | uint64 | l'un de `oid` / `cloid` | Identifiant serveur de l'ordre |
+| `cloid` | hex string | l'un de `oid` / `cloid` | Identifiant client — `0x` + 32 caractères hexadécimaux |
 
-Aucun des deux présent → `400 {"error":"missing field oid or cloid"}`. Un
-`cloid` malformé → `400`. La résolution s'arrête au premier résultat, dans cet ordre : ordre en attente actif → trigger en attente → exécution terminale → inconnu.
+Aucun des deux présent → `400 {"error":"missing field oid or cloid"}`. Un `cloid` malformé → `400`. La résolution s'arrête au premier résultat trouvé, dans cet ordre : ordre actif en attente → déclencheur en file → transaction terminale → inconnu.
 
-`data.status` discrimine la branche :
+Le champ `data.status` distingue les branches :
 
-`"resting"` — un ordre actif ouvert dans un carnet perp ou spot :
+`"resting"` — un ordre actif ouvert dans un carnet perpétuel ou au comptant :
 
 ```json
 {
@@ -778,7 +478,7 @@ Aucun des deux présent → `400 {"error":"missing field oid or cloid"}`. Un
 }
 ```
 
-`"triggered"` — un TP/SL/ordre stop en attente, attendant le franchissement du prix mark :
+`"triggered"` — un ordre TP/SL/stop en file d'attente d'un franchissement du prix mark :
 
 ```json
 {
@@ -799,114 +499,34 @@ Aucun des deux présent → `400 {"error":"missing field oid or cloid"}`. Un
 }
 ```
 
-`"filled"` — l'exécution la plus récente correspondante dans l'anneau par compte (l'objet `fill`
-a la même structure qu'un enregistrement [`user_fills`](#user_fills)) :
+`"filled"` — la transaction la plus récente correspondante dans l'anneau par compte (l'objet `fill` a la même structure qu'un enregistrement [`user_fills`](#user_fills)) :
 
 ```json
 {
   "type": "order_status",
   "data": {
     "status": "filled",
-    "fill": { /* même structure qu'un enregistrement d'exécution user_fills */ }
+    "fill": { /* same shape as a user_fills fill record */ }
   }
 }
 ```
 
-`"unknown"` — jamais vu, ou expulsé de l'anneau borné (une requête uniquement par `cloid`
-ne correspondant à aucun ordre en attente ou triggeré arrive aussi ici, car le registre des triggers
-et l'anneau d'exécutions sont indexés par `oid`) :
+`"unknown"` — jamais rencontré, ou évincé de l'anneau borné (une requête par `cloid` uniquement sans correspondance dans les ordres actifs ou déclencheurs aboutit ici également, car le registre des déclencheurs et l'anneau de transactions sont indexés par `oid`) :
 
 ```json
 { "type": "order_status", "data": { "status": "unknown" } }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | État du cycle de vie résolu |
 | `order` | object | Présent pour `"resting"` — `oid`, `market_id`, `side` (`"bid"`/`"ask"`), `px` / `size` (chaînes décimales à virgule fixe), `inserted_at_ms`, `cloid` (hex \| null) |
-| `trigger` | object | Présent pour `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (chaînes décimales à virgule fixe), `trigger_above` (bool : déclenchement quand le mark dépasse ce seuil), `registered_at_ms`, `fired` (bool) |
-| `fill` | object | Présent pour `"filled"` — l'enregistrement d'exécution correspondant (voir [`user_fills`](#user_fills)) |
-
-### `funding_history`
-
-Échantillons de prime de financement par marché.
-
-```json
-{ "type": "funding_history", "market_id": 0 }
-```
-
-| Arg | Type | Requis |
-|-----|------|----------|
-| `market_id` | uint32 | oui |
-
-Réponse :
-
-```json
-{
-  "type": "funding_history",
-  "data": {
-    "market_id": 0,
-    "samples": [
-      { "ts_ms": 1700000000000, "premium": "0.0015", "funding_rate": "0.0015" },
-      { "ts_ms": 1700000008000, "premium": "-0.0007", "funding_rate": "-0.0007" }
-    ]
-  }
-}
-```
-
-Les échantillons constituent l'anneau ordonné d'instantanés de prime issus du suivi du financement.
-`premium` est la valeur exacte `Decimal` avant plafonnement, rendue sous forme de chaîne (signée, précision
-complète) ; `funding_rate` est cette prime passée à travers le plafond de financement par actif
-(`±funding_rate_cap`, le seuil de risque dynamique ou le taux de base de `0.04`/h)
-— c'est-à-dire le taux effectivement appliqué. Lorsque la prime est
-dans les limites du plafond, `funding_rate == premium` ; au-delà, `funding_rate` est tronqué au
-plafond signé. Un marché inconnu ou vide retourne `"samples": []`.
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `market_id` | uint32 | Identifiant de marché renvoyé en écho |
-| `samples[*].ts_ms` | uint64 | Horodatage de l'échantillon (ms consensus) |
-| `samples[*].premium` | decimal string | Échantillon brut de prime de financement, avant plafonnement (signé) |
-| `samples[*].funding_rate` | decimal string | Taux effectif = `premium` tronqué au plafond par actif (signé) |
-
-### `predicted_fundings`
-
-Taux de financement prédit par marché + heure du prochain paiement, pour chaque marché
-perpétuel enregistré. Aucun paramètre.
-
-```json
-{ "type": "predicted_fundings" }
-```
-
-Le contenu `data` est un **tableau**, ordonné de façon déterministe par `asset` croissant
-(le nœud itère la `BTreeMap` des spécifications de marché). Un univers vide retourne
-`"data": []`.
-
-Réponse :
-
-```json
-{
-  "type": "predicted_fundings",
-  "data": [
-    { "asset": 0, "predicted_rate": "0.0015", "next_funding_time": 1700003600000 }
-  ]
-}
-```
-
-`predicted_rate` est le dernier échantillon de prime (proxy du taux par heure, chaîne décimale)
-— `"0"` avant le premier échantillon. `next_funding_time` est l'horodatage du prochain
-paiement dérivé (`last_sample_ts + 1h`), `0` avant le premier échantillon.
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `asset` | uint32 | Identifiant de l'actif / du marché |
-| `predicted_rate` | decimal string | Dernier échantillon de prime (proxy du taux par heure) ; `"0"` avant le premier échantillon |
-| `next_funding_time` | uint64 | Horodatage du prochain paiement de financement (ms consensus) ; `0` avant le premier échantillon |
+| `trigger` | object | Présent pour `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (chaînes décimales à virgule fixe), `trigger_above` (bool : déclencher quand le prix mark passe au-dessus), `registered_at_ms`, `fired` (bool) |
+| `fill` | object | Présent pour `"filled"` — l'enregistrement de transaction correspondant (voir [`user_fills`](#user_fills)) |
 
 ### `block_info`
 
-Métadonnées du bloc validé. Aucun argument requis (`height` est accepté mais ignoré —
-l'état de lecture ne conserve que le dernier contexte validé).
+Métadonnées du bloc validé. Aucun argument requis (`height` est accepté mais ignoré — l'état lu conserve uniquement le dernier contexte engagé).
 
 ```json
 { "type": "block_info" }
@@ -927,17 +547,17 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `height` | uint64 | Hauteur du dernier bloc validé |
 | `round` | uint64 | Tour de consensus de ce bloc |
-| `epoch` | uint64 | Époque actuelle |
+| `epoch` | uint64 | Époque en cours |
 | `timestamp_ms` | uint64 | Horodatage du bloc (ms consensus) |
-| `block_hash` | hex string (32 bytes) | Hash réel du bloc validé (désormais intégré à l'état de lecture — plus de valeur fictive à zéro) |
+| `block_hash` | hex string (32 bytes) | Hachage réel du bloc validé (désormais intégré à l'état lu — ce n'est plus le placeholder tout à zéro) |
 
 ### `agents`
 
-Portefeuilles agents / API approuvés pour un compte.
+Agents approuvés / portefeuilles API pour un compte.
 
 ```json
 { "type": "agents", "account_id": 42 }
@@ -963,12 +583,12 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Adresse principale résolue |
 | `account_id` | uint64 | Renvoyé en écho uniquement si la requête utilisait `account_id` |
 | `agents[*].agent` | hex address | Adresse du portefeuille agent approuvé |
-| `agents[*].name` | string \| null | Libellé de l'agent défini lors de l'approbation ; `null` si non renseigné |
+| `agents[*].name` | string \| null | Libellé de l'agent défini lors de l'approbation ; `null` si non défini |
 | `agents[*].expires_at_ms` | uint64 \| null | Expiration de l'approbation de l'agent (ms consensus) ; `null` pour une approbation sans expiration |
 
 ### `sub_accounts`
@@ -999,62 +619,16 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Adresse parente résolue |
 | `account_id` | uint64 | Renvoyé en écho uniquement si la requête utilisait `account_id` |
-| `sub_accounts[*].index` | uint32 | Index du sous-compte sous le compte parent |
+| `sub_accounts[*].index` | uint32 | Index du sous-compte rattaché au parent |
 | `sub_accounts[*].address` | hex address | Adresse du sous-compte |
-
-### `mip3_active_bids`
-
-Instantané de l'enchère de gaz pour le déploiement permissionless de contrats perpétuels MIP-3. Aucun paramètre.
-
-```json
-{ "type": "mip3_active_bids" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "mip3_active_bids",
-  "data": {
-    "auction_round":   2,
-    "current_bid":     "12345",
-    "current_winner":  "0x<bidder>",
-    "auction_end_ms":  1700086400000,
-    "started_at_ms":   1700000000000,
-    "bids": [
-      {
-        "bidder":          "0x<bidder>",
-        "amount":          "12345",
-        "submitted_at_ms": 1700000000500,
-        "tag":             "ETH-PERP"
-      }
-    ]
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `auction_round` | uint64 | Tour d'enchère actuel |
-| `current_bid` | decimal string | Montant de l'offre en tête |
-| `current_winner` | hex address \| null | Enchérisseur actuellement gagnant, `null` si aucun |
-| `auction_end_ms` | uint64 | Horodatage de clôture de l'enchère (ms consensus) |
-| `started_at_ms` | uint64 | Horodatage de début de l'enchère (ms consensus) |
-| `bids[*].bidder` | hex address | Adresse de l'enchérisseur |
-| `bids[*].amount` | decimal string | Montant de l'offre |
-| `bids[*].submitted_at_ms` | uint64 | Horodatage de soumission de l'offre (ms consensus) |
-| `bids[*].tag` | string | Étiquette de l'offre (ex. le nom de marché proposé) |
 
 ### `protocol_metrics`
 
-Accumulateurs / compteurs validés à l'échelle du protocole. Aucun paramètre. Chaque champ est
-lu directement depuis l'état `Exchange` validé (compteurs, pools de frais, réserves BOLE,
-staking) — rien n'est calculé à partir du moteur de correspondance ou de l'oracle, donc une
-relecture reproduit les valeurs exactement.
+Accumulateurs et compteurs validés à l'échelle du protocole. Aucun paramètre. Chaque champ est lu directement depuis l'état `Exchange` engagé (compteurs, pools de frais, réserves BOLE, staking) — rien n'est calculé à partir du moteur de correspondance ni de l'oracle, ce qui garantit une reproduction exacte lors d'un rejeu.
 
 ```json
 { "type": "protocol_metrics" }
@@ -1106,42 +680,39 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `counters.total_orders` | uint64 | Ordres admis sur la durée de vie |
-| `counters.total_fills` | uint64 | Exécutions sur la durée de vie (seul signal d'échange détaillé — un **nombre**, pas un notionnel) |
-| `counters.total_liquidations` | uint64 | Liquidations sur la durée de vie |
-| `counters.total_deposits` / `total_withdrawals` | uint64 | Nombre de dépôts / retraits sur la durée de vie |
-| `counters.total_vault_transfers` | uint64 | Transferts vers/depuis les coffres sur la durée de vie |
-| `counters.total_sub_account_transfers` | uint64 | Transferts entre sous-comptes sur la durée de vie |
-| `fee_pools.burned` | Decimal string | USDC cumulatif acheminé vers le rachat et la destruction (USDC entier) |
-| `fee_pools.mflux_vault` | Decimal string | Accumulation cumulée de frais du coffre MFlux (`"0"` — part du coffre nulle) |
-| `fee_pools.validator_pool` | Decimal string | Accumulation cumulée de frais du pool de validateurs (USDC entier) |
-| `fee_pools.treasury` | Decimal string | Accumulation cumulée de frais de la trésorerie (USDC entier) |
-| `fee_pools.burned_mtf` | Decimal string | MTF cumulatif retiré de la circulation par l'exécuteur de rachat |
-| `insurance_fund_total` | Decimal string | Σ réserves `bole_pool.insurance_fund` par actif (USDC entier) |
-| `treasury_backstop_total` | Decimal string | Σ réserves `bole_pool.treasury_backstop` par actif (USDC entier) |
-| `bole_pool.total_deposits` | Decimal string | Total des dépôts dans le pool de prêt BOLE (USDC entier) |
+| `counters.total_orders` | uint64 | Nombre cumulé d'ordres admis depuis la genèse |
+| `counters.total_fills` | uint64 | Nombre cumulé de transactions (seul signal de transaction détaillé — un **comptage**, pas un notionnel) |
+| `counters.total_liquidations` | uint64 | Nombre cumulé de liquidations |
+| `counters.total_deposits` / `total_withdrawals` | uint64 | Nombre cumulé de dépôts / retraits |
+| `counters.total_vault_transfers` | uint64 | Nombre cumulé de transferts de dépôt/retrait sur coffre |
+| `counters.total_sub_account_transfers` | uint64 | Nombre cumulé de transferts entre sous-comptes |
+| `fee_pools.burned` | Decimal string | USDC cumulé acheminé vers le rachat et la destruction (en USDC entiers) |
+| `fee_pools.mflux_vault` | Decimal string | Accumulation cumulée des frais sur le coffre MFlux (`"0"` — part du coffre annulée) |
+| `fee_pools.validator_pool` | Decimal string | Accumulation cumulée des frais dans le pool validateur (en USDC entiers) |
+| `fee_pools.treasury` | Decimal string | Accumulation cumulée des frais dans la trésorerie (en USDC entiers) |
+| `fee_pools.burned_mtf` | Decimal string | MTF cumulé retiré de la circulation par l'exécuteur de rachat |
+| `insurance_fund_total` | Decimal string | Σ réserves `bole_pool.insurance_fund` par actif (en USDC entiers) |
+| `treasury_backstop_total` | Decimal string | Σ réserves `bole_pool.treasury_backstop` par actif (en USDC entiers) |
+| `bole_pool.total_deposits` | Decimal string | Total des dépôts dans le pool de prêt BOLE (en USDC entiers) |
 | `bole_pool.shortfall_total` | Decimal string | Σ créances irrécouvrables résiduelles après la cascade ADL → assurance → trésorerie |
-| `open_interest_total_1e8` | u128 string | Σ positions ouvertes par marché, **plan comptable 1e8** (libellé `_1e8`, PAS en USDC entier) |
-| `staking.total_stake` | Decimal string | MTF total mis en staking (MTF entier) |
-| `staking.n_validators` | uint64 | Validateurs dans l'ensemble validé |
+| `open_interest_total_1e8` | u128 string | Σ des intérêts ouverts par marché, **plan de carnet 1e8** (étiqueté `_1e8`, PAS en USDC entiers) |
+| `staking.total_stake` | Decimal string | Total des MTF mis en staking (en MTF entiers) |
+| `staking.n_validators` | uint64 | Validateurs dans l'ensemble engagé |
 | `staking.n_active` | uint64 | Validateurs actifs cette époque |
 | `staking.n_jailed` | uint64 | Validateurs actuellement emprisonnés |
-| `staking.current_epoch` | uint64 | Époque de staking actuelle |
+| `staking.current_epoch` | uint64 | Époque de staking en cours |
 | `counts.n_markets` | uint64 | Marchés perpétuels MIP-3 enregistrés (`mip3_market_specs`) |
-| `counts.n_spot_pairs` | uint64 | Paires spot enregistrées (`mip3_spot_pair_specs`) |
+| `counts.n_spot_pairs` | uint64 | Paires au comptant enregistrées (`mip3_spot_pair_specs`) |
 | `counts.n_user_vaults` | uint64 | Coffres utilisateur enregistrés |
-| `counts.n_accounts_with_state` | uint64 | Comptes disposant d'un état utilisateur validé |
+| `counts.n_accounts_with_state` | uint64 | Comptes disposant d'un état utilisateur engagé |
 
 :::info
-**Aucun chiffre cumulatif de volume échangé.** Le moteur suit le **volume de frais sur 30 jours** par utilisateur
-(voir [`user_fees`](#user_fees)) et un **nombre** cumulatif d'exécutions
-(`counters.total_fills`) — il n'existe **aucun accumulateur validé de volume USD échangé à l'échelle du protocole**,
-aussi cette lecture omet délibérément cette valeur plutôt que d'insinuer qu'un total de volume existe. Les compteurs sont des totaux d'activité monotones, pas de l'argent.
+**Aucun notionnel cumulé échangé.** Le moteur suit le **volume de frais sur 30 jours** par utilisateur (voir [`user_fees`](#user_fees)) et un **comptage** cumulé de transactions (`counters.total_fills`) — il n'existe **pas d'accumulateur engagé de volume USD échangé à l'échelle du protocole**, aussi cette lecture l'omet intentionnellement plutôt que de laisser supposer qu'un tel total de volume existerait. Les compteurs sont des relevés d'activité monotones, pas des montants en devises.
 :::
 
-Source d'état : `locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + tailles de registre.
+Source d'état : `locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + tailles des registres.
 
 ### `user_fees`
 
@@ -1156,8 +727,7 @@ Palier de frais / volume par compte. Requis : `account_id` (u64) **OU** `address
 | `account_id` | uint64 | l'un de `account_id` / `address` |
 | `address` | hex address | l'un de `account_id` / `address` |
 
-Si aucun n'est fourni → `400`. Un compte sans état de frais retourne un **200** avec
-des volumes à zéro et le bps du palier de base — l'idiome de valeur nulle établi.
+Aucun des deux présent → `400`. Un compte sans état de frais retourne un **200** avec des volumes à zéro et les bps du palier de base — l'idiome habituel de zeroing.
 
 Réponse :
 
@@ -1179,32 +749,26 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Adresse du compte résolue |
 | `account_id` | uint64 | Renvoyé en écho uniquement si la requête utilisait `account_id` |
-| `taker_volume_30d` | Decimal string | Volume preneur glissant sur 30 jours (USDC entier) |
-| `maker_volume_30d` | Decimal string | Volume apporteur glissant sur 30 jours (USDC entier) |
-| `vip_tier` | uint | Indice de palier VIP validé par utilisateur ; `0` si non suivi |
-| `mm_tier` | uint | Indice de palier teneur de marché validé par utilisateur ; `0` si non suivi |
+| `taker_volume_30d` | Decimal string | Volume preneur glissant sur 30 jours (en USDC entiers) |
+| `maker_volume_30d` | Decimal string | Volume faiseur glissant sur 30 jours (en USDC entiers) |
+| `vip_tier` | uint | Indice de palier VIP par utilisateur engagé ; `0` si non suivi |
+| `mm_tier` | uint | Indice de palier market maker par utilisateur engagé ; `0` si non suivi |
 | `referrer` | hex address \| null | Référent de ce compte s'il est défini, sinon `null` |
-| `referrer_credit` | Decimal string | Σ remise accumulée *en faveur* de cette adresse agissant comme référent (USDC entier) |
-| `maker_bps` | uint | Bps de frais apporteur **effectifs**, résolus depuis la grille par palier de volume validée [`fee_schedule`](#fee_schedule) au volume apporteur sur 30 jours de ce compte |
-| `taker_bps` | uint | Bps de frais preneur **effectifs**, résolus depuis la grille validée au volume preneur sur 30 jours de ce compte |
+| `referrer_credit` | Decimal string | Σ des remises accumulées *par* cette adresse en qualité de référent (en USDC entiers) |
+| `maker_bps` | uint | Bps de frais faiseur **effectifs**, résolus à partir du barème de volume engagé [`fee_schedule`](#fee_schedule) au volume maker sur 30 jours de ce compte |
+| `taker_bps` | uint | Bps de frais preneur **effectifs**, résolus à partir du barème engagé au volume preneur sur 30 jours de ce compte |
 
-Les `maker_bps` / `taker_bps` effectifs sont résolus par sens depuis la grille par palier de volume
-validée ([`fee_schedule`](#fee_schedule)) — le taux apporteur au volume apporteur du
-compte, le taux preneur à son volume preneur — en utilisant la même
-routine que celle utilisée par le chemin de règlement pour facturer, de sorte que les bps reportés
-correspondent à ce qui est facturé au compte. Une surcharge de spécification par marché MIP-3 **n'est pas** reflétée ici :
-il s'agit du taux de base inter-marchés. `vip_tier` / `mm_tier` restent les indices de palier validés
-par utilisateur et constituent un signal distinct, présenté aux côtés des bps effectifs.
+Les `maker_bps` / `taker_bps` effectifs sont résolus par côté à partir du barème de paliers de volume engagé ([`fee_schedule`](#fee_schedule)) — le taux faiseur au volume maker du compte, le taux preneur à son volume preneur — en utilisant la même routine que celle appliquée lors du règlement, de sorte que les bps rapportés correspondent à ce qui est facturé au compte. Un éventuel écrasement MIP-3 par marché **n'est pas** reflété ici : il s'agit du taux de base inter-marchés. `vip_tier` / `mm_tier` restent les indices de palier par utilisateur engagés et constituent un signal distinct, affiché conjointement aux bps effectifs.
 
-Source d'état : `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + la grille par palier de volume validée.
+Source d'état : `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + le barème de paliers de volume engagé.
 
 ### `staking_apr`
 
-Taux d'émission de staking annuel effectif + ses paramètres validés. Aucun paramètre.
+Taux d'émission de staking annuel effectif et ses paramètres engagés. Aucun paramètre.
 
 ```json
 { "type": "staking_apr" }
@@ -1228,40 +792,40 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `total_stake` | Decimal string | MTF total mis en staking (MTF entier) |
-| `effective_apr` | Decimal string | Taux d'émission annuel effectivement appliqué par l'effet de récompense début de bloc (fraction) |
+| `total_stake` | Decimal string | Total de MTF mis en staking (MTF entiers) |
+| `effective_apr` | Decimal string | Taux d'émission annuel effectivement appliqué par la récompense begin-block (fraction) |
 | `effective_apr_bps` | Decimal string | `effective_apr × 10_000`, tronqué |
-| `governance_rate_bps` | uint | `reward_rate_bps` fixé par la gouvernance (validé) — voir indicateur |
-| `emission_floor_stake` | uint string | Stake plancher (`50M` MTF) en dessous duquel le taux est fixe |
-| `n_active_validators` | uint64 | Validateurs actifs cette époque |
-| `current_epoch` | uint64 | Époque de staking actuelle |
+| `governance_rate_bps` | uint | `reward_rate_bps` fixé par la gouvernance (engagé) — voir le flag |
+| `emission_floor_stake` | uint string | Seuil plancher de stake (`50M` MTF) en dessous duquel le taux est fixe |
+| `n_active_validators` | uint64 | Validateurs actifs durant cet epoch |
+| `current_epoch` | uint64 | Epoch de staking en cours |
 | `is_gross_pre_commission` | bool | Toujours `true` — le TAP est brut, avant commission par validateur |
 
-`effective_apr` est la courbe dont l'effet de récompense début de bloc est dérivé :
+`effective_apr` est la courbe dont dérive la récompense begin-block :
 
 ```text
 effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 ```
 
-c'est-à-dire un **taux fixe de 8%** à/en dessous de 50M MTF mis en staking, décroissant ∝ 1/√stake
-au-delà (ex. stake total = 200M ⇒ 4× le plancher ⇒ ratio 1/4 ⇒ √ = 1/2 ⇒ 4% / 400 bps).
+soit un **taux fixe de 8%** pour un stake inférieur ou égal à 50M MTF, décroissant selon 1/√stake au-delà (ex. :
+total stake = 200M ⇒ 4× le plancher ⇒ ratio 1/4 ⇒ √ = 1/2 ⇒ 4% / 400 bps).
 
 :::warning
-**`governance_rate_bps` est validé mais NON consommé par l'effet de récompense.** L'effet
-de récompense dérive le taux de paiement depuis la **courbe de stake** ci-dessus, et non depuis
-`reward_rate_bps`. Les deux sont exposés afin que la divergence soit observable plutôt que
-cachée — le TAP de paiement effectif est `effective_apr`, pas `governance_rate_bps`.
-Et `effective_apr` est un taux d'**émission brut** (`is_gross_pre_commission: true`) :
-le TAP net d'un délégant individuel est `effective_apr × (1 − commission)`.
+**`governance_rate_bps` est engagé mais N'EST PAS consommé par la récompense.** La
+récompense dérive le taux de distribution à partir de la **courbe de stake** ci-dessus, et non de
+`reward_rate_bps`. Les deux sont exposés afin que l'écart soit observable plutôt que
+dissimulé — le TAP de distribution effectif est `effective_apr`, et non `governance_rate_bps`.
+De plus, `effective_apr` est un taux d'**émission brut** (`is_gross_pre_commission: true`) :
+le TAP net d'un délégateur individuel est `effective_apr × (1 − commission)`.
 :::
 
 Source d'état : `c_staking.{total_stake, reward_rate_bps, current_epoch, validators}` + la courbe d'émission.
 
 ### `oracle_sources`
 
-Le sous-ensemble de sources d'oracle par marché validé sur la chaîne. Résout le marché par `asset_id`
+Sous-ensemble de sources oracle engagé par marché. Résout le marché par `asset_id`
 (u32) **OU** `coin` (symbole).
 
 ```json
@@ -1274,12 +838,12 @@ Ou par nom :
 { "type": "oracle_sources", "coin": "BTC" }
 ```
 
-| Arg | Type | Requis |
+| Arg | Type | Required |
 |-----|------|----------|
 | `asset_id` | uint32 | l'un des deux : `asset_id` / `coin` |
 | `coin` | symbol | l'un des deux : `asset_id` / `coin` |
 
-Les deux absents → `400` ; marché inconnu → `404 {"error":"market not found"}`.
+Aucun des deux fourni → `400` ; marché inconnu → `404 {"error":"market not found"}`.
 
 Réponse :
 
@@ -1299,40 +863,40 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `asset_id` | uint32 | Identifiant d'actif renvoyé / résolu |
+| `asset_id` | uint32 | Id d'actif résolu / retourné en écho |
 | `name` | string | Symbole du marché |
 | `oracle_set` | bool | Indique si le déployeur a explicitement confirmé le sous-ensemble via `SetOracle` |
-| `source_count` | uint64 | Nombre de sources activées (popcount du masque) |
-| `num_sources` | uint8 | Nombre total d'emplacements de source (`NUM_ORACLE_SOURCES = 10`) |
-| `enabled_sources` | uint8[] | Indices de bits activés du masque de sous-ensemble (les emplacements de source activés) |
-| `subset_mask` | uint16 | `oracle_source_subset_mask` sur 10 bits validé (bit `i` activé ⇒ la source `i` alimente la médiane) |
-| `weights_committed` | bool | Toujours `false` — les pondérations par source NE SONT PAS validées (voir le drapeau) |
+| `source_count` | uint64 | Nombre de sources activées (nombre de bits à 1 dans le masque) |
+| `num_sources` | uint8 | Total des emplacements sources (`NUM_ORACLE_SOURCES = 10`) |
+| `enabled_sources` | uint8[] | Indices des bits activés dans le masque de sous-ensemble (emplacements sources activés) |
+| `subset_mask` | uint16 | `oracle_source_subset_mask` à 10 bits engagé (bit `i` activé ⇒ la source `i` alimente la médiane) |
+| `weights_committed` | bool | Toujours `false` — les pondérations par source ne sont PAS engagées (voir le flag) |
 
 :::warning
-**Seul le masque de bits numérique est sur la chaîne — les NOMS et PONDÉRATIONS des sources NE SONT PAS
-validés** (`weights_committed: false`). Les 10 identités de source sont
-fixes hors chaîne au niveau du protocole et leurs pondérations sont
-fixées par le protocole ; l'état validé ne contient donc que le masque de bits de sous-ensemble. Cette lecture
-expose `enabled_sources` sous forme d'**indices de bits**, non de noms de plateformes, et n'émet aucune
-liste de pondérations par plateforme plutôt que d'en fabriquer une.
+**Seul le masque binaire numérique est on-chain — les NOMS et POIDS des sources ne sont PAS
+engagés** (`weights_committed: false`). Les 10 identités de sources sont fixées hors-chaîne par le
+protocole, et leurs pondérations sont également fixées par le protocole ; l'état engagé ne
+comporte donc que le masque de sous-ensemble. Cette lecture expose `enabled_sources` sous forme
+d'**indices de bits**, non de noms de sources, et n'émet aucune liste de pondérations par source
+plutôt que d'en fabriquer une.
 :::
 
 Source d'état : `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
 
-## Types de requête de gouvernance
+## Types de requêtes de gouvernance
 
-La surface de gouvernance on-chain : la machinerie de vote en direct (`gov_state`), la vue
-inter-catégories des propositions en attente avec distance au quorum (`gov_proposals`), et
-la piste d'audit des paramètres adoptés (`gov_history`). Toutes lisent l'état `Exchange`
-validé ; même enveloppe `{type, data}`. Le quorum de participation est de ⅔
-(pondéré par la mise) ; les validateurs **emprisonnés** sont exclus du dénominateur de mise active
-et de chaque décompte, conformément à la vérification d'adoption on-chain.
+La surface de gouvernance on-chain : la mécanique de vote en temps réel (`gov_state`),
+la vue des propositions en attente toutes catégories confondues avec la distance au quorum (`gov_proposals`), et
+l'historique d'audit des paramètres adoptés (`gov_history`). Toutes lisent l'état
+`Exchange` engagé ; même enveloppe `{type, data}`. Le quorum de stake est de ⅔
+(pondéré par stake) ; les validateurs **mis en prison** sont exclus du dénominateur de
+stake actif et de chaque décompte, conformément à la vérification d'adoption on-chain.
 
 ### `gov_state`
 
-La surface de gouvernance en direct — contexte de quorum de mise, tours `voteGlobal` en attente,
+La surface de gouvernance en temps réel — contexte de quorum de stake, rounds `voteGlobal` en attente,
 propositions `govPropose` ouvertes, et la valeur ACTUELLE de chaque paramètre gouverné.
 Aucun paramètre.
 
@@ -1375,34 +939,34 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `total_stake` | chaîne décimale | Σ mise sur l'ensemble des validateurs |
+| `total_stake` | decimal string | Σ stake de l'ensemble des validateurs |
 | `quorum_bps` | uint | Seuil de quorum ⅔ en bps (`6667`) |
-| `quorum_stake` | chaîne décimale | Mise nécessaire pour adopter (`total_stake × quorum_bps / 10000`) |
+| `quorum_stake` | decimal string | Stake requis pour l'adoption (`total_stake × quorum_bps / 10000`) |
 | `pending_vote_global[*].kind` | string | Nom du paramètre gouverné (snake_case), ex. `"set_reward_rate_bps"` |
 | `pending_vote_global[*].kind_id` | uint | Identifiant numérique du type |
-| `pending_vote_global[*].votes[*].validator` | adresse hex | Validateur votant |
-| `pending_vote_global[*].votes[*].value` | chaîne décimale | Valeur proposée décodée (hex `0x…` si la charge utile est opaque) |
-| `pending_vote_global[*].votes[*].stake` | chaîne décimale | Mise du votant |
+| `pending_vote_global[*].votes[*].validator` | hex address | Validateur votant |
+| `pending_vote_global[*].votes[*].value` | decimal string | Valeur proposée décodée (hex `0x…` si la charge utile est opaque) |
+| `pending_vote_global[*].votes[*].stake` | decimal string | Stake du votant |
 | `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | Horodatage de soumission du vote (ms consensus) |
-| `pending_vote_global[*].leading_stake` | chaîne décimale | Mise la plus élevée regroupée derrière une seule charge utile dans ce tour |
-| `open_proposals[*].proposal_id` | uint64 | Identifiant de tour govPropose |
+| `pending_vote_global[*].leading_stake` | decimal string | Stake le plus élevé regroupé derrière une seule charge utile dans ce round |
+| `open_proposals[*].proposal_id` | uint64 | Identifiant du round govPropose |
 | `open_proposals[*].voters` | uint64 | Nombre de votes exprimés |
-| `open_proposals[*].aye_stake` / `nay_stake` | chaîne décimale | Mise votant pour / contre |
-| `params` | object | Valeur actuelle de chaque paramètre gouverné (chacun un scalaire validé) |
-| `oracle_weight_overrides[*].asset_id` | uint32 | Actif avec une pondération d'oracle par actif remplacée |
-| `oracle_weight_overrides[*].weights` | uint[] | Pondérations par source validées pour l'actif |
+| `open_proposals[*].aye_stake` / `nay_stake` | decimal string | Stake votant pour / contre |
+| `params` | object | Valeur actuelle de chaque paramètre gouverné (chacun un scalaire engagé) |
+| `oracle_weight_overrides[*].asset_id` | uint32 | Actif disposant d'une dérogation de pondération oracle par actif |
+| `oracle_weight_overrides[*].weights` | uint[] | Pondérations par source engagées pour l'actif |
 
-L'objet `params` contient l'ensemble complet des paramètres gouvernés que la machinerie de vote
-peut modifier (répartition de la distribution des frais, réglages du staking, limites MIP-3, plafonds de risque, indicateurs spot /
-EVM / bridge, …) ; chacun représente la valeur validée en vigueur.
+L'objet `params` porte l'ensemble complet des paramètres gouvernés que la mécanique de vote
+peut modifier (répartition de la distribution des frais, paramètres de staking, limites MIP-3, plafonds de risque,
+flags spot / EVM / bridge, …) ; chacun est la valeur engagée en vigueur.
 
 ### `gov_proposals`
 
-Toutes les propositions de gouvernance ACTIVES dans TOUTES les catégories de vote (pas seulement
-`voteGlobal`), chacune avec son décompte de mise par charge utile en direct et sa distance au quorum ⅔.
-La vue inter-catégories « ce qui est en cours de vote en ce moment, et à quel point c'est proche ». Aucun paramètre.
+Toutes les propositions de gouvernance ACTIVES dans TOUTES les catégories de vote (pas uniquement
+`voteGlobal`), chacune avec son décompte de stake par charge utile en temps réel et sa distance au quorum ⅔.
+Vue transversale « ce sur quoi on vote actuellement, et à quelle distance du quorum ». Aucun paramètre.
 
 ```json
 { "type": "gov_proposals" }
@@ -1444,35 +1008,35 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `total_active_stake` | chaîne décimale | Σ mise des validateurs non emprisonnés (le dénominateur du quorum) |
+| `total_active_stake` | decimal string | Σ stake des validateurs non mis en prison (le dénominateur du quorum) |
 | `quorum_bps` | uint | Seuil de quorum ⅔ en bps (`6667`) |
-| `quorum_needed_stake` | chaîne décimale | Mise qu'une seule charge utile doit atteindre pour être adoptée |
-| `proposals[*].round` | uint64 | Identifiant de tour de vote synthétique |
+| `quorum_needed_stake` | decimal string | Stake qu'une seule charge utile doit atteindre pour être adoptée |
+| `proposals[*].round` | uint64 | Identifiant synthétique du round de vote |
 | `proposals[*].category` | string | Catégorie de vote, ex. `"gov_propose"`, `"vote_global"`, `"dynamic_risk"`, `"treasury"`, `"metaliquidity"`, `"oracle_weights"`, `"funding_formula"`, `"spot_margin"` |
-| `proposals[*].sub_id` | uint64 | Identifiant relatif à la catégorie (le tour moins la base de plage de la catégorie) |
-| `proposals[*].proposer` | adresse hex \| null | Premier votant (mandataire du proposant) |
+| `proposals[*].sub_id` | uint64 | Identifiant relatif à la catégorie (le round moins la base de plage de la catégorie) |
+| `proposals[*].proposer` | hex address \| null | Premier votant (mandataire proposant) |
 | `proposals[*].created_at_ms` | uint64 | Horodatage du premier vote (ms consensus) |
-| `proposals[*].voter_count` | uint64 | Nombre de votes exprimés sur le tour |
-| `proposals[*].leading_stake` | chaîne décimale | Mise la plus élevée regroupée derrière une charge utile |
-| `proposals[*].meets_quorum` | bool | Indique si la mise de la charge utile en tête atteint le quorum ⅔ |
-| `proposals[*].payloads[*].payload_hex` | chaîne hex | Une charge utile votée distincte (sans préfixe `0x`) |
-| `proposals[*].payloads[*].stake` | chaîne décimale | Mise active regroupée derrière cette charge utile |
+| `proposals[*].voter_count` | uint64 | Nombre de votes exprimés sur le round |
+| `proposals[*].leading_stake` | decimal string | Stake le plus élevé regroupé derrière une seule charge utile |
+| `proposals[*].meets_quorum` | bool | Indique si le stake de la charge utile dominante atteint le quorum ⅔ |
+| `proposals[*].payloads[*].payload_hex` | hex string | Une charge utile votée distincte (sans préfixe `0x`) |
+| `proposals[*].payloads[*].stake` | decimal string | Stake actif regroupé derrière cette charge utile |
 | `proposals[*].payloads[*].meets_quorum` | bool | Indique si cette charge utile seule atteint le quorum |
-| `proposals[*].proposal` | object \| null | L'enregistrement govPropose typé lorsque le tour a été ouvert via `govPropose`, sinon `null` |
-| `proposals[*].proposal.kind` | uint | Identifiant du type de paramètre gouverné |
-| `proposals[*].proposal.kind_name` | string \| null | Nom du type décodé (snake_case), `null` si inconnu |
-| `proposals[*].proposal.value` | chaîne décimale | Valeur proposée |
-| `proposals[*].proposal.title` | string | Titre de la proposition en langage naturel |
-| `proposals[*].proposal.proposer` | adresse hex | Compte ayant ouvert la proposition |
+| `proposals[*].proposal` | object \| null | L'enregistrement govPropose typé lorsque le round a été ouvert via `govPropose`, sinon `null` |
+| `proposals[*].proposal.kind` | uint | Identifiant numérique du type de paramètre gouverné |
+| `proposals[*].proposal.kind_name` | string \| null | Nom de type décodé (snake_case), `null` si inconnu |
+| `proposals[*].proposal.value` | decimal string | Valeur proposée |
+| `proposals[*].proposal.title` | string | Titre de la proposition lisible par un humain |
+| `proposals[*].proposal.proposer` | hex address | Compte ayant ouvert la proposition |
 | `proposals[*].proposal.opened_at_ms` | uint64 | Horodatage d'ouverture de la proposition (ms consensus) |
 
 ### `gov_history`
 
-La piste d'audit de la gouvernance adoptée (anneau borné, du plus ancien au plus récent) — chaque entrée
-prouve qu'un paramètre A ÉTÉ MODIFIÉ par la gouvernance on-chain par rapport à sa valeur génèse. Aucun
-paramètre. Complète `gov_proposals` (le volet EN ATTENTE).
+L'historique d'audit de la gouvernance adoptée (anneau borné, du plus ancien au plus récent) — chaque entrée
+atteste qu'un paramètre a ÉVOLUÉ par voie de gouvernance on-chain par rapport à sa valeur de genèse. Aucun
+paramètre. Complète `gov_proposals` (le volet PENDING).
 
 ```json
 { "type": "gov_history" }
@@ -1500,32 +1064,31 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `count` | uint | Nombre d'entrées dans l'anneau |
-| `enacted[*].round` | uint64 | Tour de vote synthétique ayant adopté la décision |
-| `enacted[*].kind` | uint | Identifiant du type de paramètre gouverné |
-| `enacted[*].kind_name` | string \| null | Nom du type décodé (snake_case), `null` si inconnu |
-| `enacted[*].value` | chaîne décimale | Valeur adoptée |
-| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Filière source — `govPropose`/`govVote` vs `voteGlobal` direct |
+| `enacted[*].round` | uint64 | Round de vote synthétique ayant procédé à l'adoption |
+| `enacted[*].kind` | uint | Identifiant numérique du type de paramètre gouverné |
+| `enacted[*].kind_name` | string \| null | Nom de type décodé (snake_case), `null` si inconnu |
+| `enacted[*].value` | decimal string | Valeur adoptée |
+| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Piste source — `govPropose`/`govVote` vs `voteGlobal` direct |
 | `enacted[*].enacted_at_ms` | uint64 | Horodatage d'adoption (ms consensus) |
-| `enacted[*].description` | string | Résumé de la modification en langage naturel |
+| `enacted[*].description` | string | Résumé lisible par un humain de la modification |
 
-L'anneau est plafonné à la limite du journal des adoptions on-chain ; il s'agit donc d'une fenêtre récente, non de
-l'historique complet.
+L'anneau est plafonné par la borne du journal d'adoption on-chain ; il s'agit donc d'une fenêtre récente, et non de l'intégralité de l'historique.
 
-## Types de requête différenciateurs (RFQ / FBA / marge de portefeuille)
+## Types de requêtes avancées (RFQ / FBA / marge de portefeuille)
 
-Ces requêtes lisent l'état en direct des moteurs différenciateurs MTF — elles complètent
-les indicateurs `market_info.fba_enabled` / `account_state.pm_enabled` avec l'état du moteur
-lui-même. Même enveloppe `{type, data}` et conventions natives MTF. **Plan prix :**
+Ces requêtes lisent l'état en temps réel des moteurs RFQ, FBA et de marge de portefeuille — elles complètent
+les flags `market_info.fba_enabled` / `account_state.pm_enabled` avec l'état du moteur
+lui-même. Même enveloppe `{type, data}` et conventions natives MTF. **Plan des prix :**
 les prix / tailles RFQ + FBA sont des chaînes entières en **virgule fixe 1e8** brutes (le
-plan carnet / ordre, identique à [`open_orders`](#open_orders) / [`l2_book`](#l2_book)),
-**non** en USDC entiers ; les montants de marge de portefeuille sont des chaînes entières en **cents USD**.
+plan carnet / ordres, identique à [`open_orders`](#open_orders) / [`l2_book`](./info/perpetuals.md#l2_book)),
+**et non** des USDC entiers ; les montants de marge de portefeuille sont des chaînes entières en **cents USD**.
 
 ### `rfq_open`
 
-Toutes les demandes RFQ ouvertes ainsi que les cotations des teneurs de marché. Aucun paramètre. Voir le [concept RFQ](../../concepts/rfq.md).
+Toutes les demandes RFQ ouvertes et leurs cotations maker. Aucun paramètre. Voir le [concept RFQ](../../concepts/rfq.md).
 
 ```json
 { "type": "rfq_open" }
@@ -1564,41 +1127,42 @@ Réponse :
 }
 ```
 
-`rfqs` itère de manière déterministe par `rfq_id`. Un moteur vide renvoie `"rfqs": []`.
+`rfqs` itère de manière déterministe par `rfq_id`. Un moteur vide retourne `"rfqs": []`.
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `rfqs[*].rfq_id` | uint64 | Identifiant de la demande RFQ |
-| `rfqs[*].market_id` | uint32 | Identifiant d'actif / de marché concerné par la RFQ |
+| `rfqs[*].market_id` | uint32 | Identifiant d'actif / marché concerné par le RFQ |
 | `rfqs[*].side` | `"bid"` / `"ask"` | Côté que le demandeur souhaite prendre |
 | `rfqs[*].size` | u128 string | Taille demandée, virgule fixe 1e8 |
-| `rfqs[*].requester` | adresse hex | Compte demandeur |
+| `rfqs[*].requester` | hex address | Compte demandeur |
 | `rfqs[*].requester_stp_group` | uint \| null | Groupe de prévention des auto-transactions du demandeur ; `null` si non défini |
-| `rfqs[*].expiry_ms` | uint64 | Horodatage d'expiration de la RFQ (ms consensus) |
+| `rfqs[*].expiry_ms` | uint64 | Horodatage d'expiration du RFQ (ms consensus) |
 | `rfqs[*].limit_px` | i128 string \| null | Prix limite du demandeur, virgule fixe 1e8 ; `null` si non défini |
 | `rfqs[*].created_at_ms` | uint64 | Horodatage de création (ms consensus) |
-| `rfqs[*].quotes[*].maker` | adresse hex | Teneur de marché cotant |
-| `rfqs[*].quotes[*].maker_stp_group` | uint \| null | Groupe STP du teneur de marché ; `null` si non défini |
+| `rfqs[*].quotes[*].maker` | hex address | Maker cotant |
+| `rfqs[*].quotes[*].maker_stp_group` | uint \| null | Groupe STP du maker ; `null` si non défini |
 | `rfqs[*].quotes[*].price` | i128 string | Prix de la cotation, virgule fixe 1e8 |
-| `rfqs[*].quotes[*].max_size` | u128 string | Taille maximale que le teneur de marché honorera, virgule fixe 1e8 |
-| `rfqs[*].quotes[*].valid_until_ms` | uint64 | Date limite de validité de la cotation (ms consensus) |
+| `rfqs[*].quotes[*].max_size` | u128 string | Taille maximale que le maker est prêt à exécuter, virgule fixe 1e8 |
+| `rfqs[*].quotes[*].valid_until_ms` | uint64 | Échéance de validité de la cotation (ms consensus) |
 | `rfqs[*].quotes[*].submitted_at_ms` | uint64 | Horodatage de soumission de la cotation (ms consensus) |
 
 ### `rfq_user`
 
-Les RFQ auxquelles un compte est partie — réparties entre celles qu'il a ouvertes et celles sur lesquelles il a coté. Voir le [concept RFQ](../../concepts/rfq.md).
+Demandes de cotation (RFQ) dont un compte est partie prenante — réparties entre celles qu'il a initiées et celles sur lesquelles il a soumis une cotation. Voir le [concept RFQ](../../concepts/rfq.md).
 
 ```json
 { "type": "rfq_user", "account_id": 42 }
 ```
 
-| Arg | Type | Requis |
+| Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | l'un des deux : `account_id` / `address` |
-| `address` | hex address | l'un des deux : `account_id` / `address` |
+| `account_id` | uint64 | one of `account_id` / `address` |
+| `address` | hex address | one of `account_id` / `address` |
 
-`account_id` (u64) ou `address` (hex 0x) identifient le compte ; lorsque la requête
-fournit `account_id`, il est renvoyé dans `data.account_id`. Aucun des deux présent → `400` ; `address` mal formée → `400 {"error":"invalid hex"}`.
+Soit `account_id` (u64), soit `address` (hex 0x) identifie le compte ; lorsque la
+requête fournit `account_id`, celui-ci est renvoyé dans `data.account_id`. Aucun
+des deux présent → `400` ; `address` mal formée → `400 {"error":"invalid hex"}`.
 
 Réponse :
 
@@ -1608,37 +1172,37 @@ Réponse :
   "data": {
     "address":    "0x<addr>",
     "account_id": 42,
-    "requested": [ /* <rfq>, même structure par RFQ que rfq_open */ ],
+    "requested": [ /* <rfq>, same per-RFQ shape as rfq_open */ ],
     "quoted":    [ /* <rfq> */ ]
   }
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `address` | adresse hex | Adresse du compte résolu |
+| `address` | hex address | Adresse de compte résolue |
 | `account_id` | uint64 | Renvoyé uniquement si la requête utilisait `account_id` |
-| `requested` | array&lt;rfq&gt; | RFQ ouvertes par ce compte (demandeur) ; même structure par RFQ que [`rfq_open`](#rfq_open) |
-| `quoted` | array&lt;rfq&gt; | RFQ sur lesquelles ce compte a coté (apparaît en tant que `maker`) ; même structure par RFQ |
+| `requested` | array&lt;rfq&gt; | RFQs initiées par ce compte (demandeur) ; même structure par RFQ que [`rfq_open`](#rfq_open) |
+| `quoted` | array&lt;rfq&gt; | RFQs sur lesquelles ce compte a soumis une cotation (apparaît en tant que `maker`) ; même structure par RFQ |
 
-Chaque liste itère de manière déterministe par `rfq_id`. Un compte ne participant à rien
-renvoie un **200** avec les deux listes vides (comportement idiomatique à zéro établi).
+Chaque liste est itérée de façon déterministe par `rfq_id`. Un compte ne participant
+à aucune RFQ renvoie un **200** avec les deux listes vides (idiome zéro établi).
 
 ### `fba_batch_state`
 
-Pool FBA en direct et liquidation indicative pour un marché. Voir le [concept FBA](../../concepts/fba.md).
+Pool FBA actif et compensation indicative pour un marché donné. Voir le [concept FBA](../../concepts/fba.md).
 
 ```json
 { "type": "fba_batch_state", "market_id": 3 }
 ```
 
-| Arg | Type | Requis |
+| Arg | Type | Required |
 |-----|------|----------|
-| `market_id` | uint32 | oui |
+| `market_id` | uint32 | yes |
 
 `market_id` absent → `400`. Il n'y a **pas de 404** pour un marché non enregistré : le FBA
-est opt-in par marché ; un marché sans pool renvoie un **200** avec des champs à zéro
-(`enabled:false`, `period_ms:0`, `orders` vide, `indicative:null`).
+est optionnel par marché, donc un marché sans pool renvoie un **200** avec des champs
+à zéro (`enabled:false`, `period_ms:0`, `orders` vide, `indicative:null`).
 
 Réponse :
 
@@ -1673,42 +1237,43 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `market_id` | uint32 | Identifiant de marché renvoyé |
-| `enabled` | bool | Indique si le FBA est activé pour ce marché |
-| `period_ms` | uint32 | Période de lot |
-| `min_lot` | u128 string | Taille de lot minimale, virgule fixe 1e8 |
+| `market_id` | uint32 | Identifiant de marché renvoyé en écho |
+| `enabled` | bool | Indique si le FBA est actif pour ce marché |
+| `period_ms` | uint32 | Période du lot |
+| `min_lot` | u128 string | Taille minimale du lot, virgule fixe 1e8 |
 | `last_settle_ms` | uint64 | Horodatage du dernier règlement de lot (ms consensus) |
-| `next_settle_ms` | uint64 | **Dérivé** `last_settle_ms + period_ms` — la prochaine limite due utilisée par la vérification `is_due` du bloc de début (non stockée explicitement) ; `0` quand `period_ms == 0` |
+| `next_settle_ms` | uint64 | **Dérivé** `last_settle_ms + period_ms` — prochaine échéance utilisée par la vérification `is_due` du begin-block (non stockée explicitement) ; `0` si `period_ms == 0` |
 | `order_count` | uint64 | Ordres dans la fenêtre courante |
 | `bid_count` / `ask_count` | uint64 | Nombre d'ordres par côté dans la fenêtre |
 | `bid_size` / `ask_size` | u128 string | Taille cumulée par côté, virgule fixe 1e8 |
-| `orders[*].oid` | uint64 | Identifiant serveur de l'ordre |
-| `orders[*].owner` | adresse hex | Propriétaire de l'ordre |
+| `orders[*].oid` | uint64 | Identifiant d'ordre côté serveur |
+| `orders[*].owner` | hex address | Propriétaire de l'ordre |
 | `orders[*].side` | `"bid"` / `"ask"` | Côté de l'ordre |
 | `orders[*].price` | i128 string | Prix de l'ordre, virgule fixe 1e8 |
 | `orders[*].size` | u128 string | Taille de l'ordre, virgule fixe 1e8 |
-| `orders[*].stp_group` | uint \| null | Groupe de prévention des auto-transactions ; `null` si non défini |
+| `orders[*].stp_group` | uint \| null | Groupe de protection contre l'auto-négociation ; `null` si non défini |
 | `orders[*].submitted_at_ms` | uint64 | Horodatage de soumission de l'ordre (ms consensus) |
-| `indicative` | object \| null | Le prix uniforme maximisant le volume + la taille appariée que le **prochain** lot *liquiderait* compte tenu de la fenêtre courante — calculé en lecture seule, **pas encore réglé / validé**. `null` quand il n'y a pas de croisement (fenêtre unilatérale ou vide) |
-| `indicative.clearing_px` | i128 string | Prix de liquidation uniforme indicatif, virgule fixe 1e8 |
-| `indicative.matched_size` | u128 string | Taille qui serait liquidée à `clearing_px`, virgule fixe 1e8 |
+| `indicative` | object \| null | Prix uniforme maximisant le volume + taille appariée que le **prochain** lot *clôturerait* compte tenu de la fenêtre actuelle — calculé en lecture seule, **pas encore réglé / validé**. `null` si aucun croisement (fenêtre unilatérale ou vide) |
+| `indicative.clearing_px` | i128 string | Prix de compensation uniforme indicatif, virgule fixe 1e8 |
+| `indicative.matched_size` | u128 string | Taille qui serait compensée au `clearing_px`, virgule fixe 1e8 |
 
 ### `pm_summary`
 
-Inscription à la marge de portefeuille + derniers chiffres de scénario calculés pour un compte. Voir [Marge de portefeuille](../../concepts/portfolio-margin.md).
+Inscription à la marge de portefeuille et derniers résultats de scénarios calculés pour un compte. Voir [Marge de portefeuille](../../concepts/portfolio-margin.md).
 
 ```json
 { "type": "pm_summary", "account_id": 42 }
 ```
 
-| Arg | Type | Requis |
+| Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | l'un de `account_id` / `address` |
-| `address` | hex address | l'un de `account_id` / `address` |
+| `account_id` | uint64 | one of `account_id` / `address` |
+| `address` | hex address | one of `account_id` / `address` |
 
-Soit `account_id` (u64), soit `address` (hex en 0x) ; si aucun n'est présent → `400`. Un compte non inscrit renvoie un **200** avec `enrolled:false` et des chiffres à zéro.
+Soit `account_id` (u64), soit `address` (hex 0x) ; aucun des deux présent → `400`. Un
+compte non inscrit renvoie un **200** avec `enrolled:false` et des chiffres à zéro.
 
 Réponse :
 
@@ -1728,228 +1293,34 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `address` | hex address | Adresse du compte résolue |
-| `account_id` | uint64 | Renvoyé uniquement lorsque la requête utilisait `account_id` |
+| `address` | hex address | Adresse de compte résolue |
+| `account_id` | uint64 | Renvoyé uniquement si la requête utilisait `account_id` |
 | `enrolled` | bool | Indique si le compte est inscrit à la marge de portefeuille |
 | `enrolled_at_ms` | uint64 | Horodatage d'inscription (ms consensus) ; `0` si non inscrit |
 | `last_computed_block` | uint64 | Hauteur de bloc du dernier calcul de scénario PM |
-| `pm_maint_margin_cents` | u128 string | Exigence de marge de maintien PM calculée en dernier lieu, **centimes USD** |
-| `net_value_cents` | i128 string | Valeur nette du compte calculée en dernier lieu, **centimes USD** |
-| `concentration_penalty_cents` | u128 string | Pénalité de concentration calculée en dernier lieu, **centimes USD** |
+| `pm_maint_margin_cents` | u128 string | Exigence de marge de maintenance PM calculée en dernier, **centimes USD** |
+| `net_value_cents` | i128 string | Valeur nette du compte calculée en dernier, **centimes USD** |
+| `concentration_penalty_cents` | u128 string | Pénalité de concentration calculée en dernier, **centimes USD** |
 
-La perte dans le pire scénario est intentionnellement **omise** : elle n'est pas persistée dans l'état validé, et la recalculer nécessiterait de relancer le balayage de scénarios, ce qui n'est pas une opération en lecture seule.
+La perte en scénario pessimiste est intentionnellement **omise** : elle n'est pas
+persistée dans l'état validé, et la recalculer nécessiterait de rejouer le balayage
+de scénarios, ce qui n'est pas une opération en lecture seule.
 
-## Types de requête de snapshot de nœud
+## Types de requêtes sur le snapshot de nœud
 
-Les types de requête suivants exposent la surface de snapshot de l'état validé du nœud. Chacun lit le `core_state::Exchange` validé et utilise la même enveloppe `{type, data}` ainsi que les conventions natives MTF (montants en chaîne décimale, adresses en hex `0x`, ids d'actifs en `u32`, ordre `BTreeMap`). Les recherches par clé (par adresse / actif) ne sont pas des scans O(N), sauf lorsque l'ensemble est intrinsèquement petit (marchés / vaults / validateurs) ou déjà indexé (`liquidatable` via l'index BOLE). Ils sont répartis ci-dessous par type de trading — les lectures [spot / spot-margin / Earn](#spot-spot-margin--earn-query-types) d'abord, puis les lectures de snapshot [générales](#general-node-snapshot-query-types) (contrats perpétuels et transversales). Les lectures de marchés perpétuels se trouvent dans la section principale [Types de requête](#query-types) ci-dessus, où les perpétuels sont la valeur par défaut.
+Les types de requêtes suivants exposent la surface de snapshot de l'état validé du nœud. Chacun lit le `core_state::Exchange` validé et utilise la même enveloppe `{type, data}` ainsi que les conventions natives MTF (montants en chaîne décimale, adresses hex `0x`, identifiants d'actifs `u32`, ordre `BTreeMap`). Les recherches sont indexées (par adresse / actif), sans balayages O(N), sauf lorsque l'ensemble est intrinsèquement petit (marchés / coffres / validateurs) ou déjà indexé (`liquidatable` via l'index BOLE). Les lectures de snapshots spot / marge spot / Earn disposent de leur propre page ([requêtes spot & marge](./info/spot.md)) ; les lectures de marchés perpétuels se trouvent sur la page [requêtes perpétuels](./info/perpetuals.md). Les lectures de snapshots générales (transversales) sont présentées ci-dessous.
 
-## Types de requête Spot, spot-margin & Earn
+## Types de requêtes générales sur le snapshot de nœud
 
-Surface de lecture pour les marchés [spot](../../products/spot.md), le
-[spot margin](../../products/spot-margin.md) à effet de levier, et le
-pool de prêt [Earn](../../concepts/earn.md).
-
-### `spot_meta`
-
-Univers des paires spot + registre par jeton. Aucun paramètre.
-
-```json
-{ "type": "spot_meta" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "spot_meta",
-  "data": {
-    "pairs": [
-      { "id": 100, "name": "USDC", "base": 100, "quote": 100, "taker_fee_bps": 0, "min_notional": "0", "active": true },
-      { "id": 101, "name": "BTC",  "base": 101, "quote": 101, "taker_fee_bps": 0, "min_notional": "0", "active": false },
-      { "id": 104, "name": "MTF",  "base": 104, "quote": 104, "taker_fee_bps": 0, "min_notional": "0", "active": false },
-      { "id": 110, "name": "BTC/USDC", "base": 101, "quote": 100, "taker_fee_bps": 5, "min_notional": "100", "active": true },
-      { "id": 113, "name": "MTF/USDC", "base": 104, "quote": 100, "taker_fee_bps": 5, "min_notional": "100", "active": true }
-    ],
-    "tokens": [
-      { "id": 100, "name": "USDC", "sz_decimals": 2, "wei_decimals": 6 },
-      { "id": 101, "name": "BTC",  "sz_decimals": 5, "wei_decimals": 8 },
-      { "id": 102, "name": "ETH",  "sz_decimals": 4, "wei_decimals": 18 },
-      { "id": 103, "name": "SOL",  "sz_decimals": 2, "wei_decimals": 9 },
-      { "id": 104, "name": "MTF",  "sz_decimals": 2, "wei_decimals": 8 }
-    ]
-  }
-}
-```
-
-:::info
-**`pairs` contient deux types d'entrée.** Les « paires auto-référentes » par jeton (`id` =
-id du jeton, `base == quote`, ex. `100`/USDC, `101`/BTC, …, `104`/MTF) sont le
-registre des jetons projeté sous forme de paires ; les **vraies paires négociables** ont des ids `110+`
-(`BTC/USDC`=110, `ETH/USDC`=111, `SOL/USDC`=112, `MTF/USDC`=113) avec des
-`base`/`quote` distincts et `active:true`. Le champ `active` d'une paire auto-référente indique si le carnet d'ordres autonome de ce jeton est actif (seul USDC l'est, sur le devnet).
-:::
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `pairs[*].id` | uint32 | Id de la paire (`SpotPairSpec.pair_id`) ; `110+` = vraies paires `BASE/USDC` |
-| `pairs[*].name` | string | Nom de la paire (ex. `"BTC/USDC"`) |
-| `pairs[*].base` / `quote` | uint32 | Id d'actif de base / de cotation (identiques pour les paires auto-référentes) |
-| `pairs[*].taker_fee_bps` | uint16 | Frais preneur (bps) ; `0` si non défini |
-| `pairs[*].min_notional` | decimal string | Montant notionnel minimum (centimes USDC) ; `"0"` si non défini |
-| `pairs[*].active` | bool | Indique si la paire est active pour le trading |
-| `tokens[*].id` | uint32 | Id d'actif spot du jeton (`100`=USDC, `101`=BTC, `102`=ETH, `103`=SOL, `104`=MTF) |
-| `tokens[*].name` | string | Nom du jeton (ex. `"USDC"`, `"MTF"`) |
-| `tokens[*].sz_decimals` | uint8 | Précision d'affichage / de taille |
-| `tokens[*].wei_decimals` | uint8 | Décimales natives du jeton (style ERC-20) (USDC=6, BTC=8, ETH=18, SOL=9, MTF=8) |
-
-`tokens` et `pairs` sont dans l'ordre `BTreeMap` validé (par id d'actif / de paire).
-
-Source d'état : `Exchange.mip3_spot_pair_specs` (paires) + `Exchange.mip3_spot_token_specs` (jetons).
-
-### `spot_clearinghouse_state`
-
-Soldes des jetons spot par compte. Requis : `address` (hex en 0x).
-
-```json
-{ "type": "spot_clearinghouse_state", "address": "0x<addr>" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "spot_clearinghouse_state",
-  "data": {
-    "address": "0x<addr>",
-    "balances": [ { "asset": 104, "name": "MTF", "total": "10", "hold": "0" } ]
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `balances[*].asset` | uint32 | Id d'actif spot (`104` = MTF) |
-| `balances[*].name` | string | Nom du jeton / de la paire, sinon `asset:<id>` |
-| `balances[*].total` | decimal string | Solde total, tronqué vers zéro |
-| `balances[*].hold` | decimal string | Bloqué en garantie des ordres spot au repos (séquestre) ; disponible = `total − hold` |
-
-L'ensemble des jetons est l'union des clés de solde et de séquestre (`reserved`) du compte —
-un jeton entièrement bloqué avec un solde disponible nul apparaît quand même. Analyse par plage
-par compte (sans parcours de table complète). Source d'état :
-`locus.spot_clearinghouse.{balances, reserved}` (tous deux indexés par `(owner, asset)`).
-
-### `spot_margin_state`
-
-:::info
-**Disponible sur le devnet (aperçu).** Surface de lecture pour le [spot margin](../../products/spot-margin.md) à effet de levier ; voir la page de concept pour les mises en garde de l'aperçu.
-:::
-
-Toutes les positions de spot-margin détenues par un compte. Requis : `user` (hex en 0x).
-
-```json
-{ "type": "spot_margin_state", "user": "0x<addr>" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "spot_margin_state",
-  "data": {
-    "user": "0x<addr>",
-    "accounts": [
-      {
-        "pair": 200,
-        "collateral": "5",
-        "borrowed": "20",
-        "borrow_index_snapshot": "1",
-        "base_held": "9.99",
-        "current_debt": "22",
-        "params": { "init_bps": 2000, "maint_bps": 1000 }
-      }
-    ]
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `accounts[*].pair` | uint32 | Id de la paire spot sur laquelle la position est ouverte |
-| `accounts[*].collateral` | decimal string | Garantie en cotation déposée (tampon contre les pertes) |
-| `accounts[*].borrowed` | decimal string | **Principal** du prêt en cours (à l'index snapshot) |
-| `accounts[*].borrow_index_snapshot` | decimal string | Index d'emprunt du pool capturé à l'ouverture (base d'accumulation de la dette) |
-| `accounts[*].base_held` | decimal string | Actif de base ségrégué acheté avec effet de levier (non inclus dans les soldes disponibles) |
-| `accounts[*].current_debt` | decimal string | Dette accumulée à ce jour : `borrowed × (pool_index / snapshot)` |
-| `accounts[*].params` | object \| null | `{ init_bps, maint_bps }` par paire ; `null` = marge non activée / non calibrée pour la paire |
-
-Les positions sont listées par ordre d'id de paire. Un compte sans position renvoie un tableau `accounts` vide.
-
-### `earn_state`
-
-:::info
-**Disponible sur le devnet (aperçu).** Surface de lecture pour les pools de prêt [Earn](../../concepts/earn.md) ; voir la page de concept pour les mises en garde de l'aperçu.
-:::
-
-Chaque pool de prêt Earn, ainsi que la mise d'un compte lorsque `user` est fourni. Facultatif : `user` (hex en 0x).
-
-```json
-{ "type": "earn_state", "user": "0x<addr>" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "earn_state",
-  "data": {
-    "pools": [
-      {
-        "asset": 100,
-        "total_supplied": "1000",
-        "total_borrowed": "20",
-        "idle": "980",
-        "shares_total": "1000",
-        "share_value": "1",
-        "borrow_index": "1",
-        "reserve_factor_bps": 1000,
-        "borrow_rate_bps_annual": 0,
-        "reserve_accrued": "0",
-        "user_shares": "100",
-        "user_value": "100"
-      }
-    ]
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `pools[*].asset` | uint32 | Id de l'actif de cotation prêtable (clé du pool) |
-| `pools[*].total_supplied` | decimal string | VNI du pool — principal apporté plus intérêts remboursés intégrés |
-| `pools[*].total_borrowed` | decimal string | Cotation actuellement prêtée aux emprunteurs spot-margin |
-| `pools[*].idle` | decimal string | `total_supplied − total_borrowed` — la limite retirable instantanément |
-| `pools[*].shares_total` | decimal string | Total des parts en circulation |
-| `pools[*].share_value` | decimal string | `total_supplied / shares_total` (`0` quand il n'y a pas de parts) |
-| `pools[*].borrow_index` | decimal string | Index d'emprunt cumulatif (base d'accumulation de la dette) |
-| `pools[*].reserve_factor_bps` | uint16 | Part protocolaire des intérêts d'emprunt (bps) |
-| `pools[*].borrow_rate_bps_annual` | uint32 | Taux d'emprunt annualisé (bps) |
-| `pools[*].reserve_accrued` | decimal string | Réserve protocolaire accumulée sur les intérêts |
-| `pools[*].user_shares` | decimal string | **Uniquement avec `user`** — parts détenues par le compte dans le pool |
-| `pools[*].user_value` | decimal string | **Uniquement avec `user`** — `user_shares × share_value` |
-
-Les pools sont listés par ordre d'id d'actif. Omettre `user` supprime les champs `user_shares` / `user_value`.
-
-## Types de requête de snapshot de nœud généraux
-
-Lectures de snapshot de nœud non spécifiques à un produit de trading — statut de l'exchange,
-helpers frontend / ordres ouverts, liquidation, limites de débit, vaults, validateurs,
-multi-signature et le `web_data2` agrégé.
+Lectures de snapshots de nœud non spécifiques à un produit de trading — statut de la plateforme,
+aide au frontend / ordres ouverts, liquidation, limites de débit, coffres, validateurs,
+multi-signatures, et le `web_data2` agrégé.
 
 ### `exchange_status`
 
-Statut global du trading. Aucun paramètre.
+Statut global des échanges. Aucun paramètre.
 
 ```json
 { "type": "exchange_status" }
@@ -1970,19 +1341,19 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `spot_disabled` | bool | Trading spot désactivé globalement |
+| `spot_disabled` | bool | Trading spot globalement désactivé |
 | `post_only_until_time_ms` | uint64 | Fin de la fenêtre post-only (ms consensus) ; `0` = aucune |
 | `post_only_until_height` | uint64 | Fin de la fenêtre post-only (hauteur) ; `0` = aucune |
 | `scheduled_freeze_height` | uint64 \| null | Hauteur de gel programmée pour une mise à niveau, `null` si aucune |
-| `mip3_enabled` | bool | `true` dès qu'une spec de marché/paire MIP-3 est enregistrée |
+| `mip3_enabled` | bool | `true` dès qu'une spécification de marché/paire MIP-3 est enregistrée |
 
 Source d'état : `spot_disabled`, `post_only_until_*`, `scheduled_freeze_height`, `mip3_market_specs` / `mip3_spot_pair_specs`.
 
 ### `frontend_open_orders`
 
-Similaire à `open_orders`, avec en plus le détail `tif` / `cloid` / `trigger` de chaque ordre. Requis : `address` (hex en 0x).
+Similaire à `open_orders`, avec en plus le détail `tif` / `cloid` / `trigger` de chaque ordre. Requis : `address` (hex 0x).
 
 ```json
 { "type": "frontend_open_orders", "address": "0x<addr>" }
@@ -2007,103 +1378,22 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `orders[*].oid` | uint64 | Id d'ordre on-chain |
-| `orders[*].market_id` | uint32 | Id d'actif |
-| `orders[*].side` | `"bid" \| "ask"` | Sens de l'ordre |
+| `orders[*].oid` | uint64 | Identifiant d'ordre on-chain |
+| `orders[*].market_id` | uint32 | Identifiant d'actif |
+| `orders[*].side` | `"bid" \| "ask"` | Côté de l'ordre |
 | `orders[*].px` / `size` | decimal string | Prix au repos / taille restante |
 | `orders[*].tif` | `"alo" \| "ioc" \| "gtc"` | Durée de validité |
-| `orders[*].cloid` | hex string \| null | Id d'ordre client, `null` si aucun |
+| `orders[*].cloid` | hex string \| null | Identifiant d'ordre client, `null` si aucun |
 | `orders[*].trigger` | object \| null | `{trigger_px, trigger_above}` si un déclencheur est enregistré pour l'oid, sinon `null` |
 | `orders[*].inserted_at_ms` | uint64 | Horodatage d'insertion (ms consensus) |
 
 Source d'état : ordres au repos par carnet + `Exchange.trigger_registry`.
 
-### `liquidatable`
-
-Comptes actuellement signalés pour liquidation. Aucun paramètre.
-
-```json
-{ "type": "liquidatable" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "liquidatable",
-  "data": { "accounts": [ { "address": "0x<addr>", "tier": "PartialMarket50" } ] }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `accounts[*].address` | hex address | Compte nécessitant une action |
-| `accounts[*].tier` | `"YellowCard" \| "PartialMarket50" \| "FullMarket" \| "BackstopTakeover"` | Niveau BOLE |
-
-Source d'état : `Exchange.bole_index.tier` (l'index BOLE des comptes nécessitant une action — **pas** un rescan complet des comptes).
-
-> **ATTENTION.** `bole_index` est `#[serde(skip)]` — état dérivé non canonique, reconstruit par un scan complet lors de la première utilisation / après le chargement d'un snapshot. Sur un snapshot fraîchement publié, il est vide tant que le runtime n'a pas exécuté au moins une fois le processus BOLE.
-
-### `active_asset_data`
-
-Levier / mode de marge / taille maximale de trade par actif pour un utilisateur. Requis : `address` (hex en 0x) + `asset_id` (u32).
-
-```json
-{ "type": "active_asset_data", "address": "0x<addr>", "asset_id": 0 }
-```
-
-Réponse :
-
-```json
-{
-  "type": "active_asset_data",
-  "data": {
-    "address": "0x<addr>", "asset_id": 0, "leverage": 7,
-    "margin_mode": "isolated", "max_trade_size": "5000000000", "has_position": true
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `leverage` | uint32 | Levier de la position si ouverte, sinon valeur par défaut du compte, sinon maximum du marché |
-| `margin_mode` | `"cross" \| "isolated" \| "strict_iso"` | Mode de marge effectif |
-| `max_trade_size` | decimal string | Plafond d'ordre maximal par actif (voir `max_market_order_ntls`) |
-| `has_position` | bool | Indique si l'utilisateur a une position non nulle sur cet actif |
-
-Source d'état : `locus.clearinghouses[asset].positions[addr]`, `locus.user_account_configs[addr]`, spec de marché / risque dynamique.
-
-### `max_market_order_ntls`
-
-Valeur notionnelle maximale des ordres au marché par actif. Aucun paramètre.
-
-```json
-{ "type": "max_market_order_ntls" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "max_market_order_ntls",
-  "data": { "ntls": [ { "asset_id": 0, "max_market_order_ntl": "5000000000" } ] }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `ntls[*].asset_id` | uint32 | Identifiant de l'actif |
-| `ntls[*].max_market_order_ntl` | decimal string | Plafond de taille dérivé du cap d'intérêt ouvert |
-
-Source d'état : `PerpAnnotation.oi_cap` par marché, sinon `default_mip3_limits.max_oi_per_market`.
-
-> **SIGNALÉ.** Aucun champ dédié « valeur notionnelle maximale d'un ordre au marché » par actif n'existe dans l'état validé ; le cap d'intérêt ouvert constitue le plafond de risque validé le plus proche, exprimé en unités de **taille** (la couche de correspondance le convertit en notionnel au mark live).
-
 ### `vault_summaries`
 
-Résumé de tous les coffres. Aucun paramètre.
+Récapitulatif de tous les coffres. Aucun paramètre.
 
 ```json
 { "type": "vault_summaries" }
@@ -2122,21 +1412,21 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `vaults[*].id` | uint64 | Identifiant du coffre |
-| `vaults[*].address` / `leader` | hex address | Adresse on-chain du coffre / leader |
-| `vaults[*].tvl` | decimal string | Proxy de la VNL (plus-haut historique, en centimes USD) |
+| `vaults[*].address` / `leader` | hex address | Adresse on-chain du coffre / responsable |
+| `vaults[*].tvl` | decimal string | Approximation de la VL (seuil historique haut, centimes USD) |
 | `vaults[*].follower_count` | uint64 | Nombre de détenteurs de parts |
 | `vaults[*].kind` | `"user" \| "metaliquidity"` | Type de coffre |
 
 Source d'état : `Exchange.user_vaults`.
 
-> **SIGNALÉ.** `tvl` utilise le plus-haut historique comme proxy de la VNL ; la VNL complète nécessite le moteur de correspondance et l'oracle.
+> **SIGNALÉ.** `tvl` utilise le seuil historique haut comme approximation de la VL ; la VL complète nécessite le moteur de correspondance + l'oracle.
 
 ### `user_vault_equities`
 
-Coffres dans lesquels un utilisateur a déposé des fonds, avec parts et équité. Paramètre requis : `address` (hex 0x).
+Coffres dans lesquels un utilisateur a déposé des fonds, avec ses parts / capitaux propres. Requis : `address` (hex 0x).
 
 ```json
 { "type": "user_vault_equities", "address": "0x<addr>" }
@@ -2154,18 +1444,18 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `equities[*].vault_id` | uint64 | Identifiant du coffre |
 | `equities[*].vault_address` | hex address | Adresse du coffre |
 | `equities[*].shares` | decimal string | Nombre de parts de l'appelant (18 décimales) |
-| `equities[*].equity` | decimal string | `parts × prix_de_part(plus_haut_historique)`, tronqué |
+| `equities[*].equity` | decimal string | `parts × prix_de_part(seuil_historique_haut)`, tronqué |
 
 Source d'état : `user_vaults[*].follower_shares[addr]` (indexé par coffre).
 
 ### `leading_vaults`
 
-Coffres dirigés par l'utilisateur. Paramètre requis : `address` (hex 0x). Retourne la même structure de ligne que `vault_summaries`.
+Coffres dont l'utilisateur est responsable. Requis : `address` (hex 0x). Renvoie la même structure de ligne que `vault_summaries`.
 
 ```json
 { "type": "leading_vaults", "address": "0x<addr>" }
@@ -2181,7 +1471,7 @@ Source d'état : `Exchange.user_vaults` filtré par `leader == addr`.
 
 ### `user_rate_limit`
 
-Statistiques d'actions et budget de limite de débit d'un utilisateur. Paramètre requis : `address` (hex 0x).
+Statistiques d'actions d'un utilisateur / budget de limite de débit. Requis : `address` (hex 0x).
 
 ```json
 { "type": "user_rate_limit", "address": "0x<addr>" }
@@ -2196,48 +1486,17 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `last_nonce` | uint64 | Dernier nonce d'action accepté |
-| `pending_count` | uint32 | Nombre d'actions en attente (en vol) |
+| `pending_count` | uint32 | Nombre d'actions en attente (en transit) |
 | `lifetime_count` | uint64 | Total des actions soumises depuis la création |
 
-Source d'état : `locus.user_action_registry[addr]` (`UserActionStats`) ; compte absent → valeurs nulles.
-
-### `spot_deploy_state`
-
-État de l'enchère au gaz pour le déploiement de paires spot MIP-1. Aucun paramètre.
-
-```json
-{ "type": "spot_deploy_state" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "spot_deploy_state",
-  "data": {
-    "auction_round": 3, "current_bid": "999", "current_winner": "0x<bidder>",
-    "auction_end_ms": 0, "started_at_ms": 0, "total_burned": "4200", "deposit": "0"
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `auction_round` | uint64 | Tour en cours |
-| `current_bid` | decimal string | Offre en tête |
-| `current_winner` | hex address \| null | Enchérisseur actuellement en tête |
-| `auction_end_ms` / `started_at_ms` | uint64 | Fenêtre d'enchère (ms consensus) |
-| `total_burned` | decimal string | Notionnel cumulé des offres gagnantes brûlées |
-| `deposit` | decimal string | Total du dépôt en séquestre (unités de base) |
-
-Source d'état : `Exchange.spot_pair_deploy_gas_auction`.
+Source d'état : `locus.user_action_registry[addr]` (`UserActionStats`) ; compte absent → valeurs à zéro.
 
 ### `delegator_summary`
 
-Résumé de staking pour une adresse. Paramètre requis : `address` (hex 0x).
+Récapitulatif de staking pour une adresse. Requis : `address` (hex 0x).
 
 ```json
 { "type": "delegator_summary", "address": "0x<addr>" }
@@ -2255,18 +1514,18 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `total_delegated` | decimal string | Somme des délégations actives |
-| `pending_withdrawal` | decimal string | Somme des undélégations en attente |
-| `claimable_rewards` | decimal string | Récompenses de délégateur accumulées |
+| `pending_withdrawal` | decimal string | Somme des dé-délégations en attente |
+| `claimable_rewards` | decimal string | Récompenses de délégation accumulées |
 | `n_delegations` | uint64 | Nombre de délégations actives |
 
 Source d'état : `c_staking.{delegations, pending_undelegations, delegator_rewards}`.
 
 ### `max_builder_fee`
 
-Plafond de frais builder approuvé pour `(address, builder)`. Paramètres requis : `address` (hex 0x) + `builder` (hex 0x).
+Plafond de frais de constructeur approuvé pour `(address, builder)`. Requis : `address` (hex 0x) + `builder` (hex 0x).
 
 ```json
 { "type": "max_builder_fee", "address": "0x<addr>", "builder": "0x<builder>" }
@@ -2281,10 +1540,10 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `max_fee_bps` | uint32 | Plafond en bps approuvé ; `0` si non approuvé |
-| `approved` | bool | Indique si `(address, builder)` est une paire approuvée |
+| `approved` | bool | Indique si la paire `(address, builder)` est approuvée |
 
 Source d'état : `locus.fee_tracker.approved_builders[addr][builder]` (indexé).
 
@@ -2305,17 +1564,17 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `is_multi_sig` | bool | Indique si le compte est multisig |
-| `threshold` | uint32 | Seuil M-sur-N ; `0` si non multisig |
+| `threshold` | uint32 | Seuil M-parmi-N ; `0` si non multisig |
 | `signers` | hex address[] | Ensemble des signataires ; vide si non multisig |
 
 Source d'état : `multi_sig_tracker.configs[addr]` (`MultiSigConfig`).
 
 ### `user_role`
 
-Rôle de compte dérivé. Paramètre requis : `address` (hex 0x).
+Rôle dérivé du compte. Paramètre requis : `address` (hex 0x).
 
 ```json
 { "type": "user_role", "address": "0x<addr>" }
@@ -2327,31 +1586,11 @@ Réponse :
 { "type": "user_role", "data": { "address": "0x<addr>", "role": "user" } }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `role` | `"missing" \| "user" \| "agent" \| "vault" \| "sub_account"` | Rôle dérivé |
 
-Priorité : `vault` (une `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (agent approuvé d'un compte maître) → `user` (possède un état utilisateur / config / entrée spot) → `missing`.
-
-### `perps_at_open_interest_cap`
-
-Actifs dont l'intérêt ouvert atteint ou dépasse le plafond. Aucun paramètre.
-
-```json
-{ "type": "perps_at_open_interest_cap" }
-```
-
-Réponse :
-
-```json
-{ "type": "perps_at_open_interest_cap", "data": { "assets": [0] } }
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `assets` | uint32[] | Identifiants d'actifs à ou au-dessus de leur `oi_cap`, ordre croissant |
-
-Source d'état : `open_interest` par carnet d'ordres vs `PerpAnnotation.oi_cap` (les carnets sans cap positif sont ignorés).
+Priorité : `vault` (une `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (un agent approuvé d'un compte maître) → `user` (possède un état utilisateur / une config / une entrée spot) → `missing`.
 
 ### `validator_l1_votes`
 
@@ -2373,68 +1612,18 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `latest_round` | uint64 | Dernier tour de vote accepté |
 | `votes[*].round` | uint64 | Tour du vote |
 | `votes[*].validator` | hex address | Validateur ayant soumis le vote |
 | `votes[*].submitted_at_ms` | uint64 | Horodatage de soumission (ms consensus) |
 
-Source d'état : `validator_l1_vote_tracker.round_to_votes`. La charge utile du vote est constituée d'octets oracle opaques (décodés par le Module H) — la surface de lecture rapporte les métadonnées, non la charge brute.
-
-### `margin_table`
-
-Table des paliers de marge (levier → ratios de maintien / initial). Aucun paramètre.
-
-```json
-{ "type": "margin_table" }
-```
-
-Réponse :
-
-```json
-{
-  "type": "margin_table",
-  "data": { "tiers": [ { "asset_id": 0, "max_leverage": 50, "maint_margin_ratio": "300", "init_margin_ratio": "200" } ] }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `tiers[*].asset_id` | uint32 | Identifiant de l'actif |
-| `tiers[*].max_leverage` | uint8 | Levier maximal effectif (priorité aux valeurs de remplacement, sinon valeur statique) |
-| `tiers[*].maint_margin_ratio` | bps string | Ratio de marge de maintien (priorité aux valeurs de remplacement, sinon plancher statique de 3 %) |
-| `tiers[*].init_margin_ratio` | bps string | `1 / max_leverage` |
-
-Source d'état : `dynamic_risk_overrides[asset]`, sinon la base de référence statique.
-
-> **SIGNALÉ.** L'état validé stocke un seul palier de risque effectif par marché (valeur de remplacement ou statique), et non l'échelle de levier multi-lignes servie par HL. Le proxy correspond à un palier par marché — la ligne appliquée par le moteur aujourd'hui.
-
-### `perp_dexs`
-
-Lister le ou les DEX de perpétuels. Aucun paramètre.
-
-```json
-{ "type": "perp_dexs" }
-```
-
-Réponse :
-
-```json
-{ "type": "perp_dexs", "data": { "dexs": [ { "index": 0, "n_assets": 1, "assets": [0] } ] } }
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `dexs[*].index` | uint64 | Indice du DEX dans `Exchange.perp_dexs` |
-| `dexs[*].n_assets` | uint64 | Nombre de carnets d'actifs dans le DEX |
-| `dexs[*].assets` | uint32[] | Identifiants d'actifs dans le DEX |
-
-Source d'état : `Exchange.perp_dexs`.
+Source d'état : `validator_l1_vote_tracker.round_to_votes`. Le contenu du vote est une donnée oracle opaque (décodée par le Module H) — la surface de lecture rapporte uniquement les métadonnées, pas la charge brute.
 
 ### `validator_summaries`
 
-Instantané par validateur (HL `validatorSummaries`). Aucun paramètre. Liste chaque validateur dans `c_staking.validators` validé (ensemble petit et borné) selon l'ordre `BTreeMap` validé.
+Instantané par validateur (HL `validatorSummaries`). Aucun paramètre. Répertorie chaque validateur dans `c_staking.validators` engagé (un ensemble restreint et borné) dans l'ordre `BTreeMap` engagé.
 
 ```json
 { "type": "validator_summaries" }
@@ -2461,28 +1650,28 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
 | `epoch` | uint64 | Époque de staking actuelle (`c_staking.current_epoch`) |
 | `total_stake` | decimal string | Σ mise de l'ensemble des validateurs |
 | `n_active` | uint64 | Taille de l'ensemble actif |
 | `validators[*].validator` | 0x address | Adresse principale du validateur |
 | `validators[*].signer` | 0x address | Signataire opérationnel (clé chaude) |
-| `validators[*].validator_index` | uint32 | Indice de consensus |
+| `validators[*].validator_index` | uint32 | Index de consensus |
 | `validators[*].stake` | decimal string | Mise totale déléguée |
 | `validators[*].self_stake` | decimal string | Contribution propre du validateur |
 | `validators[*].commission_bps` | uint32 | Commission (points de base) |
-| `validators[*].is_active` | bool | Dans l'ensemble actif cette époque |
-| `validators[*].is_jailed` | bool | Actuellement emprisonné |
-| `validators[*].jailed_at_ms` | uint64 \| null | Horodatage de début d'emprisonnement (null si non emprisonné) |
-| `validators[*].unjail_at_ms` | uint64 \| null | Horodatage d'emprisonnement le plus tôt possible (null si non emprisonné) |
-| `validators[*].first_active_epoch` | uint64 | Première époque où le validateur était actif |
+| `validators[*].is_active` | bool | Présent dans l'ensemble actif pour cette époque |
+| `validators[*].is_jailed` | bool | Actuellement emprisonné (jailed) |
+| `validators[*].jailed_at_ms` | uint64 \| null | Horodatage de début d'emprisonnement (null si non jailed) |
+| `validators[*].unjail_at_ms` | uint64 \| null | Horodatage de libération au plus tôt (null si non jailed) |
+| `validators[*].first_active_epoch` | uint64 | Première époque d'activité du validateur |
 
 Source d'état : `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` ne sont pas suivis on-chain — omis plutôt que fabriqués.
 
 ### `gossip_root_ips`
 
-Points de terminaison pairs gossip racine/graine configurés (HL `gossipRootIps`). Aucun paramètre. Topologie réseau, **non** engagée dans l'état : au démarrage, le nœud publie ses propres points de terminaison `network.peers[].gossip` dans la couche de lecture. Un nœud isolé n'a aucun pair → vide (comportement honnête).
+Points d'accès des pairs racines/d'amorçage du gossip configurés (HL `gossipRootIps`). Aucun paramètre. Topologie réseau, **non** état engagé : le runtime publie les points d'accès `network.peers[].gossip` de ce nœud vers la couche de lecture au démarrage. Un nœud isolé n'a aucun pair → résultat honnêtement vide.
 
 ```json
 { "type": "gossip_root_ips" }
@@ -2494,15 +1683,15 @@ Réponse :
 { "type": "gossip_root_ips", "data": { "root_ips": ["seed-a.example:4001", "seed-b.example:4001"] } }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `root_ips` | string[] | Points de terminaison pairs gossip configurés (`host:port`) ; vide sur un nœud isolé |
+| `root_ips` | string[] | Points d'accès des pairs gossip configurés (`host:port`) ; vide sur un nœud isolé |
 
-Source d'état : configuration du nœud `network.peers[].gossip` (publiée dans `NodeReadState` au démarrage ; PAS un état engagé, PAS intégré dans AppHash).
+Source d'état : configuration du nœud `network.peers[].gossip` (publiée dans `NodeReadState` au démarrage ; PAS un état engagé, PAS intégré à l'AppHash).
 
 ### `web_data2`
 
-Instantané composite « tout pour le frontend » pour une adresse. Requis : `address` (hex 0x). Composé à partir des autres lecteurs afin que les structures ne divergent jamais.
+Instantané composite « tout pour le frontend » pour une adresse. Paramètre requis : `address` (hex 0x). Composé à partir des autres lecteurs afin que les structures ne divergent jamais.
 
 ```json
 { "type": "web_data2", "address": "0x<addr>" }
@@ -2527,9 +1716,9 @@ Réponse :
 }
 ```
 
-| Champ | Type | Description |
+| Field | Type | Description |
 |-------|------|-------------|
-| `clearinghouse.account_value` | decimal string | Valeur du compte en mode croisé |
+| `clearinghouse.account_value` | decimal string | Valeur du compte en position croisée |
 | `clearinghouse.margin_used` | decimal string | Σ marge utilisée par actif |
 | `clearinghouse.positions` | object[] | Positions ouvertes par actif |
 | `spot_balances` | object[] | Réutilise `spot_clearinghouse_state.balances` |
@@ -2537,27 +1726,27 @@ Réponse :
 | `vault_equities` | object[] | Réutilise `user_vault_equities.equities` |
 | `exchange_status` | object | Réutilise `exchange_status.data` |
 
-Source d'état : composite sur les lecteurs ci-dessus.
+Source d'état : composite des lecteurs ci-dessus.
 
-## Alias hl-compat → type natif MTF (tableau de parité)
+## Alias hl-compat → type natif MTF (table de parité)
 
-La surface [hl-compat](./hl-compat.md) de la passerelle expose chaque type d'instantané de nœud sous un alias camelCase pour les clients en remplacement direct. La colonne de gauche est cet alias ; la colonne centrale est le type de nœud natif MTF auquel il correspond ; ✅ = servi, ⚠️ = servi avec un proxy signalé (pas de correspondance exacte dans l'état engagé).
+La surface [hl-compat](./hl-compat.md) de la passerelle expose chaque type d'instantané de nœud sous un alias camelCase pour les clients en remplacement direct. La colonne de gauche est cet alias ; la colonne centrale est le type de nœud natif MTF correspondant ; ✅ = servi, ⚠️ = servi avec un proxy signalé (sans correspondance exacte dans l'état engagé).
 
-| Alias hl-compat | Type natif MTF | Statut | Notes |
+| hl-compat alias | MTF-native type | Status | Notes |
 |----------------------------|------------------------------|--------|-------|
-| `meta` | `markets` | ✅ | déjà servi (S6) |
+| `meta` | `markets` | ✅ | déjà servi |
 | `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
-| `clearinghouseState` | `account_state` | ✅ | déjà servi (S6) |
+| `clearinghouseState` | `account_state` | ✅ | déjà servi |
 | `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | indexé par `(owner, asset)` |
 | `exchangeStatus` | `exchange_status` | ✅ | indicateurs scalaires |
-| `openOrders` | `open_orders` | ✅ | déjà servi (S6) |
+| `openOrders` | `open_orders` | ✅ | déjà servi |
 | `frontendOpenOrders` | `frontend_open_orders` | ✅ | + trigger / tif / cloid |
 | `liquidatable` | `liquidatable` | ✅ | index BOLE (⚠️ vide jusqu'au premier passage BOLE) |
-| `activeAssetData` | `active_asset_data` | ✅ | position / configuration / marché |
-| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | plafond OI utilisé comme proxy de plafond de taille |
-| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = proxy NAV au plus-haut historique |
-| `userVaultEquities` | `user_vault_equities` | ✅ | indexé par coffre |
-| `leadingVaults` | `leading_vaults` | ✅ | filtré par responsable |
+| `activeAssetData` | `active_asset_data` | ✅ | position / config / marché |
+| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | plafond OI comme proxy de plafond de taille |
+| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = proxy NAV en plus-haut historique |
+| `userVaultEquities` | `user_vault_equities` | ✅ | indexé par vault |
+| `leadingVaults` | `leading_vaults` | ✅ | filtré par leader |
 | `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
 | `spotDeployState` | `spot_deploy_state` | ✅ | enchère de gaz spot |
 | `delegatorSummary` | `delegator_summary` | ✅ | agrégat de staking |
@@ -2565,42 +1754,42 @@ La surface [hl-compat](./hl-compat.md) de la passerelle expose chaque type d'ins
 | `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
 | `userRole` | `user_role` | ✅ | dérivé des registres |
 | `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | OI vs `oi_cap` |
-| `validatorL1Votes` | `validator_l1_votes` | ✅ | métadonnées (charge utile opaque) |
-| `validatorSummaries` | `validator_summaries` | ✅ | mise / commission / indicateurs actif+pénalisé |
-| `gossipRootIps` | `gossip_root_ips` | ✅ | points de terminaison pairs configurés (vide sur nœud isolé) |
-| `marginTable` | `margin_table` | ⚠️ | un niveau effectif par marché (pas de grille multi-lignes) |
+| `validatorL1Votes` | `validator_l1_votes` | ✅ | métadonnées (charge opaque) |
+| `validatorSummaries` | `validator_summaries` | ✅ | mise / commission / indicateurs actif+jailed |
+| `gossipRootIps` | `gossip_root_ips` | ✅ | points d'accès des pairs configurés (vide en solo) |
+| `marginTable` | `margin_table` | ⚠️ | un palier effectif par marché (pas d'échelle multi-rangées) |
 | `perpDexs` | `perp_dexs` | ✅ | index + nombre d'actifs |
 | `webData2` | `web_data2` | ✅ | composite |
-| `userFees` | `fee_schedule` | ✅ | déjà servi (S6) |
-| `delegations` | `staking_state` | ✅ | déjà servi (S6) |
-| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | déjà servi (S6) |
-| `subAccounts` | `sub_accounts` | ✅ | déjà servi (S6) |
+| `userFees` | `fee_schedule` | ✅ | déjà servi |
+| `delegations` | `staking_state` | ✅ | déjà servi |
+| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | déjà servi |
+| `subAccounts` | `sub_accounts` | ✅ | déjà servi |
 
 ## Erreurs
 
 | HTTP | Corps | Cause |
 |------|------|-------|
 | 200 | réponse normale | succès (une **adresse inconnue** sur `account_state` etc. renvoie un **200** avec un enregistrement à zéro, PAS un 404) |
-| 400 | `{"error":"missing field \`type\`"}` | Pas de discriminant `type` |
+| 400 | `{"error":"missing field \`type\`"}` | Aucun discriminateur `type` |
 | 400 | `{"error":"unknown info type: <X>"}` | `type` mal orthographié ou non pris en charge |
 | 400 | `{"error":"missing field: address"}` / `{"error":"missing field market_id"}` | Argument requis spécifique au type omis (la casse varie selon le lecteur) |
 | 400 | `{"error":"invalid hex"}` | Argument d'adresse malformé |
-| 404 | `{"error":"market not found"}` | Identifiant d'actif / nom de devise inconnu (uniquement `market_info`) |
-| 404 | `{"error":"vault not found"}` | Adresse de coffre inconnue (uniquement `vault_state`) |
-| 405 | (pas de corps) | Méthode non POST |
+| 404 | `{"error":"market not found"}` | Identifiant d'actif / nom de coin inconnu (uniquement `market_info`) |
+| 404 | `{"error":"vault not found"}` | Adresse de vault inconnue (uniquement `vault_state`) |
+| 405 | (sans corps) | Méthode non POST |
 | 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | Voir [limites de débit](../rate-limits.md) |
 
 :::warning
-Il n'existe **pas d'erreur `account not found`** : les lecteurs indexés par compte (`account_state`,
-`open_orders`, `user_rate_limit`, `staking_state`, …) retournent un enregistrement **200** à zéro
-pour une adresse n'ayant jamais figuré on-chain — ils ne renvoient jamais de 404.
+Il n'existe **aucune erreur `account not found`** : les lecteurs indexés par compte (`account_state`,
+`open_orders`, `user_rate_limit`, `staking_state`, …) retournent un enregistrement à zéro en **200**
+pour une adresse qui n'est jamais apparue on-chain — ils ne renvoient jamais de 404.
 :::
 
 ## Cohérence lecture après écriture
 
-`/info` lit depuis le bloc engagé le plus récent. Un `POST /exchange` admis à l'instant `T` n'est pas visible dans `/info` tant que le leader n'a pas engagé le bloc le contenant (typiquement <200 ms au tick par défaut).
+`/info` lit depuis le dernier bloc engagé. Un `POST /exchange` admis à l'instant `T` n'est pas visible dans `/info` tant que le leader n'a pas engagé le bloc qui le contient (typiquement <200 ms au tick par défaut).
 
-Pour une sémantique de lecture après écriture, abonnez-vous au [canal WS `userEvents`](../ws/subscriptions.md#userevents) ; les événements admis puis engagés arrivent dans l'ordre, éliminant le besoin d'interrogation.
+Pour une sémantique de lecture après écriture, abonnez-vous au [canal WS `userEvents`](../ws/subscriptions.md#userevents) ; les événements admis puis engagés arrivent dans l'ordre, supprimant le besoin d'interrogation périodique.
 
 ## Séquence — interroger un compte, voir son propre ordre
 
@@ -2634,12 +1823,12 @@ sequenceDiagram
 <summary>Afficher la FAQ</summary>
 
 **Q : Pourquoi `asset_id` et `coin` sont-ils tous deux acceptés sur `market_info` ?**
-R : `asset_id` est canonique ; `coin` est une commodité pour les appelants humains. Les deux résolvent le même enregistrement.
+R : `asset_id` est canonique ; `coin` est une commodité pour les appelants humains. Les deux résolvent vers le même enregistrement.
 
 **Q : `user_fills` / `recent_trades` nécessitent-ils un indexeur externe ?**
-R : Non. Les deux lisent une bande engagée sur le nœud (un anneau de remplissage borné par compte et un anneau de transactions borné par marché, intégrés dans l'AppHash), de sorte que tout nœud sert directement des enregistrements réels — aucun indexeur externe n'est requis. Les anneaux étant bornés, ils conservent une fenêtre récente ; pour un flux en direct ininterrompu, abonnez-vous aux [canaux WS](../ws/subscriptions.md).
+R : Non. Les deux lisent une bande engagée sur le nœud (un anneau de remplissage borné par compte et un anneau de trades par marché intégrés dans l'AppHash), de sorte que n'importe quel nœud sert directement de vrais enregistrements — aucun indexeur externe n'est nécessaire. Les anneaux étant bornés, ils conservent une fenêtre récente ; pour un flux en direct ininterrompu, abonnez-vous aux [canaux WS](../ws/subscriptions.md).
 
 **Q : La réponse est-elle déterministe entre les nœuds ?**
-R : Oui. Tout nœud honnête renvoie des réponses identiques pour la même requête à la même hauteur engagée. Des nœuds ayant des hauteurs d'engagement différentes peuvent différer. Les champs d'identité propres à chaque nœud (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) ne font PAS partie de l'état de consensus et diffèrent légitimement. Utilisez [`block_info`](#block_info) pour connaître la hauteur qu'un nœud a engagée.
+R : Oui. Tout nœud honnête retourne des réponses identiques pour la même requête à la même hauteur engagée. Des nœuds à des hauteurs d'engagement différentes peuvent diverger. Les champs d'identité propres à chaque nœud (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) NE sont PAS des états de consensus et diffèrent légitimement. Utilisez [`block_info`](#block_info) pour connaître la hauteur à laquelle un nœud a engagé.
 
 </details>

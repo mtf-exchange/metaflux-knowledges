@@ -47,7 +47,7 @@ BTC +10%, ETH -10%:   long BTC gains $10, short ETH gains $10  → net +$20
 
 ## PM 的工作原理
 
-> 组合保证金引擎在内部以 **美分**为单位运算（整数 USDC 的 `Decimal` 平面 × 100）。PM 数值会**替换**传统模式下各资产维持保证金的加总，而非叠加。此外还提供一个只读 EVM 预编译接口（`portfolio_margin_eval`），供链下询价使用。
+> 组合保证金引擎在内部以**美分**为单位运算（整数 USDC 的 `Decimal` 平面 × 100）。PM 数值会**替换**传统模式下各资产维持保证金的加总，而非叠加。此外还提供一个只读 EVM 预编译接口（`portfolio_margin_eval`），供链下询价使用。
 
 在 PM 模式下，维持保证金来自 **SPAN 风格的场景引擎**，该引擎在确定性的 `(price-shock, vol-shock)` 网格上对全组合进行扫描：
 

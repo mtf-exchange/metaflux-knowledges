@@ -59,7 +59,7 @@ mark = median( присутствующие компоненты из {C1, C2, C
 
 **Компонент C3** расчётной цены — это **отдельный набор фидов** — срединные цены перпов с **5 перп-площадок** (Binance, OKX, Bybit, Gate, MEXC), а не таблица спотового оракула. Полный состав, правила надёжности, переопределения для отдельных символов и чтение `oracle_sources` описаны в **[Цены оракула](./oracle-prices.md)**.
 
-Чтение [`market_info`](../api/rest/info.md#market_info) возвращает `mark_source` (дескриптор `"MedianOfOraclesAndMid"`), а также составные `mark_px` / `oracle_px`; отдельные компоненты C1/C2/C3 и взвешенный список источников не выводятся как поля протокола.
+Чтение [`market_info`](../api/rest/info/perpetuals.md#market_info) возвращает `mark_source` (дескриптор `"MedianOfOraclesAndMid"`), а также составные `mark_px` / `oracle_px`; отдельные компоненты C1/C2/C3 и взвешенный список источников не выводятся как поля протокола.
 
 ## Расчётная цена vs оракул — почему они расходятся
 
@@ -119,7 +119,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-Чтение [`market_info`](../api/rest/info.md#market_info) возвращает `mark_px` и
+Чтение [`market_info`](../api/rest/info/perpetuals.md#market_info) возвращает `mark_px` и
 `oracle_px` в **плане целых USDC** (например, `"67042.335"`), а также
 дескриптор `mark_source`:
 
@@ -141,7 +141,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 `mark_px`. `Banded` означает, что полоса ограничила кандидата в данном блоке;
 `Frozen` означает, что все источники недоступны и протокол удерживает предыдущую расчётную цену.
 
-Выделенный WS-канал `mark` включён в [план развития WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (стриминг ещё не реализован); пока используйте опрос [`market_info`](../api/rest/info.md#market_info) для получения `mark_px`.
+Выделенный WS-канал `mark` включён в [план развития WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (стриминг ещё не реализован); пока используйте опрос [`market_info`](../api/rest/info/perpetuals.md#market_info) для получения `mark_px`.
 
 ## Граничные случаи
 

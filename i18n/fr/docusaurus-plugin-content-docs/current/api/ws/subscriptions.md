@@ -121,7 +121,7 @@ Flux public des transactions pour un marché — un enregistrement par exécutio
 
 ### `active_asset_ctx`
 
-Contexte par marché pour un marché — prix mark / oracle, taux de financement et intérêts ouverts — poussé lors de ses changements. **Exige `coin`.** Le corps contient les mêmes champs et unités que la lecture REST [`market_info`](../rest/info.md#market_info) : `mark_px` / `oracle_px` sont en **USDC entiers**, arrondis au tick de prix (tronqués au tick de prix du marché), et le bloc `funding` reflète `market_info.funding`. Construit à partir du même générateur d'enregistrements par marché que la lecture REST, un push WS ctx ne diverge donc jamais de `market_info`.
+Contexte par marché pour un marché — prix mark / oracle, taux de financement et intérêts ouverts — poussé lors de ses changements. **Exige `coin`.** Le corps contient les mêmes champs et unités que la lecture REST [`market_info`](../rest/info/perpetuals.md#market_info) : `mark_px` / `oracle_px` sont en **USDC entiers**, arrondis au tick de prix (tronqués au tick de prix du marché), et le bloc `funding` reflète `market_info.funding`. Construit à partir du même générateur d'enregistrements par marché que la lecture REST, un push WS ctx ne diverge donc jamais de `market_info`.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_ctx", "coin": "BTC" } }
@@ -159,7 +159,7 @@ Si le coin ne correspond à aucun marché connu, vous recevez tout de même l'ac
 
 ### `all_mids`
 
-Carte globale des prix médians — le prix mark de chaque marché, poussé lorsque les mids changent. Indexé par coin ; les valeurs sont le prix mark en USDC entiers arrondis au tick que la lecture REST [`markets`](../rest/info.md#markets) retourne. Aucun paramètre `coin`.
+Carte globale des prix médians — le prix mark de chaque marché, poussé lorsque les mids changent. Indexé par coin ; les valeurs sont le prix mark en USDC entiers arrondis au tick que la lecture REST [`markets`](../rest/info/perpetuals.md#markets) retourne. Aucun paramètre `coin`.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "all_mids" } }

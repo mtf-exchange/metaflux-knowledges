@@ -59,7 +59,7 @@ Le calculateur de marque et l'agrégation oracle opèrent entièrement dans le *
 
 La **composante C3 de la marque est un ensemble de flux distinct** — les milieux perpétuels des **5 places perpétuelles** (Binance, OKX, Bybit, Gate, MEXC), et non la table des oracles au comptant. Voir **[Prix oracle](./oracle-prices.md)** pour la composition complète, les règles de fiabilité, les remplacements par symbole et la lecture `oracle_sources`.
 
-La lecture [`market_info`](../api/rest/info.md#market_info) expose `mark_source` (le descripteur `"MedianOfOraclesAndMid"`) ainsi que les `mark_px` / `oracle_px` composés ; les composantes individuelles C1/C2/C3 et la liste des sources pondérées ne sont pas décomposées en champs de protocole.
+La lecture [`market_info`](../api/rest/info/perpetuals.md#market_info) expose `mark_source` (le descripteur `"MedianOfOraclesAndMid"`) ainsi que les `mark_px` / `oracle_px` composés ; les composantes individuelles C1/C2/C3 et la liste des sources pondérées ne sont pas décomposées en champs de protocole.
 
 ## Prix de marque vs oracle — pourquoi ils divergent
 
@@ -119,7 +119,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-La lecture [`market_info`](../api/rest/info.md#market_info) reporte `mark_px` et
+La lecture [`market_info`](../api/rest/info/perpetuals.md#market_info) reporte `mark_px` et
 `oracle_px` dans le **plan USDC entier** (par ex. `"67042.335"`), ainsi que le
 descripteur `mark_source` :
 
@@ -142,7 +142,7 @@ interne / médiane pondérée des perpétuels externes) et l'état de plage (`Ok
 `mark_px` composé est publié. `Banded` signifie que la plage a bridé le candidat sur ce bloc ;
 `Frozen` signifie que toutes les sources ont échoué et que le protocole conserve la marque précédente.
 
-Un canal WS `mark` dédié figure dans la [feuille de route WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (pas encore disponible en flux) ; interrogez [`market_info`](../api/rest/info.md#market_info) pour `mark_px` en attendant.
+Un canal WS `mark` dédié figure dans la [feuille de route WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (pas encore disponible en flux) ; interrogez [`market_info`](../api/rest/info/perpetuals.md#market_info) pour `mark_px` en attendant.
 
 ## Cas limites
 

@@ -59,7 +59,7 @@ mark = median( present components of {C1, C2, C3} )
 
 **مكوّن C3 للمرجع تغذية منفصلة** — منتصفات العقود الآجلة من **5 منصات** (Binance, OKX, Bybit, Gate, MEXC)، لا جدول أوراكل السوق الفوري. انظر **[أسعار الأوراكل](./oracle-prices.md)** للاطلاع على التركيب الكامل وقواعد الموثوقية والتجاوزات لكل رمز وقراءة `oracle_sources`.
 
-قراءة [`market_info`](../api/rest/info.md#market_info) تُظهر `mark_source` (الواصف `"MedianOfOraclesAndMid"`) والـ `mark_px` / `oracle_px` المُركَّبَين؛ أما المكوّنات الفردية C1/C2/C3 وقائمة المصادر المرجّحة فلا تُكشَف كحقول سلكية.
+قراءة [`market_info`](../api/rest/info/perpetuals.md#market_info) تُظهر `mark_source` (الواصف `"MedianOfOraclesAndMid"`) والـ `mark_px` / `oracle_px` المُركَّبَين؛ أما المكوّنات الفردية C1/C2/C3 وقائمة المصادر المرجّحة فلا تُكشَف كحقول سلكية.
 
 ## سعر المرجع مقابل الأوراكل — لماذا يتباعدان
 
@@ -119,7 +119,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"market_info","asset_id":0}'
 ```
 
-تُبلّغ قراءة [`market_info`](../api/rest/info.md#market_info) عن `mark_px` و
+تُبلّغ قراءة [`market_info`](../api/rest/info/perpetuals.md#market_info) عن `mark_px` و
 `oracle_px` على **مستوى USDC الكامل** (مثلًا `"67042.335"`)، إضافةً إلى
 واصف `mark_source`:
 
@@ -139,7 +139,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 `Frozen`) موجودة داخل محتسب المرجع؛ وهي
 **غير** مُكشَفة كحقول سلكية في `market_info` حاليًا — يُنشَر `mark_px` المُركَّب فقط. تعني `Banded` أن النطاق ثبَّت المرشح في هذه الكتلة؛ وتعني `Frozen` أن جميع المصادر فشلت والبروتوكول يحتفظ بسعر المرجع السابق.
 
-قناة `mark` المخصصة عبر WS مدرجة في [خارطة طريق WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (البثّ المباشر غير متوفر بعد)؛ استخدم [`market_info`](../api/rest/info.md#market_info) للاستعلام عن `mark_px` في انتظارها.
+قناة `mark` المخصصة عبر WS مدرجة في [خارطة طريق WS](../api/ws/subscriptions.md#roadmap--not-yet-available) (البثّ المباشر غير متوفر بعد)؛ استخدم [`market_info`](../api/rest/info/perpetuals.md#market_info) للاستعلام عن `mark_px` في انتظارها.
 
 ## الحالات الحدية
 

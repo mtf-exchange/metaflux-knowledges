@@ -41,7 +41,7 @@ the buy actually spent.
 
 The six [`/exchange`](../api/rest/exchange.md#spot-margin--earn) actions (all
 sender-authorized) drive the loop. Confirm committed state via
-[`/info` `spot_margin_state`](../api/rest/info.md#spot_margin_state).
+[`/info` `spot_margin_state`](../api/rest/info/spot.md#spot_margin_state).
 
 | Action | Effect |
 |---|---|
@@ -127,7 +127,7 @@ The open and close are ordinary spot IOC fills, so they pay the **spot** fee
 schedule, not the perp tiers. The borrow interest is the spot-margin-specific cost
 — it is exactly the yield [Earn](../concepts/earn.md) suppliers receive. All rates
 are per-pair governance parameters; query them via
-[`/info spot_margin_state`](../api/rest/info.md#spot_margin_state) and the spot
+[`/info spot_margin_state`](../api/rest/info/spot.md#spot_margin_state) and the spot
 [`fee_schedule`](../api/rest/info.md#fee_schedule).
 
 ## Collateral scope

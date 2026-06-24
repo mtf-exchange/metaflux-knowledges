@@ -24,9 +24,9 @@ Les 9 méthodes REST disponibles aujourd'hui, ainsi que l'amorçage de l'authent
 
 | Méthode CCXT | Route | Auth | Statut | Source MTF-native du nœud |
 |-------------|-------|------|--------|------------------------|
-| `fetchMarkets` | `GET /ccxt/markets` | non | structure opérationnelle ; fixture genesis statique | [`markets`](./info.md#markets) |
-| `fetchTicker` | `GET /ccxt/ticker?symbol=` | non | structure opérationnelle ; prix fictifs | [`market_info`](./info.md#market_info) + mid |
-| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | non | structure opérationnelle ; carnet vide | [`l2_book`](./info.md#l2_book) |
+| `fetchMarkets` | `GET /ccxt/markets` | non | structure opérationnelle ; fixture genesis statique | [`markets`](./info/perpetuals.md#markets) |
+| `fetchTicker` | `GET /ccxt/ticker?symbol=` | non | structure opérationnelle ; prix fictifs | [`market_info`](./info/perpetuals.md#market_info) + mid |
+| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | non | structure opérationnelle ; carnet vide | [`l2_book`](./info/perpetuals.md#l2_book) |
 | `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | non | non servi | Historique OHLCV — indexeur gateway (feuille de route) |
 | `createOrder` | `POST /ccxt/orders` | Bearer | structure opérationnelle | → [`/exchange`](./exchange.md) |
 | `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | structure opérationnelle | → [`/exchange`](./exchange.md) |
@@ -38,7 +38,7 @@ Les 9 méthodes REST disponibles aujourd'hui, ainsi que l'amorçage de l'authent
 Légende : **structure opérationnelle** = route montée, structure CCXT correcte renvoyée, champs monétaires fictifs en attente du canal de lecture · **adossé au nœud** = la lecture sous-jacente du nœud est active · non servi = pas encore de nœud sous-jacent, servi par l'indexeur gateway (feuille de route).
 
 :::warning
-**La surface est volontairement minimale.** Les méthodes que CCXT définit mais que la gateway ne monte pas encore — `fetchTickers`, `fetchTrades` (flux public), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` au-delà du stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — retournent 404. Elles seront attachées sous `/ccxt/` au fur et à mesure que le canal de lecture s'étend. `fetchOpenOrders` / `fetchOrder` traduiront depuis les lectures nœud [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) ; `fetchTrades` traduira depuis le flux nœud [`recent_trades`](./info.md#recent_trades) ; `fetchOHLCV` / `fetchClosedOrders` ne sont pas encore servis (feuille de route indexeur gateway).
+**La surface est volontairement minimale.** Les méthodes que CCXT définit mais que la gateway ne monte pas encore — `fetchTickers`, `fetchTrades` (flux public), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` au-delà du stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — retournent 404. Elles seront attachées sous `/ccxt/` au fur et à mesure que le canal de lecture s'étend. `fetchOpenOrders` / `fetchOrder` traduiront depuis les lectures nœud [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) ; `fetchTrades` traduira depuis le flux nœud [`recent_trades`](./info/perpetuals.md#recent_trades) ; `fetchOHLCV` / `fetchClosedOrders` ne sont pas encore servis (feuille de route indexeur gateway).
 :::
 
 ## Format des symboles
@@ -50,7 +50,7 @@ BTC/USDC:USDC      # perpetual, settled in USDC
 ETH/USDC:USDC
 ```
 
-Les marchés au comptant (une fois qu'un univers spot sera disponible) utilisent `"BASE/QUOTE"` sans le suffixe `:SETTLE`. Le registre de marchés actuel est une **fixture genesis statique** (`with_genesis_markets` — les contrats perpétuels genesis) ; un registre adossé à gRPC qui se rafraîchit depuis la lecture [`markets`](./info.md#markets) du nœud sera activé avec le canal de lecture. L'analyse des symboles est **réelle** : symboles malformés → 400, symboles inconnus → 400.
+Les marchés au comptant (une fois qu'un univers spot sera disponible) utilisent `"BASE/QUOTE"` sans le suffixe `:SETTLE`. Le registre de marchés actuel est une **fixture genesis statique** (`with_genesis_markets` — les contrats perpétuels genesis) ; un registre adossé à gRPC qui se rafraîchit depuis la lecture [`markets`](./info/perpetuals.md#markets) du nœud sera activé avec le canal de lecture. L'analyse des symboles est **réelle** : symboles malformés → 400, symboles inconnus → 400.
 
 ## Intervalles de temps
 
@@ -148,7 +148,7 @@ curl 'https://gateway/ccxt/ticker?symbol=BTC/USDC:USDC'
 }
 ```
 
-Les champs monétaires sont des stubs `"0.0"` pour l'instant ; le canal de lecture les alimentera depuis le mid du nœud / [`market_info`](./info.md#market_info). La structure CCXT est conforme octet par octet, de sorte que les clients désérialisent correctement dès maintenant et obtiennent de vraies valeurs de manière transparente par la suite.
+Les champs monétaires sont des stubs `"0.0"` pour l'instant ; le canal de lecture les alimentera depuis le mid du nœud / [`market_info`](./info/perpetuals.md#market_info). La structure CCXT est conforme octet par octet, de sorte que les clients désérialisent correctement dès maintenant et obtiennent de vraies valeurs de manière transparente par la suite.
 
 ### Récupérer le carnet d'ordres
 
@@ -160,7 +160,7 @@ curl 'https://gateway/ccxt/orderbook?symbol=BTC/USDC:USDC&limit=50'
 { "symbol": "BTC/USDC:USDC", "bids": [], "asks": [], "timestamp": 0, "nonce": 0 }
 ```
 
-`bids` / `asks` sont des tableaux `[[price, amount], …]` (structure CCXT). La troncature par `limit` s'appliquera une fois que les niveaux réels arriveront depuis [`l2_book`](./info.md#l2_book).
+`bids` / `asks` sont des tableaux `[[price, amount], …]` (structure CCXT). La troncature par `limit` s'appliquera une fois que les niveaux réels arriveront depuis [`l2_book`](./info/perpetuals.md#l2_book).
 
 ### Passer un ordre
 

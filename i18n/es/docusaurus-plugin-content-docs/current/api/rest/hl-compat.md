@@ -39,24 +39,24 @@ Este es el mapa maestro. La **traducción** siempre implica: snake_case → came
 | `clearinghouseState` / `userState` | **conectado** | [`account_state`](./info.md#account_state) | `marginSummary` proviene de `balance_quote` del nodo; `assetPositions:[]` hasta que el nodo exponga el estado por posición |
 | `delegations` | **conectado** | [`staking_state`](./info.md#staking_state) | el nodo usa `account_id` compacto como clave; una dirección keccak real sin id compacto devuelve un error honesto (no una lista vacía fabricada) |
 | `userFees` | **conectado** | [`fee_schedule`](./info.md#fee_schedule) | `feeSchedule` está en vivo; `activeReferrer`/`userVolumes`/`dailyUserVlm` esperan las lecturas `user_referrer`/`user_volume` del nodo |
-| `l2Book` | stub | [`l2_book`](./info.md#l2_book) | la lectura del nodo existe; la traducción del gateway a `{coin,levels,time}` aún no está conectada — devuelve un libro vacío conforme a HL |
+| `l2Book` | stub | [`l2_book`](./info/perpetuals.md#l2_book) | la lectura del nodo existe; la traducción del gateway a `{coin,levels,time}` aún no está conectada — devuelve un libro vacío conforme a HL |
 | `meta` | stub | — | requiere una lectura de todos los mercados/universo del nodo (el `market_info` del nodo es por id); devuelve `{universe:[],marginTables:[]}` |
 | `allMids` | stub | — | requiere la lectura del universo (mismo bloqueador que `meta`); devuelve `{}` |
-| `metaAndAssetCtxs` | **conectado** | [`markets`](./info.md#markets) | `[meta, [assetCtx...]]`; cada `assetCtx` de perp lleva `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, todos como cadenas decimales en USDC |
+| `metaAndAssetCtxs` | **conectado** | [`markets`](./info/perpetuals.md#markets) | `[meta, [assetCtx...]]`; cada `assetCtx` de perp lleva `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, todos como cadenas decimales en USDC |
 | `openOrders` | stub | [`open_orders`](./info.md#open_orders) | la lectura del nodo existe; la traducción del gateway aún no está conectada — devuelve `[]` |
 | `frontendOpenOrders` | stub | [`open_orders`](./info.md#open_orders) | `openOrders` + indicaciones de UI; devuelve `[]` |
 | `vaultDetails` | stub | [`vault_state`](./info.md#vault_state) | requiere un registro de dirección líder → `vault_id` (el nodo usa `vault_id` como clave); refleja el `user` de la solicitud con datos financieros en cero |
 | `subAccounts` | **conectado** | [`sub_accounts`](./info.md#sub_accounts) | mapea `{index,address}` del nodo → `{subAccountUser,name,master}`; `clearinghouseState` omitido (sin join de estado por subcuenta en la lectura del nodo) |
 | `referral` | stub | — | el referidor se establece con `Action::setReferrer`, es inmutable; devuelve `referredBy:null` |
-| `spotClearinghouseState` | **conectado** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | `{asset,name,balance}` del nodo → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (sin retención/base de costo en la lectura del nodo) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **conectado** | [`spot_meta`](./info.md#spot_meta) | los `pairs` del nodo → `universe`; registro de `tokens` a partir del `name` / `szDecimals` / `weiDecimals` reales por token del nodo (USDC con `isCanonical`); cada `assetCtx` spot lleva `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, cadenas decimales en USDC |
+| `spotClearinghouseState` | **conectado** | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) | `{asset,name,balance}` del nodo → `{coin,token,total}`; `hold:"0"` / `entryNtl:null` (sin retención/base de costo en la lectura del nodo) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **conectado** | [`spot_meta`](./info/spot.md#spot_meta) | los `pairs` del nodo → `universe`; registro de `tokens` a partir del `name` / `szDecimals` / `weiDecimals` reales por token del nodo (USDC con `isCanonical`); cada `assetCtx` spot lleva `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, cadenas decimales en USDC |
 | `predictedFundings` | stub | — | devuelve `[]` |
 | `orderStatus` | stub | — | resuelve a `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **conectado** | [`max_builder_fee`](./info.md#max_builder_fee) | proyecta el `max_fee_bps` del nodo como el número HL sin envolver; par no aprobado → `0` |
 | `userRateLimit` | **conectado** | [`user_rate_limit`](./info.md#user_rate_limit) | `lifetime_count` del nodo → `nRequestsUsed`, `nRequestsCap` de referencia; `cumVlm:"0.0"` (sin volumen del nodo en esta lectura) |
 | `userNonFundingLedgerUpdates` | stub | — | devuelve `[]` |
 | `userFunding` / `userFundings` | no servido | — | historial de pagos de financiación por usuario — servido por el indexador del gateway (hoja de ruta) |
-| `fundingHistory` | **conectado** | [`funding_history`](./info.md#funding_history) | muestras de prima/tasa realizada por moneda en una ventana de tiempo, desde el rastreador de financiación en vivo del nodo |
+| `fundingHistory` | **conectado** | [`funding_history`](./info/perpetuals.md#funding_history) | muestras de prima/tasa realizada por moneda en una ventana de tiempo, desde el rastreador de financiación en vivo del nodo |
 | `userFills` | **conectado** | [`user_fills`](./info.md#user_fills) | registro detallado de ejecuciones, desde la cinta de ejecuciones por cuenta comprometida |
 | `userFillsByTime` | **conectado** | [`user_fills_by_time`](./info.md#user_fills_by_time) | `userFills` filtrado por tiempo, misma cinta de ejecuciones comprometida |
 | `historicalOrders` | no servido | — | lista de órdenes en estado terminal — servida por el indexador del gateway (hoja de ruta) |
@@ -174,7 +174,7 @@ Una vez que el nodo exponga el estado por posición, `assetPositions[]` se llena
 
 #### `spotClearinghouseState`
 
-**Conectado** al nodo [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) (por `address` en formato 0x). El `{asset, name, balance}` del nodo → HL `{coin, token, total, hold, entryNtl}`: `coin` proviene del `name` del nodo, `token` del id `asset` del nodo, `total` del `balance` del nodo. `hold` es `"0"` y `entryNtl` es `null` — la lectura del nodo no incluye retención ni base de costo por saldo.
+**Conectado** al nodo [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (por `address` en formato 0x). El `{asset, name, balance}` del nodo → HL `{coin, token, total, hold, entryNtl}`: `coin` proviene del `name` del nodo, `token` del id `asset` del nodo, `total` del `balance` del nodo. `hold` es `"0"` y `entryNtl` es `null` — la lectura del nodo no incluye retención ni base de costo por saldo.
 
 ```json
 {"type":"spotClearinghouseState","user":"0x..."}
@@ -186,7 +186,7 @@ Una vez que el nodo exponga el estado por posición, `assetPositions[]` se llena
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**Conectado** al nodo [`spot_meta`](./info.md#spot_meta). Cada par del nodo se mapea a una entrada de `universe` (`tokens:[base,quote]`, `index` = id del par, `isCanonical` = `active` del nodo). El registro de `tokens` se construye a partir del registro real por token del nodo: el `name` / `sz_decimals` / `wei_decimals` de cada entrada se mapean directamente a `name` / `szDecimals` / `weiDecimals` de HL; `index` es el id del activo del token, `tokenId` es el hex de 32 bytes del id, y USDC se marca con `isCanonical`.
+**Conectado** al nodo [`spot_meta`](./info/spot.md#spot_meta). Cada par del nodo se mapea a una entrada de `universe` (`tokens:[base,quote]`, `index` = id del par, `isCanonical` = `active` del nodo). El registro de `tokens` se construye a partir del registro real por token del nodo: el `name` / `sz_decimals` / `wei_decimals` de cada entrada se mapean directamente a `name` / `szDecimals` / `weiDecimals` de HL; `index` es el id del activo del token, `tokenId` es el hex de 32 bytes del id, y USDC se marca con `isCanonical`.
 
 ```json
 {"type":"spotMeta"}
@@ -200,7 +200,7 @@ Una vez que el nodo exponga el estado por posición, `assetPositions[]` se llena
 }
 ```
 
-Los ids de token del nodo comienzan en `100` (USDC) — véase [`spot_meta`](./info.md#spot_meta) para el registro completo — por lo que `index` refleja esos ids, no el esquema base `0` de HL.
+Los ids de token del nodo comienzan en `100` (USDC) — véase [`spot_meta`](./info/spot.md#spot_meta) para el registro completo — por lo que `index` refleja esos ids, no el esquema base `0` de HL.
 
 `spotMetaAndAssetCtxs` devuelve `[spotMeta, [spotAssetCtx...]]`; el segundo elemento es un `spotAssetCtx` por par, alineado por índice con `spotMeta.universe`. Cada `spotAssetCtx` lleva el `coin` del par junto con contexto en vivo:
 
@@ -259,7 +259,7 @@ Estos devuelven la forma exacta de HL con contenidos vacíos o en cero. La lectu
 }
 ```
 
-`levels` es una tupla `[bids, asks]` (forma HL); cada nivel es `{"px":"...","sz":"...","n":N}`. Se respaldará en el nodo [`l2_book`](./info.md#l2_book) una vez que la traducción esté conectada.
+`levels` es una tupla `[bids, asks]` (forma HL); cada nivel es `{"px":"...","sz":"...","n":N}`. Se respaldará en el nodo [`l2_book`](./info/perpetuals.md#l2_book) una vez que la traducción esté conectada.
 
 #### `meta`
 

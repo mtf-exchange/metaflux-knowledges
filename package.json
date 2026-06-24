@@ -6,6 +6,7 @@
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
     "build": "docusaurus build",
+    "build:en": "docusaurus build --locale en",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "@docusaurus/core": "^3.6.0",
+    "@docusaurus/faster": "^3.10.1",
     "@docusaurus/preset-classic": "^3.6.0",
     "@docusaurus/theme-mermaid": "^3.10.1",
     "@easyops-cn/docusaurus-search-local": "^0.55.2",

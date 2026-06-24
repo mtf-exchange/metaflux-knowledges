@@ -90,7 +90,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## L
 
-**L2 book.** The order book at a given depth (top-N levels per side). See [`l2_book` info](../api/rest/info.md#l2_book).
+**L2 book.** The order book at a given depth (top-N levels per side). See [`l2_book` info](../api/rest/info/perpetuals.md#l2_book).
 
 **Liquidation tier.** Stage in the [tiered ladder](./tiered-liquidation.md): T0 yellow card, T1 partial, T2 full, T3 backstop, T4 ADL.
 

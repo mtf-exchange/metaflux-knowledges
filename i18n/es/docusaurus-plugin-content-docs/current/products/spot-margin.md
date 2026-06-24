@@ -41,7 +41,7 @@ la compra realmente consumió.
 
 Las seis acciones de [`/exchange`](../api/rest/exchange.md#spot-margin--earn) (todas
 autorizadas por el remitente) controlan el ciclo. Confirma el estado comprometido a través de
-[`/info` `spot_margin_state`](../api/rest/info.md#spot_margin_state).
+[`/info` `spot_margin_state`](../api/rest/info/spot.md#spot_margin_state).
 
 | Acción | Efecto |
 |---|---|
@@ -127,7 +127,7 @@ Las aperturas y cierres son rellenos IOC spot ordinarios, por lo que pagan el es
 **spot**, no los niveles de perpetuos. El interés por préstamo es el coste específico del margen spot
 — es exactamente el rendimiento que reciben los proveedores de [Earn](../concepts/earn.md). Todas las tasas
 son parámetros de gobernanza por par; consúltalas mediante
-[`/info spot_margin_state`](../api/rest/info.md#spot_margin_state) y el
+[`/info spot_margin_state`](../api/rest/info/spot.md#spot_margin_state) y el
 [`fee_schedule`](../api/rest/info.md#fee_schedule) spot.
 
 ## Alcance del colateral

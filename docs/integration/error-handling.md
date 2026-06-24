@@ -33,8 +33,8 @@ Each layer has different semantics. Confusing them is the most common production
 flowchart TD
     G{"got a response?"}
     G -->|yes| S{"status code?"}
-    G -->|no| U["unknown outcome<br/>&rarr; RECONCILE"]
-    S -->|2xx| R2xx["admitted; track via WS"]
+    G -->|no| U["unknown outcome<br/>&rarr — RECONCILE"]
+    S -->|2xx| R2xx["admitted — track via WS"]
     S -->|4xx| R4xx["check parse error for cause"]
     S -->|5xx| R5xx["retry with expo backoff"]
     S -->|429| R429["backoff per retry_after_ms"]
@@ -138,11 +138,11 @@ flowchart TD
     E["upon network error:<br/>compute action_hash = keccak256(msgpack(action))"]
     E --> L{"for attempt in 1..10:<br/>query /info openOrders or relevant info"}
     L --> H{"action_hash visible in committed state?"}
-    H -->|yes| D1["admitted + committed &rarr; done"]
+    H -->|yes| D1["admitted + committed &rarr — done"]
     H -->|no| C{"cloid visible in committed state?"}
-    C -->|yes| D2["admitted + committed &rarr; done"]
+    C -->|yes| D2["admitted + committed &rarr — done"]
     C -->|no| K{"known commit-time error for action_hash?"}
-    K -->|yes| D3["admitted + failed at commit &rarr; handle commit error"]
+    K -->|yes| D3["admitted + failed at commit &rarr — handle commit error"]
     K -->|no| SL["sleep(200 * attempt)"]
     SL --> L
     L -->|not visible after 10 attempts| D4["action never made it;<br/>safe to retry with new nonce"]

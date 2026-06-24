@@ -69,7 +69,7 @@ curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
 `"queued"` буквально означает: выдача оформляется в виде двух системных действий, вводимых валидатором
 (`SystemUserModify{AdjustCrossAccountValue}` для USDC + `SystemSpotSend` для MTF),
 которые добавляются в начало следующего предлагаемого блока. Для проверки баланса опросите [`account_state`](./info.md#account_state)
-(или [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state)) примерно через ~1 блок:
+(или [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)) примерно через ~1 блок:
 
 ```json
 // account_state после фиксации зачисления:

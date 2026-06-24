@@ -8,7 +8,7 @@ Any builder can deploy a new perpetual market on MetaFlux by paying through an o
 
 ## Why this exists
 
-A core differentiation axis. Centralised exchanges curate listings; MetaFlux makes the listing process itself part of the protocol. Builders who want a market for some niche asset don't need permission — they need to win an auction and supply seed parameters.
+A core protocol capability. Centralised exchanges curate listings; MetaFlux makes the listing process itself part of the protocol. Builders who want a market for some niche asset don't need permission — they need to win an auction and supply seed parameters.
 
 This is MetaFlux's adaptation of the permissionless-market-deploy design pioneered by leading on-chain perp venues, with the following equivalences and adjustments preserved:
 

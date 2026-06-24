@@ -46,7 +46,7 @@ El precio de ejecución es **uniforme** para todos los participantes del lote �
 | Pares spot | CLOB continuo | Convención |
 | Productos indexados / estructurados | FBA | La fijación de precios compuesta requiere liquidación sincrónica |
 
-El modo de emparejamiento de cada mercado se indica en [`market_info.fba_enabled`](../api/rest/info.md#market_info). Los mercados con FBA habilitado aceptan tanto `FbaOrder` (dirigido al lote) como [`submit_order`](../api/rest/exchange.md#submit_order) (tratado como orden FBA para el siguiente lote). Consulta el [catálogo de acciones de `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` es un stub reconocido pero sin mapeo actualmente.
+El modo de emparejamiento de cada mercado se indica en [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Los mercados con FBA habilitado aceptan tanto `FbaOrder` (dirigido al lote) como [`submit_order`](../api/rest/exchange.md#submit_order) (tratado como orden FBA para el siguiente lote). Consulta el [catálogo de acciones de `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` es un stub reconocido pero sin mapeo actualmente.
 
 ## Intervalo de lote
 
@@ -70,7 +70,7 @@ Los intervalos más cortos reducen la espera pero aumentan el costo computaciona
 }
 ```
 
-`batch_id` selecciona a qué lote se une la orden. El ID de lote actual se encuentra en [`market_info`](../api/rest/info.md#market_info) bajo `fba_current_batch_id`. Las órdenes con `batch_id < current` son rechazadas (`{"error":"batch already closed"}`); las órdenes con `batch_id` > current se encolan para ese lote futuro.
+`batch_id` selecciona a qué lote se une la orden. El ID de lote actual se encuentra en [`market_info`](../api/rest/info/perpetuals.md#market_info) bajo `fba_current_batch_id`. Las órdenes con `batch_id < current` son rechazadas (`{"error":"batch already closed"}`); las órdenes con `batch_id` > current se encolan para ese lote futuro.
 
 Omite `batch_id` para apuntar al siguiente lote — el servidor selecciona el que está aceptando órdenes actualmente.
 
@@ -206,7 +206,7 @@ Los precios y tamaños son cadenas enteras en **punto fijo 1e8** (el plano de li
 - [Tipos de orden](./order-types.md)
 - [Catálogo de acciones de `/exchange`](../api/rest/exchange.md#action-catalog) — `FbaOrder` (stub reconocido pero sin mapeo actualmente)
 - [MIP-3](../mip/mip-3.md) — los mercados se incorporan a FBA al despliegue
-- [`market_info`](../api/rest/info.md#market_info) — verifica `fba_enabled` por mercado
+- [`market_info`](../api/rest/info/perpetuals.md#market_info) — verifica `fba_enabled` por mercado
 
 ## Preguntas frecuentes
 

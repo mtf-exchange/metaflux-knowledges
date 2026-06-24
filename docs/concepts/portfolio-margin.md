@@ -167,7 +167,7 @@ penalty = trunc( 200 × 1000 / 10000 ) = $20      # 10% of the over-concentrated
 
 If the PM scenario sweep computes (say) `$25` worst-case loss, `pm_margin = max(0, −worst) + penalty = $25 + $20 = $45`.
 
-A more balanced book where no single asset exceeds 50 % of net value pays **no** penalty — `pm_margin` is the scenario worst-case alone. The penalty discourages single-asset concentration within PM; classical margin doesn't differentiate.
+A more balanced book where no single asset exceeds 50 % of net value pays **no** penalty — `pm_margin` is the scenario worst-case alone. The penalty discourages single-asset concentration within PM; classical margin applies no such penalty.
 
 ## Querying
 

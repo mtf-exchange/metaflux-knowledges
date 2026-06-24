@@ -8,7 +8,7 @@ MIP-4 is a MetaFlux-operated **perps liquidity aggregator / internalizer** — a
 
 ## Why this exists
 
-A capability-driven differentiation axis: rather than competing on listing breadth (that's [MIP-3](./mip-3.md)), MIP-4 competes on execution quality for retail flow. By internalizing flow against its own resting book, the aggregator can recapture spread that would otherwise be paid out as maker fees — and hand part of that back to the user as price improvement. That is the same pitch a retail-broker wholesaler makes: "best price, often better than top of book."
+A capability-driven approach: rather than competing on listing breadth (that's [MIP-3](./mip-3.md)), MIP-4 competes on execution quality for retail flow. By internalizing flow against its own resting book, the aggregator can recapture spread that would otherwise be paid out as maker fees — and hand part of that back to the user as price improvement. That is the same pitch a retail-broker wholesaler makes: "best price, often better than top of book."
 
 It pairs naturally with a Robinhood-style retail UI built on top of the existing client SDKs — product/front-end, not protocol.
 

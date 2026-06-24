@@ -63,7 +63,7 @@
 
 ## Запросы
 
-Сформированное значение `oracle_px` отображается в **плоскости целых USDC** (например, `"67042.335"`) запросом [`market_info`](../api/rest/info.md#market_info) вместе с `mark_px`:
+Сформированное значение `oracle_px` отображается в **плоскости целых USDC** (например, `"67042.335"`) запросом [`market_info`](../api/rest/info/perpetuals.md#market_info) вместе с `mark_px`:
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \

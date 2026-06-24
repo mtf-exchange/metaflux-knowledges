@@ -24,9 +24,9 @@ The 9 REST methods that ship today, plus the auth bootstrap. **Translation** is 
 
 | CCXT method | Route | Auth | Status | Node MTF-native source |
 |-------------|-------|------|--------|------------------------|
-| `fetchMarkets` | `GET /ccxt/markets` | no | shape live; static genesis fixture | [`markets`](./info.md#markets) |
-| `fetchTicker` | `GET /ccxt/ticker?symbol=` | no | shape live; prices stubbed | [`market_info`](./info.md#market_info) + mid |
-| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | no | shape live; empty book | [`l2_book`](./info.md#l2_book) |
+| `fetchMarkets` | `GET /ccxt/markets` | no | shape live; static genesis fixture | [`markets`](./info/perpetuals.md#markets) |
+| `fetchTicker` | `GET /ccxt/ticker?symbol=` | no | shape live; prices stubbed | [`market_info`](./info/perpetuals.md#market_info) + mid |
+| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | no | shape live; empty book | [`l2_book`](./info/perpetuals.md#l2_book) |
 | `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | no | not served | OHLCV history — gateway indexer (roadmap) |
 | `createOrder` | `POST /ccxt/orders` | Bearer | shape live | → [`/exchange`](./exchange.md) |
 | `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | shape live | → [`/exchange`](./exchange.md) |
@@ -38,7 +38,7 @@ The 9 REST methods that ship today, plus the auth bootstrap. **Translation** is 
 Legend: **shape live** = route mounted, CCXT-correct shape returned, monetary fields are stubs awaiting the read backhaul · **node-backed** = the underlying node read is live · not served = no node backing yet, served by the gateway indexer (roadmap).
 
 :::warning
-**Surface is deliberately minimal.** Methods CCXT defines but the gateway does **not** mount yet — `fetchTickers`, `fetchTrades` (public tape), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` beyond the stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — return 404. They attach under `/ccxt/` as the read backhaul expands. `fetchOpenOrders` / `fetchOrder` will translate from the node [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) reads; `fetchTrades` will translate from the node [`recent_trades`](./info.md#recent_trades) tape; `fetchOHLCV` / `fetchClosedOrders` are not yet served (gateway indexer roadmap).
+**Surface is deliberately minimal.** Methods CCXT defines but the gateway does **not** mount yet — `fetchTickers`, `fetchTrades` (public tape), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` beyond the stub, `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — return 404. They attach under `/ccxt/` as the read backhaul expands. `fetchOpenOrders` / `fetchOrder` will translate from the node [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status) reads; `fetchTrades` will translate from the node [`recent_trades`](./info/perpetuals.md#recent_trades) tape; `fetchOHLCV` / `fetchClosedOrders` are not yet served (gateway indexer roadmap).
 :::
 
 ## Symbol format
@@ -50,7 +50,7 @@ BTC/USDC:USDC      # perpetual, settled in USDC
 ETH/USDC:USDC
 ```
 
-Spot markets (once a spot universe lands) use `"BASE/QUOTE"` without the `:SETTLE` suffix. The market registry today is a **static genesis fixture** (`with_genesis_markets` — the genesis perps); a gRPC-backed registry that refreshes from the node's [`markets`](./info.md#markets) read swaps in with the read backhaul. Symbol parsing is **real**: malformed symbols → 400, unknown symbols → 400.
+Spot markets (once a spot universe lands) use `"BASE/QUOTE"` without the `:SETTLE` suffix. The market registry today is a **static genesis fixture** (`with_genesis_markets` — the genesis perps); a gRPC-backed registry that refreshes from the node's [`markets`](./info/perpetuals.md#markets) read swaps in with the read backhaul. Symbol parsing is **real**: malformed symbols → 400, unknown symbols → 400.
 
 ## Timeframes
 
@@ -148,7 +148,7 @@ curl 'https://gateway/ccxt/ticker?symbol=BTC/USDC:USDC'
 }
 ```
 
-Monetary fields are `"0.0"` stubs today; the read backhaul fills them from the node mid / [`market_info`](./info.md#market_info). The CCXT shape is byte-correct so clients deserialize cleanly now and get real numbers transparently later.
+Monetary fields are `"0.0"` stubs today; the read backhaul fills them from the node mid / [`market_info`](./info/perpetuals.md#market_info). The CCXT shape is byte-correct so clients deserialize cleanly now and get real numbers transparently later.
 
 ### Fetch order book
 
@@ -160,7 +160,7 @@ curl 'https://gateway/ccxt/orderbook?symbol=BTC/USDC:USDC&limit=50'
 { "symbol": "BTC/USDC:USDC", "bids": [], "asks": [], "timestamp": 0, "nonce": 0 }
 ```
 
-`bids` / `asks` are `[[price, amount], …]` arrays (CCXT shape). `limit` truncation applies once real levels land from [`l2_book`](./info.md#l2_book).
+`bids` / `asks` are `[[price, amount], …]` arrays (CCXT shape). `limit` truncation applies once real levels land from [`l2_book`](./info/perpetuals.md#l2_book).
 
 ### Place an order
 

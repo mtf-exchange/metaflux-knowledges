@@ -78,7 +78,7 @@ curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
 `"queued"` is literal: the grant is two validator-injected system actions
 (`SystemUserModify{AdjustCrossAccountValue}` for USDC + `SystemSpotSend` for MTF)
 prepended to the next proposed block. Poll [`account_state`](./info.md#account_state)
-(or [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state)) ~1 block
+(or [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)) ~1 block
 later to see the balance:
 
 ```json

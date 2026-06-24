@@ -69,7 +69,7 @@ curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
 القيمة `"queued"` حرفية: المنحة عبارة عن إجراءَي نظام يحقنهما المدقّق
 (`SystemUserModify{AdjustCrossAccountValue}` لـ USDC + `SystemSpotSend` لـ MTF)
 تُضافان في مقدمة البلوك المقترح التالي. استعلم عن [`account_state`](./info.md#account_state)
-(أو [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state)) بعد نحو بلوك واحد
+(أو [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)) بعد نحو بلوك واحد
 للتحقق من الرصيد:
 
 ```json

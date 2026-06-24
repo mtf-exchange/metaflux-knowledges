@@ -46,7 +46,7 @@ batch t+1:      open
 | 现货交易对 | 连续 CLOB | 行业惯例 |
 | 指数 / 结构化产品 | FBA | 合成定价需要同步结算 |
 
-每个市场的撮合模式可通过 [`market_info.fba_enabled`](../api/rest/info.md#market_info) 查看。启用 FBA 的市场同时接受 `FbaOrder`（直接指定批次）和 [`submit_order`](../api/rest/exchange.md#submit_order)（作为 FBA 订单处理，进入下一批次）。参见 [`/exchange` 操作目录](../api/rest/exchange.md#action-catalog)——`FbaOrder` 目前是已识别但尚未映射的占位类型。
+每个市场的撮合模式可通过 [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info) 查看。启用 FBA 的市场同时接受 `FbaOrder`（直接指定批次）和 [`submit_order`](../api/rest/exchange.md#submit_order)（作为 FBA 订单处理，进入下一批次）。参见 [`/exchange` 操作目录](../api/rest/exchange.md#action-catalog)——`FbaOrder` 目前是已识别但尚未映射的占位类型。
 
 ## 批次间隔
 
@@ -70,7 +70,7 @@ batch t+1:      open
 }
 ```
 
-`batch_id` 指定订单加入的批次。当前批次 ID 可从 [`market_info`](../api/rest/info.md#market_info) 的 `fba_current_batch_id` 字段获取。`batch_id < current` 的订单会被拒绝（`{"error":"batch already closed"}`）；`batch_id` 大于当前值的订单会排入对应的未来批次。
+`batch_id` 指定订单加入的批次。当前批次 ID 可从 [`market_info`](../api/rest/info/perpetuals.md#market_info) 的 `fba_current_batch_id` 字段获取。`batch_id < current` 的订单会被拒绝（`{"error":"batch already closed"}`）；`batch_id` 大于当前值的订单会排入对应的未来批次。
 
 省略 `batch_id` 则自动加入下一批次——服务端会选择当前正在接受订单的批次。
 
@@ -202,7 +202,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 - [订单类型](./order-types.md)
 - [`/exchange` 操作目录](../api/rest/exchange.md#action-catalog) — `FbaOrder`（目前为已识别但尚未映射的占位类型）
 - [MIP-3](../mip/mip-3.md) — 市场在部署时选择启用 FBA
-- [`market_info`](../api/rest/info.md#market_info) — 查看各市场的 `fba_enabled` 状态
+- [`market_info`](../api/rest/info/perpetuals.md#market_info) — 查看各市场的 `fba_enabled` 状态
 
 ## 常见问题
 

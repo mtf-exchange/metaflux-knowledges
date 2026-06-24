@@ -63,7 +63,7 @@
 
 ## 查询
 
-合成后的 `oracle_px` 以**整 USDC 精度**（如 `"67042.335"`）通过 [`market_info`](../api/rest/info.md#market_info) 接口返回，同时附带 `mark_px`：
+合成后的 `oracle_px` 以**整 USDC 精度**（如 `"67042.335"`）通过 [`market_info`](../api/rest/info/perpetuals.md#market_info) 接口返回，同时附带 `mark_px`：
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \

@@ -160,7 +160,7 @@ Spot es un CLOB de token contra token (sin apalancamiento, sin posiciones) — l
 **Disponible en devnet (vista previa).** El spot con apalancamiento ([margen spot](../../products/spot-margin.md)) y su lado de oferta de préstamos ([Earn](../../concepts/earn.md)) funcionan de extremo a extremo en **devnet hoy**: deposita colateral, toma prestado del pool Earn, compra la base al contado con apalancamiento (IOC) y cierra para reembolsar. Trátalo como una **vista previa** — la liquidación forzada no está conectada todavía (un cierre forzado no realiza PnL ni decrementa el interés abierto), y las ratios de mantenimiento por par son parámetros de gobernanza que aún están siendo calibrados. No asumas seguridad en producción a escala.
 :::
 
-Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: el colateral en cotización depositado es un amortiguador de pérdidas puro, la compra está financiada al 100% por un préstamo de cotización tomado del pool Earn del par, y la base comprada se mantiene **segregada** en la cuenta de margen (nunca en tus saldos disponibles). Earn es el otro lado — los proveedores depositan la cotización prestable a cambio de participaciones en el pool, y el interés de préstamo que pagan los traders de margen spot aumenta el valor de cada participación. Las seis acciones son **autorizadas por el remitente** (el firmante es el actor; no hay `owner`). `amount` / `shares` / `borrow` son decimales enviados como cadenas JSON; `size` / `limit_px` son `u64` en los planos `1e8` / lotes crudos como en [`spot_order`](#spot_order). Cada una devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission) (no un `oid` síncrono); observa el resultado confirmado mediante [`/info` `spot_margin_state`](./info.md#spot_margin_state) y [`earn_state`](./info.md#earn_state).
+Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: el colateral en cotización depositado es un amortiguador de pérdidas puro, la compra está financiada al 100% por un préstamo de cotización tomado del pool Earn del par, y la base comprada se mantiene **segregada** en la cuenta de margen (nunca en tus saldos disponibles). Earn es el otro lado — los proveedores depositan la cotización prestable a cambio de participaciones en el pool, y el interés de préstamo que pagan los traders de margen spot aumenta el valor de cada participación. Las seis acciones son **autorizadas por el remitente** (el firmante es el actor; no hay `owner`). `amount` / `shares` / `borrow` son decimales enviados como cadenas JSON; `size` / `limit_px` son `u64` en los planos `1e8` / lotes crudos como en [`spot_order`](#spot_order). Cada una devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission) (no un `oid` síncrono); observa el resultado confirmado mediante [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) y [`earn_state`](./info/spot.md#earn_state).
 
 | `type` | Propósito | Firmante | Idempotente |
 |--------|---------|-----------|-----------|
@@ -780,7 +780,7 @@ Deposita garantía en forma de activo de cotización (USDC) en tu cuenta de marg
 
 **Restricciones.** El margen debe estar **habilitado para el par** — el par necesita parámetros de riesgo por par presentes, que son una configuración de gobernanza que aún se está calibrando. Un depósito en un par sin dichos parámetros se rechaza (`spot margin not enabled for pair`). Un par desconocido, un `amount` no positivo o un importe superior a tu saldo de cotización disponible se rechazan en la admisión.
 
-**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission) (no un `oid` síncrono). Confirma la garantía acreditada mediante [`/info` `spot_margin_state`](./info.md#spot_margin_state). Consulta [margen spot](../../products/spot-margin.md).
+**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission) (no un `oid` síncrono). Confirma la garantía acreditada mediante [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state). Consulta [margen spot](../../products/spot-margin.md).
 
 ---
 
@@ -806,7 +806,7 @@ Mueve la garantía libre de tu cuenta de margen `(cuenta, par)` de vuelta a tu s
 
 **Restricciones.** Se rechaza si no existe cuenta de margen para el par, si `amount` supera la garantía depositada, o (con una posición abierta) si la garantía restante quedaría por debajo del requisito de margen inicial, o si no hay precio de referencia para valorar la base mantenida.
 
-**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission). Confirma mediante [`/info` `spot_margin_state`](./info.md#spot_margin_state).
+**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission). Confirma mediante [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state).
 
 ---
 
@@ -836,7 +836,7 @@ Abre una posición larga apalancada: toma prestado `borrow` en cotización del p
 
 **Restricciones.** Se rechaza si el margen no está habilitado para el par, si no existe cuenta de margen (deposita garantía primero), si ya hay una posición abierta en el par, si la liquidez inactiva del pool Earn es inferior a `borrow`, si el trading spot está suspendido, o si `size` es cero o `borrow` no es positivo.
 
-**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission) (no un `oid` síncrono — la ejecución de la IOC interna es un efecto confirmado). Observa el `borrowed` / `base_held` resultante mediante [`/info` `spot_margin_state`](./info.md#spot_margin_state); el `total_borrowed` del pool Earn cambia en [`earn_state`](./info.md#earn_state). Consulta [margen spot](../../products/spot-margin.md).
+**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission) (no un `oid` síncrono — la ejecución de la IOC interna es un efecto confirmado). Observa el `borrowed` / `base_held` resultante mediante [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state); el `total_borrowed` del pool Earn cambia en [`earn_state`](./info/spot.md#earn_state). Consulta [margen spot](../../products/spot-margin.md).
 
 ---
 
@@ -864,7 +864,7 @@ Cierra la posición: **vende IOC** la base mantenida a no menos de `limit_px`, r
 
 **Restricciones.** Se rechaza si no existe cuenta de margen, si no hay posición abierta (nada mantenido) o si la posición tiene deuda pero el pool Earn del par no existe.
 
-**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission). Confirma el cierre total o parcial y el importe reembolsado mediante [`/info` `spot_margin_state`](./info.md#spot_margin_state) (una cuenta eliminada ya no aparece); los efectos del lado proveedor se muestran en [`earn_state`](./info.md#earn_state).
+**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission). Confirma el cierre total o parcial y el importe reembolsado mediante [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) (una cuenta eliminada ya no aparece); los efectos del lado proveedor se muestran en [`earn_state`](./info/spot.md#earn_state).
 
 ---
 
@@ -890,7 +890,7 @@ Suministra cotización a un pool de préstamos y recibe **participaciones del po
 
 **Restricciones.** Se rechaza si `amount` no es positivo, si el saldo disponible es inferior a `amount`, o si `asset` no es prestable (no es la cotización de ningún par y no tiene pool existente). Un depósito tan pequeño que acuñaría cero participaciones se rechaza.
 
-**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission). Confirma las participaciones acuñadas y tu posición mediante [`/info` `earn_state`](./info.md#earn_state) (pasa `user` para incluir tu `user_shares` / `user_value`). Consulta [Earn](../../concepts/earn.md).
+**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission). Confirma las participaciones acuñadas y tu posición mediante [`/info` `earn_state`](./info/spot.md#earn_state) (pasa `user` para incluir tu `user_shares` / `user_value`). Consulta [Earn](../../concepts/earn.md).
 
 ---
 
@@ -916,7 +916,7 @@ Canjea participaciones del pool a cotización, pagada a tu saldo disponible. El 
 
 **Restricciones.** Se rechaza si el pool no existe, si `shares` no es positivo, si `shares` supera lo que posees, si el pool es insolvente (NAV cero con participaciones pendientes) o si el pool tiene **cero liquidez inactiva** (todo está actualmente prestado — espera a que los prestatarios reembolsen). Un canje que se cuantifica a cero se rechaza.
 
-**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission); la cantidad de participaciones quemadas puede ser **inferior a la solicitada** cuando el pago fue limitado por la liquidez inactiva. Confirma la posición restante y los totales del pool mediante [`/info` `earn_state`](./info.md#earn_state). Consulta [Earn](../../concepts/earn.md).
+**Respuesta.** Devuelve el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission); la cantidad de participaciones quemadas puede ser **inferior a la solicitada** cuando el pago fue limitado por la liquidez inactiva. Confirma la posición restante y los totales del pool mediante [`/info` `earn_state`](./info/spot.md#earn_state). Consulta [Earn](../../concepts/earn.md).
 
 ---
 

@@ -64,7 +64,7 @@ depositor_APY  ≈ borrow_APR × utilisation × (1 − protocol_fee)
 **معرّف أصل الاقتباس القابل للإقراض** (مفتاح المجمع — الاقتباس لزوج فوري مسجّل)،
 و`amount` / `shares` أعداد عشرية تُرسَل كسلاسل JSON. **يُنشأ المجمع تلقائياً عند أول إيداع**
 لأي أصل قابل للإقراض. تحقق من الحصص المُصدَرة / المتبقية وإجماليات المجمع عبر
-[`/info` `earn_state`](../api/rest/info.md#earn_state).
+[`/info` `earn_state`](../api/rest/info/spot.md#earn_state).
 
 ```json
 // supply 5,000 USDC into the Earn pool for asset 100

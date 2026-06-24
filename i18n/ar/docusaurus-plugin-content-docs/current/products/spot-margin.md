@@ -40,7 +40,7 @@
 
 تُشغّل الإجراءات الستة في [`/exchange`](../api/rest/exchange.md#spot-margin--earn)
 (جميعها مُفوَّضة من المُرسِل) الدورة الكاملة. تحقق من الحالة المُثبَّتة عبر
-[`/info` `spot_margin_state`](../api/rest/info.md#spot_margin_state).
+[`/info` `spot_margin_state`](../api/rest/info/spot.md#spot_margin_state).
 
 | الإجراء | التأثير |
 |---|---|
@@ -121,7 +121,7 @@ Earn — لا يصل أبداً إلى حساب العقود الدائمة ال
 لا لمستويات العقود الدائمة. فائدة الاقتراض هي التكلفة الخاصة بهامش السبوت
 — وهي بالضبط العائد الذي يستلمه موردو [Earn](../concepts/earn.md). جميع المعدلات
 معاملات حوكمة لكل زوج؛ استعلم عنها عبر
-[`/info spot_margin_state`](../api/rest/info.md#spot_margin_state) و
+[`/info spot_margin_state`](../api/rest/info/spot.md#spot_margin_state) و
 [`fee_schedule`](../api/rest/info.md#fee_schedule) للسبوت.
 
 ## نطاق الضمانات

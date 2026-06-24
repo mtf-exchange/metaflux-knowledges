@@ -24,9 +24,9 @@ https://<gateway>/ccxt/<path>
 
 | CCXT-метод | Маршрут | Аутентификация | Статус | Источник (нативный MTF) |
 |------------|---------|----------------|--------|-------------------------|
-| `fetchMarkets` | `GET /ccxt/markets` | нет | структура готова; статическая genesis-фикстура | [`markets`](./info.md#markets) |
-| `fetchTicker` | `GET /ccxt/ticker?symbol=` | нет | структура готова; цены заглушены | [`market_info`](./info.md#market_info) + mid |
-| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | нет | структура готова; стакан пустой | [`l2_book`](./info.md#l2_book) |
+| `fetchMarkets` | `GET /ccxt/markets` | нет | структура готова; статическая genesis-фикстура | [`markets`](./info/perpetuals.md#markets) |
+| `fetchTicker` | `GET /ccxt/ticker?symbol=` | нет | структура готова; цены заглушены | [`market_info`](./info/perpetuals.md#market_info) + mid |
+| `fetchOrderBook` | `GET /ccxt/orderbook?symbol=&limit=` | нет | структура готова; стакан пустой | [`l2_book`](./info/perpetuals.md#l2_book) |
 | `fetchOHLCV` | `GET /ccxt/ohlcv?symbol=&timeframe=&since=&limit=` | нет | не обслуживается | История OHLCV — индексатор шлюза (дорожная карта) |
 | `createOrder` | `POST /ccxt/orders` | Bearer | структура готова | → [`/exchange`](./exchange.md) |
 | `cancelOrder` | `DELETE /ccxt/orders/{id}` | Bearer | структура готова | → [`/exchange`](./exchange.md) |
@@ -38,7 +38,7 @@ https://<gateway>/ccxt/<path>
 Пояснения: **структура готова** = маршрут подключён, возвращается корректная CCXT-структура, денежные поля являются заглушками до реализации канала обратного чтения · **данные от ноды** = соответствующее чтение ноды активно · не обслуживается = источник данных в ноде отсутствует, будет обеспечен индексатором шлюза (дорожная карта).
 
 :::warning
-**Поверхность намеренно минималистична.** Методы, определённые в CCXT, но ещё не подключённые шлюзом — `fetchTickers`, `fetchTrades` (публичная лента), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` (помимо заглушки), `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — возвращают 404. Они будут добавлены под `/ccxt/` по мере расширения канала обратного чтения. `fetchOpenOrders` / `fetchOrder` будут транслироваться из чтений ноды [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status); `fetchTrades` — из ленты [`recent_trades`](./info.md#recent_trades); `fetchOHLCV` / `fetchClosedOrders` пока не обслуживаются (дорожная карта индексатора шлюза).
+**Поверхность намеренно минималистична.** Методы, определённые в CCXT, но ещё не подключённые шлюзом — `fetchTickers`, `fetchTrades` (публичная лента), `fetchOrder`, `fetchOpenOrders`, `fetchClosedOrders`, `fetchOHLCV` (помимо заглушки), `setLeverage`, `setMarginMode`, `fetchFundingRate`, `cancelAllOrders` — возвращают 404. Они будут добавлены под `/ccxt/` по мере расширения канала обратного чтения. `fetchOpenOrders` / `fetchOrder` будут транслироваться из чтений ноды [`open_orders`](./info.md#open_orders) / [`order_status`](./info.md#order_status); `fetchTrades` — из ленты [`recent_trades`](./info/perpetuals.md#recent_trades); `fetchOHLCV` / `fetchClosedOrders` пока не обслуживаются (дорожная карта индексатора шлюза).
 :::
 
 ## Формат символа
@@ -50,7 +50,7 @@ BTC/USDC:USDC      # perpetual, settled in USDC
 ETH/USDC:USDC
 ```
 
-Спотовые рынки (когда появится спотовая вселенная) используют `"BASE/QUOTE"` без суффикса `:SETTLE`. Реестр рынков в настоящее время представляет собой **статическую genesis-фикстуру** (`with_genesis_markets` — genesis-бессрочные контракты); gRPC-реестр, обновляемый из чтения [`markets`](./info.md#markets) ноды, будет подключён вместе с каналом обратного чтения. Разбор символов **реален**: некорректные символы → 400, неизвестные символы → 400.
+Спотовые рынки (когда появится спотовая вселенная) используют `"BASE/QUOTE"` без суффикса `:SETTLE`. Реестр рынков в настоящее время представляет собой **статическую genesis-фикстуру** (`with_genesis_markets` — genesis-бессрочные контракты); gRPC-реестр, обновляемый из чтения [`markets`](./info/perpetuals.md#markets) ноды, будет подключён вместе с каналом обратного чтения. Разбор символов **реален**: некорректные символы → 400, неизвестные символы → 400.
 
 ## Таймфреймы
 
@@ -148,7 +148,7 @@ curl 'https://gateway/ccxt/ticker?symbol=BTC/USDC:USDC'
 }
 ```
 
-Денежные поля сегодня представлены заглушками `"0.0"`; канал обратного чтения заполнит их из mid-цены ноды / [`market_info`](./info.md#market_info). CCXT-структура побайтово корректна, поэтому клиенты уже сейчас десериализуют её без ошибок и в будущем прозрачно получат реальные значения.
+Денежные поля сегодня представлены заглушками `"0.0"`; канал обратного чтения заполнит их из mid-цены ноды / [`market_info`](./info/perpetuals.md#market_info). CCXT-структура побайтово корректна, поэтому клиенты уже сейчас десериализуют её без ошибок и в будущем прозрачно получат реальные значения.
 
 ### Получение стакана заявок
 
@@ -160,7 +160,7 @@ curl 'https://gateway/ccxt/orderbook?symbol=BTC/USDC:USDC&limit=50'
 { "symbol": "BTC/USDC:USDC", "bids": [], "asks": [], "timestamp": 0, "nonce": 0 }
 ```
 
-`bids` / `asks` — массивы вида `[[price, amount], …]` (структура CCXT). Усечение по `limit` будет применяться после получения реальных уровней из [`l2_book`](./info.md#l2_book).
+`bids` / `asks` — массивы вида `[[price, amount], …]` (структура CCXT). Усечение по `limit` будет применяться после получения реальных уровней из [`l2_book`](./info/perpetuals.md#l2_book).
 
 ### Выставление заявки
 

@@ -90,7 +90,7 @@
 
 ## L
 
-**L2 订单簿（L2 book）。** 指定深度（每侧前 N 档）的订单簿快照。参见 [`l2_book` info](../api/rest/info.md#l2_book)。
+**L2 订单簿（L2 book）。** 指定深度（每侧前 N 档）的订单簿快照。参见 [`l2_book` info](../api/rest/info/perpetuals.md#l2_book)。
 
 **清算层级（Liquidation tier）。** [分级清算阶梯](./tiered-liquidation.md)中的各阶段：T0 黄牌警告、T1 部分清算、T2 全额清算、T3 兜底、T4 ADL 自动减仓。
 

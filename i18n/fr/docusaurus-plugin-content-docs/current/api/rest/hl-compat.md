@@ -39,24 +39,24 @@ Voici la table de correspondance maître. La **traduction** consiste toujours à
 | `clearinghouseState` / `userState` | **câblé** | [`account_state`](./info.md#account_state) | `marginSummary` issu du `balance_quote` du nœud ; `assetPositions:[]` jusqu'à ce que le nœud expose l'état par position |
 | `delegations` | **câblé** | [`staking_state`](./info.md#staking_state) | le nœud est indexé par `account_id` compact (u64) ; une vraie adresse keccak sans id compact renvoie une erreur honnête (pas une liste vide fabriquée) |
 | `userFees` | **câblé** | [`fee_schedule`](./info.md#fee_schedule) | `feeSchedule` est en direct ; `activeReferrer`/`userVolumes`/`dailyUserVlm` attendent les lectures `user_referrer`/`user_volume` du nœud |
-| `l2Book` | bouchon | [`l2_book`](./info.md#l2_book) | la lecture du nœud existe ; la traduction passerelle vers `{coin,levels,time}` n'est pas encore câblée — renvoie un carnet HL vide |
+| `l2Book` | bouchon | [`l2_book`](./info/perpetuals.md#l2_book) | la lecture du nœud existe ; la traduction passerelle vers `{coin,levels,time}` n'est pas encore câblée — renvoie un carnet HL vide |
 | `meta` | bouchon | — | nécessite une lecture lister-tous-les-marchés / univers du nœud (le `market_info` du nœud est par id) ; renvoie `{universe:[],marginTables:[]}` |
 | `allMids` | bouchon | — | nécessite la lecture de l'univers (même blocage que `meta`) ; renvoie `{}` |
-| `metaAndAssetCtxs` | **câblé** | [`markets`](./info.md#markets) | `[meta, [assetCtx...]]` ; chaque `assetCtx` perpétuel porte `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, tous en chaînes décimales USDC |
+| `metaAndAssetCtxs` | **câblé** | [`markets`](./info/perpetuals.md#markets) | `[meta, [assetCtx...]]` ; chaque `assetCtx` perpétuel porte `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `funding` / `openInterest` / `oraclePx`, tous en chaînes décimales USDC |
 | `openOrders` | bouchon | [`open_orders`](./info.md#open_orders) | la lecture du nœud existe ; la traduction passerelle n'est pas encore câblée — renvoie `[]` |
 | `frontendOpenOrders` | bouchon | [`open_orders`](./info.md#open_orders) | `openOrders` + indices UI ; renvoie `[]` |
 | `vaultDetails` | bouchon | [`vault_state`](./info.md#vault_state) | nécessite un registre adresse-leader → `vault_id` (le nœud est indexé par `vault_id`) ; répercute le `user` de la requête, données financières à zéro |
 | `subAccounts` | **câblé** | [`sub_accounts`](./info.md#sub_accounts) | mappe `{index,address}` du nœud vers `{subAccountUser,name,master}` ; `clearinghouseState` omis (pas de jointure par sous-compte sur la lecture du nœud) |
 | `referral` | bouchon | — | le référent est défini par `Action::setReferrer`, immuable ; renvoie `referredBy:null` |
-| `spotClearinghouseState` | **câblé** | [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) | `{asset,name,balance}` du nœud → `{coin,token,total}` ; `hold:"0"` / `entryNtl:null` (pas de réserve/base de coût sur la lecture du nœud) |
-| `spotMeta` / `spotMetaAndAssetCtxs` | **câblé** | [`spot_meta`](./info.md#spot_meta) | `pairs` du nœud → `universe` ; registre `tokens` issu du vrai registre par jeton du nœud : `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`) ; chaque `assetCtx` spot porte `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, en chaînes décimales USDC |
+| `spotClearinghouseState` | **câblé** | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) | `{asset,name,balance}` du nœud → `{coin,token,total}` ; `hold:"0"` / `entryNtl:null` (pas de réserve/base de coût sur la lecture du nœud) |
+| `spotMeta` / `spotMetaAndAssetCtxs` | **câblé** | [`spot_meta`](./info/spot.md#spot_meta) | `pairs` du nœud → `universe` ; registre `tokens` issu du vrai registre par jeton du nœud : `name` / `szDecimals` / `weiDecimals` (USDC `isCanonical`) ; chaque `assetCtx` spot porte `dayNtlVlm` / `prevDayPx` / `markPx` / `midPx` / `circulatingSupply`, en chaînes décimales USDC |
 | `predictedFundings` | bouchon | — | renvoie `[]` |
 | `orderStatus` | bouchon | — | résout en `{status:"unknownOid",order:null}` |
 | `maxBuilderFee` | **câblé** | [`max_builder_fee`](./info.md#max_builder_fee) | projette le `max_fee_bps` du nœud en tant que nombre HL brut ; paire non approuvée → `0` |
 | `userRateLimit` | **câblé** | [`user_rate_limit`](./info.md#user_rate_limit) | `lifetime_count` du nœud → `nRequestsUsed`, `nRequestsCap` de référence ; `cumVlm:"0.0"` (pas de volume du nœud sur cette lecture) |
 | `userNonFundingLedgerUpdates` | bouchon | — | renvoie `[]` |
 | `userFunding` / `userFundings` | non servi | — | historique des paiements de financement par utilisateur — servi par l'indexeur de la passerelle (feuille de route) |
-| `fundingHistory` | **câblé** | [`funding_history`](./info.md#funding_history) | échantillons de prime/taux réalisé par coin sur une fenêtre, issus du tracker de financement du nœud en direct |
+| `fundingHistory` | **câblé** | [`funding_history`](./info/perpetuals.md#funding_history) | échantillons de prime/taux réalisé par coin sur une fenêtre, issus du tracker de financement du nœud en direct |
 | `userFills` | **câblé** | [`user_fills`](./info.md#user_fills) | journal de remplissages détaillé, issu de la bande de remplissages par compte validée |
 | `userFillsByTime` | **câblé** | [`user_fills_by_time`](./info.md#user_fills_by_time) | `userFills` fenêtré dans le temps, même bande de remplissages validée |
 | `historicalOrders` | non servi | — | liste des ordres en état terminal — servi par l'indexeur de la passerelle (feuille de route) |
@@ -174,7 +174,7 @@ Une fois que le nœud expose l'état par position, `assetPositions[]` se remplit
 
 #### `spotClearinghouseState`
 
-**Câblé** au nœud [`spot_clearinghouse_state`](./info.md#spot_clearinghouse_state) (par `address` en 0x). `{asset, name, balance}` du nœud → HL `{coin, token, total, hold, entryNtl}` : `coin` issu du `name` du nœud, `token` issu de l'id `asset` du nœud, `total` issu du `balance` du nœud. `hold` vaut `"0"` et `entryNtl` vaut `null` — la lecture du nœud ne comporte ni réserve par solde, ni base de coût.
+**Câblé** au nœud [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (par `address` en 0x). `{asset, name, balance}` du nœud → HL `{coin, token, total, hold, entryNtl}` : `coin` issu du `name` du nœud, `token` issu de l'id `asset` du nœud, `total` issu du `balance` du nœud. `hold` vaut `"0"` et `entryNtl` vaut `null` — la lecture du nœud ne comporte ni réserve par solde, ni base de coût.
 
 ```json
 {"type":"spotClearinghouseState","user":"0x..."}
@@ -186,7 +186,7 @@ Une fois que le nœud expose l'état par position, `assetPositions[]` se remplit
 
 #### `spotMeta` / `spotMetaAndAssetCtxs`
 
-**Câblé** au nœud [`spot_meta`](./info.md#spot_meta). Chaque paire du nœud est mappée sur une entrée `universe` (`tokens:[base,quote]`, `index` = id de paire, `isCanonical` = `active` du nœud). Le registre `tokens` est construit à partir du vrai registre par jeton du nœud : le `name` / `sz_decimals` / `wei_decimals` de chaque entrée sont directement mappés sur le HL `name` / `szDecimals` / `weiDecimals` ; `index` est l'id d'actif du jeton, `tokenId` est l'hexadécimal sur 32 octets de l'id, et USDC est marqué `isCanonical`.
+**Câblé** au nœud [`spot_meta`](./info/spot.md#spot_meta). Chaque paire du nœud est mappée sur une entrée `universe` (`tokens:[base,quote]`, `index` = id de paire, `isCanonical` = `active` du nœud). Le registre `tokens` est construit à partir du vrai registre par jeton du nœud : le `name` / `sz_decimals` / `wei_decimals` de chaque entrée sont directement mappés sur le HL `name` / `szDecimals` / `weiDecimals` ; `index` est l'id d'actif du jeton, `tokenId` est l'hexadécimal sur 32 octets de l'id, et USDC est marqué `isCanonical`.
 
 ```json
 {"type":"spotMeta"}
@@ -200,7 +200,7 @@ Une fois que le nœud expose l'état par position, `assetPositions[]` se remplit
 }
 ```
 
-Les ids de jetons du nœud commencent à `100` (USDC) — voir [`spot_meta`](./info.md#spot_meta) pour le registre complet — donc `index` reflète ces ids, et non le schéma `0`-indexé de HL.
+Les ids de jetons du nœud commencent à `100` (USDC) — voir [`spot_meta`](./info/spot.md#spot_meta) pour le registre complet — donc `index` reflète ces ids, et non le schéma `0`-indexé de HL.
 
 `spotMetaAndAssetCtxs` renvoie `[spotMeta, [spotAssetCtx...]]` ; le second
 élément est un `spotAssetCtx` par paire, aligné sur les indices de `spotMeta.universe`.
@@ -261,7 +261,7 @@ Ces types renvoient la forme exacte de HL avec des contenus à zéro ou vides. L
 }
 ```
 
-`levels` est un tuple `[bids, asks]` (forme HL) ; chaque niveau est `{"px":"...","sz":"...","n":N}`. S'appuie sur le nœud [`l2_book`](./info.md#l2_book) une fois la traduction câblée.
+`levels` est un tuple `[bids, asks]` (forme HL) ; chaque niveau est `{"px":"...","sz":"...","n":N}`. S'appuie sur le nœud [`l2_book`](./info/perpetuals.md#l2_book) une fois la traduction câblée.
 
 #### `meta`
 

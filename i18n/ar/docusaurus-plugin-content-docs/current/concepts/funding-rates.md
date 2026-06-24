@@ -186,7 +186,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 ```
 
 يُعيد الحلقة المرتبة من عيّنات `(ts_ms, premium)` (انظر
-[`funding_history`](../api/rest/info.md#funding_history)):
+[`funding_history`](../api/rest/info/perpetuals.md#funding_history)):
 
 ```json
 {
@@ -201,7 +201,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 }
 ```
 
-قناة `fundingTicks` عبر WebSocket مدرجة في [خارطة طريق WS](../api/ws/subscriptions.md#roadmap--not-yet-available)؛ استخدم [`funding_history`](../api/rest/info.md#funding_history) في الوقت الراهن.
+قناة `fundingTicks` عبر WebSocket مدرجة في [خارطة طريق WS](../api/ws/subscriptions.md#roadmap--not-yet-available)؛ استخدم [`funding_history`](../api/rest/info/perpetuals.md#funding_history) في الوقت الراهن.
 
 ## ما لا يفعله التمويل
 

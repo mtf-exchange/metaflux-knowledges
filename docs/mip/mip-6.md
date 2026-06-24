@@ -7,7 +7,7 @@
 MIP-6 is MetaFlux's **Outcomes / prediction-markets** mechanism — on-chain
 markets where users trade on the resolution of binary or categorical outcomes
 (the analogue of the prediction-market improvement proposal on established
-on-chain venues). It is a future differentiation axis, deferred to **V3**.
+on-chain venues). It is a future capability, deferred to **V3**.
 
 ## Why this exists as a separate number
 
@@ -19,7 +19,7 @@ mechanisms. Do not refer to Outcomes as "MIP-4".
 
 ## Why deferred
 
-- It is a lower-priority differentiation axis: derivatives / perps are the main
+- It is a lower-priority capability: derivatives / perps are the main
   battleground, and the retail revenue from the MIP-4 aggregator dwarfs the
   Outcomes opportunity.
 - Outcomes settlement adds clearing complexity the core does not otherwise need:

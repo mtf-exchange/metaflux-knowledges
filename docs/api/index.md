@@ -10,7 +10,7 @@ choice of path.
 
 | Family | Where | Use when |
 |--------|-------|----------|
-| **MTF-native** | Gateway **default** path: `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | New clients. Compact snake_case shape. Exposes everything, including MTF differentiation features (RFQ, FBA, PM enrollment, cross-chain). |
+| **MTF-native** | Gateway **default** path: `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | New clients. Compact snake_case shape. Exposes everything, including advanced MTF features (RFQ, FBA, PM enrollment, cross-chain). |
 | **HL-compat** | Gateway under `/hl/*`: `POST /hl/exchange`, `POST /hl/info`, `GET /hl/ws` | Bringing an existing HL client over. JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
 | **CCXT-compat** | Gateway under `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
 

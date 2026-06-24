@@ -123,7 +123,7 @@ Public trade tape for one market — one record per fill on that market, emitted
 
 Per-market context for one market — mark / oracle price, funding, and open
 interest — pushed when it changes. **Requires `coin`.** The body carries the same
-fields and units as the REST [`market_info`](../rest/info.md#market_info) read:
+fields and units as the REST [`market_info`](../rest/info/perpetuals.md#market_info) read:
 `mark_px` / `oracle_px` are **whole-USDC**, tick-snapped (truncated to the market's
 price tick), and the `funding` block mirrors `market_info.funding`. Built from the
 same per-market record builder as the REST read, so a WS ctx push never drifts
@@ -167,7 +167,7 @@ pushes follow (so a client deserializing a fixed ctx struct never breaks):
 
 ### `all_mids`
 
-Global mid map — every market's mark price, pushed when the mids change. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info.md#markets) read reports. No `coin` parameter.
+Global mid map — every market's mark price, pushed when the mids change. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info/perpetuals.md#markets) read reports. No `coin` parameter.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "all_mids" } }
