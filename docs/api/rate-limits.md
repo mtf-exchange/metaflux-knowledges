@@ -22,9 +22,7 @@
 | WS subscriptions per connection | 256 | — | — |
 
 All limits are governance-controlled. A per-account budget snapshot is available
-via the native [`user_rate_limit`](./rest/info.md) read on the gateway default
-path (the gateway also exposes the same data as HL-compat `userRateLimit` under
-`/hl`):
+via the native [`user_rate_limit`](./rest/info.md) read:
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
@@ -62,10 +60,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
 | `POST /info` `userFills`, `historicalOrders` (paginated) | 2 |
 | `POST /exchange` | 5 |
-| `GET /ccxt/markets`, `GET /ccxt/ticker` | 1 |
-| `GET /ccxt/orderbook`, `GET /ccxt/ohlcv` | 2 |
-| `GET /ccxt/balance`, `/positions`, `/myTrades` | 2 |
-| `POST /ccxt/orders`, `DELETE /ccxt/orders/{id}` | 5 |
 | WS `subscribe` | 1 |
 | WS published message | 0 |
 | WS `unsubscribe` | 0 |
@@ -78,7 +72,7 @@ Once a request is signed, the gateway authenticates the `sender` and counts agai
 
 | Sender state | Counted against |
 |--------------|-----------------|
-| Anonymous (no signature, e.g. `GET /ccxt/markets`) | per-IP |
+| Anonymous (no signature, e.g. `POST /info`) | per-IP |
 | Signed by master | per-IP + per-account |
 | Signed by agent | per-IP + per-account-of-master |
 

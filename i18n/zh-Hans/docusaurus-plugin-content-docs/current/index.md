@@ -11,7 +11,7 @@ slug: /
 
 :::info
 **初次接触？** 从[快速入门](./integration/quickstart.md)开始（5 分钟完成充值 → 交易 → 提现）。
-**从其他永续合约 DEX 迁移？** 直接查看[从 HL 迁移](./integration/migrating-from-hl.md)——其中的模式同样适用于其他兼容 HL 的机器人。
+**从其他永续合约 DEX 迁移？** 直接查看[从 HL 迁移](./integration/migrating-from-hl.md)——将你的机器人切换到 MTF 原生 SDK / API。
 **开发链上应用？** 参阅 [MIP-3 无许可市场部署](./mip/mip-3.md)。
 :::
 
@@ -19,7 +19,7 @@ slug: /
 
 <div class="mtf-cardgrid">
 
-- [**API 参考**](./api/) — REST `/exchange` · `/info`，兼容 HL 与 CCXT，WebSocket，错误码，频率限制
+- [**API 参考**](./api/) — REST `/exchange` · `/info`，WebSocket，错误码，频率限制
 - [**核心概念**](./concepts/) — 保证金、分级清算、订单类型、资金费率、金库、手续费
 - [**集成指南**](./integration/) — 快速入门、签名、幂等性、错误处理、SDK
 - [**EVM**](./evm/) — 执行模型、Core ↔ EVM 资产转移、预编译合约
@@ -31,7 +31,7 @@ slug: /
 ## 快速导航
 
 - [快速入门](./integration/quickstart.md) — 5 分钟完成充值 → 交易 → 提现
-- [从 HL 迁移](./integration/migrating-from-hl.md) — 兼容 HL 机器人的直接替换方案
+- [从 HL 迁移](./integration/migrating-from-hl.md) — 将 Hyperliquid 机器人切换到 MTF 原生 API
 - [`POST /exchange`](./api/rest/exchange.md) — 写操作路径与完整 action 目录
 - [`POST /info`](./api/rest/info.md) — 读操作路径
 - [分级清算](./concepts/tiered-liquidation.md) — T0 → T4 阶梯机制

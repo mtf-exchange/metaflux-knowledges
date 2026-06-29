@@ -13,7 +13,7 @@ description: "El endpoint de lectura POST /info — tipos de consulta, sobre, y 
 Un único endpoint, múltiples tipos. Despacha según el campo `type` del cuerpo de la solicitud. Solo lectura — nunca muta estado, nunca requiere firma.
 
 :::tip
-**Dividido por producto.** Las consultas de lectura de mercados de contratos perpetuos están en [consultas de perpetuos](./info/perpetuals.md); las consultas de lectura de spot, margen spot y Earn están en [consultas spot y margen](./info/spot.md). Esta página cubre el sobre, las convenciones, las lecturas de cuenta/gobernanza/vault/validador, y la tabla de alias de compatibilidad HL.
+**Dividido por producto.** Las consultas de lectura de mercados de contratos perpetuos están en [consultas de perpetuos](./info/perpetuals.md); las consultas de lectura de spot, margen spot y Earn están en [consultas spot y margen](./info/spot.md). Esta página cubre el sobre, las convenciones, y las lecturas de cuenta/gobernanza/vault/validador.
 :::
 
 ## URL
@@ -24,12 +24,10 @@ POST  https://<net>-gateway.mtf.exchange/info
 
 | Ruta | Forma en wire |
 |------|-----------|
-| `POST /info` (gateway por defecto) | Nativo MTF (este documento) |
-| `POST /hl/info` (gateway, bajo `/hl`) | **Compatible con HL** — ver [hl-compat.md](./hl-compat.md) |
+| `POST /info` (gateway) | Nativo MTF (este documento) |
 
-MTF nativo es la ruta por defecto del gateway; el modo compatible con HL está bajo el espacio de nombres `/hl/*`.
-Si ejecuta el nodo usted mismo, el mismo `/info` nativo se sirve directamente en
-`http://localhost:8080`.
+El gateway sirve el `/info` nativo MTF. Si ejecuta el nodo usted mismo, el mismo
+`/info` nativo se sirve directamente en `http://localhost:8080`.
 
 ## Sobre
 
@@ -1752,43 +1750,6 @@ Respuesta:
 
 Fuente de estado: composición sobre los lectores anteriores.
 
-## Alias hl-compat → tipo nativo MTF (tabla de paridad)
-
-La interfaz [hl-compat](./hl-compat.md) del gateway expone cada tipo de instantánea de nodo bajo un alias camelCase para clientes de reemplazo directo. La columna izquierda es ese alias; la del medio es el tipo de nodo nativo MTF al que apunta; ✅ = servido, ⚠️ = servido con un proxy marcado (sin respaldo exacto en el estado confirmado).
-
-| Alias hl-compat | Tipo nativo MTF | Estado | Notas |
-|----------------------------|------------------------------|--------|-------|
-| `meta` | `markets` | ✅ | ya servido |
-| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
-| `clearinghouseState` | `account_state` | ✅ | ya servido |
-| `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | indexado por `(owner, asset)` |
-| `exchangeStatus` | `exchange_status` | ✅ | indicadores escalares |
-| `openOrders` | `open_orders` | ✅ | ya servido |
-| `frontendOpenOrders` | `frontend_open_orders` | ✅ | + trigger / tif / cloid |
-| `liquidatable` | `liquidatable` | ✅ | índice BOLE (⚠️ vacío hasta el primer pase BOLE) |
-| `activeAssetData` | `active_asset_data` | ✅ | posición / config / mercado |
-| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | proxy de techo de tamaño basado en límite OI |
-| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = proxy NAV de marca de agua máxima |
-| `userVaultEquities` | `user_vault_equities` | ✅ | indexado por vault |
-| `leadingVaults` | `leading_vaults` | ✅ | filtrado por líder |
-| `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
-| `spotDeployState` | `spot_deploy_state` | ✅ | subasta de gas spot |
-| `delegatorSummary` | `delegator_summary` | ✅ | agregado de staking |
-| `maxBuilderFee` | `max_builder_fee` | ✅ | `approved_builders` |
-| `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
-| `userRole` | `user_role` | ✅ | derivado de los registros |
-| `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | OI vs `oi_cap` |
-| `validatorL1Votes` | `validator_l1_votes` | ✅ | metadatos (contenido opaco) |
-| `validatorSummaries` | `validator_summaries` | ✅ | stake / comisión / indicadores activo+encarcelado |
-| `gossipRootIps` | `gossip_root_ips` | ✅ | endpoints de pares configurados (vacío en solitario) |
-| `marginTable` | `margin_table` | ⚠️ | un nivel efectivo por mercado (sin escalera multifila) |
-| `perpDexs` | `perp_dexs` | ✅ | índice + recuento de activos |
-| `webData2` | `web_data2` | ✅ | compuesto |
-| `userFees` | `fee_schedule` | ✅ | ya servido |
-| `delegations` | `staking_state` | ✅ | ya servido |
-| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | ya servido |
-| `subAccounts` | `sub_accounts` | ✅ | ya servido |
-
 ## Errores
 
 | HTTP | Cuerpo | Causa |
@@ -1838,7 +1799,6 @@ sequenceDiagram
 
 - [`POST /exchange`](./exchange.md) — ruta de escritura
 - [`POST /faucet`](./faucet.md) — fondos de prueba en devnet/testnet (USDC + MTF)
-- [HL-compat `/info`](./hl-compat.md) — estructura camelCase, tipos de consulta adicionales
 - [Suscripciones WS](../ws/subscriptions.md) — equivalentes push
 
 ## Preguntas frecuentes

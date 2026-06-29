@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex-строка или `Uint8Array` | да (если не задан `signer`) | 32-байтовый закрытый ключ secp256k1 |
 | `signer` | `Signer` | да (если не задан `privateKey`) | Пользовательский подписант (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex-адрес | опционально | Если задан, используется как `sender`; адрес подписанта определяется из ключа подписи. Для [паттерна агентского кошелька](./agent-wallets-howto.md). |
-| `baseUrl` | string | да | Точка входа шлюза (`https://<сеть>-gateway.mtf.exchange`). SDK использует протокол MTF-native, который является путём шлюза по умолчанию (`/info` · `/exchange` · `/ws`); HL-совместимый режим доступен по `/hl/*`. Запускаете узел самостоятельно? Укажите `http://localhost:8080`. См. [сети](../networks.md). |
+| `baseUrl` | string | да | Точка входа шлюза (`https://<сеть>-gateway.mtf.exchange`). SDK использует протокол MTF-native, который обслуживается шлюзом по адресам `/info` · `/exchange` · `/ws`. Запускаете узел самостоятельно? Укажите `http://localhost:8080`. См. [сети](../networks.md). |
 | `chainId` | number | да | Зависит от сети — см. [сети](../networks.md) |
 | `timeoutMs` | number | опционально (по умолчанию 5000) | Таймаут HTTP-запросов |
 | `nonceFn` | `() => number` | опционально (по умолчанию `Date.now`) | Пользовательский генератор нонса |

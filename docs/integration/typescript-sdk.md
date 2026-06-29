@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex string OR `Uint8Array` | yes (unless `signer` set) | 32-byte secp256k1 private key |
 | `signer` | `Signer` | yes (unless `privateKey` set) | Custom signer (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex address | optional | If set, used as `sender`; signer's address used as the recovered signer. For [agent-wallet pattern](./agent-wallets-howto.md). |
-| `baseUrl` | string | yes | Gateway front door (`https://<net>-gateway.mtf.exchange`). The SDK speaks MTF-native, which is the gateway's default path (`/info` · `/exchange` · `/ws`); HL-compat lives under `/hl/*`. Running the node yourself? Point at `http://localhost:8080`. See [networks](../networks.md). |
+| `baseUrl` | string | yes | Gateway front door (`https://<net>-gateway.mtf.exchange`). The SDK speaks MTF-native, served by the gateway at `/info` · `/exchange` · `/ws`. Running the node yourself? Point at `http://localhost:8080`. See [networks](../networks.md). |
 | `chainId` | number | yes | Per network — see [networks](../networks.md) |
 | `timeoutMs` | number | optional (default 5000) | HTTP timeout |
 | `nonceFn` | `() => number` | optional (default `Date.now`) | Custom nonce generator |

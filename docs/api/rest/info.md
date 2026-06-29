@@ -13,7 +13,7 @@ description: The POST /info read endpoint — query types, envelope, and convent
 Single endpoint, multi-type. Dispatches on the request body's `type` field. Read-only — never mutates state, never requires a signature.
 
 :::tip
-**Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md). This page covers the envelope, conventions, account/governance/vault/validator reads, and the hl-compat alias table.
+**Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md). This page covers the envelope, conventions, and account/governance/vault/validator reads.
 :::
 
 ## URL
@@ -24,12 +24,10 @@ POST  https://<net>-gateway.mtf.exchange/info
 
 | Path | Wire shape |
 |------|-----------|
-| `POST /info` (gateway default) | MTF-native (this document) |
-| `POST /hl/info` (gateway, under `/hl`) | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
+| `POST /info` (gateway) | MTF-native (this document) |
 
-MTF-native is the gateway's default path; HL-compat is namespaced under `/hl/*`.
-Running the node yourself, the same native `/info` is served directly at
-`http://localhost:8080`.
+The gateway serves the MTF-native `/info`. Running the node yourself, the same
+native `/info` is served directly at `http://localhost:8080`.
 
 ## Envelope
 
@@ -1755,43 +1753,6 @@ Response:
 
 State source: composite over the readers above.
 
-## hl-compat alias → MTF-native type (parity table)
-
-The gateway's [hl-compat](./hl-compat.md) surface exposes each node snapshot type under a camelCase alias for drop-in clients. The left column is that alias; the middle is the MTF-native node type it maps to; ✅ = served, ⚠️ = served with a flagged proxy (no exact backing in committed state).
-
-| hl-compat alias | MTF-native type | Status | Notes |
-|----------------------------|------------------------------|--------|-------|
-| `meta` | `markets` | ✅ | already served |
-| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
-| `clearinghouseState` | `account_state` | ✅ | already served |
-| `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | keyed by `(owner, asset)` |
-| `exchangeStatus` | `exchange_status` | ✅ | scalar flags |
-| `openOrders` | `open_orders` | ✅ | already served |
-| `frontendOpenOrders` | `frontend_open_orders` | ✅ | + trigger / tif / cloid |
-| `liquidatable` | `liquidatable` | ✅ | BOLE index (⚠️ empty until first BOLE pass) |
-| `activeAssetData` | `active_asset_data` | ✅ | position / config / market |
-| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | OI cap as size ceiling proxy |
-| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = high-water-mark NAV proxy |
-| `userVaultEquities` | `user_vault_equities` | ✅ | keyed per vault |
-| `leadingVaults` | `leading_vaults` | ✅ | filtered by leader |
-| `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
-| `spotDeployState` | `spot_deploy_state` | ✅ | spot gas auction |
-| `delegatorSummary` | `delegator_summary` | ✅ | staking aggregate |
-| `maxBuilderFee` | `max_builder_fee` | ✅ | `approved_builders` |
-| `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
-| `userRole` | `user_role` | ✅ | derived from registries |
-| `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | OI vs `oi_cap` |
-| `validatorL1Votes` | `validator_l1_votes` | ✅ | metadata (opaque payload) |
-| `validatorSummaries` | `validator_summaries` | ✅ | stake / commission / active+jailed flags |
-| `gossipRootIps` | `gossip_root_ips` | ✅ | configured peer endpoints (empty on solo) |
-| `marginTable` | `margin_table` | ⚠️ | one effective tier per market (no multi-row ladder) |
-| `perpDexs` | `perp_dexs` | ✅ | index + asset count |
-| `webData2` | `web_data2` | ✅ | composite |
-| `userFees` | `fee_schedule` | ✅ | already served |
-| `delegations` | `staking_state` | ✅ | already served |
-| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | already served |
-| `subAccounts` | `sub_accounts` | ✅ | already served |
-
 ## Errors
 
 | HTTP | Body | Cause |
@@ -1841,7 +1802,6 @@ sequenceDiagram
 
 - [`POST /exchange`](./exchange.md) — write path
 - [`POST /faucet`](./faucet.md) — devnet/testnet test-fund grant (USDC + MTF)
-- [HL-compat `/info`](./hl-compat.md) — camelCase shape, additional query types
 - [WS subscriptions](../ws/subscriptions.md) — push equivalents
 
 ## FAQ

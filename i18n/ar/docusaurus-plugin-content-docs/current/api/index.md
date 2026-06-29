@@ -1,30 +1,24 @@
 ---
-description: "واجهات REST و WebSocket — ثلاث عائلات بروتوكول، جميعها مدعومة بنفس السلسلة."
+description: "واجهات REST و WebSocket — بروتوكول MTF-native، مدعوم بالسلسلة."
 ---
 
 # مرجع الـ API
 
-ثلاث عائلات بروتوكول، تخدمها جميعاً نقطة دخول موحدة
-(`https://<net>-gateway.mtf.exchange`) — الاختيار بين أشكال الاتصال من جانب العميل
-هو مجرد اختيار للمسار.
+بروتوكول واحد أصلي لـ MTF، تخدمه نقطة دخول البوابة
+(`https://<net>-gateway.mtf.exchange`).
 
-| العائلة | الموقع | متى تستخدمها |
+| السطح | الموقع | ملاحظات |
 |--------|-------|----------|
-| **MTF-native** | المسار **الافتراضي** للبوابة: `POST /exchange`، `POST /info`، `GET /ws`، `POST /faucet` | العملاء الجدد. بنية مدمجة بصيغة snake_case. تعرض كل الإمكانيات، بما فيها ميزات MTF المتقدمة (RFQ، FBA، تسجيل PM، التكامل متعدد السلاسل). |
-| **HL-compat** | البوابة تحت `/hl/*`: `POST /hl/exchange`، `POST /hl/info`، `GET /hl/ws` | لنقل عميل HL قائم. تتطابق بنية JSON تماماً مع HL. لا تغيير في الكود لعمليات `order` و`cancel` (تُضاف المزيد من المتغيرات تدريجياً). |
-| **CCXT-compat** | البوابة تحت `/ccxt/*` | أُطر العمل الكمية التي تعمل بـ CCXT بالفعل. مجموعة REST الأساسية متاحة؛ CCXT Pro WS قادم. |
+| **MTF-native** | `POST /exchange`، `POST /info`، `GET /ws`، `POST /faucet` | بنية مدمجة بصيغة snake_case. تعرض كل الإمكانيات، بما فيها ميزات MTF المتقدمة (RFQ، FBA، تسجيل PM، التكامل متعدد السلاسل). |
 
-> البوابة هي نقطة الدخول الموحدة — MTF-native هو المسار الافتراضي
-> (`/info`، `/exchange`)، بينما HL-compat منظّم تحت `/hl/*`، و CCXT تحت
-> `/ccxt/*`. هل تشغّل العقدة بنفسك؟ تُقدّم نفس الواجهة الأصلية
-> مباشرةً على `http://localhost:8080`.
+> البوابة هي نقطة الدخول للسطح الأصلي لـ MTF
+> (`/info`، `/exchange`، `/ws`). هل تشغّل العقدة بنفسك؟ تُقدّم نفس
+> الواجهة الأصلية مباشرةً على `http://localhost:8080`.
 
 ## REST
 
 - [`POST /exchange`](./rest/exchange.md) — MTF-native؛ قائمة الإجراءات الكاملة
 - [`POST /info`](./rest/info.md) — MTF-native؛ مخططات لكل نوع
-- [HL-compat](./rest/hl-compat.md) — مطابقة لبروتوكول HL
-- [CCXT-compat](./rest/ccxt-compat.md) — توابع CCXT لـ REST
 
 ## WebSocket
 

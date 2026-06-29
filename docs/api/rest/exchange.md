@@ -30,12 +30,10 @@ POST  https://<net>-gateway.mtf.exchange/exchange
 
 | Path | Wire shape |
 |------|-----------|
-| `POST /exchange` (gateway default) | **MTF-native** (this document) |
-| `POST /hl/exchange` (gateway, under `/hl`) | **HL-compat** — see [hl-compat.md](./hl-compat.md) |
+| `POST /exchange` (gateway) | **MTF-native** (this document) |
 
-MTF-native is the gateway's default path; HL-compat is namespaced under `/hl/*`.
-Running the node yourself, the same native `/exchange` is served directly at
-`http://localhost:8080`.
+The gateway serves the MTF-native `/exchange`. Running the node yourself, the same
+native `/exchange` is served directly at `http://localhost:8080`.
 
 ## Request envelope
 
@@ -176,9 +174,8 @@ follow are split by trading type** — [Perpetual order actions](#perpetual-orde
 
 :::warning
 **`px` / `size` are unsigned fixed-point `u64` on the native wire**, sent as JSON
-numbers (the node decodes them as `u64`, then widens internally). This differs
-from the HL-compat path (decimal strings). Addresses are `0x`-hex (40 chars);
-`cloid` is `0x` + 32 hex chars (16 bytes).
+numbers (the node decodes them as `u64`, then widens internally). Addresses are
+`0x`-hex (40 chars); `cloid` is `0x` + 32 hex chars (16 bytes).
 :::
 
 ### Order placement & lifecycle
@@ -298,8 +295,8 @@ signature would act on the agent's own (separate) account, never the master's.
 
 ### Not on the public `/exchange` path
 
-These action names appear in earlier drafts (and some in the HL-compat surface),
-but they are **not bridged on the MTF-native `/exchange` handler**. They are
+These action names appear in earlier drafts, but they are **not bridged on the
+MTF-native `/exchange` handler**. They are
 either privileged / system writes that must never transit the public user path,
 or recognized-but-unmapped schema stubs. Posting them returns
 `400 unsupported action`. See [the table below](#non-bridged-actions) for the
@@ -2093,7 +2090,6 @@ sequenceDiagram
 ## See also
 
 - [`POST /info`](./info.md) — read path (MTF-native)
-- [HL-compat `/exchange`](./hl-compat.md) — alternative wire shape for HL clients
 - [Agent wallets](../../concepts/agent-wallets.md)
 - [Signing walkthrough](../../integration/signing.md)
 - [Typed-data signing](../../integration/typed-data-signing.md) — the EIP-712 signing scheme

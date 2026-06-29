@@ -14,15 +14,12 @@ Dépôt, placement d'un ordre, annulation, retrait. À la fin de cette page, vot
 
 ## Points d'accès
 
-La passerelle est l'unique point d'entrée public. Le mode MTF-natif est le chemin par défaut ;
-la compatibilité HL est disponible sous `/hl/*`.
+La passerelle est l'unique point d'entrée public, desservant la surface MTF-native.
 
 | Service | URL (devnet) |
 |---------|--------------|
 | Porte d'entrée de la passerelle | `https://devnet-gateway.mtf.exchange` |
-| MTF-natif (défaut) | `POST /info` · `POST /exchange` · `GET /ws` |
-| Compatibilité HL | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| Compatibilité CCXT | `/ccxt/*` |
+| MTF-natif | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet) | `POST /faucet` |
 | Explorateur | `https://devnet.mtf.exchange/explorer` |
@@ -48,19 +45,17 @@ Une demande accorde **3 000 USDC** en collatéral croisé **et 10 MTF** en token
 avec une limite de débit de 1 / minute / IP. Le paramètre optionnel `amount` ne peut que
 réduire le montant d'USDC accordé *à la baisse* (≤ 3 000) ; le MTF est fixe. L'attribution est à l'état `"queued"` — elle arrive environ 1 bloc plus tard, attendez donc un moment avant de confirmer le solde :
 
-Les appels curl bruts ci-dessous utilisent le format **compatibilité HL** sous `/hl/*` sur la passerelle
-(types camelCase comme `clearinghouseState` / `openOrders`, enveloppes signées msgpack) —
-pratique si vous disposez déjà d'un client HL. Les exemples `@metaflux/sdk`
-communiquent quant à eux en MTF-natif sur le chemin par défaut de la passerelle (`/info` · `/exchange`).
-Choisissez une voie ; les deux passent par la même porte d'entrée, avec des chemins différents.
+Les appels curl bruts ci-dessous utilisent le format **MTF-native** sur la passerelle
+(types en snake_case comme `account_state` / `open_orders`). Les exemples `@metaflux/sdk`
+communiquent sur cette même surface native — le SDK se contente de construire l'enveloppe signée pour vous.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-Vous devriez voir `marginSummary.accountValue: "3000.0"`.
+Vous devriez voir `data.account_value: "3000"`.
 
 ## Étape 2 — Placer un ordre à cours limité
 
@@ -90,15 +85,15 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-Curl brut (format compatibilité HL — vous construisez la signature vous-même ; voir [signature](./signing.md)) :
+Curl brut (format MTF-native — vous construisez la signature vous-même ; voir [signature](./signing.md)) :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
 
-où `order.json` est l'enveloppe au format HL que vous avez assemblée.
+où `order.json` est l'enveloppe MTF-native signée que vous avez assemblée.
 
 ### Exemple de trading spot
 
@@ -131,9 +126,9 @@ spot ouverts via [`POST /info`](../api/rest/info.md) ; annulez avec
 ## Étape 3 — Vérifier que l'ordre est dans le carnet
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
 Vous devriez voir votre ordre avec l'`oid` de l'étape 2.
@@ -155,7 +150,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

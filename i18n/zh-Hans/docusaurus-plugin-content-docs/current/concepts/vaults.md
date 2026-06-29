@@ -206,7 +206,6 @@ sequenceDiagram
 
 - [分层清算](./tiered-liquidation.md) — T3 兜底、保险池
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — 金库存入/提取/费用事件通过此频道推送
 - [质押](./staking.md) — 与金库相互独立
 

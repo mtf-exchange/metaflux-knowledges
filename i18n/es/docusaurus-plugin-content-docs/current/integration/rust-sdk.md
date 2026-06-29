@@ -53,9 +53,8 @@ pub struct ClientOpts {
     pub sender_address: Option<Address>,
 
     /// Gateway front door (`https://<net>-gateway.mtf.exchange`). The SDK speaks
-    /// MTF-native, which is the gateway's default path (`/info` · `/exchange` ·
-    /// `/ws`); HL-compat lives under `/hl/*`. Running the node yourself? Point at
-    /// `http://localhost:8080`.
+    /// MTF-native, served by the gateway at `/info` · `/exchange` · `/ws`.
+    /// Running the node yourself? Point at `http://localhost:8080`.
     pub base_url:       String,
     pub chain_id:       u64,
     pub timeout:        Duration,           // default 5s

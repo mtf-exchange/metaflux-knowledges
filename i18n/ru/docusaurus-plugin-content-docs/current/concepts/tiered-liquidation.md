@@ -226,7 +226,7 @@ when account enters T3 (or parked un-fillable lots exist):
 
 ## Как оставаться в безопасной зоне
 
-- Следите за `health` через запросы `userState` (HL-compat) или [`account_state`](../api/rest/info.md#account_state).
+- Следите за `health` через запросы [`account_state`](../api/rest/info.md#account_state).
 - Настройте внутренние алерты на `health < 1.2` — значительно выше T0.
 - Для автоматизированных стратегий зарегистрируйте [бота-наблюдателя за рисками](../integration/risk-watcher.md), чтобы пополнять депозит при пересечении порогового значения health.
 - Следите за [`userEvents`](../api/ws/subscriptions.md#userevents) в WS-фиде для немедленного получения уведомлений о переходах уровней (события маржи и ликвидации проходят по этому каналу).

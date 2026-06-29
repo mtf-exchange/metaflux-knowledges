@@ -175,7 +175,7 @@ The per-asset `funding_rate_multiplier` is MTF's improvement over HL's governanc
 
 ## Funding history
 
-Per-account history via [`POST /info userFills`](../api/rest/info.md) or [HL-compat `userFills`](../api/rest/hl-compat.md) — funding payments appear with `kind: "funding"` and the relevant asset.
+Per-account history via [`POST /info user_fills`](../api/rest/info.md) — funding payments appear with `kind: "funding"` and the relevant asset.
 
 Per-market history:
 

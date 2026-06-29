@@ -62,10 +62,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
 | `POST /info` `userFills`, `historicalOrders` (paginé) | 2 |
 | `POST /exchange` | 5 |
-| `GET /ccxt/markets`, `GET /ccxt/ticker` | 1 |
-| `GET /ccxt/orderbook`, `GET /ccxt/ohlcv` | 2 |
-| `GET /ccxt/balance`, `/positions`, `/myTrades` | 2 |
-| `POST /ccxt/orders`, `DELETE /ccxt/orders/{id}` | 5 |
 | WS `subscribe` | 1 |
 | Message publié WS | 0 |
 | WS `unsubscribe` | 0 |
@@ -78,7 +74,7 @@ Dès qu'une requête est signée, la passerelle authentifie le `sender` et l'imp
 
 | État de l'émetteur | Imputé sur |
 |--------------------|------------|
-| Anonyme (sans signature, p. ex. `GET /ccxt/markets`) | par IP |
+| Anonyme (sans signature, p. ex. `POST /info`) | par IP |
 | Signé par le compte principal | par IP + par compte |
 | Signé par un agent | par IP + par compte du compte principal |
 

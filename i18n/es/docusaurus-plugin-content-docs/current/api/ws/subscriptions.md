@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Los nombres de canal van en snake_case (nativo de MTF).** Esta es la superficie nativa del nodo `/ws`, por lo que los nombres de canal en el protocolo son snake_case (`l2_book`, `user_events`, …). Los clientes que prefieran los nombres de canal en camelCase de HL (`l2Book`, `userEvents`, `userFills`, `candle`, …) deben conectarse al **`/hl/ws`** del gateway (compatible con HL), que los traduce internamente a estos canales snake_case nativos. Según el enrutamiento del gateway unificado: `<net>-gateway.mtf.exchange/ws` = snake_case nativo, `/hl/ws` = camelCase de HL.
+**Los nombres de canal van en snake_case (nativo de MTF).** Esta es la superficie nativa del nodo `/ws`, por lo que los nombres de canal en el protocolo son snake_case (`l2_book`, `user_events`, …). El gateway sirve este mismo WS nativo en `<net>-gateway.mtf.exchange/ws`.
 :::
 
 El protocolo de trama sigue el de HL; los **nombres de canal son snake_case nativos de MTF**. La suscripción se realiza con:
@@ -196,7 +196,7 @@ Feed de eventos por cuenta. Requiere `user` (la dirección 0x) — NO un `coin`.
 { "channel": "user_events", "data": { "fills": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] } }
 ```
 
-El nombre de canal nativo es `user_events` (snake_case); en el `/hl/ws` del gateway (compatible con HL), el equivalente es `userEvents` de HL.
+El nombre de canal nativo es `user_events` (snake_case).
 
 :::warning
 `user_events` contiene datos por cuenta pero actualmente **no tiene autenticación** — cualquier conexión puede suscribirse al feed de cualquier dirección. No lo trate como un canal privado hasta que se implemente la compuerta de autenticación en la suscripción; para lecturas/escrituras autenticadas, use `post` con una acción firmada.
@@ -234,7 +234,7 @@ Cada **push** es un **único objeto de barra** (no el array) — la barra abiert
 
 La serie es **continua**: un intervalo sin operaciones emite una barra plana que lleva el cierre anterior hacia adelante (`o = h = l = c = cierre anterior`, `v = q = 0`, `n = 0`). No se emite ninguna barra antes de la primera operación del mercado — la serie comienza en el bucket de la primera ejecución.
 
-Un almacén mantiene hasta **1000 barras por serie `(coin, interval)`**; las series frías (sin suscriptor) se desalojan, por lo que un mercado/intervalo no observado no tiene coste. En el `/hl/ws` del gateway (compatible con HL), el nombre de canal equivalente es `candle` de HL (en singular).
+Un almacén mantiene hasta **1000 barras por serie `(coin, interval)`**; las series frías (sin suscriptor) se desalojan, por lo que un mercado/intervalo no observado no tiene coste.
 
 ### `order_updates`
 
@@ -306,18 +306,6 @@ Contexto de operación por (usuario, coin) — apalancamiento, modo de margen y 
 ```
 
 - `margin_mode` ∈ `cross` / `isolated` / `strict_iso`; `max_trade_size` es el límite de tamaño derivado del tope de OI (string de lotes crudos); los campos son idénticos a la lectura REST [`active_asset_data`](../rest/info.md).
-
-En el `/hl/ws` del gateway (compatible con HL), el nombre de canal equivalente es `activeAssetData` de HL, y la trama se traduce a la forma camelCase de HL:
-
-```json
-{ "channel": "activeAssetData", "data": {
-  "user": "0x<address>", "coin": "BTC", "leverage": 7,
-  "maxTradeSzs": ["5.0", "5.0"], "availableToTrade": ["35000.00", "35000.00"] } }
-```
-
-- `user` — la dirección 0x de la cuenta; `coin` — el símbolo del mercado.
-- `maxTradeSzs` — `[compra, venta]`: el **tamaño** máximo negociable en cada lado (unidades base), como strings decimales.
-- `availableToTrade` — `[compra, venta]`: el nocional en **USD** disponible para operar en cada lado, como strings decimales.
 
 ### `account_state`
 

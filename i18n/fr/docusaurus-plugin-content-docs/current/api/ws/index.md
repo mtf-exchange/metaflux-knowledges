@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Les noms de canaux sont en snake_case (natif MTF).** La surface `/ws` du nœud est native MTF, donc les noms de canaux sur le fil sont en snake_case : `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Les clients souhaitant utiliser les noms de canaux en camelCase HL (`l2Book`, `userEvents`, `userFills`, `candle`, …) se connectent au **`/hl/ws`** de la passerelle (compatibilité HL), qui traduit vers le snake_case natif en coulisses. Selon le routage de la passerelle unifiée : `<net>-gateway.mtf.exchange/ws` = snake_case natif, `/hl/ws` = camelCase HL.
+**Les noms de canaux sont en snake_case (natif MTF).** La surface `/ws` du nœud est native MTF, donc les noms de canaux sur le fil sont en snake_case : `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. La passerelle dessert ce même WS natif sur `<net>-gateway.mtf.exchange/ws`.
 :::
 
 ## En bref
@@ -18,7 +18,7 @@ Une seule connexion WS multiplexe les abonnements à de nombreux canaux. Le prot
 wss://<net>-gateway.mtf.exchange/ws
 ```
 
-Le WS natif MTF (canaux en snake_case) est le point d'accès par défaut de la passerelle sur `/ws` ; le WS compatible HL (canaux en camelCase) est accessible via `/hl/ws`. La porte d'entrée de la passerelle termine le TLS (`wss://`). Si vous opérez votre propre nœud, le même WS natif est servi en clair sur `ws://localhost:8080/ws` — le protocole de trames est identique dans les deux cas.
+Le WS natif MTF (canaux en snake_case) est desservi par la passerelle sur `/ws`. La porte d'entrée de la passerelle termine le TLS (`wss://`). Si vous opérez votre propre nœud, le même WS natif est servi en clair sur `ws://localhost:8080/ws` — le protocole de trames est identique dans les deux cas.
 
 ## Cycle de vie de la connexion
 
@@ -119,7 +119,6 @@ Les trames de données live partagent une même enveloppe :
 ```
 
 - `is_snapshot` est un booléen : `true` sur la trame initiale reçue à l'abonnement (l'instantané complet), `false` sur les pushs ultérieurs pilotés par les changements. **Chaque corps de trame est un instantané complet** (ex. `l2_book` contient les 20 meilleurs niveaux complets, `all_mids` la map complète, `account_state` l'état complet du compte) — `is_snapshot` est informatif, ce n'est pas un indicateur « diff ». Un client qui remplace simplement son état local à chaque trame reste cohérent et peut ignorer ce champ.
-- L'indicateur d'instantané dans l'enveloppe est **sensible au dialecte**, exactement comme les noms de `type` de canal : sur ce point de montage natif `/ws` il est en snake_case `is_snapshot` ; sur le point de montage HL-compat `/hl/ws` le même champ est en camelCase `isSnapshot`.
 - Il n'y a **pas** de champ `seq`, `ts` ou `sub_id` sur la trame. Le démultiplexage s'effectue sur `channel` (et, pour les canaux par marché, le `coin` à l'intérieur de `data`).
 
 Les mises à jour sont **pilotées par les changements** : après chaque commit, le nœud publie une trame pour un canal souscrit **uniquement si l'état engagé de ce canal a réellement changé** depuis le commit précédent. Un commit qui ne modifie pas un canal surveillé n'émet rien pour lui — vous recevez ainsi moins de trames qu'il n'y a de blocs, sans jamais recevoir de re-push redondant de données inchangées (voir [Push par abonné](#per-subscriber-push)).

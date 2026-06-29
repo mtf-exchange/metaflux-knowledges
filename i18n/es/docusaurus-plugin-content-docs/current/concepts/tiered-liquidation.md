@@ -226,7 +226,7 @@ Esto impide la manipulación "gratuita" intra-bloque, en la que un usuario añad
 
 ## Cómo mantenerse fuera de peligro
 
-- Monitoriza `health` mediante consultas `userState` (compatible con HL) o [`account_state`](../api/rest/info.md#account_state).
+- Monitoriza `health` mediante consultas [`account_state`](../api/rest/info.md#account_state).
 - Configura alertas internas en `health < 1.2` — bien por encima de T0.
 - Para estrategias automatizadas, registra un [bot de vigilancia de riesgo](../integration/risk-watcher.md) que deposite cuando el ratio de salud cruce un umbral.
 - Monitoriza [`userEvents`](../api/ws/subscriptions.md#userevents) en el feed WebSocket para transiciones de nivel inmediatas (los eventos de margen y liquidación se transmiten por este canal).

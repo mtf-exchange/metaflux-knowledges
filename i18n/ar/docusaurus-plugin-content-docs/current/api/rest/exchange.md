@@ -20,10 +20,9 @@ POST  https://<net>-gateway.mtf.exchange/exchange
 
 | المسار | شكل البيانات |
 |------|-----------|
-| `POST /exchange` (البوابة الافتراضية) | **MTF-native** (هذا المستند) |
-| `POST /hl/exchange` (البوابة، تحت `/hl`) | **HL-compat** — انظر [hl-compat.md](./hl-compat.md) |
+| `POST /exchange` (البوابة) | **MTF-native** (هذا المستند) |
 
-المسار MTF-native هو المسار الافتراضي للبوابة؛ أما HL-compat فيقع تحت مساحة الأسماء `/hl/*`. إذا كنت تشغّل العقدة بنفسك، يُقدَّم نفس المسار `/exchange` مباشرةً على `http://localhost:8080`.
+تخدم البوابة المسار `/exchange` الأصلي لـ MTF. إذا كنت تشغّل العقدة بنفسك، يُقدَّم نفس المسار `/exchange` الأصلي مباشرةً على `http://localhost:8080`.
 
 ## غلاف الطلب
 
@@ -126,7 +125,7 @@ domain_separator = keccak256(
 كل متغير كائن مُوسوم `{ "type": "<snake_case_tag>", <flat body> }`. مفاتيح الجسم **مسطَّحة تحت كائن الإجراء** (لا يوجد `type` بحالة PascalCase ولا غلاف `params` عام) — مثلًا `submit_order` يحمل كائن `order`، و`cancel_order` يحمل كائن `cancel`، والإجراءات المُفوَّضة بالمُرسِل تحمل كائن `params`. انقر للاطلاع على الجدول التفصيلي للحقول. تُجمِّع الجداول الإجمالية أدناه كل إجراء حسب الفئة؛ **تعريفات الحقول الكاملة التي تعقبها مقسَّمة حسب نوع التداول** — [إجراءات أوامر العقود الدائمة](#perpetual-order-actions)، [إجراءات تداول Spot](#spot-trading-actions)، [إجراءات هامش Spot وEarn](#spot-margin--earn-actions)، [إجراءات هامش العقود الدائمة والمخاطر](#perpetual-margin--risk-actions)، و[إجراءات الحساب والتخزين والخزائن والجسر](#account-staking-vaults--bridge-actions).
 
 :::warning
-**`px` / `size` هي `u64` غير موقَّعة بنقطة ثابتة على البيانات الأصلية**، تُرسَل كأرقام JSON (يفككها العقدة كـ `u64` ثم يوسّعها داخليًا). يختلف هذا عن مسار HL-compat (سلاسل عشرية). العناوين هي hex بـ `0x` (40 حرفًا)؛ `cloid` هو `0x` + 32 حرف hex (16 بايت).
+**`px` / `size` هي `u64` غير موقَّعة بنقطة ثابتة على البيانات الأصلية**، تُرسَل كأرقام JSON (يفككها العقدة كـ `u64` ثم يوسّعها داخليًا). العناوين هي hex بـ `0x` (40 حرفًا)؛ `cloid` هو `0x` + 32 حرف hex (16 بايت).
 :::
 
 ### وضع الأوامر ودورة حياتها
@@ -1897,7 +1896,6 @@ sequenceDiagram
 ## انظر أيضاً
 
 - [`POST /info`](./info.md) — مسار القراءة (أصيل في MTF)
-- [HL-compat `/exchange`](./hl-compat.md) — شكل سلك بديل لعملاء HL
 - [محافظ الوكلاء](../../concepts/agent-wallets.md)
 - [شرح عملية التوقيع](../../integration/signing.md)
 - [توقيع البيانات المكتوبة](../../integration/typed-data-signing.md) — مخطط توقيع EIP-712

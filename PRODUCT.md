@@ -6,7 +6,7 @@ product
 
 ## Users
 
-External developers and bot operators integrating with the MetaFlux derivatives exchange — quants, market makers, and engineers wiring up trading clients. Their context: in a task, looking up a specific wire shape, error code, signing step, or concept while writing code. They arrive from search or a deep link, scan for the exact field/endpoint, copy a payload, and leave. Many are migrating an existing HL-compatible bot.
+External developers and bot operators integrating with the MetaFlux derivatives exchange — quants, market makers, and engineers wiring up trading clients. Their context: in a task, looking up a specific wire shape, error code, signing step, or concept while writing code. They arrive from search or a deep link, scan for the exact field/endpoint, copy a payload, and leave. Many are migrating a bot from another venue to the MTF-native API.
 
 ## Product Purpose
 

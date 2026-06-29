@@ -76,8 +76,6 @@ Définitions des termes utilisés dans l'ensemble de la documentation. Renvois c
 
 **Filigrane (High-water mark).** Prix d'action historique le plus élevé d'un vault, utilisé pour conditionner l'accumulation des commissions de performance. Voir [vaults](./vaults.md).
 
-**HL-compat.** La surface protocolaire de la passerelle qui reproduit la forme réseau de HL (URL, JSON, signatures). Voir [hl-compat](../api/rest/hl-compat.md).
-
 ## I
 
 **IOC — Immédiat ou annulé (Immediate-Or-Cancel).** TIF : exécute ce qui est disponible, annule tout reliquat non exécuté. Voir [types d'ordres](./order-types.md#time-in-force).

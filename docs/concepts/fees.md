@@ -143,13 +143,9 @@ pay it as part of the loss settled on close, flagged on the liquidation fills in
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
 curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — MTF-native (gateway default path)
+# your personal tier and recent volume — MTF-native
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
-
-# or the HL-compat shape under /hl on the gateway
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
-  -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 
 ## Edge cases
@@ -179,7 +175,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — MTF-native per-user tier / 30-day volume
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — cumulative fee pools (burn / treasury / validator)
-- [`POST /info userFees`](../api/rest/hl-compat.md#userfees) — HL-compat
 - [Tiered liquidation](./tiered-liquidation.md) — liquidation mechanics
 
 ## FAQ

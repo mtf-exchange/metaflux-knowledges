@@ -172,8 +172,6 @@ Returns the sub list with indices, derived addresses, labels, and a snapshot of 
 
 Each sub can also be queried as a first-class account via `account_state`, `open_orders`, `user_fills`, etc., by passing its address as `address`.
 
-[HL-compat equivalent](../api/rest/hl-compat.md#subaccounts).
-
 ## Limits
 
 | Limit | Default | Notes |
@@ -262,7 +260,6 @@ sequenceDiagram
 - [Portfolio margin](./portfolio-margin.md) — interaction with cross-asset PM
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso per sub
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — MTF-native query
-- [`subAccounts` HL-compat](../api/rest/hl-compat.md#subaccounts) — HL-shape query
 
 ## FAQ
 

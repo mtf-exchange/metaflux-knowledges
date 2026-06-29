@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to the native snake_case underneath. Per the unified-gateway routing: `<net>-gateway.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. The gateway serves this same native WS at `<net>-gateway.mtf.exchange/ws`.
 :::
 
 ## TL;DR
@@ -18,7 +18,7 @@ A single WS connection multiplexes subscriptions to many channels. The frame pro
 wss://<net>-gateway.mtf.exchange/ws
 ```
 
-MTF-native WS (snake_case channels) is the gateway's default at `/ws`; HL-compat WS (camelCase channels) is under `/hl/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
+MTF-native WS (snake_case channels) is served by the gateway at `/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
 
 ## Connection lifecycle
 
@@ -119,7 +119,6 @@ Live data frames share one envelope:
 ```
 
 - `is_snapshot` is a boolean: `true` on the initial on-subscribe frame (the full snapshot), `false` on the subsequent change-driven pushes. **Every frame body is a full snapshot regardless** (e.g. `l2_book` is the full top-20 levels, `all_mids` the full map, `account_state` the full account state) — `is_snapshot` is informational, not a "this is a diff" flag. A client that simply replaces its local state on every frame stays correct and can ignore the field.
-- The envelope snapshot flag is **dialect-aware**, exactly like the channel `type` names: on this native `/ws` mount it is snake_case `is_snapshot`; on the HL-compat `/hl/ws` mount the same frame field is camelCase `isSnapshot`.
 - There is **no** `seq`, `ts`, or `sub_id` field on the frame. Demultiplex on `channel` (and, for per-market channels, the `coin` inside `data`).
 
 Updates are **change-driven**: after each commit the node publishes a frame for a subscribed channel **only when that channel's committed state actually changed** since the previous commit. A commit that leaves a watched channel untouched emits nothing for it — so you receive fewer frames than there are blocks, never a redundant re-push of unchanged data (see [Per-subscriber push](#per-subscriber-push)).

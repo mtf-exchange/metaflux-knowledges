@@ -16,16 +16,13 @@
 
 بيئة الاختبار التكاملي. يمكنك الحصول على USDC مجانًا عبر الصنبور؛ والحالة مؤقتة (تُعاد تهيئتها بشكل دوري).
 
-البوابة هي نقطة الدخول العامة الوحيدة. المسار الافتراضي هو MTF-native
-(`/info` · `/exchange` · `/ws`)؛ وتقع واجهة HL-compat تحت `/hl/*`؛ وواجهة CCXT تحت
-`/ccxt/*`؛ وواجهة EVM JSON-RPC على `/evm`.
+البوابة هي نقطة الدخول العامة الوحيدة. يُخدَّم السطح الأصلي لـ MTF على
+`/info` · `/exchange` · `/ws`؛ وواجهة EVM JSON-RPC على `/evm`.
 
 | الخدمة | نقطة النهاية |
 |--------|-------------|
 | البوابة الرئيسية | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (افتراضي) | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT-compat | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | الصنبور (devnet/testnet) | `POST /faucet` |
 | Gateway WS (native) | `wss://devnet-gateway.mtf.exchange/ws` |

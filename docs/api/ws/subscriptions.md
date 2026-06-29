@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). Clients wanting the HL-camelCase channel names (`l2Book`, `userEvents`, `userFills`, `candle`, …) connect to the gateway's **`/hl/ws`** (HL-compat), which translates to these native snake_case channels underneath. Per the unified-gateway routing: `<net>-gateway.mtf.exchange/ws` = native snake_case, `/hl/ws` = HL camelCase.
+**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `<net>-gateway.mtf.exchange/ws`.
 :::
 
 The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**. You subscribe with:
@@ -204,7 +204,7 @@ Per-account event feed. Requires `user` (the 0x address) — NOT a `coin`. Today
 { "channel": "user_events", "data": { "fills": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] } }
 ```
 
-The native channel name is `user_events` (snake_case); on the gateway's `/hl/ws` (HL-compat) the equivalent is HL's `userEvents`.
+The native channel name is `user_events` (snake_case).
 
 :::warning
 `user_events` is per-account data but currently has **no authentication** — any connection can subscribe to any address's feed. Do not treat it as a private channel until the auth-at-subscribe gate lands; for authenticated reads/writes use `post` with a signed action.
@@ -242,7 +242,7 @@ Each **push** is a **single bar object** (not the array) — the current open ba
 
 The series is **gapless**: an interval with no trades emits a flat bar carrying the prior close forward (`o = h = l = c = previous close`, `v = q = 0`, `n = 0`). No bar is emitted before the market's first trade — the series begins at the bucket of the first print.
 
-A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing. On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's `candle` (singular).
+A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing.
 
 ### `order_updates`
 
@@ -320,21 +320,6 @@ re-emits it only when that context changes.
 - `margin_mode` ∈ `cross` / `isolated` / `strict_iso`; `max_trade_size` is the
   OI-cap-derived size ceiling (raw-lot string); fields are identical to the REST
   [`active_asset_data`](../rest/info.md) read.
-
-On the gateway's `/hl/ws` (HL-compat) the equivalent channel name is HL's
-`activeAssetData`, and the frame is translated into HL's camelCase shape:
-
-```json
-{ "channel": "activeAssetData", "data": {
-  "user": "0x<address>", "coin": "BTC", "leverage": 7,
-  "maxTradeSzs": ["5.0", "5.0"], "availableToTrade": ["35000.00", "35000.00"] } }
-```
-
-- `user` — the 0x account address; `coin` — the market symbol.
-- `maxTradeSzs` — `[buy, sell]`: the maximum tradeable **size** on each side
-  (base units), as decimal strings.
-- `availableToTrade` — `[buy, sell]`: the **USD** notional available to trade on
-  each side, as decimal strings.
 
 ### `account_state`
 

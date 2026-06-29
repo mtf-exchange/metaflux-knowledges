@@ -13,7 +13,7 @@ description: "Le point de terminaison de lecture POST /info — types de requêt
 Un seul point de terminaison, multi-type. Le routage s'effectue sur le champ `type` du corps de la requête. Lecture seule — ne modifie jamais l'état, ne nécessite jamais de signature.
 
 :::tip
-**Séparation par produit.** Les requêtes de lecture sur les marchés perpétuels se trouvent sur [requêtes perpétuelles](./info/perpetuals.md) ; les requêtes de lecture sur le comptant, le comptant sur marge et Earn se trouvent sur [requêtes comptant & marge](./info/spot.md). Cette page couvre l'enveloppe, les conventions, les lectures compte/gouvernance/coffre/validateur, ainsi que le tableau des alias hl-compat.
+**Séparation par produit.** Les requêtes de lecture sur les marchés perpétuels se trouvent sur [requêtes perpétuelles](./info/perpetuals.md) ; les requêtes de lecture sur le comptant, le comptant sur marge et Earn se trouvent sur [requêtes comptant & marge](./info/spot.md). Cette page couvre l'enveloppe, les conventions, et les lectures compte/gouvernance/coffre/validateur.
 :::
 
 ## URL
@@ -24,12 +24,10 @@ POST  https://<net>-gateway.mtf.exchange/info
 
 | Chemin | Format wire |
 |------|-----------|
-| `POST /info` (gateway par défaut) | MTF natif (ce document) |
-| `POST /hl/info` (gateway, sous `/hl`) | **HL-compat** — voir [hl-compat.md](./hl-compat.md) |
+| `POST /info` (gateway) | MTF natif (ce document) |
 
-Le format MTF natif est le chemin par défaut du gateway ; HL-compat est exposé sous l'espace de nommage `/hl/*`.
-Si vous exploitez le nœud vous-même, le même `/info` natif est servi directement à l'adresse
-`http://localhost:8080`.
+Le gateway sert le `/info` natif MTF. Si vous exploitez le nœud vous-même, le même
+`/info` natif est servi directement à l'adresse `http://localhost:8080`.
 
 ## Enveloppe
 
@@ -1728,43 +1726,6 @@ Réponse :
 
 Source d'état : composite des lecteurs ci-dessus.
 
-## Alias hl-compat → type natif MTF (table de parité)
-
-La surface [hl-compat](./hl-compat.md) de la passerelle expose chaque type d'instantané de nœud sous un alias camelCase pour les clients en remplacement direct. La colonne de gauche est cet alias ; la colonne centrale est le type de nœud natif MTF correspondant ; ✅ = servi, ⚠️ = servi avec un proxy signalé (sans correspondance exacte dans l'état engagé).
-
-| hl-compat alias | MTF-native type | Status | Notes |
-|----------------------------|------------------------------|--------|-------|
-| `meta` | `markets` | ✅ | déjà servi |
-| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
-| `clearinghouseState` | `account_state` | ✅ | déjà servi |
-| `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | indexé par `(owner, asset)` |
-| `exchangeStatus` | `exchange_status` | ✅ | indicateurs scalaires |
-| `openOrders` | `open_orders` | ✅ | déjà servi |
-| `frontendOpenOrders` | `frontend_open_orders` | ✅ | + trigger / tif / cloid |
-| `liquidatable` | `liquidatable` | ✅ | index BOLE (⚠️ vide jusqu'au premier passage BOLE) |
-| `activeAssetData` | `active_asset_data` | ✅ | position / config / marché |
-| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | plafond OI comme proxy de plafond de taille |
-| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = proxy NAV en plus-haut historique |
-| `userVaultEquities` | `user_vault_equities` | ✅ | indexé par vault |
-| `leadingVaults` | `leading_vaults` | ✅ | filtré par leader |
-| `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
-| `spotDeployState` | `spot_deploy_state` | ✅ | enchère de gaz spot |
-| `delegatorSummary` | `delegator_summary` | ✅ | agrégat de staking |
-| `maxBuilderFee` | `max_builder_fee` | ✅ | `approved_builders` |
-| `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
-| `userRole` | `user_role` | ✅ | dérivé des registres |
-| `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | OI vs `oi_cap` |
-| `validatorL1Votes` | `validator_l1_votes` | ✅ | métadonnées (charge opaque) |
-| `validatorSummaries` | `validator_summaries` | ✅ | mise / commission / indicateurs actif+jailed |
-| `gossipRootIps` | `gossip_root_ips` | ✅ | points d'accès des pairs configurés (vide en solo) |
-| `marginTable` | `margin_table` | ⚠️ | un palier effectif par marché (pas d'échelle multi-rangées) |
-| `perpDexs` | `perp_dexs` | ✅ | index + nombre d'actifs |
-| `webData2` | `web_data2` | ✅ | composite |
-| `userFees` | `fee_schedule` | ✅ | déjà servi |
-| `delegations` | `staking_state` | ✅ | déjà servi |
-| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | déjà servi |
-| `subAccounts` | `sub_accounts` | ✅ | déjà servi |
-
 ## Erreurs
 
 | HTTP | Corps | Cause |
@@ -1814,7 +1775,6 @@ sequenceDiagram
 
 - [`POST /exchange`](./exchange.md) — chemin d'écriture
 - [`POST /faucet`](./faucet.md) — attribution de fonds de test devnet/testnet (USDC + MTF)
-- [HL-compat `/info`](./hl-compat.md) — structure camelCase, types de requêtes supplémentaires
 - [Abonnements WS](../ws/subscriptions.md) — équivalents en mode push
 
 ## FAQ

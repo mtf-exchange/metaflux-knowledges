@@ -172,8 +172,6 @@ Devuelve la lista de sub-cuentas con índices, direcciones derivadas, etiquetas 
 
 Cada sub-cuenta también puede consultarse como cuenta de primera clase a través de `account_state`, `open_orders`, `user_fills`, etc., pasando su dirección en el parámetro `address`.
 
-[Equivalente compatible con HL](../api/rest/hl-compat.md#subaccounts).
-
 ## Límites
 
 | Límite | Valor predeterminado | Notas |
@@ -262,7 +260,6 @@ sequenceDiagram
 - [Margen de cartera](./portfolio-margin.md) — interacción con el PM entre activos
 - [Modos de margen](./margin-modes.md) — Cruzado / Aislado / Strict-Iso por sub
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — consulta nativa de MTF
-- [`subAccounts` HL-compat](../api/rest/hl-compat.md#subaccounts) — consulta en formato HL
 
 ## Preguntas frecuentes
 

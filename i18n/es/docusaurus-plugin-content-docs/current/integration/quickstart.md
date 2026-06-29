@@ -14,15 +14,12 @@ Depositar, colocar una orden, cancelarla, retirar fondos. Al final de esta pági
 
 ## Endpoints
 
-El gateway es la única puerta de entrada pública. MTF-native es la ruta por defecto;
-HL-compat vive bajo `/hl/*`.
+El gateway es la única puerta de entrada pública, que sirve la superficie MTF-native.
 
 | Servicio | URL (devnet) |
 |---------|--------------|
 | Puerta de entrada del gateway | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (por defecto) | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT-compat | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet) | `POST /faucet` |
 | Explorador | `https://devnet.mtf.exchange/explorer` |
@@ -49,19 +46,18 @@ con límite de 1 solicitud / minuto / IP. El parámetro opcional `amount` solo r
 *hacia abajo* (≤ 3000); MTF es fijo. La concesión queda en estado `"queued"` — se confirma ~1 bloque
 después, así que espera un momento antes de verificar el saldo:
 
-Los curl directos que aparecen a continuación utilizan el formato **HL-compat** bajo `/hl/*` en el gateway
-(tipos en camelCase como `clearinghouseState` / `openOrders`, envelopes firmados con msgpack)
-— práctico si ya tienes un cliente HL. Los ejemplos con `@metaflux/sdk`
-usan MTF-native en la ruta por defecto del gateway (`/info` · `/exchange`).
-Elige una vía; ambas pasan por la misma puerta de entrada, solo difieren en la ruta.
+Los curl directos que aparecen a continuación hablan **MTF-native** en el gateway
+(tipos en snake_case como `account_state` / `open_orders`). Los ejemplos con
+`@metaflux/sdk` usan la misma superficie nativa — el SDK solo construye por ti el
+envelope firmado.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-Deberías ver `marginSummary.accountValue: "3000.0"`.
+Deberías ver `data.account_value: "3000"`.
 
 ## Paso 2 — Colocar una orden límite
 
@@ -91,15 +87,15 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-Curl directo (formato HL-compat — construyes la firma tú mismo; consulta [firma](./signing.md)):
+Curl directo (formato MTF-native — construyes la firma tú mismo; consulta [firma](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
 
-donde `order.json` es el envelope en formato HL que armaste.
+donde `order.json` es el envelope MTF-native firmado que armaste.
 
 ### Ejemplo de trading spot
 
@@ -132,9 +128,9 @@ La respuesta sincrónica incluye el `oid` asignado con una entrada `resting` o `
 ## Paso 3 — Verificar que la orden está en el libro
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
 Deberías ver tu orden con el `oid` del paso 2.
@@ -156,7 +152,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # curl directo
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -d @cancel.json
 ```
 
@@ -209,7 +205,7 @@ sequenceDiagram
 - [Tipos de órdenes](../concepts/order-types.md) — más allá de las órdenes límite simples
 - [Manejo de errores](./error-handling.md) — admisión vs confirmación vs red
 - [Suscripciones WS](../api/ws/subscriptions.md) — datos en tiempo real mediante push
-- [Migración desde HL](./migrating-from-hl.md) — ¿ya tienes un bot de HL? empieza por esta página
+- [Migración desde HL](./migrating-from-hl.md) — ¿ya tienes un bot de Hyperliquid? empieza por esta página
 
 ## Solución de problemas
 

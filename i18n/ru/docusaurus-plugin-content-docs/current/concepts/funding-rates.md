@@ -175,7 +175,7 @@ short 0.5 BTC:
 
 ## История финансирования
 
-История по счёту через [`POST /info userFills`](../api/rest/info.md) или [HL-compat `userFills`](../api/rest/hl-compat.md) — выплаты финансирования отображаются с `kind: "funding"` и соответствующим активом.
+История по счёту через [`POST /info user_fills`](../api/rest/info.md) — выплаты финансирования отображаются с `kind: "funding"` и соответствующим активом.
 
 История по рынку:
 

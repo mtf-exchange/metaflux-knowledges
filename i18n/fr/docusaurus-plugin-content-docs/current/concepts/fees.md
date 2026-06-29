@@ -100,10 +100,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"
 # your personal tier and recent volume — MTF-native (gateway default path)
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
-
-# or the HL-compat shape under /hl on the gateway
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
-  -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 
 ## Cas limites
@@ -125,7 +121,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — palier par utilisateur MTF-natif / volume sur 30 jours
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — pools de frais cumulatifs (destruction / trésorerie / validateurs)
-- [`POST /info userFees`](../api/rest/hl-compat.md#userfees) — compatible HL
 - [Liquidation par paliers](./tiered-liquidation.md) — mécaniques de liquidation
 
 ## FAQ

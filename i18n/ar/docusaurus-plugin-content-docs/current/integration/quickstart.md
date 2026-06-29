@@ -14,15 +14,12 @@
 
 ## نقاط النهاية
 
-البوابة هي المدخل العام الوحيد. المسار MTF-native هو المسار الافتراضي؛
-يقع المسار المتوافق مع HL تحت `/hl/*`.
+البوابة هي المدخل العام الوحيد، وتخدم السطح الأصلي لـ MTF.
 
 | الخدمة | عنوان URL (devnet) |
 |---------|--------------|
 | مدخل البوابة الرئيسي | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (افتراضي) | `POST /info` · `POST /exchange` · `GET /ws` |
-| متوافق مع HL | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| متوافق مع CCXT | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | الصنبور (devnet) | `POST /faucet` |
 | المستعرض | `https://devnet.mtf.exchange/explorer` |
@@ -44,16 +41,15 @@ curl -X POST https://devnet-gateway.mtf.exchange/faucet \
 **مرة واحدة فقط لكل عنوان** (يعيد الطلب الثاني `429 address already funded`)،
 مع تحديد معدل 1 / دقيقة / IP. الخيار الاختياري `amount` لا يُقيَّد إلا **تنازلياً** على منحة USDC (≤ 3000)؛ أما MTF فثابتة. المنحة في حالة `"queued"` — وتصل بعد نحو كتلة واحدة، لذا انتظر لحظة قبل التحقق من الرصيد:
 
-تستخدم طلبات curl الخام أدناه شكل **HL-compat** تحت `/hl/*` على البوابة
-(أنواع camelCase مثل `clearinghouseState` / `openOrders`، وأظرفة موقّعة بـ msgpack) — مفيد إذا كان لديك عميل HL بالفعل. أمثلة `@metaflux/sdk` تتحدث MTF-native على المسار الافتراضي للبوابة (`/info` · `/exchange`). اختر مساراً واحداً؛ كلاهما يمر عبر نفس المدخل الرئيسي، ولكن بمسارات مختلفة.
+تتحدّث طلبات curl الخام أدناه بروتوكول **MTF-native** على البوابة (أنواع snake_case مثل `account_state` / `open_orders`). أمثلة `@metaflux/sdk` تتحدّث نفس السطح الأصلي — تكتفي الحزمة ببناء الغلاف الموقّع نيابةً عنك.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-ينبغي أن ترى `marginSummary.accountValue: "3000.0"`.
+ينبغي أن ترى `data.account_value: "3000"`.
 
 ## الخطوة 2 — ضع أمر بسعر محدد
 
@@ -83,15 +79,15 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-طلب curl الخام (شكل HL-compat — عليك بناء التوقيع بنفسك؛ انظر [التوقيع](./signing.md)):
+طلب curl الخام (شكل MTF-native — عليك بناء التوقيع بنفسك؛ انظر [التوقيع](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
 
-حيث `order.json` هو ظرف شكل HL الذي أعددته.
+حيث `order.json` هو ظرف MTF-native الموقّع الذي أعددته.
 
 ### مثال على التداول الفوري
 
@@ -117,9 +113,9 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
 ## الخطوة 3 — تحقق من وجود الأمر في دفتر الطلبات
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
 ينبغي أن ترى أمرك مع الـ `oid` من الخطوة 2.
@@ -141,7 +137,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

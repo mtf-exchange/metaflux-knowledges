@@ -172,8 +172,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 يمكن الاستعلام عن كل حساب فرعي أيضًا باعتباره حسابًا مستقلًا من الدرجة الأولى عبر `account_state` و`open_orders` و`user_fills` وغيرها، بتمرير عنوانه في معامل `address`.
 
-[المعادل المتوافق مع HL](../api/rest/hl-compat.md#subaccounts).
-
 ## الحدود
 
 | الحد | القيمة الافتراضية | ملاحظات |
@@ -262,7 +260,6 @@ sequenceDiagram
 - [هامش المحفظة](./portfolio-margin.md) — التفاعل مع PM متعدد الأصول
 - [أوضاع الهامش](./margin-modes.md) — الوضع الكلي / المعزول / Strict-Iso لكل حساب فرعي
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — استعلام MTF الأصلي
-- [`subAccounts` HL-compat](../api/rest/hl-compat.md#subaccounts) — استعلام بتنسيق HL
 
 ## الأسئلة الشائعة
 

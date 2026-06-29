@@ -175,7 +175,7 @@ short 0.5 BTC:
 
 ## سجل التمويل
 
-سجل الحساب عبر [`POST /info userFills`](../api/rest/info.md) أو [HL-compat `userFills`](../api/rest/hl-compat.md) — تظهر مدفوعات التمويل بصيغة `kind: "funding"` مع الأصل ذي الصلة.
+سجل الحساب عبر [`POST /info user_fills`](../api/rest/info.md) — تظهر مدفوعات التمويل بصيغة `kind: "funding"` مع الأصل ذي الصلة.
 
 سجل السوق:
 

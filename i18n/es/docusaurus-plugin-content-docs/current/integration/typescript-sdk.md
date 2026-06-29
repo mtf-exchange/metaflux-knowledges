@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex string OR `Uint8Array` | sí (salvo que se defina `signer`) | Clave privada secp256k1 de 32 bytes |
 | `signer` | `Signer` | sí (salvo que se defina `privateKey`) | Firmante personalizado (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex address | opcional | Si se establece, se usa como `sender`; la dirección del firmante se emplea como firmante recuperado. Para el [patrón de agente-wallet](./agent-wallets-howto.md). |
-| `baseUrl` | string | sí | Punto de entrada del gateway (`https://<net>-gateway.mtf.exchange`). El SDK utiliza el protocolo MTF-native, que es la ruta predeterminada del gateway (`/info` · `/exchange` · `/ws`); la compatibilidad HL reside bajo `/hl/*`. ¿Ejecutas el nodo tú mismo? Apunta a `http://localhost:8080`. Consulta [redes](../networks.md). |
+| `baseUrl` | string | sí | Punto de entrada del gateway (`https://<net>-gateway.mtf.exchange`). El SDK utiliza el protocolo MTF-native, servido por el gateway en `/info` · `/exchange` · `/ws`. ¿Ejecutas el nodo tú mismo? Apunta a `http://localhost:8080`. Consulta [redes](../networks.md). |
 | `chainId` | number | sí | Según la red — véase [redes](../networks.md) |
 | `timeoutMs` | number | opcional (por defecto 5000) | Tiempo de espera HTTP |
 | `nonceFn` | `() => number` | opcional (por defecto `Date.now`) | Generador de nonce personalizado |

@@ -244,7 +244,6 @@ sequenceDiagram
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective emission APR + committed inputs
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)
-- [HL-compat `delegations`](../api/rest/hl-compat.md#delegations)
 - [Fees](./fees.md) — fee revenue is one of the staking reward sources
 
 ## FAQ

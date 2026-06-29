@@ -12,7 +12,6 @@ Comment connecter un client à MetaFlux. Choisissez le chemin qui correspond à 
 |--------------------------|-------|
 | Rien — juste envie d'essayer | [Démarrage rapide](./quickstart.md) |
 | Un bot / outil HL existant | [Migration depuis HL](./migrating-from-hl.md) |
-| Un framework quant basé sur CCXT | [Intégration CCXT](../api/rest/ccxt-compat.md) |
 | TypeScript / navigateur en partant de zéro | [SDK TypeScript](./typescript-sdk.md) |
 | Service Rust en partant de zéro | [SDK Rust](./rust-sdk.md) |
 | Autre chose (Python, Go, …) | [Signature de données typées](./typed-data-signing.md) — implémentez vous-même la signature EIP-712 sur des données typées |
@@ -45,9 +44,7 @@ La passerelle (`https://<net>-gateway.mtf.exchange`) est le point d'entrée publ
 
 | Chemin | Sert | Rôle |
 |------|--------|---------|
-| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native (par défaut) | Surface native en snake_case |
-| `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` | Compatible HL | Format de transport HL |
-| `/ccxt/*` | Compatible CCXT | Méthodes REST CCXT |
+| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native | Surface native en snake_case |
 | `POST /evm` | EVM JSON-RPC | RPC de la sidechain EVM |
 | `POST /faucet` | Faucet | Robinet de test devnet/testnet |
 

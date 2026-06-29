@@ -14,14 +14,12 @@
 
 ## 端点
 
-网关是唯一的公开入口。MTF 原生接口为默认路径；HL 兼容接口位于 `/hl/*`。
+网关是唯一的公开入口，提供 MTF 原生接口。
 
 | 服务 | URL（devnet） |
 |---------|--------------|
 | 网关入口 | `https://devnet-gateway.mtf.exchange` |
-| MTF 原生（默认） | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL 兼容 | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT 兼容 | `/ccxt/*` |
+| MTF 原生 | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | 水龙头（devnet） | `POST /faucet` |
 | 浏览器 | `https://devnet.mtf.exchange/explorer` |
@@ -41,15 +39,15 @@ curl -X POST https://devnet-gateway.mtf.exchange/faucet \
 
 每次申领可获得 **3000 USDC** 全仓保证金**和 10 MTF** 现货代币——**每个地址仅限一次**（重复申领将返回 `429 address already funded`），且同一 IP 每分钟限速 1 次。可选的 `amount` 参数只能*向下*限制 USDC 发放数量（≤ 3000）；MTF 数量固定。发放状态为 `"queued"`——约 1 个区块后到账，请稍等片刻再确认余额：
 
-以下原始 curl 示例使用网关上 `/hl/*` 路径的 **HL 兼容**格式（camelCase 类型如 `clearinghouseState` / `openOrders`，msgpack 签名信封）——如果你已有 HL 客户端会很方便。`@metaflux/sdk` 示例则走网关默认路径（`/info` · `/exchange`）的 MTF 原生接口。二者任选其一，都通过同一个入口，只是路径不同。
+下面的原始 curl 示例在网关上使用 **MTF 原生**格式（snake_case 类型如 `account_state` / `open_orders`）。`@metaflux/sdk` 示例使用相同的原生接口——SDK 只是替你构建已签名的信封。
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-响应中应可看到 `marginSummary.accountValue: "3000.0"`。
+响应中应可看到 `data.account_value: "3000"`。
 
 ## 第二步 — 下限价单
 
@@ -79,15 +77,15 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-原始 curl（HL 兼容格式——需自行构建签名；参见[签名](./signing.md)）：
+原始 curl（MTF 原生格式——需自行构建签名；参见[签名](./signing.md)）：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
 
-其中 `order.json` 为你自行组装的 HL 格式信封。
+其中 `order.json` 为你自行组装的已签名 MTF 原生信封。
 
 ### 现货交易示例
 
@@ -113,9 +111,9 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
 ## 第三步 — 确认订单已进入委托簿
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
 响应中应能看到第二步返回的 `oid` 对应的订单。
@@ -137,7 +135,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

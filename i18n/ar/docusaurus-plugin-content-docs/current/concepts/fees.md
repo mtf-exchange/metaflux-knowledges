@@ -97,13 +97,9 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metr
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
 curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — MTF-native (gateway default path)
+# your personal tier and recent volume — MTF-native
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
-
-# or the HL-compat shape under /hl on the gateway
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
-  -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 
 ## الحالات الطرفية
@@ -125,7 +121,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — شريحة المستخدم وحجم الـ30 يومًا (MTF-native)
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — مجمَّعات الرسوم التراكمية (الحرق / الخزينة / المحققون)
-- [`POST /info userFees`](../api/rest/hl-compat.md#userfees) — HL-compat
 - [التصفية المتدرجة](./tiered-liquidation.md) — آليات التصفية
 
 ## الأسئلة الشائعة

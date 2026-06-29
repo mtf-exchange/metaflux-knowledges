@@ -16,14 +16,12 @@
 
 集成沙箱环境。通过水龙头领取免费 USDC；状态为临时性（会不定期重置）。
 
-网关是唯一的公共入口。MTF 原生路径为默认接入方式（`/info` · `/exchange` · `/ws`）；兼容 HL 的路径位于 `/hl/*`；CCXT 兼容路径位于 `/ccxt/*`；EVM JSON-RPC 位于 `/evm`。
+网关是唯一的公共入口。MTF 原生接口位于 `/info` · `/exchange` · `/ws`；EVM JSON-RPC 位于 `/evm`。
 
 | 服务 | 端点 |
 |------|------|
 | 网关入口 | `https://devnet-gateway.mtf.exchange` |
-| MTF 原生（默认） | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL 兼容 | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT 兼容 | `/ccxt/*` |
+| MTF 原生 | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | 水龙头（Devnet/Testnet） | `POST /faucet` |
 | 网关 WebSocket（原生） | `wss://devnet-gateway.mtf.exchange/ws` |

@@ -172,8 +172,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 每个子账户也可以作为一等账户单独查询，通过 `account_state`、`open_orders`、`user_fills` 等接口传入其地址即可。
 
-[HL 兼容接口对应文档](../api/rest/hl-compat.md#subaccounts)。
-
 ## 限制
 
 | 限制项 | 默认值 | 备注 |
@@ -262,7 +260,6 @@ sequenceDiagram
 - [组合保证金](./portfolio-margin.md) — 与跨资产 PM 的交互
 - [保证金模式](./margin-modes.md) — 子账户的全仓 / 逐仓 / 严格逐仓模式
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — MTF 原生查询
-- [`subAccounts` HL 兼容接口](../api/rest/hl-compat.md#subaccounts) — HL 格式查询
 
 ## 常见问题
 

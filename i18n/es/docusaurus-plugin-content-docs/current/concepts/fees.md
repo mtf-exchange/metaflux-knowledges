@@ -97,13 +97,9 @@ Las cierres por liquidación siguen el proceso estándar de comisión de taker d
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
 curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — MTF-native (gateway default path)
+# your personal tier and recent volume — MTF-native
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
-
-# or the HL-compat shape under /hl on the gateway
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
-  -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 
 ## Casos extremos
@@ -125,7 +121,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — nivel por usuario nativo de MTF / volumen de 30 días
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — pools de comisiones acumuladas (quema / tesorería / validadores)
-- [`POST /info userFees`](../api/rest/hl-compat.md#userfees) — compatible con HL
 - [Liquidación por niveles](./tiered-liquidation.md) — mecánica de liquidación
 
 ## Preguntas frecuentes

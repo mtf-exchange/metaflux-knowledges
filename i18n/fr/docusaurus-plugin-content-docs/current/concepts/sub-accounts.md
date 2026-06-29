@@ -172,8 +172,6 @@ Retourne la liste des sous-comptes avec leurs indices, adresses dérivées, libe
 
 Chaque sous-compte peut également être interrogé comme un compte à part entière via `account_state`, `open_orders`, `user_fills`, etc., en passant son adresse comme paramètre `address`.
 
-[Équivalent compatible HL](../api/rest/hl-compat.md#subaccounts).
-
 ## Limites
 
 | Limite | Valeur par défaut | Remarques |
@@ -262,7 +260,6 @@ sequenceDiagram
 - [Marge de portefeuille](./portfolio-margin.md) — interaction avec le PM multi-actifs
 - [Modes de marge](./margin-modes.md) — Croisée / Isolée / Strict-Iso par sous-compte
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — requête native MTF
-- [`subAccounts` compatible HL](../api/rest/hl-compat.md#subaccounts) — requête au format HL
 
 ## FAQ
 

@@ -76,8 +76,6 @@ Términos definidos que se utilizan a lo largo de la documentación. Con referen
 
 **Marca de máximo histórico (High-water mark).** Precio de participación histórico más alto de un vault, utilizado para controlar la acumulación de comisiones de rendimiento. Véase [vaults](./vaults.md).
 
-**HL-compat.** La superficie de protocolo del gateway que refleja la forma wire de HL (URL, JSON, firmas). Véase [hl-compat](../api/rest/hl-compat.md).
-
 ## I
 
 **IOC — Inmediata o cancelar (Immediate-Or-Cancel).** TIF; coincide con lo disponible, cancela el remanente no ejecutado. Véase [tipos de orden](./order-types.md#time-in-force).

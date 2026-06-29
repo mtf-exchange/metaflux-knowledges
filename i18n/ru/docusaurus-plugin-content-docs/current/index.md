@@ -11,7 +11,7 @@ slug: /
 
 :::info
 **Впервые здесь?** Начните с [Быстрого старта](./integration/quickstart.md) (5 минут: депозит → торговля → вывод).
-**Мигрируете с другого перп-DEX?** Перейдите к разделу [Миграция с HL](./integration/migrating-from-hl.md) — паттерны применимы и к другим HL-совместимым ботам.
+**Мигрируете с другого перп-DEX?** Перейдите к разделу [Миграция с HL](./integration/migrating-from-hl.md) — переведите бота на MTF-native SDK / API.
 **Строите on-chain?** Смотрите [MIP-3: безразрешительный деплой рынка](./mip/mip-3.md).
 :::
 
@@ -19,7 +19,7 @@ slug: /
 
 <div class="mtf-cardgrid">
 
-- [**Справочник API**](./api/) — REST `/exchange` · `/info`, совместимость с HL и CCXT, WebSocket, ошибки, лимиты запросов
+- [**Справочник API**](./api/) — REST `/exchange` · `/info`, WebSocket, ошибки, лимиты запросов
 - [**Концепции**](./concepts/) — маржа, многоуровневая ликвидация, типы ордеров, финансирование, хранилища, комиссии
 - [**Интеграция**](./integration/) — быстрый старт, подписание, идемпотентность, обработка ошибок, SDK
 - [**EVM**](./evm/) — модель исполнения, переводы Core ↔ EVM, прекомпайлы
@@ -31,7 +31,7 @@ slug: /
 ## Быстрые ссылки
 
 - [Быстрый старт](./integration/quickstart.md) — депозит → торговля → вывод за 5 минут
-- [Миграция с HL](./integration/migrating-from-hl.md) — совместимая замена для HL-ботов
+- [Миграция с HL](./integration/migrating-from-hl.md) — перевод бота Hyperliquid на MTF-native API
 - [`POST /exchange`](./api/rest/exchange.md) — путь записи и полный каталог действий
 - [`POST /info`](./api/rest/info.md) — путь чтения
 - [Многоуровневая ликвидация](./concepts/tiered-liquidation.md) — лестница T0 → T4

@@ -175,7 +175,7 @@ short 0.5 BTC:
 
 ## 资金费历史记录
 
-账户维度的历史记录可通过 [`POST /info userFills`](../api/rest/info.md) 或 [HL 兼容接口 `userFills`](../api/rest/hl-compat.md) 查询——资金费支付记录的 `kind` 字段为 `"funding"`，并标注相关资产。
+账户维度的历史记录可通过 [`POST /info user_fills`](../api/rest/info.md) 查询——资金费支付记录的 `kind` 字段为 `"funding"`，并标注相关资产。
 
 市场维度的历史记录：
 

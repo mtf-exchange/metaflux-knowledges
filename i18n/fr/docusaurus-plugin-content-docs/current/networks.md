@@ -16,16 +16,13 @@
 
 L'environnement sandbox d'intégration. USDC gratuits via le faucet ; état éphémère (réinitialisations occasionnelles).
 
-La passerelle constitue l'unique point d'entrée public. MTF-native est le chemin par défaut
-(`/info` · `/exchange` · `/ws`) ; la compatibilité HL se trouve sous `/hl/*` ; CCXT sous
-`/ccxt/*` ; EVM JSON-RPC à `/evm`.
+La passerelle constitue l'unique point d'entrée public. La surface MTF-native est desservie sur
+`/info` · `/exchange` · `/ws` ; EVM JSON-RPC à `/evm`.
 
 | Service | Point de terminaison |
 |---------|----------------------|
 | Porte d'entrée passerelle | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (par défaut) | `POST /info` · `POST /exchange` · `GET /ws` |
-| Compatibilité HL | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| Compatibilité CCXT | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet/testnet) | `POST /faucet` |
 | WS passerelle (natif) | `wss://devnet-gateway.mtf.exchange/ws` |
