@@ -172,8 +172,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 Каждый субсчёт также можно запросить как полноценный аккаунт через `account_state`, `open_orders`, `user_fills` и т.д., передав его адрес в параметре `address`.
 
-[Эквивалент HL-совместимости](../api/rest/hl-compat.md#subaccounts).
-
 ## Ограничения
 
 | Ограничение | По умолчанию | Примечания |
@@ -262,7 +260,6 @@ sequenceDiagram
 - [Портфельная маржа](./portfolio-margin.md) — взаимодействие с кросс-активным PM
 - [Режимы маржи](./margin-modes.md) — Cross / Isolated / Strict-Iso для каждого субсчёта
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — нативный запрос MTF
-- [`subAccounts` HL-совместимость](../api/rest/hl-compat.md#subaccounts) — запрос в формате HL
 
 ## FAQ
 

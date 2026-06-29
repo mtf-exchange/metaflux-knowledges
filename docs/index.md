@@ -11,7 +11,7 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 
 :::info
 **New?** Start with the [Quickstart](./integration/quickstart.md) (5 minutes, deposit → trade → withdraw).
-**Migrating from another perps DEX?** Jump to [Migrating from HL](./integration/migrating-from-hl.md) — the patterns translate to other HL-compatible bots.
+**Migrating from another perps DEX?** Jump to [Migrating from HL](./integration/migrating-from-hl.md) — switch your bot to the MTF-native SDK / API.
 **Building on-chain?** See [MIP-3 permissionless market deploy](./mip/mip-3.md).
 :::
 
@@ -19,7 +19,7 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 
 <div class="mtf-cardgrid">
 
-- [**API reference**](./api/) — REST `/exchange` · `/info`, HL- & CCXT-compat, WebSocket, errors, rate limits
+- [**API reference**](./api/) — REST `/exchange` · `/info`, WebSocket, errors, rate limits
 - [**Concepts**](./concepts/) — margin, tiered liquidation, order types, funding, vaults, fees
 - [**Integration**](./integration/) — quickstart, signing, idempotency, error handling, SDKs
 - [**EVM**](./evm/) — execution model, Core ↔ EVM transfers, precompiles
@@ -31,7 +31,7 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 ## Quick links
 
 - [Quickstart](./integration/quickstart.md) — 5-minute deposit → trade → withdraw
-- [Migrating from HL](./integration/migrating-from-hl.md) — drop-in for HL-compatible bots
+- [Migrating from HL](./integration/migrating-from-hl.md) — switch a Hyperliquid bot to the MTF-native API
 - [`POST /exchange`](./api/rest/exchange.md) — write path + full action catalog
 - [`POST /info`](./api/rest/info.md) — read path
 - [Tiered liquidation](./concepts/tiered-liquidation.md) — T0 → T4 ladder

@@ -16,16 +16,13 @@
 
 The integration sandbox. Free USDC via the faucet; ephemeral state (occasional resets).
 
-The gateway is the single public front door. MTF-native is the default path
-(`/info` · `/exchange` · `/ws`); HL-compat lives under `/hl/*`; CCXT under
-`/ccxt/*`; EVM JSON-RPC at `/evm`.
+The gateway is the single public front door. The MTF-native surface is served at
+`/info` · `/exchange` · `/ws`; EVM JSON-RPC at `/evm`.
 
 | Service | Endpoint |
 |---------|----------|
 | Gateway front door | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (default) | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT-compat | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet/testnet) | `POST /faucet` |
 | Gateway WS (native) | `wss://devnet-gateway.mtf.exchange/ws` |

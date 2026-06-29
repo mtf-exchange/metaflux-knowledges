@@ -76,8 +76,6 @@
 
 **最高水位线（High-water mark）。** 金库历史最高份额净值，用于门控绩效费累计。参见[金库](./vaults.md)。
 
-**HL 兼容层（HL-compat）。** 网关协议接口层，与 HL 的接口形态（URL、JSON、签名）保持一致。参见 [hl-compat](../api/rest/hl-compat.md)。
-
 ## I
 
 **IOC — 立即成交或取消（Immediate-Or-Cancel）。** TIF 类型，立即撮合可成交部分，未成交部分直接撤销。参见[订单类型](./order-types.md#time-in-force)。

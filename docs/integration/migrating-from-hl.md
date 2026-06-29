@@ -1,231 +1,220 @@
 # Migrating from HL
 
 :::info
-**Preview.** The HL-compat surface covers `POST /info` (15 query types) and `POST /exchange` (order + cancel today, more action types over time).
+**MetaFlux speaks its own MTF-native protocol — there is no Hyperliquid-compatible shim.** Your bot keeps its strategy and trading logic; what changes is the client/wire layer. The fastest path is the official [TypeScript](./typescript-sdk.md) or [Rust](./rust-sdk.md) SDK, which builds the native envelope and EIP-712 signature for you. For other languages, implement [typed-data signing](./typed-data-signing.md) directly.
 :::
 
-If your bot already speaks HL's protocol, you can point it at MetaFlux with **no code change** for the covered surface — same URL shapes, same request/response JSON, same EIP-712 envelope.
+If your bot already trades on a Hyperliquid-style perps DEX, the move to MetaFlux is a **client-layer rewrite, not a strategy rewrite**. The concepts you depend on — limit orders, fills, funding, cross / isolated margin, agent wallets, sub-accounts, vaults — all exist on MTF. What you swap out is the wire shape, the action / query names, the chain ID, and the asset IDs.
 
-## What works out of the box
+## The shape of the move
 
-- `POST /info` for: `meta`, `allMids`, `userState`, `clearinghouseState`, `openOrders`, `frontendOpenOrders`, `userFills`, `historicalOrders`, `metaAndAssetCtxs`, `l2Book`, `vaultDetails`, `delegations`, `userFees`, `subAccounts`, `referral`
-- `POST /exchange` for: `order` (place limit / IOC / ALO), `cancel` (cancel by OID)
-- WS subscriptions (coming) will use the same channel names as HL
+- **Wire shape.** MTF-native is snake_case JSON over `POST /exchange` (write), `POST /info` (read), and `GET /ws` (stream), each EIP-712-signed where required. Adopt the SDK or implement the [native signing scheme](./typed-data-signing.md).
+- **Strategy & risk logic.** Unchanged — your quoting, sizing, and hedging code carries over.
+- **Names & a few semantics.** Action types and query types are renamed (table below) and a handful of behaviours differ (asset IDs, the T0 liquidation tier, agent-approval latency).
 
-## What's different
+## What works the same
 
-### 1. Chain ID
+- Limit / IOC / ALO orders, reduce-only, client order ids (`cloid`).
+- EIP-712 signing — same signature primitive, different domain and chain ID.
+- Cross / isolated margin, funding payments, fills and order-status reads.
+- Agent wallets (hot keys with no withdrawal authority), sub-accounts, vaults.
+
+## What changes
+
+### 1. Protocol surface
+
+There is one MTF-native surface; you call it through the SDK or build the envelope yourself. Names map cleanly:
+
+| You used on HL | MTF-native equivalent |
+|----------------|-----------------------|
+| `POST /exchange` `order` | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
+| `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
+| `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `POST /info` `meta` | [`markets`](../api/rest/info/perpetuals.md#markets) |
+| `POST /info` `clearinghouseState` | [`account_state`](../api/rest/info.md#account_state) |
+| `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) / [`frontend_open_orders`](../api/rest/info.md#frontend_open_orders) |
+| `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
+| WS `userEvents`, `l2Book`, `candle` | `user_events`, `l2_book`, `candles` (snake_case) — see [WS subscriptions](../api/ws/subscriptions.md) |
+
+The full catalogs are [`POST /exchange`](../api/rest/exchange.md) and [`POST /info`](../api/rest/info.md).
+
+### 2. Chain ID
 
 MetaFlux is its own L1, not an HL deployment. Sign against the MetaFlux chain ID, **not** HL's:
 
-| Network | HL `chainId` | MTF `chainId` |
-|---------|--------------|---------------|
-| Mainnet | 1337 | **8964** (`0x2304`) |
-| Testnet | 998 | **114514** (`0x1bf52`) |
-| Devnet / local | 1337 | **31337** (`0x7a69`) |
+| Network | MTF `chainId` |
+|---------|---------------|
+| Mainnet | **8964** (`0x2304`) |
+| Testnet | **114514** (`0x1bf52`) |
+| Devnet / local | **31337** (`0x7a69`) |
 
-Update one constant in your signing code and the rest of the EIP-712 envelope is identical. The MTF domain uses `name = "MetaFlux"`, `version = "1"`, `verifyingContract = 0x0`.
+The MTF EIP-712 domain uses `name = "MetaFlux"`, `version = "1"`, `verifyingContract = 0x0`. See [networks](../networks.md) and [signing](./signing.md).
 
-### 2. Base URL
+### 3. Base URL
 
 ```
-HL:  https://<your-current-hl-api-base>/{info,exchange}
-MTF: https://gateway.<your-deployment>/hl/{info,exchange}
+MTF: https://<net>-gateway.mtf.exchange/{info,exchange,ws}
 ```
 
-The gateway is the single front door. HL-compat lives under `/hl/*`
-(`/hl/info`, `/hl/exchange`, `/hl/ws`) — so an HL client just gains the `/hl`
-prefix. The gateway's default top-level path (`/info`, `/exchange`) is
-MTF-native; running the node yourself, the same surface is served at
-`http://localhost:8080`.
-
-### 3. Action types not yet on the compat layer
-
-If your bot uses HL actions beyond `order` / `cancel`, the gateway today returns:
-
-```json
-{ "status": "err", "response": "unimplemented action: <type>" }
-```
-
-at HTTP 200. The HL convention is errors are 200s with `status: "err"`, which MTF preserves.
-
-The full HL action coverage rolls out in subsequent releases. For new actions you'd rather have today, use the [MTF-native action surface](../api/rest/exchange.md) directly — it has full feature coverage including features HL doesn't have (RFQ, FBA, portfolio margin enrollment, cross-chain primitives).
+The gateway is the single front door for the MTF-native surface. Running the node yourself, the same surface is served at `http://localhost:8080`.
 
 ### 4. Asset IDs
 
-HL and MTF both use integer asset IDs but **the integers are not the same**. `0` on HL is BTC perp; `0` on MTF might be ETH or anything else depending on the deployment. Always look up your asset IDs via `POST /info { "type": "meta" }` at startup; never hard-code.
+HL and MTF both use integer asset IDs but **the integers are not the same**. `0` on HL is BTC perp; `0` on MTF might be ETH or anything else depending on the deployment. Always look up your asset IDs via `POST /info { "type": "markets" }` at startup; never hard-code.
 
 ### 5. Numeric precision
 
-Both chains use scaled integers (e.g. `px`) and represent them as strings in JSON because IEEE-754 loses precision past 2^53. If your bot is doing JSON parsing with default JS `JSON.parse`, switch to a big-int aware parser for these fields — the wire shape is the same as HL but the failure mode (silent precision loss) is the same too.
+Price and size fields are scaled integers transmitted as JSON strings because IEEE-754 loses precision past 2^53. If your bot parses with default JS `JSON.parse`, switch to a big-int-aware parser for these fields.
 
 ### 6. Liquidation behaviour
 
-MetaFlux adds a [T0 yellow card grace tier](../concepts/tiered-liquidation.md) that HL does not have. Practical effect: at health `[1.0, 1.1)` your account's resting ALO orders get force-cancelled and a warning event is emitted, but positions are not touched. Then T1 / T2 / T3 behave like HL's Partial / Market / Backstop.
+MetaFlux adds a [T0 yellow-card grace tier](../concepts/tiered-liquidation.md) that HL does not have. Practical effect: at health `[1.0, 1.1)` your account's resting ALO orders get force-cancelled and a warning event is emitted, but positions are not touched. Then T1 / T2 / T3 behave like HL's Partial / Market / Backstop.
 
 If your bot listens for liquidation events to trigger margin top-ups, **add a handler for the new T0 event** — that's the early-warning signal HL doesn't give you. Catching it gives you one block of grace to act.
 
 ### 7. Agent wallet semantics
 
-HL: an agent is a key with no withdrawal authority. Same on MTF — see [agent wallets](../concepts/agent-wallets.md). The action name is `ApproveAgent`; the wire shape mirrors HL's. The one mechanical difference: MTF's agent approval becomes effective **one block after commit**, vs HL's typically two-block latency. Slightly faster; same warm-up dance.
+An agent is a key with no withdrawal authority — same model as HL (see [agent wallets](../concepts/agent-wallets.md)). The action is [`approve_agent`](../api/rest/exchange.md#approve_agent). The one mechanical difference: MTF's agent approval becomes effective **one block after commit**, vs HL's typically two-block latency. Slightly faster; same warm-up dance.
 
 ### 8. Vaults
 
-HL vaults and MetaFlux vaults are not the same product. `vaultDetails` returns information about MTF's own vault types (MFlux Vault, user vaults). HL vault addresses won't resolve. The query shape is the same; just expect MTF entities, not HL ones.
+HL vaults and MetaFlux vaults are not the same product. The [`vault_state`](../api/rest/info.md#vault_state) read returns MTF's own vault types (MFlux Vault, user vaults). HL vault addresses won't resolve. Expect MTF entities, not HL ones.
 
 ## Step-by-step migration
 
-### Day 0 — point at MetaFlux
+### Day 0 — adopt the native client
 
-1. Change base URL in your client config.
-2. Change `chainId` constant in your signer.
-3. Run your existing test suite against MTF devnet. `order` / `cancel` / all `info` queries should pass with no code change.
+1. Install the [TypeScript](./typescript-sdk.md) or [Rust](./rust-sdk.md) SDK (or implement [typed-data signing](./typed-data-signing.md) for your language).
+2. Point `baseUrl` at the MTF gateway and set `chainId` for your target network.
+3. Re-implement asset lookup against `POST /info { "type": "markets" }`.
 
-### Day 1 — handle the action surface gap
+### Day 1 — map your actions
 
-For HL actions not yet on the MTF compat layer:
-
-- **Modify orders** — for now, cancel + re-submit. The `modify` action lands in a subsequent compat update.
-- **Set leverage / margin mode** — use the MTF-native action via `POST /exchange` on the gateway default path (`UpdateLeverage`, `UpdateIsolatedMargin`). Same EIP-712 envelope; different action variant name.
-- **Transfer / withdraw** — MTF-native.
+Translate each action your bot sends to its MTF-native equivalent (see the table in [§1](#1-protocol-surface)). `order` → `submit_order`, `cancel` → `cancel_order`, leverage / margin changes → `update_leverage` / `update_isolated_margin`. The EIP-712 envelope is built by the SDK; only the action variant name and field casing differ.
 
 ### Day 2 — wire the new signals
 
-- Subscribe to `subAccounts` info if you operate sub-accounts (semantics differ slightly — MTF allows up to 32 subs per master).
-- Add a handler for T0 yellow-card events. Easiest place is the same fill / liquidation feed you already consume; the event shape is `{ "type": "yellowCard", "user": "0x...", "block": N }`.
-- If you depend on portfolio margin: re-enroll on MTF (`UserPortfolioMargin { enabled: true }`). The threshold and scenario set are network parameters — see [portfolio margin](../concepts/portfolio-margin.md).
+- Subscribe to `sub_accounts` reads if you operate sub-accounts (MTF allows up to 32 subs per master).
+- Add a handler for T0 yellow-card events on the `user_events` WS channel.
+- If you depend on portfolio margin, enroll on MTF with [`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin). The threshold and scenario set are network parameters — see [portfolio margin](../concepts/portfolio-margin.md).
 
 ### Day 3+ — adopt MTF-only features
 
-Optional. If you want to use features HL doesn't have:
+Optional. If you want features HL doesn't have:
 
-- **RFQ** — request-for-quote primitives, useful for size that doesn't want to advertise on the book
-- **FBA** — frequent batch auction matching for designated markets, reduces MEV
-- **Cross-chain primitives** — bridge primitives natively callable from EVM contracts
+- **RFQ** — request-for-quote primitives, useful for size that doesn't want to advertise on the book.
+- **FBA** — frequent batch auction matching for designated markets, reduces MEV.
+- **Cross-chain primitives** — bridge primitives natively callable from EVM contracts.
 
-These are MTF-native actions, sent on the gateway's default path (`POST /exchange` — MTF-native is the default; HL-compat is under `/hl/*`; see [API overview](../api/index.md)).
+These are MTF-native actions on `POST /exchange`; see the [API overview](../api/index.md).
 
-## Top 5 HL bot patterns — concrete migration
+## Top HL bot patterns — concrete migration
 
 ### 1. Simple limit-order MM (the canonical pattern)
 
-```diff
-- const HL_URL = 'https://<your-current-hl-api-base>';
-+ const MTF_URL = 'https://gateway.mtf.exchange/hl';   // HL-compat is under /hl/*
+```typescript
+import { MetaFluxClient } from '@metaflux/sdk';
 
-- const HL_CHAIN_ID = 1337;
-+ const MTF_CHAIN_ID = 114514;    // testnet (mainnet 8964, devnet 31337)
+const client = new MetaFluxClient({
+  privateKey: process.env.PRIVATE_KEY!,
+  baseUrl:    'https://testnet-gateway.mtf.exchange',
+  chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
+});
 
-- const HL_DOMAIN_NAME = 'HLSignTransaction';   // varies by mode
-+ const MTF_DOMAIN_NAME = 'MetaFlux';
-+ const MTF_DOMAIN_VERSION = '1';
+// asset lookup: HL `meta.universe` → MTF `markets`
+const markets = await client.info.markets();
+const BTC = markets.findIndex(m => m.name === 'BTC');   // may not be 0
 
-  // asset lookup runs against /info { type: "meta" } — same call, different result
-  const meta = await fetch(MTF_URL + '/info', {
-    method: 'POST',
-    body: JSON.stringify({ type: 'meta' }),
-  }).then(r => r.json());
-
-  const BTC = meta.universe.findIndex(m => m.name === 'BTC');  // may not be 0
-
-  // order, cancel — unchanged HL wire shape
-  await place_order(BTC, 'B', '100', '0.1', 'Gtc');
+// order / cancel — your strategy logic, native action names
+await client.exchange.order({
+  asset: BTC, isBuy: true, price: '100', size: '0.1', tif: 'Gtc', reduceOnly: false,
+});
 ```
 
-Switching `chainId` + base URL is ~5 minutes of work for a typical client.
+The strategy stays; the client layer becomes the SDK call.
 
-### 2. Liquidation-watching bot (margin-top-up)
+### 2. Liquidation-watching bot (margin top-up)
 
-HL emits `liquidation` events when accounts hit the partial / market tier. MTF adds **`yellowCard`** as the earliest signal.
+HL emits `liquidation` events at the partial / market tier. MTF adds **`yellowCard`** as the earliest signal on the `user_events` channel.
 
-```diff
-  ws.subscribe('userEvents', { user: address }, (event) => {
-    switch (event.data.kind) {
-+     case 'yellowCard':
-+       // T0 — one block to act. ALO orders already cancelled.
-+       deposit(YELLOW_CARD_DEPOSIT);
-+       break;
-      case 'liquidation':
--       // HL partial / market
-+       // T1 partial OR T2 full — too late for prevention
-        emergency_unwind();
-        break;
-    }
-  });
+```typescript
+const ws = client.ws();
+ws.subscribe('user_events', { user: client.address }, (event) => {
+  switch (event.data.kind) {
+    case 'yellowCard':
+      // T0 — one block to act; ALO orders already cancelled
+      deposit(YELLOW_CARD_DEPOSIT);
+      break;
+    case 'liquidation':
+      // T1 partial OR T2 full — too late for prevention
+      emergency_unwind();
+      break;
+  }
+});
 ```
 
 See [risk-watcher](./risk-watcher.md) for the full pattern.
 
 ### 3. Funding-rate arb bot
 
-Funding cadence is similar (HL is hourly; MTF is hourly by default but configurable per market). Formula structure is identical.
+Funding cadence is similar (hourly by default, configurable per market on MTF). Formula structure is identical; the read is the native `funding` query.
 
-```diff
-  // URL is the /hl base from pattern 1 (gateway .../hl) — HL-compat shape
-  const funding = await fetch(URL + '/info', {
-    body: JSON.stringify({ type: 'fundingHistory', coin: 'BTC' }),
-  }).then(r => r.json());
-
-- // HL funding rate at funding[0].fundingRate
-+ // MTF same shape; values may differ because oracle composition differs
-  const rate = funding[0].fundingRate;
+```typescript
+const funding = await client.info.fundingHistory({ coin: 'BTC' });
+// values may differ from HL because oracle composition differs
+const rate = funding[0].rate_per_hr;
 ```
 
-MTF's oracle composition is governed per-market (committed `SetOracleWeights`) — if your arb depends on specific oracle providers, verify the weighted source list matches your expectation. See [mark prices](../concepts/mark-prices.md).
+MTF's oracle composition is governed per-market (committed `SetOracleWeights`) — if your arb depends on specific oracle providers, verify the weighted source list. See [mark prices](../concepts/mark-prices.md).
 
 ### 4. Multi-account / institutional setup
 
 HL: master + agents per host. MTF: same, plus first-class **multi-sig accounts**.
 
-```diff
-  // existing: master + agents
-  await master.approveAgent(host1_agent);
-  await master.approveAgent(host2_agent);
+```typescript
+// existing: master + agents
+await master.approveAgent(host1_agent);
+await master.approveAgent(host2_agent);
 
-+ // new on MTF: convert master to multi-sig for cold custody
-+ await master.convertToMultiSigUser({
-+   threshold: 2,
-+   signers: [signer1, signer2, signer3],
-+ });
-+ // every subsequent master-level action requires 2 sigs
-+ // agents still work as before for trading actions
+// new on MTF: convert master to multi-sig for cold custody
+await master.convertToMultiSigUser({
+  threshold: 2,
+  signers: [signer1, signer2, signer3],
+});
+// every subsequent master-level action then requires 2 sigs;
+// agents still work as before for trading actions
 ```
 
 See [multi-sig](../concepts/multi-sig.md).
 
 ### 5. Sub-account portfolio manager
 
-HL sub-accounts: up to 8. MTF: up to 32. The wire shape matches:
+HL sub-accounts: up to 8. MTF: up to 32.
 
-```diff
-- // HL: create one of up to 8 subs
-+ // MTF: create one of up to 32 subs (otherwise identical)
-  await master.createSubAccount({ name: 'desk-A' });
-  await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
+```typescript
+// MTF: create one of up to 32 subs
+await master.createSubAccount({ name: 'desk-A' });
+await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
 ```
 
-Per-sub agent management, per-sub PM enrollment, per-sub margin modes are all supported identically.
+Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are all supported.
 
 ## Reference table
 
-| Action you used on HL | Status on MTF |
-|----------------------|---------------|
-| `order` (place limit / IOC / ALO) | ✅ HL-compat shape supported |
-| `cancel` (by OID) | ✅ HL-compat shape supported |
-| `cancelByCloid` | rolling out |
-| `modify` | rolling out |
-| `batchModify` | rolling out |
-| `usdSend` / spot transfers | use MTF-native |
-| `withdraw3` | use MTF-native |
-| `approveAgent` | MTF-native shape; see [agent wallets](../concepts/agent-wallets.md) |
-| `updateLeverage` / `updateIsolatedMargin` | MTF-native shape |
-| `usdClassTransfer` | use MTF-native equivalent |
-| `convertToMultiSigUser` | MTF-native, preview |
-| `setReferrer` / `createReferral` | MTF-native; semantics may differ |
-
-(The table updates as compat-layer support grows.)
+| Action you used on HL | MTF-native action |
+|-----------------------|-------------------|
+| `order` (place limit / IOC / ALO) | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
+| `cancel` (by OID) | [`cancel_order`](../api/rest/exchange.md#cancel_order) |
+| `cancelByCloid` | [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
+| `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `usdSend` / spot transfers | native spot transfer actions |
+| `withdraw3` | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) |
+| `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
+| `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
+| `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user) |
+| `setReferrer` / `createReferral` | [`set_referrer`](../api/rest/exchange.md#set_referrer) (semantics may differ) |
 
 ## Getting help
 
-- This repo (`mtf-exchange/metaflux-knowledges`) — file an issue
-- See [`POST /exchange`](../api/rest/exchange.md) and [signing walkthrough](./signing.md) for the wire-level reference
+- This repo (`mtf-exchange/metaflux-knowledges`) — file an issue.
+- See [`POST /exchange`](../api/rest/exchange.md) and the [signing walkthrough](./signing.md) for the wire-level reference.

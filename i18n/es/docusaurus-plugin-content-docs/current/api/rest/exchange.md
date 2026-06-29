@@ -20,10 +20,9 @@ POST  https://<net>-gateway.mtf.exchange/exchange
 
 | Ruta | Forma wire |
 |------|-----------|
-| `POST /exchange` (gateway por defecto) | **nativa MTF** (este documento) |
-| `POST /hl/exchange` (gateway, bajo `/hl`) | **compatible HL** — véase [hl-compat.md](./hl-compat.md) |
+| `POST /exchange` (gateway) | **nativa MTF** (este documento) |
 
-La nativa MTF es la ruta por defecto del gateway; la compatible HL está bajo el espacio de nombres `/hl/*`. Si ejecutas el nodo tú mismo, el mismo `/exchange` nativo se sirve directamente en `http://localhost:8080`.
+El gateway sirve la `/exchange` nativa MTF. Si ejecutas el nodo tú mismo, el mismo `/exchange` nativo se sirve directamente en `http://localhost:8080`.
 
 ## Sobre de solicitud
 
@@ -126,7 +125,7 @@ La entrada de cada acción en el [catálogo](#action-catalog) indica explícitam
 Cada variante es un objeto etiquetado `{ "type": "<snake_case_tag>", <cuerpo plano> }`. Las claves del cuerpo están **en el plano bajo el objeto de acción** (no hay `type` en PascalCase ni un envoltorio `params` universal) — p. ej., `submit_order` lleva un objeto `order`, `cancel_order` lleva un objeto `cancel`, y las acciones autorizadas por el remitente llevan un objeto `params`. Haz clic para ver la tabla de campos detallada. Las tablas de resumen a continuación agrupan todas las acciones por categoría; las **definiciones completas a nivel de campo que siguen están divididas por tipo de operación** — [Acciones de orden perpetuo](#perpetual-order-actions), [Acciones de trading spot](#spot-trading-actions), [Acciones de margen spot y Earn](#spot-margin--earn-actions), [Acciones de margen y riesgo en perpetuos](#perpetual-margin--risk-actions) y [Cuenta, staking, vaults y bridge](#account-staking-vaults--bridge-actions).
 
 :::warning
-**`px` / `size` son `u64` de punto fijo sin signo en el wire nativo**, enviados como números JSON (el nodo los decodifica como `u64`, luego los amplía internamente). Esto difiere de la ruta compatible con HL (cadenas decimales). Las direcciones son hex con `0x` (40 caracteres); `cloid` es `0x` + 32 caracteres hex (16 bytes).
+**`px` / `size` son `u64` de punto fijo sin signo en el wire nativo**, enviados como números JSON (el nodo los decodifica como `u64`, luego los amplía internamente). Las direcciones son hex con `0x` (40 caracteres); `cloid` es `0x` + 32 caracteres hex (16 bytes).
 :::
 
 ### Colocación y ciclo de vida de órdenes
@@ -236,7 +235,7 @@ Los retiros externos salen de la cadena a través de [MetaBridge](../../bridge/i
 
 ### No disponibles en la ruta pública `/exchange`
 
-Estos nombres de acción aparecen en borradores anteriores (y algunos en la superficie compatible con HL), pero **no están puenteados en el manejador nativo MTF de `/exchange`**. Son escrituras privilegiadas / de sistema que nunca deben transitar por la ruta pública de usuario, o stubs de esquema reconocidos pero sin mapeo. Publicarlos devuelve `400 unsupported action`. Véase [la tabla a continuación](#non-bridged-actions) para la disposición de cada uno.
+Estos nombres de acción aparecen en borradores anteriores, pero **no están puenteados en el manejador nativo MTF de `/exchange`**. Son escrituras privilegiadas / de sistema que nunca deben transitar por la ruta pública de usuario, o stubs de esquema reconocidos pero sin mapeo. Publicarlos devuelve `400 unsupported action`. Véase [la tabla a continuación](#non-bridged-actions) para la disposición de cada uno.
 
 | Nombre del borrador | Etiqueta nativa (si se reconoce) | Por qué no está puenteado |
 |-----------|----------------------------|-----------------|
@@ -1934,7 +1933,6 @@ sequenceDiagram
 ## Véase también
 
 - [`POST /info`](./info.md) — ruta de lectura (nativo MTF)
-- [HL-compat `/exchange`](./hl-compat.md) — formato de wire alternativo para clientes HL
 - [Billeteras de agente](../../concepts/agent-wallets.md)
 - [Guía de firma](../../integration/signing.md)
 - [Firma de datos tipados](../../integration/typed-data-signing.md) — el esquema de firma EIP-712

@@ -239,7 +239,6 @@ sequenceDiagram
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR de emisión efectivo + valores de entrada confirmados
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — agregados de staking a nivel de protocolo (`staking.*`)
-- [HL-compat `delegations`](../api/rest/hl-compat.md#delegations)
 - [Comisiones](./fees.md) — los ingresos por comisiones son una de las fuentes de recompensas de staking
 
 ## FAQ

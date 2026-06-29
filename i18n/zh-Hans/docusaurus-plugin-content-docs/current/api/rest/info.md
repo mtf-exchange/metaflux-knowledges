@@ -13,7 +13,7 @@ description: "POST /info 只读端点——查询类型、请求/响应信封及
 单一端点，多类型分发。根据请求体中的 `type` 字段进行路由。只读——不修改任何状态，无需签名。
 
 :::tip
-**按产品分类。** 永续合约市场的读取查询请参见[永续合约查询](./info/perpetuals.md)；现货、现货保证金及 Earn 的读取查询请参见[现货与保证金查询](./info/spot.md)。本页涵盖信封格式、使用约定、账户/治理/金库/验证者查询，以及 hl-compat 别名对照表。
+**按产品分类。** 永续合约市场的读取查询请参见[永续合约查询](./info/perpetuals.md)；现货、现货保证金及 Earn 的读取查询请参见[现货与保证金查询](./info/spot.md)。本页涵盖信封格式、使用约定，以及账户/治理/金库/验证者查询。
 :::
 
 ## URL
@@ -24,12 +24,10 @@ POST  https://<net>-gateway.mtf.exchange/info
 
 | 路径 | 数据格式 |
 |------|-----------|
-| `POST /info`（网关默认路径） | MTF 原生格式（本文档） |
-| `POST /hl/info`（网关 `/hl` 命名空间） | **HL 兼容模式** — 参见 [hl-compat.md](./hl-compat.md) |
+| `POST /info`（网关） | MTF 原生格式（本文档） |
 
-MTF 原生格式是网关的默认路径；HL 兼容模式挂载于 `/hl/*` 命名空间下。
-若自行运行节点，原生 `/info` 接口直接通过
-`http://localhost:8080` 访问。
+网关提供 MTF 原生 `/info` 接口。若自行运行节点，相同的原生 `/info`
+接口直接通过 `http://localhost:8080` 访问。
 
 ## 信封格式
 
@@ -1672,43 +1670,6 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：对上述读取器的复合调用。
 
-## hl-compat 别名 → MTF 原生类型对照表
-
-网关的 [hl-compat](./hl-compat.md) 接口以 camelCase 别名暴露每种节点快照类型，便于直接兼容现有客户端。左列为该别名，中列为其映射的 MTF 原生节点类型；✅ = 已提供，⚠️ = 通过代理提供（已提交状态中无完全对应的后备数据）。
-
-| hl-compat 别名 | MTF 原生类型 | 状态 | 备注 |
-|----------------------------|------------------------------|--------|-------|
-| `meta` | `markets` | ✅ | 已提供 |
-| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
-| `clearinghouseState` | `account_state` | ✅ | 已提供 |
-| `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | 以 `(owner, asset)` 为键 |
-| `exchangeStatus` | `exchange_status` | ✅ | 标量标志位 |
-| `openOrders` | `open_orders` | ✅ | 已提供 |
-| `frontendOpenOrders` | `frontend_open_orders` | ✅ | 含触发条件 / tif / cloid |
-| `liquidatable` | `liquidatable` | ✅ | BOLE 索引（⚠️ 首次 BOLE 扫描前为空） |
-| `activeAssetData` | `active_asset_data` | ✅ | 持仓 / 配置 / 市场 |
-| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | 以持仓上限作为市价单规模上限的代理 |
-| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = 历史峰值 NAV 代理 |
-| `userVaultEquities` | `user_vault_equities` | ✅ | 按金库分键 |
-| `leadingVaults` | `leading_vaults` | ✅ | 按主导者筛选 |
-| `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
-| `spotDeployState` | `spot_deploy_state` | ✅ | 现货 gas 竞价 |
-| `delegatorSummary` | `delegator_summary` | ✅ | 质押聚合数据 |
-| `maxBuilderFee` | `max_builder_fee` | ✅ | `approved_builders` |
-| `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
-| `userRole` | `user_role` | ✅ | 从注册表派生 |
-| `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | 持仓量 vs `oi_cap` |
-| `validatorL1Votes` | `validator_l1_votes` | ✅ | 元数据（载荷不透明） |
-| `validatorSummaries` | `validator_summaries` | ✅ | 质押量 / 佣金率 / 活跃+监禁标志 |
-| `gossipRootIps` | `gossip_root_ips` | ✅ | 已配置对等节点端点（单节点时为空） |
-| `marginTable` | `margin_table` | ⚠️ | 每个市场仅一档有效梯度（无多行阶梯） |
-| `perpDexs` | `perp_dexs` | ✅ | 索引 + 资产数量 |
-| `webData2` | `web_data2` | ✅ | 复合快照 |
-| `userFees` | `fee_schedule` | ✅ | 已提供 |
-| `delegations` | `staking_state` | ✅ | 已提供 |
-| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | 已提供 |
-| `subAccounts` | `sub_accounts` | ✅ | 已提供 |
-
 ## 错误码
 
 | HTTP | 响应体 | 原因 |
@@ -1758,7 +1719,6 @@ sequenceDiagram
 
 - [`POST /exchange`](./exchange.md) — 写入路径
 - [`POST /faucet`](./faucet.md) — Devnet/测试网测试资金发放（USDC + MTF）
-- [HL-compat `/info`](./hl-compat.md) — camelCase 格式，含更多查询类型
 - [WS 订阅](../ws/subscriptions.md) — 推送等价接口
 
 ## 常见问题

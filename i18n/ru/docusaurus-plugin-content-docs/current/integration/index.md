@@ -12,7 +12,6 @@ description: Подключение клиента к MetaFlux — SDK, подп
 |--------------------------|-------|
 | Нуля — просто хотите попробовать | [Быстрый старт](./quickstart.md) |
 | Существующего HL-бота / инструмента | [Миграция с HL](./migrating-from-hl.md) |
-| Фреймворка на основе CCXT | [Интеграция с CCXT](../api/rest/ccxt-compat.md) |
 | Нового проекта на TypeScript / в браузере | [TypeScript SDK](./typescript-sdk.md) |
 | Нового сервиса на Rust | [Rust SDK](./rust-sdk.md) |
 | Чего-то иного (Python, Go, …) | [Подпись типизированных данных](./typed-data-signing.md) — реализуйте подпись EIP-712 самостоятельно |
@@ -26,7 +25,7 @@ description: Подключение клиента к MetaFlux — SDK, подп
 - [Идемпотентность](./idempotency.md) — стратегия nonce + безопасные повторные попытки
 - [Обработка ошибок](./error-handling.md) — дерево решений: приём vs. фиксация vs. сетевой сбой
 - [Паттерн мониторинга рисков](./risk-watcher.md) — автоматическое пополнение маржи
-- [Миграция с HL](./migrating-from-hl.md) — замена для HL-ботов без изменения кода
+- [Миграция с HL](./migrating-from-hl.md) — перевод бота Hyperliquid на MTF-native API
 
 ## SDK
 
@@ -45,9 +44,7 @@ description: Подключение клиента к MetaFlux — SDK, подп
 
 | Путь | Обслуживает | Назначение |
 |------|--------|---------|
-| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native (по умолчанию) | Нативный интерфейс в стиле snake_case |
-| `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` | HL-совместимый | Формат HL-протокола |
-| `/ccxt/*` | CCXT-совместимый | REST-методы CCXT |
+| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native | Нативный интерфейс в стиле snake_case |
 | `POST /evm` | EVM JSON-RPC | RPC EVM-сайдчейна |
 | `POST /faucet` | Кран | Тестовый кран для devnet/testnet |
 

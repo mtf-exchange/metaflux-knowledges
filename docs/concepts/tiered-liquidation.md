@@ -259,7 +259,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 
 ## How to stay clear
 
-- Watch `health` via `userState` queries (HL-compat) or [`account_state`](../api/rest/info.md#account_state).
+- Watch `health` via [`account_state`](../api/rest/info.md#account_state) queries.
 - Set internal alerts at `health < 1.2` — well above T0.
 - For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when health crosses a threshold.
 - Watch [`userEvents`](../api/ws/subscriptions.md#userevents) on the WS feed for immediate tier transitions (margin / liquidation events ride this channel).

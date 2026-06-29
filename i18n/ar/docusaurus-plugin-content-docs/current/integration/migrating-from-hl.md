@@ -1,231 +1,220 @@
 # الترحيل من HL
 
 :::info
-**معاينة.** تغطي طبقة توافق HL الطلبَين `POST /info` (15 نوعًا من الاستعلامات) و`POST /exchange` (أمر ووضع الطلب والإلغاء اليوم، مع المزيد من أنواع الإجراءات تدريجيًا).
+**يتحدّث MetaFlux بروتوكولَه الأصلي MTF-native — ولا توجد طبقة توافق مع Hyperliquid.** يحتفظ بوتك باستراتيجيته ومنطق تداوله؛ ما يتغيّر هو طبقة العميل / السلك. أسرع مسار هو حزمة SDK الرسمية لـ [TypeScript](./typescript-sdk.md) أو [Rust](./rust-sdk.md)، التي تبني لك الغلاف الأصلي وتوقيع EIP-712. وللغات الأخرى، نفّذ [توقيع البيانات المُهيكَلة (typed-data)](./typed-data-signing.md) مباشرةً.
 :::
 
-إذا كان بوتك يتحدث بالفعل بروتوكول HL، يمكنك توجيهه إلى MetaFlux **دون أي تغيير في الكود** للسطح المدعوم — نفس أشكال URL، ونفس JSON للطلب والاستجابة، ونفس غلاف EIP-712.
+إذا كان بوتك يتداول بالفعل على منصة عقود دائمة لامركزية بأسلوب Hyperliquid، فإن الانتقال إلى MetaFlux هو **إعادة كتابة لطبقة العميل، لا لطبقة الاستراتيجية**. فالمفاهيم التي تعتمد عليها — الأوامر المحدودة، عمليات الإتمام، التمويل، الهامش المتقاطع / المعزول، محافظ الوكلاء، الحسابات الفرعية، الخزائن — كلها موجودة في MTF. ما تستبدله هو شكل السلك، وأسماء الإجراءات / الاستعلامات، ومعرّف السلسلة، ومعرّفات الأصول.
 
-## ما يعمل مباشرةً دون تهيئة
+## شكل الانتقال
 
-- `POST /info` لـ: `meta`، `allMids`، `userState`، `clearinghouseState`، `openOrders`، `frontendOpenOrders`، `userFills`، `historicalOrders`، `metaAndAssetCtxs`، `l2Book`، `vaultDetails`، `delegations`، `userFees`، `subAccounts`، `referral`
-- `POST /exchange` لـ: `order` (وضع أوامر limit / IOC / ALO)، `cancel` (إلغاء بالـ OID)
-- اشتراكات WS (قادمة) ستستخدم نفس أسماء القنوات المستخدمة في HL
+- **شكل السلك.** MTF-native هو JSON بصيغة snake_case عبر `POST /exchange` (الكتابة)، و`POST /info` (القراءة)، و`GET /ws` (التدفّق)، كلٌّ منها موقَّع بـ EIP-712 حيثما لزم. اعتمد حزمة SDK أو نفّذ [نظام التوقيع الأصلي](./typed-data-signing.md).
+- **منطق الاستراتيجية والمخاطر.** بلا تغيير — كود التسعير والتحجيم والتحوّط ينتقل كما هو.
+- **الأسماء وبعض الدلالات.** تُعاد تسمية أنواع الإجراءات وأنواع الاستعلامات (الجدول أدناه)، وتختلف حفنة من السلوكيات (معرّفات الأصول، مرحلة تصفية T0، كمون موافقة الوكيل).
 
-## ما يختلف
+## ما يعمل بالطريقة نفسها
 
-### 1. معرّف السلسلة (Chain ID)
+- أوامر Limit / IOC / ALO، وreduce-only، ومعرّفات أوامر العميل (`cloid`).
+- توقيع EIP-712 — نفس بدائية التوقيع، بنطاق ومعرّف سلسلة مختلفين.
+- الهامش المتقاطع / المعزول، ومدفوعات التمويل، وقراءات عمليات الإتمام وحالة الأوامر.
+- محافظ الوكلاء (مفاتيح ساخنة بلا صلاحية سحب)، والحسابات الفرعية، والخزائن.
+
+## ما يتغيّر
+
+### 1. سطح البروتوكول {#1-protocol-surface}
+
+هناك سطح واحد أصلي لـ MTF؛ تستدعيه عبر حزمة SDK أو تبني الغلاف بنفسك. تتطابق الأسماء بوضوح:
+
+| استخدمته في HL | المعادل الأصلي في MTF |
+|----------------|-----------------------|
+| `POST /exchange` `order` | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
+| `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
+| `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `POST /info` `meta` | [`markets`](../api/rest/info/perpetuals.md#markets) |
+| `POST /info` `clearinghouseState` | [`account_state`](../api/rest/info.md#account_state) |
+| `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) / [`frontend_open_orders`](../api/rest/info.md#frontend_open_orders) |
+| `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
+| WS `userEvents`, `l2Book`, `candle` | `user_events`، `l2_book`، `candles` (snake_case) — راجع [اشتراكات WS](../api/ws/subscriptions.md) |
+
+الفهارس الكاملة في [`POST /exchange`](../api/rest/exchange.md) و[`POST /info`](../api/rest/info.md).
+
+### 2. معرّف السلسلة (Chain ID)
 
 MetaFlux هي طبقة L1 مستقلة، وليست إصدارًا من HL. وقّع ضد معرّف سلسلة MetaFlux، **لا** معرّف HL:
 
-| الشبكة | `chainId` لـ HL | `chainId` لـ MTF |
-|---------|--------------|---------------|
-| Mainnet | 1337 | **8964** (`0x2304`) |
-| Testnet | 998 | **114514** (`0x1bf52`) |
-| Devnet / محلي | 1337 | **31337** (`0x7a69`) |
+| الشبكة | `chainId` لـ MTF |
+|---------|---------------|
+| Mainnet | **8964** (`0x2304`) |
+| Testnet | **114514** (`0x1bf52`) |
+| Devnet / محلي | **31337** (`0x7a69`) |
 
-غيّر ثابتًا واحدًا في كود التوقيع وستبقى بقية غلاف EIP-712 مطابقة تمامًا. يستخدم نطاق MTF القيم: `name = "MetaFlux"`، `version = "1"`، `verifyingContract = 0x0`.
+يستخدم نطاق EIP-712 لـ MTF القيم: `name = "MetaFlux"`، `version = "1"`، `verifyingContract = 0x0`. راجع [الشبكات](../networks.md) و[التوقيع](./signing.md).
 
-### 2. عنوان URL الأساسي
+### 3. عنوان URL الأساسي
 
 ```
-HL:  https://<your-current-hl-api-base>/{info,exchange}
-MTF: https://gateway.<your-deployment>/hl/{info,exchange}
+MTF: https://<net>-gateway.mtf.exchange/{info,exchange,ws}
 ```
 
-البوابة هي نقطة الدخول الموحدة. توافق HL يقع تحت المسار `/hl/*`
-(`/hl/info`، `/hl/exchange`، `/hl/ws`) — لذا يكتسب عميل HL فقط البادئة `/hl`.
-المسار الافتراضي للبوابة في المستوى الأعلى (`/info`، `/exchange`) هو
-المسار الأصلي لـ MTF؛ وعند تشغيل العقدة محليًا، يُخدَّم نفس السطح على
-`http://localhost:8080`.
-
-### 3. أنواع الإجراءات غير المتوفرة بعد في طبقة التوافق
-
-إذا كان بوتك يستخدم إجراءات HL تتجاوز `order` / `cancel`، تُعيد البوابة اليوم:
-
-```json
-{ "status": "err", "response": "unimplemented action: <type>" }
-```
-
-باستجابة HTTP 200. يتبع HL اتفاقية بأن الأخطاء تُعاد برمز 200 مع `status: "err"`، وهو ما تحافظ عليه MTF.
-
-تغطية إجراءات HL الكاملة ستُطرح في إصدارات لاحقة. للإجراءات الجديدة التي تريدها اليوم، استخدم [سطح الإجراءات الأصلي لـ MTF](../api/rest/exchange.md) مباشرةً — فهو يوفر تغطية كاملة للميزات بما فيها ما لا يملكه HL (RFQ، FBA، التسجيل في هامش المحفظة، والبدائيات عبر السلاسل).
+البوابة هي نقطة الدخول الموحدة للسطح الأصلي لـ MTF. وعند تشغيل العقدة بنفسك، يُخدَّم نفس السطح على `http://localhost:8080`.
 
 ### 4. معرّفات الأصول
 
-يستخدم كلٌّ من HL وMTF معرّفات أصول عددية صحيحة، لكن **الأعداد ليست متطابقة**. `0` في HL هو BTC perp؛ `0` في MTF قد يكون ETH أو أي أصل آخر حسب الإصدار المُنشأ. ابحث دائمًا عن معرّفات أصولك عبر `POST /info { "type": "meta" }` عند بدء التشغيل؛ لا تُثبّتها في الكود أبدًا.
+يستخدم كلٌّ من HL وMTF معرّفات أصول عددية صحيحة، لكن **الأعداد ليست متطابقة**. `0` في HL هو BTC perp؛ `0` في MTF قد يكون ETH أو أي أصل آخر حسب الإصدار المُنشأ. ابحث دائمًا عن معرّفات أصولك عبر `POST /info { "type": "markets" }` عند بدء التشغيل؛ لا تُثبّتها في الكود أبدًا.
 
 ### 5. الدقة العددية
 
-كلتا السلسلتين تستخدمان أعدادًا صحيحة مقيَّسة (مثل `px`) وتمثّلانها كسلاسل نصية في JSON لأن IEEE-754 يفقد الدقة عند تجاوز 2^53. إذا كان بوتك يُحلّل JSON بـ`JSON.parse` الافتراضي في JS، انتقل إلى محلّل يدعم الأعداد الصحيحة الكبيرة (big-int) لهذه الحقول — شكل الإرسال عبر الشبكة مطابق لـ HL، لكن مشكلة فقدان الدقة الصامتة واردة كذلك.
+حقول السعر والحجم هي أعداد صحيحة مقيَّسة تُرسَل كسلاسل نصية في JSON لأن IEEE-754 يفقد الدقة عند تجاوز 2^53. إذا كان بوتك يُحلّل JSON بـ`JSON.parse` الافتراضي في JS، فانتقل إلى محلّل يدعم الأعداد الصحيحة الكبيرة (big-int) لهذه الحقول.
 
 ### 6. سلوك التصفية (Liquidation)
 
-تضيف MetaFlux [مرحلة إنذار T0 بالبطاقة الصفراء](../concepts/tiered-liquidation.md) التي لا تتوفر في HL. الأثر العملي: عند صحة الحساب في النطاق `[1.0, 1.1)` تُلغى تلقائيًا أوامر ALO الساكنة ويُصدر حدث تحذيري، لكن المراكز لا تُمسّ. ثم تسلك مراحل T1 / T2 / T3 سلوكَ Partial / Market / Backstop في HL.
+تضيف MetaFlux [مرحلة إنذار T0 بالبطاقة الصفراء](../concepts/tiered-liquidation.md) التي لا تتوفر في HL. الأثر العملي: عند صحة الحساب في النطاق `[1.0, 1.1)` تُلغى قسرًا أوامر ALO الساكنة في حسابك ويُصدر حدث تحذيري، لكن المراكز لا تُمسّ. ثم تسلك مراحل T1 / T2 / T3 سلوكَ Partial / Market / Backstop في HL.
 
 إذا كان بوتك يستمع لأحداث التصفية لتفعيل إضافة هامش، **أضف معالجًا لحدث T0 الجديد** — فهو إشارة الإنذار المبكر التي لا توفّرها HL. اصطيادُه يمنحك بلوكًا واحدًا من المهلة للتصرف.
 
 ### 7. دلالات محفظة الوكيل (Agent Wallet)
 
-في HL: الوكيل هو مفتاح لا يملك صلاحية السحب. الأمر ذاته في MTF — راجع [محافظ الوكلاء](../concepts/agent-wallets.md). اسم الإجراء هو `ApproveAgent`؛ وشكل الإرسال يطابق HL. الفارق الوحيد: يصبح إذن الوكيل في MTF ساريًا **بعد بلوك واحد من الالتزام**، مقارنةً بالكمون المعتاد لبلوكين في HL. أسرع قليلًا؛ ونفس إجراء الإحماء.
+الوكيل هو مفتاح لا يملك صلاحية السحب — نفس نموذج HL (راجع [محافظ الوكلاء](../concepts/agent-wallets.md)). الإجراء هو [`approve_agent`](../api/rest/exchange.md#approve_agent). الفارق الميكانيكي الوحيد: يصبح إذن الوكيل في MTF ساريًا **بعد بلوك واحد من الالتزام**، مقارنةً بالكمون المعتاد لبلوكين في HL. أسرع قليلًا؛ ونفس إجراء الإحماء.
 
 ### 8. الخزائن (Vaults)
 
-خزائن HL وخزائن MetaFlux منتجان مختلفان. يُعيد `vaultDetails` معلومات عن أنواع الخزائن الخاصة بـ MTF (MFlux Vault، خزائن المستخدمين). لن تُحلّ عناوين خزائن HL. شكل الاستعلام متطابق؛ توقّع فقط كيانات MTF لا كيانات HL.
+خزائن HL وخزائن MetaFlux منتجان مختلفان. تُعيد قراءة [`vault_state`](../api/rest/info.md#vault_state) أنواع الخزائن الخاصة بـ MTF (MFlux Vault، خزائن المستخدمين). لن تُحلّ عناوين خزائن HL. توقّع كيانات MTF لا كيانات HL.
 
 ## خطوات الترحيل التفصيلية
 
-### اليوم 0 — التوجيه إلى MetaFlux
+### اليوم 0 — اعتماد العميل الأصلي
 
-1. غيّر عنوان URL الأساسي في إعدادات عميلك.
-2. غيّر ثابت `chainId` في موقّعك.
-3. شغّل مجموعة الاختبارات الحالية على Devnet لـ MTF. يجب أن تجتاز الأوامر `order` / `cancel` وجميع استعلامات `info` دون أي تغيير في الكود.
+1. ثبّت حزمة SDK لـ [TypeScript](./typescript-sdk.md) أو [Rust](./rust-sdk.md) (أو نفّذ [توقيع البيانات المُهيكَلة](./typed-data-signing.md) للغتك).
+2. وجّه `baseUrl` إلى بوابة MTF واضبط `chainId` للشبكة المستهدفة.
+3. أعِد تنفيذ البحث عن الأصول مقابل `POST /info { "type": "markets" }`.
 
-### اليوم 1 — معالجة فجوة سطح الإجراءات
+### اليوم 1 — ربط إجراءاتك
 
-لإجراءات HL غير المتوفرة بعد في طبقة توافق MTF:
-
-- **تعديل الأوامر** — في الوقت الحالي، ألغِ وأعِد الإرسال. سيُضاف إجراء `modify` في تحديث توافق لاحق.
-- **ضبط الرفع المالي / وضع الهامش** — استخدم الإجراء الأصلي لـ MTF عبر `POST /exchange` على المسار الافتراضي للبوابة (`UpdateLeverage`، `UpdateIsolatedMargin`). نفس غلاف EIP-712؛ اسم متغيّر الإجراء مختلف.
-- **التحويل / السحب** — استخدم الإجراءات الأصلية لـ MTF.
+ترجِم كل إجراء يرسله بوتك إلى معادله الأصلي في MTF (راجع الجدول في [§1](#1-protocol-surface)). `order` ينتقل إلى `submit_order`، و`cancel` إلى `cancel_order`، وتغييرات الرفع المالي / الهامش إلى `update_leverage` / `update_isolated_margin`. تبني حزمة SDK غلاف EIP-712؛ ولا يختلف إلا اسم متغيّر الإجراء وحالة أحرف الحقول.
 
 ### اليوم 2 — ربط الإشارات الجديدة
 
-- اشترك في معلومات `subAccounts` إذا كنت تُشغّل حسابات فرعية (الدلالات تختلف قليلًا — تسمح MTF بحتى 32 حسابًا فرعيًا لكل حساب رئيسي).
-- أضف معالجًا لأحداث البطاقة الصفراء T0. أسهل مكان هو نفس تغذية الإتمام / التصفية التي تستهلكها بالفعل؛ شكل الحدث هو `{ "type": "yellowCard", "user": "0x...", "block": N }`.
-- إذا كنت تعتمد على هامش المحفظة: سجّل من جديد على MTF (`UserPortfolioMargin { enabled: true }`). العتبة ومجموعة السيناريوهات معاملات شبكة — راجع [هامش المحفظة](../concepts/portfolio-margin.md).
+- اشترك في قراءات `sub_accounts` إذا كنت تُشغّل حسابات فرعية (تسمح MTF بحتى 32 حسابًا فرعيًا لكل حساب رئيسي).
+- أضف معالجًا لأحداث البطاقة الصفراء T0 على قناة WS `user_events`.
+- إذا كنت تعتمد على هامش المحفظة، فسجّل على MTF عبر [`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin). العتبة ومجموعة السيناريوهات معاملات شبكة — راجع [هامش المحفظة](../concepts/portfolio-margin.md).
 
 ### اليوم 3 وما بعده — اعتماد ميزات MTF الحصرية
 
 اختياري. إذا أردت استخدام ميزات لا تتوفر في HL:
 
-- **RFQ** — بدائيات الطلب-للسعر، مفيدة للحجوم التي لا تريد الإعلان في دفتر الطلبات
-- **FBA** — مزادات دُفعية متكررة لمطابقة الأسواق المحددة، يقلّل MEV
-- **بدائيات عبر السلاسل** — بدائيات جسر قابلة للاستدعاء أصلًا من عقود EVM
+- **RFQ** — بدائيات الطلب-للسعر، مفيدة للحجوم التي لا تريد الإعلان في دفتر الطلبات.
+- **FBA** — مزادات دُفعية متكررة لمطابقة الأسواق المحددة، يقلّل MEV.
+- **بدائيات عبر السلاسل** — بدائيات جسر قابلة للاستدعاء أصلًا من عقود EVM.
 
-هذه إجراءات أصلية لـ MTF، تُرسَل على المسار الافتراضي للبوابة (`POST /exchange` — المسار الأصلي لـ MTF هو الافتراضي؛ توافق HL يقع تحت `/hl/*`؛ راجع [نظرة عامة على API](../api/index.md)).
+هذه إجراءات أصلية لـ MTF على `POST /exchange`؛ راجع [نظرة عامة على API](../api/index.md).
 
-## أنماط بوتات HL الخمسة الأبرز — ترحيل عملي
+## أبرز أنماط بوتات HL — ترحيل عملي
 
 ### 1. صانع سوق بأوامر محدودة بسيطة (النمط الأساسي)
 
-```diff
-- const HL_URL = 'https://<your-current-hl-api-base>';
-+ const MTF_URL = 'https://gateway.mtf.exchange/hl';   // HL-compat is under /hl/*
+```typescript
+import { MetaFluxClient } from '@metaflux/sdk';
 
-- const HL_CHAIN_ID = 1337;
-+ const MTF_CHAIN_ID = 114514;    // testnet (mainnet 8964, devnet 31337)
+const client = new MetaFluxClient({
+  privateKey: process.env.PRIVATE_KEY!,
+  baseUrl:    'https://testnet-gateway.mtf.exchange',
+  chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
+});
 
-- const HL_DOMAIN_NAME = 'HLSignTransaction';   // varies by mode
-+ const MTF_DOMAIN_NAME = 'MetaFlux';
-+ const MTF_DOMAIN_VERSION = '1';
+// asset lookup: HL `meta.universe` → MTF `markets`
+const markets = await client.info.markets();
+const BTC = markets.findIndex(m => m.name === 'BTC');   // may not be 0
 
-  // asset lookup runs against /info { type: "meta" } — same call, different result
-  const meta = await fetch(MTF_URL + '/info', {
-    method: 'POST',
-    body: JSON.stringify({ type: 'meta' }),
-  }).then(r => r.json());
-
-  const BTC = meta.universe.findIndex(m => m.name === 'BTC');  // may not be 0
-
-  // order, cancel — unchanged HL wire shape
-  await place_order(BTC, 'B', '100', '0.1', 'Gtc');
+// order / cancel — your strategy logic, native action names
+await client.exchange.order({
+  asset: BTC, isBuy: true, price: '100', size: '0.1', tif: 'Gtc', reduceOnly: false,
+});
 ```
 
-تغيير `chainId` وعنوان URL الأساسي يستغرق نحو 5 دقائق لعميل نموذجي.
+تبقى الاستراتيجية كما هي؛ وتصبح طبقة العميل استدعاءً لحزمة SDK.
 
 ### 2. بوت مراقبة التصفية (إضافة الهامش)
 
-تُصدر HL أحداث `liquidation` عندما تصل الحسابات إلى مرحلة التصفية الجزئية / السوقية. تضيف MTF **`yellowCard`** كإشارة إنذار مبكر.
+تُصدر HL أحداث `liquidation` عند مرحلة التصفية الجزئية / السوقية. تضيف MTF **`yellowCard`** كأبكر إشارة على قناة `user_events`.
 
-```diff
-  ws.subscribe('userEvents', { user: address }, (event) => {
-    switch (event.data.kind) {
-+     case 'yellowCard':
-+       // T0 — one block to act. ALO orders already cancelled.
-+       deposit(YELLOW_CARD_DEPOSIT);
-+       break;
-      case 'liquidation':
--       // HL partial / market
-+       // T1 partial OR T2 full — too late for prevention
-        emergency_unwind();
-        break;
-    }
-  });
+```typescript
+const ws = client.ws();
+ws.subscribe('user_events', { user: client.address }, (event) => {
+  switch (event.data.kind) {
+    case 'yellowCard':
+      // T0 — one block to act; ALO orders already cancelled
+      deposit(YELLOW_CARD_DEPOSIT);
+      break;
+    case 'liquidation':
+      // T1 partial OR T2 full — too late for prevention
+      emergency_unwind();
+      break;
+  }
+});
 ```
 
 راجع [مراقب المخاطر](./risk-watcher.md) للنمط الكامل.
 
 ### 3. بوت مراجحة معدل التمويل
 
-وتيرة التمويل مماثلة (HL بشكل ساعي؛ MTF ساعي افتراضيًا لكن قابل للتهيئة لكل سوق). بنية الصيغة الحسابية متطابقة.
+وتيرة التمويل مماثلة (ساعي افتراضيًا، وقابل للتهيئة لكل سوق في MTF). بنية الصيغة الحسابية متطابقة؛ والقراءة هي استعلام `funding` الأصلي.
 
-```diff
-  // URL is the /hl base from pattern 1 (gateway .../hl) — HL-compat shape
-  const funding = await fetch(URL + '/info', {
-    body: JSON.stringify({ type: 'fundingHistory', coin: 'BTC' }),
-  }).then(r => r.json());
-
-- // HL funding rate at funding[0].fundingRate
-+ // MTF same shape; values may differ because oracle composition differs
-  const rate = funding[0].fundingRate;
+```typescript
+const funding = await client.info.fundingHistory({ coin: 'BTC' });
+// values may differ from HL because oracle composition differs
+const rate = funding[0].rate_per_hr;
 ```
 
-تخضع تركيبة أوراكل MTF لحوكمة لكل سوق (مُنفَّذة عبر `SetOracleWeights`) — إذا كانت مراجحتك تعتمد على موفّري أوراكل بعينهم، تحقق من أن قائمة المصادر الموزونة تطابق توقعاتك. راجع [أسعار المارك](../concepts/mark-prices.md).
+تخضع تركيبة أوراكل MTF لحوكمة لكل سوق (مُنفَّذة عبر `SetOracleWeights` المُلتزَم) — إذا كانت مراجحتك تعتمد على موفّري أوراكل بعينهم، فتحقّق من قائمة المصادر الموزونة. راجع [أسعار المارك](../concepts/mark-prices.md).
 
 ### 4. الإعداد متعدد الحسابات / المؤسسي
 
 HL: حساب رئيسي + وكلاء لكل مضيف. MTF: الأمر ذاته، بالإضافة إلى **حسابات متعددة التوقيع** كدرجة أولى.
 
-```diff
-  // existing: master + agents
-  await master.approveAgent(host1_agent);
-  await master.approveAgent(host2_agent);
+```typescript
+// existing: master + agents
+await master.approveAgent(host1_agent);
+await master.approveAgent(host2_agent);
 
-+ // new on MTF: convert master to multi-sig for cold custody
-+ await master.convertToMultiSigUser({
-+   threshold: 2,
-+   signers: [signer1, signer2, signer3],
-+ });
-+ // every subsequent master-level action requires 2 sigs
-+ // agents still work as before for trading actions
+// new on MTF: convert master to multi-sig for cold custody
+await master.convertToMultiSigUser({
+  threshold: 2,
+  signers: [signer1, signer2, signer3],
+});
+// every subsequent master-level action then requires 2 sigs;
+// agents still work as before for trading actions
 ```
 
 راجع [التوقيع المتعدد](../concepts/multi-sig.md).
 
 ### 5. مدير محفظة الحسابات الفرعية
 
-الحسابات الفرعية في HL: حتى 8. في MTF: حتى 32. شكل الإرسال متطابق:
+الحسابات الفرعية في HL: حتى 8. في MTF: حتى 32.
 
-```diff
-- // HL: create one of up to 8 subs
-+ // MTF: create one of up to 32 subs (otherwise identical)
-  await master.createSubAccount({ name: 'desk-A' });
-  await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
+```typescript
+// MTF: create one of up to 32 subs
+await master.createSubAccount({ name: 'desk-A' });
+await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
 ```
 
-إدارة الوكلاء لكل حساب فرعي، والتسجيل في هامش المحفظة لكل حساب فرعي، وأوضاع الهامش لكل حساب فرعي — كلها مدعومة بشكل متطابق.
+إدارة الوكلاء لكل حساب فرعي، والتسجيل في هامش المحفظة لكل حساب فرعي، وأوضاع الهامش لكل حساب فرعي — كلها مدعومة.
 
 ## جدول مرجعي
 
-| الإجراء الذي استخدمته في HL | الحالة في MTF |
-|----------------------|---------------|
-| `order` (place limit / IOC / ALO) | ✅ مدعوم بشكل توافق HL |
-| `cancel` (by OID) | ✅ مدعوم بشكل توافق HL |
-| `cancelByCloid` | قيد الطرح |
-| `modify` | قيد الطرح |
-| `batchModify` | قيد الطرح |
-| `usdSend` / spot transfers | استخدم الإجراء الأصلي لـ MTF |
-| `withdraw3` | استخدم الإجراء الأصلي لـ MTF |
-| `approveAgent` | شكل أصلي لـ MTF؛ راجع [محافظ الوكلاء](../concepts/agent-wallets.md) |
-| `updateLeverage` / `updateIsolatedMargin` | شكل أصلي لـ MTF |
-| `usdClassTransfer` | استخدم المعادل الأصلي لـ MTF |
-| `convertToMultiSigUser` | أصلي لـ MTF، معاينة |
-| `setReferrer` / `createReferral` | أصلي لـ MTF؛ قد تختلف الدلالات |
-
-(يُحدَّث الجدول مع نمو دعم طبقة التوافق.)
+| الإجراء الذي استخدمته في HL | الإجراء الأصلي في MTF |
+|-----------------------|-------------------|
+| `order` (وضع limit / IOC / ALO) | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
+| `cancel` (بالـ OID) | [`cancel_order`](../api/rest/exchange.md#cancel_order) |
+| `cancelByCloid` | [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
+| `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `usdSend` / تحويلات الرمز الفوري | إجراءات تحويل الرمز الفوري الأصلية |
+| `withdraw3` | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) |
+| `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
+| `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
+| `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user) |
+| `setReferrer` / `createReferral` | [`set_referrer`](../api/rest/exchange.md#set_referrer) (قد تختلف الدلالات) |
 
 ## الحصول على المساعدة
 
-- هذا المستودع (`mtf-exchange/metaflux-knowledges`) — أنشئ إشكالية (issue)
-- راجع [`POST /exchange`](../api/rest/exchange.md) و[شرح التوقيع التفصيلي](./signing.md) للمرجع على مستوى الإرسال
+- هذا المستودع (`mtf-exchange/metaflux-knowledges`) — أنشئ إشكالية (issue).
+- راجع [`POST /exchange`](../api/rest/exchange.md) و[شرح التوقيع التفصيلي](./signing.md) للمرجع على مستوى الإرسال.

@@ -5,7 +5,7 @@
 :::
 
 :::info
-**频道名称采用 snake_case（MTF 原生格式）。** 节点的 `/ws` 接入面是 MTF 原生的，因此频道的线路名称为 snake_case：`l2_book`、`bbo`、`trades`、`active_asset_ctx`、`fills`、`candles`、`user_events`。如果客户端需要使用 HL 风格的 camelCase 频道名（`l2Book`、`userEvents`、`userFills`、`candle` 等），请连接网关的 **`/hl/ws`**（HL 兼容模式），该路径会在底层自动转换为原生 snake_case。根据统一网关路由规则：`<net>-gateway.mtf.exchange/ws` 为原生 snake_case，`/hl/ws` 为 HL camelCase。
+**频道名称采用 snake_case（MTF 原生格式）。** 节点的 `/ws` 接入面是 MTF 原生的，因此频道的线路名称为 snake_case：`l2_book`、`bbo`、`trades`、`active_asset_ctx`、`fills`、`candles`、`user_events`。网关在 `<net>-gateway.mtf.exchange/ws` 上提供相同的原生 WS 接口。
 :::
 
 ## 概述
@@ -18,7 +18,7 @@
 wss://<net>-gateway.mtf.exchange/ws
 ```
 
-MTF 原生 WS（snake_case 频道）是网关默认的 `/ws` 路径；HL 兼容 WS（camelCase 频道）在 `/hl/ws` 下。网关入口负责 TLS 终止（`wss://`）。若自行运行节点，相同的原生 WS 以明文形式在 `ws://localhost:8080/ws` 上提供——帧协议完全一致。
+MTF 原生 WS（snake_case 频道）由网关在 `/ws` 路径提供。网关入口负责 TLS 终止（`wss://`）。若自行运行节点，相同的原生 WS 以明文形式在 `ws://localhost:8080/ws` 上提供——帧协议完全一致。
 
 ## 连接生命周期
 
@@ -119,7 +119,6 @@ sequenceDiagram
 ```
 
 - `is_snapshot` 为布尔值：订阅后的初始帧（完整快照）为 `true`，后续变更驱动的推送帧为 `false`。**每帧数据体始终是完整快照**（例如 `l2_book` 始终包含完整的前20档买卖盘，`all_mids` 始终是完整的映射表，`account_state` 始终是完整的账户状态）——`is_snapshot` 仅供参考，并非"这是增量差异"的标志。客户端只需在每帧到达时直接替换本地状态，无需关注该字段。
-- 信封中的快照标志字段**随方言变化**，与频道 `type` 名称的规则一致：在原生 `/ws` 挂载点下为 snake_case 的 `is_snapshot`；在 HL 兼容的 `/hl/ws` 挂载点下，同一字段为 camelCase 的 `isSnapshot`。
 - 帧上**没有** `seq`、`ts` 或 `sub_id` 字段。请通过 `channel` 字段（以及按市场频道中 `data` 内的 `coin`）进行解复用。
 
 更新采用**变更驱动**模式：每次提交后，节点仅在某个已订阅频道的已提交状态**自上次提交以来真正发生变化时**，才向其推送一帧。某次提交未触及所监听频道则不推送任何内容——因此收到的帧数少于区块数，不会有冗余的重复推送（详见[按订阅者推送](#按订阅者推送)）。

@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Los nombres de canal usan snake_case (nativo de MTF).** La interfaz `/ws` del nodo es nativa de MTF, por lo que los nombres de canal en el wire son snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Los clientes que deseen los nombres de canal en camelCase de HL (`l2Book`, `userEvents`, `userFills`, `candle`, …) deben conectarse al **`/hl/ws`** del gateway (compatibilidad HL), que traduce al snake_case nativo internamente. Según el enrutamiento del gateway unificado: `<net>-gateway.mtf.exchange/ws` = snake_case nativo, `/hl/ws` = camelCase de HL.
+**Los nombres de canal usan snake_case (nativo de MTF).** La interfaz `/ws` del nodo es nativa de MTF, por lo que los nombres de canal en el wire son snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. El gateway sirve este mismo WS nativo en `<net>-gateway.mtf.exchange/ws`.
 :::
 
 ## Resumen rápido
@@ -18,7 +18,7 @@ Una única conexión WS multiplexa suscripciones a múltiples canales. El protoc
 wss://<net>-gateway.mtf.exchange/ws
 ```
 
-El WS nativo de MTF (canales snake_case) es el predeterminado del gateway en `/ws`; el WS compatible con HL (canales camelCase) se encuentra en `/hl/ws`. La puerta de entrada del gateway termina TLS (`wss://`). Si ejecuta el nodo usted mismo, el mismo WS nativo se sirve en texto plano en `ws://localhost:8080/ws` — el protocolo de frames es idéntico en ambos casos.
+El WS nativo de MTF (canales snake_case) lo sirve el gateway en `/ws`. La puerta de entrada del gateway termina TLS (`wss://`). Si ejecuta el nodo usted mismo, el mismo WS nativo se sirve en texto plano en `ws://localhost:8080/ws` — el protocolo de frames es idéntico en ambos casos.
 
 ## Ciclo de vida de la conexión
 
@@ -119,7 +119,6 @@ Los frames de datos en vivo comparten un mismo envelope:
 ```
 
 - `is_snapshot` es un booleano: `true` en el frame inicial al suscribirse (el snapshot completo), `false` en los pushes posteriores orientados a cambios. **Cada cuerpo de frame es un snapshot completo independientemente** (p. ej. `l2_book` contiene los 20 niveles superiores completos, `all_mids` el mapa completo, `account_state` el estado completo de la cuenta) — `is_snapshot` es informativo, no indica "esto es un diff". Un cliente que simplemente reemplaza su estado local en cada frame se mantiene consistente y puede ignorar el campo.
-- El flag de snapshot del envelope es **consciente del dialecto**, exactamente igual que los nombres de `type` del canal: en este mount nativo `/ws` es snake_case `is_snapshot`; en el mount compatible HL `/hl/ws`, el mismo campo del frame es camelCase `isSnapshot`.
 - **No** existe campo `seq`, `ts` ni `sub_id` en el frame. Desmultiplexe por `channel` (y, para canales por mercado, por el `coin` dentro de `data`).
 
 Las actualizaciones son **orientadas a cambios**: tras cada commit, el nodo publica un frame para un canal suscrito **solo cuando el estado confirmado de ese canal cambió efectivamente** desde el commit anterior. Un commit que no modifica un canal vigilado no emite nada para él — por lo tanto recibirá menos frames que bloques, sin re-envíos redundantes de datos sin cambios (consulte [Push por suscriptor](#push-por-suscriptor)).

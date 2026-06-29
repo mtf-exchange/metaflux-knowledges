@@ -226,7 +226,7 @@ when account enters T3 (or parked un-fillable lots exist):
 
 ## 如何保持安全
 
-- 通过 `userState` 查询（HL 兼容）或 [`account_state`](../api/rest/info.md#account_state) 监控 `health`。
+- 通过 [`account_state`](../api/rest/info.md#account_state) 查询监控 `health`。
 - 将内部预警设置为 `health < 1.2`——远高于 T0。
 - 对于自动化策略，注册[风控监控机器人](../integration/risk-watcher.md)，在健康度跨越阈值时自动追加保证金。
 - 订阅 WebSocket 的 [`userEvents`](../api/ws/subscriptions.md#userevents) 频道，实时获取等级切换通知（保证金/清算事件均通过该频道推送）。

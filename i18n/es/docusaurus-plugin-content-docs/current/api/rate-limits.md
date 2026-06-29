@@ -22,9 +22,7 @@
 | Suscripciones WS por conexión | 256 | — | — |
 
 Todos los límites están controlados por gobernanza. Una instantánea del presupuesto por cuenta está disponible
-mediante la lectura nativa [`user_rate_limit`](./rest/info.md) en la ruta predeterminada del gateway
-(el gateway también expone los mismos datos como `userRateLimit` compatible con HL bajo
-`/hl`):
+mediante la lectura nativa [`user_rate_limit`](./rest/info.md):
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
@@ -62,10 +60,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
 | `POST /info` `userFills`, `historicalOrders` (paginado) | 2 |
 | `POST /exchange` | 5 |
-| `GET /ccxt/markets`, `GET /ccxt/ticker` | 1 |
-| `GET /ccxt/orderbook`, `GET /ccxt/ohlcv` | 2 |
-| `GET /ccxt/balance`, `/positions`, `/myTrades` | 2 |
-| `POST /ccxt/orders`, `DELETE /ccxt/orders/{id}` | 5 |
 | WS `subscribe` | 1 |
 | Mensaje publicado WS | 0 |
 | WS `unsubscribe` | 0 |
@@ -78,7 +72,7 @@ Una vez que una solicitud está firmada, el gateway autentica al `sender` y lo c
 
 | Estado del remitente | Contabilizado contra |
 |----------------------|----------------------|
-| Anónimo (sin firma, p.ej. `GET /ccxt/markets`) | por IP |
+| Anónimo (sin firma, p.ej. `POST /info`) | por IP |
 | Firmado por cuenta maestra | por IP + por cuenta |
 | Firmado por agente | por IP + por cuenta-de-la-maestra |
 

@@ -20,10 +20,9 @@ POST  https://<net>-gateway.mtf.exchange/exchange
 
 | 路径 | 线格式 |
 |------|-----------|
-| `POST /exchange`（网关默认） | **MTF 原生**（本文档） |
-| `POST /hl/exchange`（网关，位于 `/hl` 下） | **HL 兼容** — 参见 [hl-compat.md](./hl-compat.md) |
+| `POST /exchange`（网关） | **MTF 原生**（本文档） |
 
-MTF 原生是网关的默认路径；HL 兼容命名空间位于 `/hl/*` 下。若自行运行节点，同一原生 `/exchange` 直接服务于 `http://localhost:8080`。
+网关提供 MTF 原生 `/exchange` 接口。若自行运行节点，同一原生 `/exchange` 直接服务于 `http://localhost:8080`。
 
 ## 请求信封
 
@@ -126,7 +125,7 @@ domain_separator = keccak256(
 每个变体均为标签化对象 `{ "type": "<snake_case_tag>", <扁平体> }`。体键在操作对象下**扁平展开**（没有 PascalCase 的 `type`，也没有通用的 `params` 包装层）——例如 `submit_order` 携带 `order` 对象，`cancel_order` 携带 `cancel` 对象，发送者授权操作携带 `params` 对象。点击可查看字段级表格。下方概览表按类别分组列出所有操作；**后续完整的字段级定义按交易类型拆分**——[永续合约订单操作](#perpetual-order-actions)、[现货交易操作](#spot-trading-actions)、[现货保证金与 Earn 操作](#spot-margin--earn-actions)、[永续合约保证金与风险操作](#perpetual-margin--risk-actions)，以及[账户、质押、金库与桥接操作](#account-staking-vaults--bridge-actions)。
 
 :::warning
-**`px` / `size` 在原生线格式上为无符号定点 `u64`**，以 JSON number 发送（节点解码为 `u64`，随后在内部加宽）。这与 HL 兼容路径（十进制字符串）不同。地址为 `0x` 十六进制（40 字符）；`cloid` 为 `0x` + 32 个十六进制字符（16 字节）。
+**`px` / `size` 在原生线格式上为无符号定点 `u64`**，以 JSON number 发送（节点解码为 `u64`，随后在内部加宽）。地址为 `0x` 十六进制（40 字符）；`cloid` 为 `0x` + 32 个十六进制字符（16 字节）。
 :::
 
 ### 订单下单与生命周期
@@ -236,7 +235,7 @@ domain_separator = keccak256(
 
 ### 不在公开 `/exchange` 路径上的操作
 
-这些操作名称出现在早期草案中（部分也出现在 HL 兼容接口上），但它们**未在 MTF 原生 `/exchange` 处理器上桥接**。它们要么是绝不应经由公共用户路径的特权/系统写入，要么是已识别但未映射的 schema 存根。提交它们将返回 `400 unsupported action`。各条目的处置详见[下表](#non-bridged-actions)。
+这些操作名称出现在早期草案中，但它们**未在 MTF 原生 `/exchange` 处理器上桥接**。它们要么是绝不应经由公共用户路径的特权/系统写入，要么是已识别但未映射的 schema 存根。提交它们将返回 `400 unsupported action`。各条目的处置详见[下表](#non-bridged-actions)。
 
 | 草案名称 | 原生标签（如已识别） | 未桥接原因 |
 |-----------|----------------------------|-----------------|
@@ -1837,7 +1836,6 @@ sequenceDiagram
 ## 参见
 
 - [`POST /info`](./info.md) — 读取路径（MTF 原生）
-- [HL 兼容 `/exchange`](./hl-compat.md) — 面向 HL 客户端的替代报文格式
 - [代理钱包](../../concepts/agent-wallets.md)
 - [签名操作指南](../../integration/signing.md)
 - [类型化数据签名](../../integration/typed-data-signing.md) — EIP-712 签名方案

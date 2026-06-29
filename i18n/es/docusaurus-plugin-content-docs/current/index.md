@@ -11,7 +11,7 @@ Bienvenido. Comienza aquí si estás **integrando** o **construyendo sobre** Met
 
 :::info
 **¿Es tu primera vez?** Empieza con la [Guía de inicio rápido](./integration/quickstart.md) (5 minutos: depósito → operación → retiro).
-**¿Migrando desde otro DEX de perpetuos?** Ve directamente a [Migración desde HL](./integration/migrating-from-hl.md) — los patrones son aplicables a otros bots compatibles con HL.
+**¿Migrando desde otro DEX de perpetuos?** Ve directamente a [Migración desde HL](./integration/migrating-from-hl.md) — cambia tu bot al SDK / API nativo de MTF.
 **¿Construyendo on-chain?** Consulta el [despliegue de mercado sin permisos MIP-3](./mip/mip-3.md).
 :::
 
@@ -19,7 +19,7 @@ Bienvenido. Comienza aquí si estás **integrando** o **construyendo sobre** Met
 
 <div class="mtf-cardgrid">
 
-- [**Referencia de API**](./api/) — REST `/exchange` · `/info`, compatibilidad con HL y CCXT, WebSocket, errores, límites de tasa
+- [**Referencia de API**](./api/) — REST `/exchange` · `/info`, WebSocket, errores, límites de tasa
 - [**Conceptos**](./concepts/) — margen, liquidación por niveles, tipos de órdenes, financiación, bóvedas, comisiones
 - [**Integración**](./integration/) — inicio rápido, firma, idempotencia, manejo de errores, SDKs
 - [**EVM**](./evm/) — modelo de ejecución, transferencias Core ↔ EVM, precompilaciones
@@ -31,7 +31,7 @@ Bienvenido. Comienza aquí si estás **integrando** o **construyendo sobre** Met
 ## Enlaces rápidos
 
 - [Inicio rápido](./integration/quickstart.md) — depósito → operación → retiro en 5 minutos
-- [Migración desde HL](./integration/migrating-from-hl.md) — reemplazo directo para bots compatibles con HL
+- [Migración desde HL](./integration/migrating-from-hl.md) — cambia un bot de Hyperliquid a la API nativa de MTF
 - [`POST /exchange`](./api/rest/exchange.md) — ruta de escritura + catálogo completo de acciones
 - [`POST /info`](./api/rest/info.md) — ruta de lectura
 - [Liquidación por niveles](./concepts/tiered-liquidation.md) — escala T0 → T4

@@ -14,15 +14,12 @@
 
 ## Эндпоинты
 
-Шлюз является единственной публичной точкой входа. По умолчанию используется MTF-нативный маршрут;
-HL-совместимый маршрут доступен по пути `/hl/*`.
+Шлюз является единственной публичной точкой входа и обслуживает MTF-нативную поверхность.
 
 | Сервис | URL (devnet) |
 |---------|--------------|
 | Шлюз (точка входа) | `https://devnet-gateway.mtf.exchange` |
-| MTF-нативный (по умолчанию) | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL-совместимый | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT-совместимый | `/ccxt/*` |
+| MTF-нативный | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Фасет (devnet) | `POST /faucet` |
 | Обозреватель | `https://devnet.mtf.exchange/explorer` |
@@ -49,19 +46,17 @@ curl -X POST https://devnet-gateway.mtf.exchange/faucet \
 (≤ 3000); количество MTF фиксировано. Выплата переходит в статус `"queued"` — она зачисляется примерно через 1 блок,
 поэтому перед проверкой баланса подождите немного:
 
-Приведённые ниже примеры curl используют **HL-совместимый** формат по пути `/hl/*` на шлюзе
-(camelCase-типы вроде `clearinghouseState` / `openOrders`, конверты с подписью msgpack) —
-удобно, если у вас уже есть HL-клиент. Примеры на `@metaflux/sdk`
-используют MTF-нативный формат по пути шлюза по умолчанию (`/info` · `/exchange`).
-Выберите один способ; оба проходят через один шлюз, но по разным путям.
+Приведённые ниже примеры curl используют **MTF-нативный** формат на шлюзе
+(snake_case-типы вроде `account_state` / `open_orders`). Примеры на `@metaflux/sdk`
+используют ту же нативную поверхность — SDK просто собирает подписанный конверт за вас.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-В ответе должно быть `marginSummary.accountValue: "3000.0"`.
+В ответе должно быть `data.account_value: "3000"`.
 
 ## Шаг 2 — Выставить лимитный ордер
 
@@ -91,15 +86,15 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-Пример через curl (HL-совместимый формат — подпись формируете самостоятельно; см. [Подписание](./signing.md)):
+Пример через curl (MTF-нативный формат — подпись формируете самостоятельно; см. [Подписание](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
 
-где `order.json` — собранный вами конверт в формате HL.
+где `order.json` — собранный вами подписанный конверт в формате MTF-native.
 
 ### Пример спот-торговли
 
@@ -132,9 +127,9 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
 ## Шаг 3 — Убедиться, что ордер стоит в книге
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
 В ответе должен быть ваш ордер с `oid` из шага 2.
@@ -156,7 +151,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

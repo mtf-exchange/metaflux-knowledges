@@ -1,30 +1,24 @@
 ---
-description: REST and WebSocket surface — three protocol families, all backed by the same chain.
+description: REST and WebSocket surface — the MTF-native protocol, backed by the chain.
 ---
 
 # API Reference
 
-Three protocol families, all served by the same gateway front door
-(`https://<net>-gateway.mtf.exchange`) — the choice of client wire shape is just a
-choice of path.
+One MTF-native protocol, served by the gateway front door
+(`https://<net>-gateway.mtf.exchange`).
 
-| Family | Where | Use when |
-|--------|-------|----------|
-| **MTF-native** | Gateway **default** path: `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | New clients. Compact snake_case shape. Exposes everything, including advanced MTF features (RFQ, FBA, PM enrollment, cross-chain). |
-| **HL-compat** | Gateway under `/hl/*`: `POST /hl/exchange`, `POST /hl/info`, `GET /hl/ws` | Bringing an existing HL client over. JSON shapes match HL exactly. Zero code change for `order`, `cancel` (more variants ship over time). |
-| **CCXT-compat** | Gateway under `/ccxt/*` | Quant frameworks already speaking CCXT. Minimal REST subset live; CCXT Pro WS coming. |
+| Surface | Where | Notes |
+|---------|-------|-------|
+| **MTF-native** | `POST /exchange`, `POST /info`, `GET /ws`, `POST /faucet` | Compact snake_case shape. Exposes everything, including advanced MTF features (RFQ, FBA, PM enrollment, cross-chain). |
 
-> The gateway is the unified front door — MTF-native is the default path
-> (`/info`, `/exchange`), HL-compat is namespaced under `/hl/*`, CCXT under
-> `/ccxt/*`. Running the node yourself? It serves the same native surface
-> directly at `http://localhost:8080`.
+> The gateway is the front door for the MTF-native surface
+> (`/info`, `/exchange`, `/ws`). Running the node yourself? It serves the same
+> native surface directly at `http://localhost:8080`.
 
 ## REST
 
 - [`POST /exchange`](./rest/exchange.md) — MTF-native; full action catalog
 - [`POST /info`](./rest/info.md) — MTF-native; per-type schemas
-- [HL-compat](./rest/hl-compat.md) — mirror of HL's wire
-- [CCXT-compat](./rest/ccxt-compat.md) — CCXT REST methods
 
 ## WebSocket
 

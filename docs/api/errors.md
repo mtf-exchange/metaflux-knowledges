@@ -8,7 +8,7 @@ A complete enumeration of HTTP status codes, error-string conventions, root caus
 
 ## TL;DR
 
-- **2xx** — success. Note that HL-compat endpoints return `200 OK` even for application-level errors and signal them in the body (`{"status":"err"}`). MTF-native endpoints use proper status codes.
+- **2xx** — success. MTF-native endpoints use proper HTTP status codes for errors, not in-body error flags.
 - **400** — client-side bug: malformed request, bad signature shape, unknown action variant. Do not retry without fixing.
 - **401** — signature failed authentication. Recover the address locally and check.
 - **404** — resource doesn't exist. Common on `/info` when the queried account / market / vault has never been seen.
@@ -30,14 +30,6 @@ All non-2xx responses on MTF-native endpoints use:
 ```
 
 `detail` and `retry_after_ms` are present only when applicable. The `error` field is the stable identifier — keep your error handler keyed off it.
-
-HL-compat endpoints (`/info`, `/exchange` on the gateway) instead wrap everything in:
-
-```json
-{ "status": "ok"|"err", "response": ... }
-```
-
-with `status: "err"` carrying a string in `response` for application-level errors at HTTP 200. Transport-level errors (malformed JSON, wrong method) still surface as 4xx.
 
 ## Catalog
 
@@ -79,7 +71,7 @@ with `status: "err"` carrying a string in `response` for application-level error
 | `vault not found` | `vault_id` not present |
 | `order not found` | `Cancel` against an oid that was already cancelled / filled / never existed |
 
-For `/info` queries, MTF-native returns `404`; HL-compat returns `200` with `{"status":"err","response":"<msg>"}` (HL's convention).
+For `/info` queries, MTF-native returns `404` when the queried resource is unknown.
 
 ### 405 — method not allowed
 

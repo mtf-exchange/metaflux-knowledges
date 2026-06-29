@@ -238,7 +238,6 @@ sequenceDiagram
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR الإصدار الفعلي + المدخلات الملتزمة
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — إجماليات التحصيص على مستوى البروتوكول (`staking.*`)
-- [HL-compat `delegations`](../api/rest/hl-compat.md#delegations)
 - [الرسوم](./fees.md) — عائدات الرسوم أحد مصادر مكافآت التحصيص
 
 ## الأسئلة الشائعة

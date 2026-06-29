@@ -208,7 +208,6 @@ sequenceDiagram
 
 - [Tiered liquidation](./tiered-liquidation.md) — T3 backstop, insurance pool
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — vault deposit / withdraw / fee events ride this channel
 - [Staking](./staking.md) — separate from vaults
 

@@ -22,9 +22,7 @@
 | WS-подписки на соединение | 256 | — | — |
 
 Все лимиты управляются через механизм управления (governance). Снимок бюджета по аккаунту доступен
-через нативный вызов [`user_rate_limit`](./rest/info.md) на стандартном пути шлюза
-(шлюз также предоставляет эти данные в формате HL-compat `userRateLimit` по пути
-`/hl`):
+через нативный вызов [`user_rate_limit`](./rest/info.md):
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
@@ -62,10 +60,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
 | `POST /info` `userFills`, `historicalOrders` (с пагинацией) | 2 |
 | `POST /exchange` | 5 |
-| `GET /ccxt/markets`, `GET /ccxt/ticker` | 1 |
-| `GET /ccxt/orderbook`, `GET /ccxt/ohlcv` | 2 |
-| `GET /ccxt/balance`, `/positions`, `/myTrades` | 2 |
-| `POST /ccxt/orders`, `DELETE /ccxt/orders/{id}` | 5 |
 | WS `subscribe` | 1 |
 | WS опубликованное сообщение | 0 |
 | WS `unsubscribe` | 0 |
@@ -78,7 +72,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 | Состояние отправителя | Учитывается в |
 |-----------------------|---------------|
-| Анонимный (без подписи, напр. `GET /ccxt/markets`) | по IP |
+| Анонимный (без подписи, напр. `POST /info`) | по IP |
 | Подписан мастер-ключом | по IP + по аккаунту |
 | Подписан агентом | по IP + по аккаунту мастера |
 

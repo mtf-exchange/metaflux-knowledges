@@ -206,7 +206,6 @@ sequenceDiagram
 
 - [Liquidación por niveles](./tiered-liquidation.md) — respaldo T3, fondo de seguro
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — los eventos de depósito, retiro y comisión de bóveda se transmiten por este canal
 - [Staking](./staking.md) — independiente de las bóvedas
 

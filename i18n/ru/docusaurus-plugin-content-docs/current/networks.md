@@ -16,16 +16,13 @@
 
 Песочница для интеграции. Тестовые USDC — через кран (faucet); состояние эфемерное (периодически сбрасывается).
 
-Шлюз (gateway) — единая публичная точка входа. Нативный путь MTF используется по умолчанию
-(`/info` · `/exchange` · `/ws`); HL-совместимый путь находится под `/hl/*`; CCXT — под
-`/ccxt/*`; EVM JSON-RPC — по адресу `/evm`.
+Шлюз (gateway) — единая публичная точка входа. Нативная поверхность MTF предоставляется по адресам
+`/info` · `/exchange` · `/ws`; EVM JSON-RPC — по адресу `/evm`.
 
 | Сервис | Эндпоинт |
 |--------|----------|
 | Точка входа шлюза | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (по умолчанию) | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL-совместимый | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT-совместимый | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Кран (devnet/testnet) | `POST /faucet` |
 | WebSocket шлюза (native) | `wss://devnet-gateway.mtf.exchange/ws` |

@@ -97,13 +97,9 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metr
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
 curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — MTF-native (gateway default path)
+# your personal tier and recent volume — MTF-native
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
-
-# or the HL-compat shape under /hl on the gateway
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
-  -d '{"type":"userFees","user":"0x<addr>"}'
 ```
 
 ## 边界情形
@@ -125,7 +121,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
 - [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — MTF 原生接口：每用户档位 / 30 日交易量
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — 累计手续费池（销毁 / 国库 / 验证者）
-- [`POST /info userFees`](../api/rest/hl-compat.md#userfees) — HL 兼容接口
 - [分层清算](./tiered-liquidation.md) — 清算机制说明
 
 ## 常见问题

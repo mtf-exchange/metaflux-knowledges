@@ -175,7 +175,7 @@ El `funding_rate_multiplier` por activo es la mejora de MTF sobre el valor está
 
 ## Historial de financiamiento
 
-Historial por cuenta mediante [`POST /info userFills`](../api/rest/info.md) o [HL-compat `userFills`](../api/rest/hl-compat.md) — los pagos de financiamiento aparecen con `kind: "funding"` y el activo correspondiente.
+Historial por cuenta mediante [`POST /info user_fills`](../api/rest/info.md) — los pagos de financiamiento aparecen con `kind: "funding"` y el activo correspondiente.
 
 Historial por mercado:
 

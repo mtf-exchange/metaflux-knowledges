@@ -21,7 +21,7 @@
 | 每账户内存池操作数 | 50 个待处理 | 随操作提交自动释放 | — |
 | 每连接 WS 订阅数 | 256 | — | — |
 
-所有限制均由治理控制。可通过网关默认路径下的原生 [`user_rate_limit`](./rest/info.md) 接口查询账户配额快照（网关也在 `/hl` 下以 HL 兼容格式 `userRateLimit` 暴露相同数据）：
+所有限制均由治理控制。可通过原生 [`user_rate_limit`](./rest/info.md) 接口查询账户配额快照：
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
@@ -56,10 +56,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | `POST /info` `l2Book`、`metaAndAssetCtxs` | 2 |
 | `POST /info` `userFills`、`historicalOrders`（分页） | 2 |
 | `POST /exchange` | 5 |
-| `GET /ccxt/markets`、`GET /ccxt/ticker` | 1 |
-| `GET /ccxt/orderbook`、`GET /ccxt/ohlcv` | 2 |
-| `GET /ccxt/balance`、`/positions`、`/myTrades` | 2 |
-| `POST /ccxt/orders`、`DELETE /ccxt/orders/{id}` | 5 |
 | WS `subscribe` | 1 |
 | WS 推送消息 | 0 |
 | WS `unsubscribe` | 0 |
@@ -72,7 +68,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 | 发送方状态 | 计入对象 |
 |-----------|---------|
-| 匿名（无签名，如 `GET /ccxt/markets`） | 按 IP |
+| 匿名（无签名，如 `POST /info`） | 按 IP |
 | 主账户签名 | 按 IP + 按账户 |
 | 代理账户签名 | 按 IP + 按主账户 |
 

@@ -13,7 +13,7 @@ description: "Эндпоинт чтения POST /info — типы запрос
 Единый эндпоинт, несколько типов. Диспетчеризация происходит по полю `type` тела запроса. Только чтение — никогда не изменяет состояние, подпись не требуется.
 
 :::tip
-**Разделение по продукту.** Запросы на чтение для бессрочных рынков описаны в разделе [запросы по бессрочным контрактам](./info/perpetuals.md); запросы для спота, спотовой маржи и Earn — в разделе [запросы по споту и марже](./info/spot.md). На этой странице описаны конверт, соглашения, чтение данных по аккаунтам/управлению/хранилищам/валидаторам, а также таблица псевдонимов hl-compat.
+**Разделение по продукту.** Запросы на чтение для бессрочных рынков описаны в разделе [запросы по бессрочным контрактам](./info/perpetuals.md); запросы для спота, спотовой маржи и Earn — в разделе [запросы по споту и марже](./info/spot.md). На этой странице описаны конверт, соглашения, чтение данных по аккаунтам/управлению/хранилищам/валидаторам.
 :::
 
 ## URL
@@ -24,12 +24,10 @@ POST  https://<net>-gateway.mtf.exchange/info
 
 | Путь | Формат данных |
 |------|-----------|
-| `POST /info` (шлюз по умолчанию) | MTF-native (этот документ) |
-| `POST /hl/info` (шлюз, под `/hl`) | **HL-compat** — см. [hl-compat.md](./hl-compat.md) |
+| `POST /info` (шлюз) | MTF-native (этот документ) |
 
-MTF-native — путь шлюза по умолчанию; HL-compat вынесен в пространство имён `/hl/*`.
-При самостоятельном запуске ноды тот же нативный `/info` доступен напрямую по адресу
-`http://localhost:8080`.
+Шлюз обслуживает MTF-native `/info`. При самостоятельном запуске ноды тот же нативный
+`/info` доступен напрямую по адресу `http://localhost:8080`.
 
 ## Конверт
 
@@ -1690,43 +1688,6 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 Источник состояния: составной из перечисленных выше ридеров.
 
-## Псевдонимы hl-compat → нативные типы MTF (таблица совместимости)
-
-Поверхность [hl-compat](./hl-compat.md) шлюза предоставляет каждый тип снимка узла под псевдонимом в camelCase для клиентов с поддержкой совместимости. Левый столбец — этот псевдоним; средний — нативный тип узла MTF, на который он указывает; ✅ = обслуживается, ⚠️ = обслуживается через помеченный прокси (нет точного соответствия в зафиксированном состоянии).
-
-| Псевдоним hl-compat | Нативный тип MTF | Статус | Примечания |
-|----------------------------|------------------------------|--------|-------|
-| `meta` | `markets` | ✅ | уже обслуживается |
-| `spotMeta` | `spot_meta` | ✅ | `mip3_spot_pair_specs` + `mip3_spot_token_specs` |
-| `clearinghouseState` | `account_state` | ✅ | уже обслуживается |
-| `spotClearinghouseState` | `spot_clearinghouse_state` | ✅ | ключ: `(owner, asset)` |
-| `exchangeStatus` | `exchange_status` | ✅ | скалярные флаги |
-| `openOrders` | `open_orders` | ✅ | уже обслуживается |
-| `frontendOpenOrders` | `frontend_open_orders` | ✅ | + trigger / tif / cloid |
-| `liquidatable` | `liquidatable` | ✅ | индекс BOLE (⚠️ пуст до первого прохода BOLE) |
-| `activeAssetData` | `active_asset_data` | ✅ | позиция / конфигурация / рынок |
-| `maxMarketOrderNtls` | `max_market_order_ntls` | ⚠️ | лимит OI как прокси верхней границы размера |
-| `vaultSummaries` | `vault_summaries` | ✅ | ⚠️ `tvl` = прокси NAV на максимальном уровне |
-| `userVaultEquities` | `user_vault_equities` | ✅ | ключ по хранилищу |
-| `leadingVaults` | `leading_vaults` | ✅ | отфильтровано по лидеру |
-| `userRateLimit` | `user_rate_limit` | ✅ | `UserActionStats` |
-| `spotDeployState` | `spot_deploy_state` | ✅ | газовый аукцион спот |
-| `delegatorSummary` | `delegator_summary` | ✅ | агрегат стейкинга |
-| `maxBuilderFee` | `max_builder_fee` | ✅ | `approved_builders` |
-| `userToMultiSigSigners` | `user_to_multi_sig_signers` | ✅ | `MultiSigConfig` |
-| `userRole` | `user_role` | ✅ | производится из реестров |
-| `perpsAtOpenInterestCap` | `perps_at_open_interest_cap` | ✅ | OI против `oi_cap` |
-| `validatorL1Votes` | `validator_l1_votes` | ✅ | метаданные (непрозрачная нагрузка) |
-| `validatorSummaries` | `validator_summaries` | ✅ | ставка / комиссия / флаги active+jailed |
-| `gossipRootIps` | `gossip_root_ips` | ✅ | настроенные конечные точки пиров (пусто на одиночном узле) |
-| `marginTable` | `margin_table` | ⚠️ | один эффективный уровень на рынок (без многоуровневой лестницы) |
-| `perpDexs` | `perp_dexs` | ✅ | индекс + количество активов |
-| `webData2` | `web_data2` | ✅ | составной |
-| `userFees` | `fee_schedule` | ✅ | уже обслуживается |
-| `delegations` | `staking_state` | ✅ | уже обслуживается |
-| `perpDeployAuctionStatus` | `mip3_active_bids` | ✅ | уже обслуживается |
-| `subAccounts` | `sub_accounts` | ✅ | уже обслуживается |
-
 ## Ошибки
 
 | HTTP | Тело | Причина |
@@ -1776,7 +1737,6 @@ sequenceDiagram
 
 - [`POST /exchange`](./exchange.md) — путь записи
 - [`POST /faucet`](./faucet.md) — выдача тестовых средств в devnet/testnet (USDC + MTF)
-- [HL-compat `/info`](./hl-compat.md) — формат camelCase, дополнительные типы запросов
 - [WS-подписки](../ws/subscriptions.md) — push-эквиваленты
 
 ## FAQ

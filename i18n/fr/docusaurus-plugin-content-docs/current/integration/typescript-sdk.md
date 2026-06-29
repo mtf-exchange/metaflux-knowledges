@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex string OR `Uint8Array` | oui (sauf si `signer` est défini) | Clé privée secp256k1 de 32 octets |
 | `signer` | `Signer` | oui (sauf si `privateKey` est défini) | Signataire personnalisé (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex address | optionnel | Si défini, utilisé comme `sender` ; l'adresse du signataire sert de signataire récupéré. Pour le [pattern agent-wallet](./agent-wallets-howto.md). |
-| `baseUrl` | string | oui | Point d'entrée de la passerelle (`https://<net>-gateway.mtf.exchange`). Le SDK utilise le protocole MTF-native, qui est le chemin par défaut de la passerelle (`/info` · `/exchange` · `/ws`) ; la compatibilité HL se trouve sous `/hl/*`. Vous faites tourner le nœud vous-même ? Pointez sur `http://localhost:8080`. Voir [réseaux](../networks.md). |
+| `baseUrl` | string | oui | Point d'entrée de la passerelle (`https://<net>-gateway.mtf.exchange`). Le SDK utilise le protocole MTF-native, desservi par la passerelle sur `/info` · `/exchange` · `/ws`. Vous faites tourner le nœud vous-même ? Pointez sur `http://localhost:8080`. Voir [réseaux](../networks.md). |
 | `chainId` | number | oui | Selon le réseau — voir [réseaux](../networks.md) |
 | `timeoutMs` | number | optionnel (défaut 5000) | Délai d'expiration HTTP |
 | `nonceFn` | `() => number` | optionnel (défaut `Date.now`) | Générateur de nonce personnalisé |

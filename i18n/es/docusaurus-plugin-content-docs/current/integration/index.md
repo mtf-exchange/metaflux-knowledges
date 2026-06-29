@@ -12,7 +12,6 @@ Cómo conectar un cliente a MetaFlux. Elige el punto de partida que mejor se ada
 |--------------------------|-------|
 | Cero — solo quieres probarlo | [Inicio rápido](./quickstart.md) |
 | Un bot/herramienta HL existente | [Migración desde HL](./migrating-from-hl.md) |
-| Un framework cuantitativo basado en CCXT | [Integración con CCXT](../api/rest/ccxt-compat.md) |
 | TypeScript / browser desde cero | [SDK de TypeScript](./typescript-sdk.md) |
 | Servicio Rust desde cero | [SDK de Rust](./rust-sdk.md) |
 | Cualquier otro (Python, Go, …) | [Firma con typed-data](./typed-data-signing.md) — implementa tú mismo la firma EIP-712 typed-data |
@@ -26,7 +25,7 @@ Cómo conectar un cliente a MetaFlux. Elige el punto de partida que mejor se ada
 - [Idempotencia](./idempotency.md) — estrategia de nonce y reintentos seguros
 - [Manejo de errores](./error-handling.md) — árbol de decisión para admisión, confirmación y red
 - [Patrón risk-watcher](./risk-watcher.md) — recarga automática de margen
-- [Migración desde HL](./migrating-from-hl.md) — sustitución directa para bots de HL
+- [Migración desde HL](./migrating-from-hl.md) — cambia un bot de Hyperliquid a la API nativa de MTF
 
 ## SDKs
 
@@ -45,9 +44,7 @@ El gateway (`https://<net>-gateway.mtf.exchange`) es el único punto de entrada 
 
 | Ruta | Sirve | Propósito |
 |------|--------|---------|
-| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native (predeterminado) | Superficie nativa en snake_case |
-| `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` | HL-compat | Formato de wire HL |
-| `/ccxt/*` | CCXT-compat | Métodos REST de CCXT |
+| `POST /info` · `POST /exchange` · `GET /ws` | MTF-native | Superficie nativa en snake_case |
 | `POST /evm` | EVM JSON-RPC | RPC de la sidechain EVM |
 | `POST /faucet` | Faucet | Grifo de prueba para devnet/testnet |
 

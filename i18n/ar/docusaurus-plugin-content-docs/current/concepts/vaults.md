@@ -206,7 +206,6 @@ sequenceDiagram
 
 - [التصفية المتدرجة](./tiered-liquidation.md) — احتياطي T3، صندوق التأمين
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — أحداث الإيداع والسحب والرسوم تمر عبر هذه القناة
 - [التوقيع](./staking.md) — مستقل عن الخزائن
 

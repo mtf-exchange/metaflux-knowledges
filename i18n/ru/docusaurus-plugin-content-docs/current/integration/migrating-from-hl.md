@@ -1,231 +1,220 @@
 # Миграция с HL
 
 :::info
-**Предварительная версия.** Уровень совместимости с HL охватывает `POST /info` (15 типов запросов) и `POST /exchange` (сегодня — размещение ордеров и отмена, со временем появятся новые типы действий).
+**MetaFlux использует собственный протокол MTF-native — совместимого с Hyperliquid слоя нет.** Ваш бот сохраняет свою стратегию и торговую логику; меняется лишь клиентский/проводной уровень. Самый быстрый путь — официальный SDK для [TypeScript](./typescript-sdk.md) или [Rust](./rust-sdk.md), который собирает нативный конверт и подпись EIP-712 за вас. Для других языков реализуйте [подпись типизированных данных](./typed-data-signing.md) напрямую.
 :::
 
-Если ваш бот уже работает по протоколу HL, вы можете переключить его на MetaFlux **без изменения кода** для поддерживаемой части API — те же формы URL, тот же JSON запросов/ответов, та же оболочка EIP-712.
+Если ваш бот уже торгует на перп-DEX в стиле Hyperliquid, переход на MetaFlux — это **переписывание клиентского уровня, а не стратегии**. Концепции, на которые вы опираетесь — лимитные ордера, исполнения, финансирование, кросс-/изолированная маржа, агентские кошельки, субсчета, хранилища — все они есть в MTF. Меняются проводной формат, имена действий / запросов, chain ID и идентификаторы активов.
 
-## Что работает из коробки
+## Суть перехода
 
-- `POST /info` для: `meta`, `allMids`, `userState`, `clearinghouseState`, `openOrders`, `frontendOpenOrders`, `userFills`, `historicalOrders`, `metaAndAssetCtxs`, `l2Book`, `vaultDetails`, `delegations`, `userFees`, `subAccounts`, `referral`
-- `POST /exchange` для: `order` (выставление лимитного ордера / IOC / ALO), `cancel` (отмена по OID)
-- WS-подписки (скоро) будут использовать те же названия каналов, что и HL
+- **Проводной формат.** MTF-native — это JSON в snake_case через `POST /exchange` (запись), `POST /info` (чтение) и `GET /ws` (стрим), каждый из которых подписывается по EIP-712 там, где это требуется. Возьмите SDK или реализуйте [нативную схему подписи](./typed-data-signing.md).
+- **Логика стратегии и риска.** Без изменений — ваш код котирования, расчёта размера и хеджирования переносится как есть.
+- **Имена и несколько семантических нюансов.** Типы действий и типы запросов переименованы (таблица ниже), и ряд поведений отличается (идентификаторы активов, уровень ликвидации T0, задержка одобрения агента).
 
-## Что изменилось
+## Что работает так же
 
-### 1. Chain ID
+- Ордера Limit / IOC / ALO, reduce-only, клиентские идентификаторы ордеров (`cloid`).
+- Подпись EIP-712 — тот же примитив подписи, другой домен и chain ID.
+- Кросс-/изолированная маржа, выплаты финансирования, чтение исполнений и статусов ордеров.
+- Агентские кошельки (горячие ключи без права вывода), субсчета, хранилища.
+
+## Что меняется
+
+### 1. Поверхность протокола {#1-protocol-surface}
+
+Существует одна поверхность MTF-native; вы обращаетесь к ней через SDK или собираете конверт самостоятельно. Имена отображаются однозначно:
+
+| Что вы использовали в HL | Эквивалент в MTF-native |
+|----------------|-----------------------|
+| `POST /exchange` `order` | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
+| `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
+| `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `POST /info` `meta` | [`markets`](../api/rest/info/perpetuals.md#markets) |
+| `POST /info` `clearinghouseState` | [`account_state`](../api/rest/info.md#account_state) |
+| `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) / [`frontend_open_orders`](../api/rest/info.md#frontend_open_orders) |
+| `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
+| WS `userEvents`, `l2Book`, `candle` | `user_events`, `l2_book`, `candles` (snake_case) — см. [WS-подписки](../api/ws/subscriptions.md) |
+
+Полные каталоги — [`POST /exchange`](../api/rest/exchange.md) и [`POST /info`](../api/rest/info.md).
+
+### 2. Chain ID
 
 MetaFlux — собственная L1-сеть, а не развёртывание HL. Подписывайте транзакции с использованием chain ID MetaFlux, а **не** HL:
 
-| Сеть | HL `chainId` | MTF `chainId` |
-|---------|--------------|---------------|
-| Mainnet | 1337 | **8964** (`0x2304`) |
-| Testnet | 998 | **114514** (`0x1bf52`) |
-| Devnet / local | 1337 | **31337** (`0x7a69`) |
+| Сеть | MTF `chainId` |
+|---------|---------------|
+| Mainnet | **8964** (`0x2304`) |
+| Testnet | **114514** (`0x1bf52`) |
+| Devnet / локальная | **31337** (`0x7a69`) |
 
-Измените одну константу в коде подписи — остальная оболочка EIP-712 идентична. В домене MTF используются `name = "MetaFlux"`, `version = "1"`, `verifyingContract = 0x0`.
+Домен EIP-712 в MTF использует `name = "MetaFlux"`, `version = "1"`, `verifyingContract = 0x0`. См. [сети](../networks.md) и [подписание](./signing.md).
 
-### 2. Базовый URL
+### 3. Базовый URL
 
 ```
-HL:  https://<your-current-hl-api-base>/{info,exchange}
-MTF: https://gateway.<your-deployment>/hl/{info,exchange}
+MTF: https://<net>-gateway.mtf.exchange/{info,exchange,ws}
 ```
 
-Шлюз (gateway) — единая точка входа. Уровень совместимости с HL находится по пути `/hl/*`
-(`/hl/info`, `/hl/exchange`, `/hl/ws`) — клиент HL просто добавляет префикс `/hl`.
-Корневой путь шлюза по умолчанию (`/info`, `/exchange`) — это нативный MTF API;
-при самостоятельном запуске ноды тот же API доступен по адресу
-`http://localhost:8080`.
-
-### 3. Типы действий, ещё не перенесённые в слой совместимости
-
-Если ваш бот использует HL-действия помимо `order` / `cancel`, шлюз на сегодня возвращает:
-
-```json
-{ "status": "err", "response": "unimplemented action: <type>" }
-```
-
-при HTTP 200. HL-конвенция предписывает передавать ошибки как 200 с `status: "err"` — MTF её сохраняет.
-
-Полное покрытие HL-действий будет добавлено в последующих релизах. Если вам нужны новые действия уже сейчас, используйте [нативную поверхность действий MTF](../api/rest/exchange.md) напрямую — там реализовано полное покрытие функций, в том числе возможности, которых нет в HL (RFQ, FBA, подключение портфельной маржи, межсетевые примитивы).
+Шлюз — единая точка входа для поверхности MTF-native. При самостоятельном запуске узла та же поверхность доступна по адресу `http://localhost:8080`.
 
 ### 4. Идентификаторы активов
 
-HL и MTF оба используют целочисленные ID активов, но **эти числа не совпадают**. `0` в HL — бессрочный контракт на BTC; `0` в MTF может быть ETH или чем-то другим — в зависимости от развёртывания. Всегда запрашивайте ID активов через `POST /info { "type": "meta" }` при старте; никогда не задавайте их в коде как константы.
+HL и MTF используют целочисленные идентификаторы активов, но **целые числа не совпадают**. `0` в HL — это BTC perp; `0` в MTF может быть ETH или чем угодно ещё в зависимости от развёртывания. Всегда определяйте идентификаторы активов через `POST /info { "type": "markets" }` при запуске; никогда не задавайте их жёстко.
 
 ### 5. Числовая точность
 
-Обе сети используют масштабированные целые числа (например, `px`) и передают их как строки в JSON, поскольку IEEE-754 теряет точность после 2^53. Если ваш бот разбирает JSON стандартным `JSON.parse` в JS — переключитесь на парсер с поддержкой больших целых для этих полей. Формат данных совпадает с HL, но риск потери точности (без каких-либо предупреждений) — тот же.
+Поля цены и размера — это масштабированные целые числа, передаваемые в виде JSON-строк, поскольку IEEE-754 теряет точность за пределами 2^53. Если ваш бот разбирает их стандартным `JSON.parse` в JS, переключитесь на парсер с поддержкой big-int для этих полей.
 
 ### 6. Поведение при ликвидации
 
-MetaFlux добавляет [предупредительный уровень T0 («жёлтая карточка»)](../concepts/tiered-liquidation.md), которого нет в HL. Практический эффект: при здоровье счёта в диапазоне `[1.0, 1.1)` все ожидающие ALO-ордера принудительно отменяются и генерируется предупредительное событие, однако позиции остаются нетронутыми. Уровни T1 / T2 / T3 ведут себя как Partial / Market / Backstop в HL.
+MetaFlux добавляет [уровень-отсрочку T0 (жёлтая карточка)](../concepts/tiered-liquidation.md), которого нет в HL. Практический эффект: при health `[1.0, 1.1)` стоящие ALO-ордера вашего счёта принудительно отменяются и публикуется предупреждающее событие, но позиции не затрагиваются. Затем T1 / T2 / T3 ведут себя как Partial / Market / Backstop в HL.
 
-Если ваш бот отслеживает события ликвидации для пополнения маржи, **добавьте обработчик нового события T0** — это ранний предупредительный сигнал, которого HL не предоставляет. Его перехват даёт один блок времени для принятия мер.
+Если ваш бот слушает события ликвидации для запуска пополнения маржи, **добавьте обработчик нового события T0** — это сигнал раннего предупреждения, которого HL вам не даёт. Его перехват даёт один блок отсрочки для действий.
 
 ### 7. Семантика агентского кошелька
 
-В HL агент — это ключ без права на вывод средств. В MTF так же — см. [агентские кошельки](../concepts/agent-wallets.md). Название действия — `ApproveAgent`; формат данных совпадает с HL. Одно механическое отличие: подтверждение агента в MTF вступает в силу **через один блок после коммита**, тогда как в HL обычно требуется два блока. Немного быстрее; та же процедура активации.
+Агент — это ключ без права вывода; та же модель, что и в HL (см. [агентские кошельки](../concepts/agent-wallets.md)). Действие — [`approve_agent`](../api/rest/exchange.md#approve_agent). Единственное механическое отличие: одобрение агента в MTF вступает в силу **через один блок после коммита**, против обычной задержки в два блока у HL. Чуть быстрее; тот же разогрев.
 
-### 8. Хранилища (Vaults)
+### 8. Хранилища
 
-Хранилища HL и MetaFlux — разные продукты. `vaultDetails` возвращает информацию о собственных типах хранилищ MTF (MFlux Vault, пользовательские хранилища). Адреса хранилищ HL не будут найдены. Формат запроса совпадает — просто ожидайте сущностей MTF, а не HL.
+Хранилища HL и хранилища MetaFlux — это не один и тот же продукт. Чтение [`vault_state`](../api/rest/info.md#vault_state) возвращает собственные типы хранилищ MTF (MFlux Vault, пользовательские хранилища). Адреса хранилищ HL не разрешатся. Ожидайте сущности MTF, а не HL.
 
 ## Пошаговая миграция
 
-### День 0 — переключение на MetaFlux
+### День 0 — переход на нативный клиент
 
-1. Измените базовый URL в конфигурации вашего клиента.
-2. Измените константу `chainId` в вашем модуле подписи.
-3. Запустите существующий набор тестов против devnet MTF. Запросы `order` / `cancel` и все `info`-запросы должны проходить без изменений в коде.
+1. Установите SDK для [TypeScript](./typescript-sdk.md) или [Rust](./rust-sdk.md) (или реализуйте [подпись типизированных данных](./typed-data-signing.md) для вашего языка).
+2. Укажите `baseUrl` на шлюз MTF и задайте `chainId` для вашей целевой сети.
+3. Перепишите поиск активов через `POST /info { "type": "markets" }`.
 
-### День 1 — закрытие пробелов в покрытии действий
+### День 1 — сопоставьте свои действия
 
-Для HL-действий, ещё не перенесённых в слой совместимости MTF:
+Переведите каждое действие, которое отправляет ваш бот, в его эквивалент MTF-native (см. таблицу в [§1](#1-protocol-surface)). `order` → `submit_order`, `cancel` → `cancel_order`, изменения плеча / маржи → `update_leverage` / `update_isolated_margin`. Конверт EIP-712 собирается SDK; отличаются лишь имя варианта действия и регистр полей.
 
-- **Изменение ордеров** — пока: отмена + повторное выставление. Действие `modify` появится в следующем обновлении совместимости.
-- **Установка кредитного плеча / режима маржи** — используйте нативное действие MTF через `POST /exchange` по корневому пути шлюза (`UpdateLeverage`, `UpdateIsolatedMargin`). Та же оболочка EIP-712; другое название варианта действия.
-- **Перевод / вывод** — нативный MTF.
+### День 2 — подключите новые сигналы
 
-### День 2 — подключение новых сигналов
+- Подпишитесь на чтение `sub_accounts`, если вы используете субсчета (MTF допускает до 32 субсчетов на мастер-аккаунт).
+- Добавьте обработчик событий «жёлтой карточки» T0 в WS-канале `user_events`.
+- Если вы зависите от портфельной маржи, подключитесь к ней в MTF через [`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin). Порог и набор сценариев — это параметры сети; см. [портфельную маржу](../concepts/portfolio-margin.md).
 
-- Подпишитесь на `subAccounts` в info, если управляете субсчётами (семантика немного отличается — MTF допускает до 32 субсчётов на один мастер-аккаунт).
-- Добавьте обработчик событий T0 («жёлтая карточка»). Удобнее всего — в том же потоке заполнений/ликвидаций, который вы уже обрабатываете; форма события: `{ "type": "yellowCard", "user": "0x...", "block": N }`.
-- Если вы зависите от портфельной маржи: выполните повторную регистрацию в MTF (`UserPortfolioMargin { enabled: true }`). Пороговые значения и набор сценариев — сетевые параметры, см. [портфельная маржа](../concepts/portfolio-margin.md).
+### День 3+ — освойте функции, уникальные для MTF
 
-### День 3+ — использование возможностей только MTF
+Опционально. Если вам нужны функции, которых нет в HL:
 
-Опционально. Если вы хотите использовать функции, которых нет в HL:
+- **RFQ** — примитивы запроса котировки (request-for-quote), полезны для объёма, который не хочет светиться в стакане.
+- **FBA** — частые пакетные аукционы (frequent batch auction) для назначенных рынков, снижают MEV.
+- **Кросс-чейн примитивы** — примитивы моста, нативно вызываемые из EVM-контрактов.
 
-- **RFQ** — примитивы запроса котировки (request-for-quote), полезны для объёмов, которые не нужно показывать в стакане
-- **FBA** — сопоставление ордеров в частом пакетном аукционе (frequent batch auction) для выбранных рынков, снижает MEV
-- **Межсетевые примитивы** — примитивы моста, вызываемые нативно из EVM-контрактов
+Это нативные действия MTF на `POST /exchange`; см. [обзор API](../api/index.md).
 
-Это нативные MTF-действия, отправляемые по корневому пути шлюза (`POST /exchange` — нативный MTF используется по умолчанию; совместимость с HL — под `/hl/*`; см. [обзор API](../api/index.md)).
-
-## 5 типичных паттернов HL-ботов — конкретная миграция
+## Топ-паттерны HL-ботов — конкретная миграция
 
 ### 1. Простой маркет-мейкер на лимитных ордерах (канонический паттерн)
 
-```diff
-- const HL_URL = 'https://<your-current-hl-api-base>';
-+ const MTF_URL = 'https://gateway.mtf.exchange/hl';   // HL-compat is under /hl/*
+```typescript
+import { MetaFluxClient } from '@metaflux/sdk';
 
-- const HL_CHAIN_ID = 1337;
-+ const MTF_CHAIN_ID = 114514;    // testnet (mainnet 8964, devnet 31337)
+const client = new MetaFluxClient({
+  privateKey: process.env.PRIVATE_KEY!,
+  baseUrl:    'https://testnet-gateway.mtf.exchange',
+  chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
+});
 
-- const HL_DOMAIN_NAME = 'HLSignTransaction';   // varies by mode
-+ const MTF_DOMAIN_NAME = 'MetaFlux';
-+ const MTF_DOMAIN_VERSION = '1';
+// asset lookup: HL `meta.universe` → MTF `markets`
+const markets = await client.info.markets();
+const BTC = markets.findIndex(m => m.name === 'BTC');   // may not be 0
 
-  // asset lookup runs against /info { type: "meta" } — same call, different result
-  const meta = await fetch(MTF_URL + '/info', {
-    method: 'POST',
-    body: JSON.stringify({ type: 'meta' }),
-  }).then(r => r.json());
-
-  const BTC = meta.universe.findIndex(m => m.name === 'BTC');  // may not be 0
-
-  // order, cancel — unchanged HL wire shape
-  await place_order(BTC, 'B', '100', '0.1', 'Gtc');
+// order / cancel — your strategy logic, native action names
+await client.exchange.order({
+  asset: BTC, isBuy: true, price: '100', size: '0.1', tif: 'Gtc', reduceOnly: false,
+});
 ```
 
-Изменение `chainId` и базового URL занимает около 5 минут для типичного клиента.
+Стратегия остаётся; клиентский уровень превращается в вызов SDK.
 
 ### 2. Бот-наблюдатель за ликвидациями (пополнение маржи)
 
-HL генерирует события `liquidation`, когда счета достигают уровня частичной / рыночной ликвидации. MTF добавляет **`yellowCard`** как самый ранний сигнал.
+HL публикует события `liquidation` на уровне partial / market. MTF добавляет **`yellowCard`** как самый ранний сигнал в канале `user_events`.
 
-```diff
-  ws.subscribe('userEvents', { user: address }, (event) => {
-    switch (event.data.kind) {
-+     case 'yellowCard':
-+       // T0 — one block to act. ALO orders already cancelled.
-+       deposit(YELLOW_CARD_DEPOSIT);
-+       break;
-      case 'liquidation':
--       // HL partial / market
-+       // T1 partial OR T2 full — too late for prevention
-        emergency_unwind();
-        break;
-    }
-  });
+```typescript
+const ws = client.ws();
+ws.subscribe('user_events', { user: client.address }, (event) => {
+  switch (event.data.kind) {
+    case 'yellowCard':
+      // T0 — one block to act; ALO orders already cancelled
+      deposit(YELLOW_CARD_DEPOSIT);
+      break;
+    case 'liquidation':
+      // T1 partial OR T2 full — too late for prevention
+      emergency_unwind();
+      break;
+  }
+});
 ```
 
-Полный паттерн описан в [risk-watcher](./risk-watcher.md).
+См. [risk-watcher](./risk-watcher.md) для полного паттерна.
 
-### 3. Бот-арбитражник по ставке финансирования
+### 3. Бот для арбитража ставки финансирования
 
-Периодичность финансирования схожа (в HL — раз в час; в MTF — раз в час по умолчанию, но настраивается для каждого рынка). Структура формулы идентична.
+Периодичность финансирования схожа (по умолчанию ежечасно, настраивается для каждого рынка в MTF). Структура формулы идентична; чтение — это нативный запрос `funding`.
 
-```diff
-  // URL is the /hl base from pattern 1 (gateway .../hl) — HL-compat shape
-  const funding = await fetch(URL + '/info', {
-    body: JSON.stringify({ type: 'fundingHistory', coin: 'BTC' }),
-  }).then(r => r.json());
-
-- // HL funding rate at funding[0].fundingRate
-+ // MTF same shape; values may differ because oracle composition differs
-  const rate = funding[0].fundingRate;
+```typescript
+const funding = await client.info.fundingHistory({ coin: 'BTC' });
+// values may differ from HL because oracle composition differs
+const rate = funding[0].rate_per_hr;
 ```
 
-Состав оракула MTF управляется на уровне каждого рынка (зафиксировано в `SetOracleWeights`) — если ваш арбитраж зависит от конкретных провайдеров оракула, проверьте, совпадает ли взвешенный список источников с вашими ожиданиями. См. [цены маркировки](../concepts/mark-prices.md).
+Состав оракула в MTF управляется отдельно для каждого рынка (зафиксированный `SetOracleWeights`) — если ваш арбитраж зависит от конкретных поставщиков оракула, проверьте список взвешенных источников. См. [цены марк](../concepts/mark-prices.md).
 
-### 4. Мультисчётная / институциональная конфигурация
+### 4. Мультиаккаунт / институциональная настройка
 
-HL: мастер + агенты на каждом хосте. MTF: то же самое, плюс полноценные **мультиподписные счета**.
+HL: мастер + агенты на каждый хост. MTF: то же, плюс первоклассные **мультиподписные счета**.
 
-```diff
-  // existing: master + agents
-  await master.approveAgent(host1_agent);
-  await master.approveAgent(host2_agent);
+```typescript
+// existing: master + agents
+await master.approveAgent(host1_agent);
+await master.approveAgent(host2_agent);
 
-+ // new on MTF: convert master to multi-sig for cold custody
-+ await master.convertToMultiSigUser({
-+   threshold: 2,
-+   signers: [signer1, signer2, signer3],
-+ });
-+ // every subsequent master-level action requires 2 sigs
-+ // agents still work as before for trading actions
+// new on MTF: convert master to multi-sig for cold custody
+await master.convertToMultiSigUser({
+  threshold: 2,
+  signers: [signer1, signer2, signer3],
+});
+// every subsequent master-level action then requires 2 sigs;
+// agents still work as before for trading actions
 ```
 
 См. [мультиподпись](../concepts/multi-sig.md).
 
-### 5. Менеджер портфеля на субсчётах
+### 5. Менеджер портфеля на субсчетах
 
-Субсчета HL: до 8. MTF: до 32. Формат данных совпадает:
+Субсчета HL: до 8. MTF: до 32.
 
-```diff
-- // HL: create one of up to 8 subs
-+ // MTF: create one of up to 32 subs (otherwise identical)
-  await master.createSubAccount({ name: 'desk-A' });
-  await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
+```typescript
+// MTF: create one of up to 32 subs
+await master.createSubAccount({ name: 'desk-A' });
+await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
 ```
 
-Управление агентами на уровне субсчёта, подключение PM на уровне субсчёта, режимы маржи на уровне субсчёта — всё поддерживается идентично.
+Управление агентами для каждого субсчёта, подключение PM для каждого субсчёта и режимы маржи для каждого субсчёта — всё поддерживается.
 
 ## Справочная таблица
 
-| Действие в HL | Статус в MTF |
-|----------------------|---------------|
-| `order` (place limit / IOC / ALO) | ✅ Поддерживается в формате HL-compat |
-| `cancel` (by OID) | ✅ Поддерживается в формате HL-compat |
-| `cancelByCloid` | выкатывается |
-| `modify` | выкатывается |
-| `batchModify` | выкатывается |
-| `usdSend` / spot transfers | используйте нативный MTF |
-| `withdraw3` | используйте нативный MTF |
-| `approveAgent` | нативный формат MTF; см. [агентские кошельки](../concepts/agent-wallets.md) |
-| `updateLeverage` / `updateIsolatedMargin` | нативный формат MTF |
-| `usdClassTransfer` | используйте нативный эквивалент MTF |
-| `convertToMultiSigUser` | нативный MTF, предварительная версия |
-| `setReferrer` / `createReferral` | нативный MTF; семантика может отличаться |
+| Действие, которое вы использовали в HL | Действие MTF-native |
+|-----------------------|-------------------|
+| `order` (выставление limit / IOC / ALO) | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
+| `cancel` (по OID) | [`cancel_order`](../api/rest/exchange.md#cancel_order) |
+| `cancelByCloid` | [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
+| `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `usdSend` / спот-переводы | нативные действия спот-перевода |
+| `withdraw3` | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) |
+| `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
+| `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
+| `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user) |
+| `setReferrer` / `createReferral` | [`set_referrer`](../api/rest/exchange.md#set_referrer) (семантика может отличаться) |
 
-(Таблица обновляется по мере расширения поддержки слоя совместимости.)
+## Как получить помощь
 
-## Получение помощи
-
-- Этот репозиторий (`mtf-exchange/metaflux-knowledges`) — откройте задачу (issue)
-- См. [`POST /exchange`](../api/rest/exchange.md) и [руководство по подписи](./signing.md) для справки по формату данных
+- Этот репозиторий (`mtf-exchange/metaflux-knowledges`) — создайте issue.
+- Справочник проводного уровня — см. [`POST /exchange`](../api/rest/exchange.md) и [руководство по подписанию](./signing.md).

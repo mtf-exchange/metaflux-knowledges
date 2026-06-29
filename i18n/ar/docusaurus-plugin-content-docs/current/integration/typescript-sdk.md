@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex string OR `Uint8Array` | نعم (ما لم يُحدَّد `signer`) | مفتاح secp256k1 الخاص، 32 بايت |
 | `signer` | `Signer` | نعم (ما لم يُحدَّد `privateKey`) | موقِّع مخصَّص (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex address | اختياري | إذا حُدِّد، استُخدم كـ `sender`؛ ويُستخدم عنوان الموقِّع بوصفه الموقِّع المُستردّ. راجع [نمط محفظة الوكيل](./agent-wallets-howto.md). |
-| `baseUrl` | string | نعم | بوابة الدخول الأمامية (`https://<net>-gateway.mtf.exchange`). تتحدّث الحزمة بروتوكول MTF-native، وهو المسار الافتراضي للبوابة (`/info` · `/exchange` · `/ws`)؛ وتقع التوافقية مع HL تحت `/hl/*`. هل تشغِّل العقدة بنفسك؟ أشِر إلى `http://localhost:8080`. راجع [الشبكات](../networks.md). |
+| `baseUrl` | string | نعم | بوابة الدخول الأمامية (`https://<net>-gateway.mtf.exchange`). تتحدّث الحزمة بروتوكول MTF-native، الذي تخدمه البوابة على `/info` · `/exchange` · `/ws`. هل تشغِّل العقدة بنفسك؟ أشِر إلى `http://localhost:8080`. راجع [الشبكات](../networks.md). |
 | `chainId` | number | نعم | يختلف باختلاف الشبكة — راجع [الشبكات](../networks.md) |
 | `timeoutMs` | number | اختياري (الافتراضي 5000) | مهلة HTTP |
 | `nonceFn` | `() => number` | اختياري (الافتراضي `Date.now`) | مولِّد nonce مخصَّص |

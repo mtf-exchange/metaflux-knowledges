@@ -239,7 +239,6 @@ sequenceDiagram
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR d'émission effectif + entrées validées
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — agrégats de staking à l'échelle du protocole (`staking.*`)
-- [HL-compat `delegations`](../api/rest/hl-compat.md#delegations)
 - [Frais](./fees.md) — les revenus de frais constituent l'une des sources de récompenses de staking
 
 ## FAQ

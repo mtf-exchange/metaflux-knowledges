@@ -101,8 +101,6 @@ const sidebars = {
               items: ['api/rest/info/perpetuals', 'api/rest/info/spot'],
             },
             'api/rest/faucet',
-            'api/rest/hl-compat',
-            'api/rest/ccxt-compat',
           ],
         },
         {

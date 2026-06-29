@@ -237,7 +237,6 @@ sequenceDiagram
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — эффективный APR эмиссии и связанные входные параметры
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — агрегированные показатели стейкинга по протоколу (`staking.*`)
-- [Совместимость с HL: `delegations`](../api/rest/hl-compat.md#delegations)
 - [Комиссии](./fees.md) — комиссионный доход является одним из источников вознаграждений за стейкинг
 
 ## Часто задаваемые вопросы

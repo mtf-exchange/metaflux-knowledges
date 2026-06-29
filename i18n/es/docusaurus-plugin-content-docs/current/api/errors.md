@@ -8,7 +8,7 @@ Una enumeración completa de códigos de estado HTTP, convenciones de cadenas de
 
 ## Resumen rápido
 
-- **2xx** — éxito. Tenga en cuenta que los endpoints con compatibilidad HL devuelven `200 OK` incluso para errores a nivel de aplicación y los señalan en el cuerpo (`{"status":"err"}`). Los endpoints nativos de MTF utilizan códigos de estado apropiados.
+- **2xx** — éxito. Los endpoints nativos de MTF utilizan códigos de estado HTTP apropiados para los errores, no indicadores de error en el cuerpo.
 - **400** — error del cliente: solicitud mal formada, forma de firma incorrecta, variante de acción desconocida. No reintente sin corregir el problema.
 - **401** — la firma falló la autenticación. Recupere la dirección localmente y verifíquela.
 - **404** — el recurso no existe. Es frecuente en `/info` cuando la cuenta, el mercado o el vault consultado nunca han sido vistos.
@@ -30,14 +30,6 @@ Todas las respuestas no-2xx en los endpoints nativos de MTF utilizan:
 ```
 
 `detail` y `retry_after_ms` están presentes solo cuando aplica. El campo `error` es el identificador estable — mantenga su manejador de errores vinculado a él.
-
-Los endpoints con compatibilidad HL (`/info`, `/exchange` en el gateway) en cambio encapsulan todo en:
-
-```json
-{ "status": "ok"|"err", "response": ... }
-```
-
-con `status: "err"` llevando una cadena en `response` para errores a nivel de aplicación con HTTP 200. Los errores de nivel de transporte (JSON mal formado, método incorrecto) siguen apareciendo como 4xx.
 
 ## Catálogo
 
@@ -79,7 +71,7 @@ con `status: "err"` llevando una cadena en `response` para errores a nivel de ap
 | `vault not found` | `vault_id` no existe |
 | `order not found` | `Cancel` sobre un oid que ya fue cancelado / ejecutado / nunca existió |
 
-Para consultas de `/info`, MTF nativo devuelve `404`; la compatibilidad HL devuelve `200` con `{"status":"err","response":"<msg>"}` (convención de HL).
+Para consultas de `/info`, MTF nativo devuelve `404` cuando el recurso consultado es desconocido.
 
 ### 405 — método no permitido
 

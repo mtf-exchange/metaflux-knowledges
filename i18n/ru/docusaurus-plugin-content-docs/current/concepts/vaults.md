@@ -208,7 +208,6 @@ sequenceDiagram
 
 - [Ярусная ликвидация](./tiered-liquidation.md) — резервный пул T3, страховой пул
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — события пополнения / вывода / комиссий хранилища передаются по этому каналу
 - [Стейкинг](./staking.md) — отдельный механизм, не связанный с хранилищами
 

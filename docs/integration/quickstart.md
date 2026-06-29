@@ -14,15 +14,12 @@ Deposit, place an order, cancel, withdraw. By the end of this page your TypeScri
 
 ## Endpoints
 
-The gateway is the single public front door. MTF-native is the default path;
-HL-compat lives under `/hl/*`.
+The gateway is the single public front door, serving the MTF-native surface.
 
 | Service | URL (devnet) |
 |---------|--------------|
 | Gateway front door | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (default) | `POST /info` · `POST /exchange` · `GET /ws` |
-| HL-compat | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| CCXT-compat | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet) | `POST /faucet` |
 | Explorer | `https://devnet.mtf.exchange/explorer` |
@@ -49,19 +46,17 @@ rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
 *downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
-The raw curls below use the **HL-compat** shape under `/hl/*` on the gateway
-(camelCase types like `clearinghouseState` / `openOrders`, msgpack-signed
-envelopes) — handy if you already have an HL client. The `@metaflux/sdk` examples
-instead speak MTF-native on the gateway's default path (`/info` · `/exchange`).
-Pick one lane; both go through the same front door, just different paths.
+The raw curls below speak **MTF-native** on the gateway (snake_case types like
+`account_state` / `open_orders`). The `@metaflux/sdk` examples speak the same
+native surface — the SDK just builds the signed envelope for you.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"clearinghouseState","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-You should see `marginSummary.accountValue: "3000.0"`.
+You should see `data.account_value: "3000"`.
 
 ## Step 2 — Place a limit order
 
@@ -91,15 +86,15 @@ const result = await client.exchange.order({
 console.log('order id:', result.oid);
 ```
 
-Raw curl (HL-compat shape — you build the signature yourself; see [signing](./signing.md)):
+Raw curl (MTF-native shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
 
-where `order.json` is the HL-shape envelope you assembled.
+where `order.json` is the signed MTF-native envelope you assembled.
 
 ### Spot trading example
 
@@ -132,9 +127,9 @@ spot orders back via [`POST /info`](../api/rest/info.md); cancel with
 ## Step 3 — Check the order is on the book
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/hl/info \
+curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"openOrders","user":"0x<YOUR_ADDRESS>"}'
+  -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
 You should see your order with the `oid` from step 2.
@@ -156,7 +151,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/hl/exchange \
+curl -X POST https://devnet-gateway.mtf.exchange/exchange \
   -d @cancel.json
 ```
 
@@ -209,7 +204,7 @@ sequenceDiagram
 - [Order types](../concepts/order-types.md) — beyond plain limit orders
 - [Error handling](./error-handling.md) — admission vs commit vs network
 - [WS subscriptions](../api/ws/subscriptions.md) — push for live data
-- [Migrating from HL](./migrating-from-hl.md) — already have an HL bot? this page first
+- [Migrating from HL](./migrating-from-hl.md) — already have a Hyperliquid bot? this page first
 
 ## Troubleshooting
 

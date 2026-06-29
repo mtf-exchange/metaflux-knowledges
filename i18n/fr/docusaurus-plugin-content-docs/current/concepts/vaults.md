@@ -208,7 +208,6 @@ sequenceDiagram
 
 - [Liquidation par paliers](./tiered-liquidation.md) — garantie T3, fonds d'assurance
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`vaultDetails` HL-compat](../api/rest/hl-compat.md#vaultdetails)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — les événements de dépôt / retrait / frais des coffres transitent par ce canal
 - [Staking](./staking.md) — distinct des coffres
 

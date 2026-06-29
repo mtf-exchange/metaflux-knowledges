@@ -19,7 +19,7 @@ Bienvenue. Commencez ici si vous **intégrez** ou **développez sur** MetaFlux.
 
 <div class="mtf-cardgrid">
 
-- [**Référence API**](./api/) — REST `/exchange` · `/info`, compatibilité HL & CCXT, WebSocket, erreurs, limites de débit
+- [**Référence API**](./api/) — REST `/exchange` · `/info`, WebSocket, erreurs, limites de débit
 - [**Concepts**](./concepts/) — marge, liquidation par paliers, types d'ordres, financement, coffres, frais
 - [**Intégration**](./integration/) — démarrage rapide, signature, idempotence, gestion des erreurs, SDK
 - [**EVM**](./evm/) — modèle d'exécution, transferts Core ↔ EVM, précompilations

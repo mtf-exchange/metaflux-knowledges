@@ -236,7 +236,6 @@ sequenceDiagram
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — 实际生效的增发 APR 及已承诺参数
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — 全协议质押聚合数据（`staking.*`）
-- [HL 兼容 `delegations`](../api/rest/hl-compat.md#delegations)
 - [手续费](./fees.md) — 手续费收入是质押奖励来源之一
 
 ## 常见问题

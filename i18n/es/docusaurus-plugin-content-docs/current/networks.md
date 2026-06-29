@@ -16,16 +16,13 @@
 
 El entorno de integración. USDC gratuito a través del faucet; estado efímero (se reinicia ocasionalmente).
 
-El gateway es la única puerta de entrada pública. MTF-native es la ruta por defecto
-(`/info` · `/exchange` · `/ws`); la compatibilidad HL está disponible en `/hl/*`; CCXT en
-`/ccxt/*`; EVM JSON-RPC en `/evm`.
+El gateway es la única puerta de entrada pública. La superficie MTF-native se sirve en
+`/info` · `/exchange` · `/ws`; EVM JSON-RPC en `/evm`.
 
 | Servicio | Endpoint |
 |---------|----------|
 | Puerta de entrada del gateway | `https://devnet-gateway.mtf.exchange` |
-| MTF-native (por defecto) | `POST /info` · `POST /exchange` · `GET /ws` |
-| Compatibilidad HL | `POST /hl/info` · `POST /hl/exchange` · `GET /hl/ws` |
-| Compatibilidad CCXT | `/ccxt/*` |
+| MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet/testnet) | `POST /faucet` |
 | Gateway WS (nativo) | `wss://devnet-gateway.mtf.exchange/ws` |

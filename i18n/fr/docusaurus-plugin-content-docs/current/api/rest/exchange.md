@@ -22,12 +22,10 @@ POST  https://<net>-gateway.mtf.exchange/exchange
 
 | Chemin | Format sur le fil |
 |------|-----------|
-| `POST /exchange` (gateway par défaut) | **MTF-natif** (ce document) |
-| `POST /hl/exchange` (gateway, sous `/hl`) | **Compat HL** — voir [hl-compat.md](./hl-compat.md) |
+| `POST /exchange` (gateway) | **MTF-natif** (ce document) |
 
-Le format MTF-natif est le chemin par défaut de la gateway ; la compat HL est sous l'espace de noms `/hl/*`.
-Si vous faites tourner le nœud vous-même, le même `/exchange` natif est servi directement sur
-`http://localhost:8080`.
+Le gateway sert le `/exchange` natif MTF. Si vous faites tourner le nœud vous-même, le même
+`/exchange` natif est servi directement sur `http://localhost:8080`.
 
 ## Enveloppe de requête
 
@@ -166,9 +164,8 @@ qui suivent sont découpées par type de trading** — [Actions d'ordres perpét
 
 :::warning
 **`px` / `size` sont des `u64` à virgule fixe non signés sur le fil natif**, envoyés comme
-nombres JSON (le nœud les décode en `u64`, puis les élargit en interne). Cela diffère
-du chemin compat HL (chaînes décimales). Les adresses sont en hex `0x` (40 chars) ;
-`cloid` est `0x` + 32 chars hex (16 octets).
+nombres JSON (le nœud les décode en `u64`, puis les élargit en interne). Les adresses sont
+en hex `0x` (40 chars) ; `cloid` est `0x` + 32 chars hex (16 octets).
 :::
 
 ### Placement & cycle de vie des ordres
@@ -288,8 +285,7 @@ signature d'agent agirait sur le propre compte de l'agent (distinct), jamais sur
 
 ### Hors du chemin public `/exchange`
 
-Ces noms d'action apparaissent dans les premières ébauches (et certains dans la surface compat HL),
-mais ils ne sont **pas bridgés sur le handler MTF-natif `/exchange`**. Il s'agit soit
+Ces noms d'action apparaissent dans les premières ébauches, mais ils ne sont **pas bridgés sur le handler MTF-natif `/exchange`**. Il s'agit soit
 d'écritures privilégiées / système qui ne doivent jamais transiter par le chemin utilisateur public,
 soit de stubs de schéma reconnus mais non mappés. Leur soumission renvoie
 `400 unsupported action`. Voir [le tableau ci-dessous](#non-bridged-actions) pour la
@@ -2011,7 +2007,6 @@ sequenceDiagram
 ## Voir aussi
 
 - [`POST /info`](./info.md) — chemin de lecture (natif MTF)
-- [HL-compat `/exchange`](./hl-compat.md) — format de message alternatif pour les clients HL
 - [Portefeuilles agents](../../concepts/agent-wallets.md)
 - [Procédure de signature](../../integration/signing.md)
 - [Signature de données typées](../../integration/typed-data-signing.md) — le schéma de signature EIP-712

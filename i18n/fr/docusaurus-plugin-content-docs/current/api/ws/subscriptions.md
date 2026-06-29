@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Les noms de canaux sont en snake_case (natif MTF).** Il s'agit de la surface native du nœud `/ws`, donc les noms de canaux sur le fil sont en snake_case (`l2_book`, `user_events`, …). Les clients souhaitant utiliser les noms de canaux en camelCase HL (`l2Book`, `userEvents`, `userFills`, `candle`, …) se connectent au **`/hl/ws`** de la passerelle (compatibilité HL), qui traduit vers ces canaux snake_case natifs en dessous. Conformément au routage de la passerelle unifiée : `<net>-gateway.mtf.exchange/ws` = snake_case natif, `/hl/ws` = camelCase HL.
+**Les noms de canaux sont en snake_case (natif MTF).** Il s'agit de la surface native du nœud `/ws`, donc les noms de canaux sur le fil sont en snake_case (`l2_book`, `user_events`, …). La passerelle dessert ce même WS natif sur `<net>-gateway.mtf.exchange/ws`.
 :::
 
 Le protocole de trame reflète celui de HL ; les **noms de canaux sont en snake_case natif MTF**. L'abonnement s'effectue via :
@@ -196,7 +196,7 @@ Flux d'événements par compte. Exige `user` (l'adresse 0x) — PAS un `coin`. I
 { "channel": "user_events", "data": { "fills": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] } }
 ```
 
-Le nom natif du canal est `user_events` (snake_case) ; sur le `/hl/ws` de la passerelle (compatibilité HL), l'équivalent est `userEvents` de HL.
+Le nom natif du canal est `user_events` (snake_case).
 
 :::warning
 `user_events` est une donnée par compte, mais ne dispose actuellement d'**aucune authentification** — n'importe quelle connexion peut s'abonner au flux de n'importe quelle adresse. Ne le traitez pas comme un canal privé tant que la vérification d'authentification à l'abonnement n'est pas en place ; pour les lectures/écritures authentifiées, utilisez `post` avec une action signée.
@@ -234,7 +234,7 @@ Chaque **poussée** est un **objet barre unique** (pas le tableau) — la barre 
 
 La série est **sans lacune** : un intervalle sans transaction émet une barre plate qui reporte la clôture précédente (`o = h = l = c = clôture précédente`, `v = q = 0`, `n = 0`). Aucune barre n'est émise avant la première transaction du marché — la série commence au bucket de la première impression.
 
-Un store conserve jusqu'à **1 000 barres par série `(coin, interval)`** ; les séries froides (sans abonné) sont évincées, de sorte qu'un marché/intervalle non surveillé ne coûte rien. Sur le `/hl/ws` de la passerelle (compatibilité HL), le nom de canal équivalent est `candle` de HL (singulier).
+Un store conserve jusqu'à **1 000 barres par série `(coin, interval)`** ; les séries froides (sans abonné) sont évincées, de sorte qu'un marché/intervalle non surveillé ne coûte rien.
 
 ### `order_updates`
 
@@ -306,18 +306,6 @@ Contexte de trading par (utilisateur, coin) — effet de levier, mode de marge e
 ```
 
 - `margin_mode` ∈ `cross` / `isolated` / `strict_iso` ; `max_trade_size` est le plafond de taille dérivé du plafond OI (chaîne de lots bruts) ; les champs sont identiques à la lecture REST [`active_asset_data`](../rest/info.md).
-
-Sur le `/hl/ws` de la passerelle (compatibilité HL), le nom de canal équivalent est `activeAssetData` de HL, et la trame est traduite dans la forme camelCase de HL :
-
-```json
-{ "channel": "activeAssetData", "data": {
-  "user": "0x<address>", "coin": "BTC", "leverage": 7,
-  "maxTradeSzs": ["5.0", "5.0"], "availableToTrade": ["35000.00", "35000.00"] } }
-```
-
-- `user` — l'adresse 0x du compte ; `coin` — le symbole du marché.
-- `maxTradeSzs` — `[achat, vente]` : la **taille** maximale négociable de chaque côté (unités de base), sous forme de chaînes décimales.
-- `availableToTrade` — `[achat, vente]` : le notionnel **USD** disponible au trading de chaque côté, sous forme de chaînes décimales.
 
 ### `account_state`
 

@@ -56,10 +56,6 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
 | `POST /info` `userFills`, `historicalOrders` (مُقسَّمة إلى صفحات) | 2 |
 | `POST /exchange` | 5 |
-| `GET /ccxt/markets`, `GET /ccxt/ticker` | 1 |
-| `GET /ccxt/orderbook`, `GET /ccxt/ohlcv` | 2 |
-| `GET /ccxt/balance`, `/positions`, `/myTrades` | 2 |
-| `POST /ccxt/orders`, `DELETE /ccxt/orders/{id}` | 5 |
 | WS `subscribe` | 1 |
 | رسالة WS منشورة | 0 |
 | WS `unsubscribe` | 0 |
@@ -72,7 +68,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 | حالة المُرسِل | يُحتسب على |
 |--------------|-----------|
-| مجهول (بلا توقيع، مثل `GET /ccxt/markets`) | لكل IP |
+| مجهول (بلا توقيع، مثل `POST /info`) | لكل IP |
 | موقَّع بالمفتاح الرئيسي | لكل IP + لكل حساب |
 | موقَّع بوكيل | لكل IP + لكل حساب رئيسي |
 
