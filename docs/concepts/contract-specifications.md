@@ -110,7 +110,7 @@ Every MetaFlux market is a **linear perpetual future**:
 - **Settlement & margin currency** — USDC throughout. Collateral, margin, PnL, and
   funding are all USDC (see [the clearing plane](../concepts/margin-modes.md#how-margin-is-computed)).
 
-Perps are entirely separate from [spot](./spot.md) — a perp position is leveraged
+Perps are entirely separate from [spot](../products/spot.md) — a perp position is leveraged
 exposure backed by collateral, not ownership of the asset.
 
 ## Underlying — the oracle index

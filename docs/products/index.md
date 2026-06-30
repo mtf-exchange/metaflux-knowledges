@@ -40,7 +40,7 @@ leverage and borrowing introduce interest (riba), speculation, and uncertainty
 
 ## See also
 
-- [Contract specifications](./contract-specifications.md) — the per-contract perp spec (margin, mark, funding, increments, limits) read live from the API
+- [Contract specifications](../concepts/contract-specifications.md) — the per-contract perp spec (margin, mark, funding, increments, limits) read live from the API
 - [Concepts](../concepts/index.md) — the shared mechanics: [order types](../concepts/order-types.md), [margin modes](../concepts/margin-modes.md), [funding rates](../concepts/funding-rates.md), [tiered liquidation](../concepts/tiered-liquidation.md), [fees](../concepts/fees.md)
 - [`/exchange`](../api/rest/exchange.md) — the wire actions behind every product
 - [Start here](../start-here.md) — a plain-language introduction for newcomers
