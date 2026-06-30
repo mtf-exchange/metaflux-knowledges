@@ -45,7 +45,7 @@ const sidebars = {
             'concepts/funding-rates',
             'concepts/oracle-prices',
             'concepts/mark-prices',
-            'products/contract-specifications',
+            'concepts/contract-specifications',
           ],
         },
         {
