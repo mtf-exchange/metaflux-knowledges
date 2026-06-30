@@ -13,7 +13,7 @@ const sidebars = {
       items: ['start-here', 'networks', 'security', 'versioning'],
     },
 
-    {type: 'doc', id: 'concepts/consensus', label: 'Consensus'},
+    {type: 'doc', id: 'concepts/consensus', label: 'MetaFluxBFT'},
 
     {
       type: 'category',
@@ -21,7 +21,6 @@ const sidebars = {
       link: {type: 'doc', id: 'products/index'},
       items: [
         'products/perpetuals',
-        'products/contract-specifications',
         'products/spot',
         'products/spot-margin',
         'products/options',
@@ -46,6 +45,7 @@ const sidebars = {
             'concepts/funding-rates',
             'concepts/oracle-prices',
             'concepts/mark-prices',
+            'products/contract-specifications',
           ],
         },
         {
