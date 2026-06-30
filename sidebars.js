@@ -21,6 +21,7 @@ const sidebars = {
       link: {type: 'doc', id: 'products/index'},
       items: [
         'products/perpetuals',
+        'products/contract-specifications',
         'products/spot',
         'products/spot-margin',
         'products/options',

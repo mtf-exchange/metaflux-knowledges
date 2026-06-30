@@ -3,8 +3,8 @@
 :::tip
 **Live on devnet.** CoreWriter actions are operational, as are the stateless MTF
 derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed read precompiles —
-querying the chain's own positions / book directly — and the cross-chain
-precompiles are upcoming. The bridge ([Bridge](../bridge/)) is live.
+querying the chain's own positions / book directly — are upcoming. The bridge
+([Bridge](../bridge/)) is live.
 :::
 
 A contract on the MetaFlux EVM talks to **Core** (the L1 perps clearinghouse +
@@ -106,6 +106,34 @@ These are **stateless quoting** precompiles today: the caller passes the inputs
 result, so a contract can reproduce a Core calculation off the chain's own
 formulas. **Live Core-state-backed reads** (querying the chain's own positions /
 book directly) are upcoming.
+
+### `portfolio_margin_eval` (v1 ABI)
+
+The `0x0900` margin precompile delegates to the **same SPAN engine** that margins
+live accounts (see [portfolio margin](../concepts/portfolio-margin.md)), so an
+off-chain quote matches on-chain maintenance exactly — there is no second copy of
+the math. Its v1 input adds a per-position **implied-vol** field and a **full-grid**
+flag bit (run the complete scenario sweep, vs a faster subset); prices and sizes are
+packed on the 1e8 plane and converted to the engine's internal USD cents at the
+boundary. The return mirrors the engine result in **USD cents** — required
+maintenance margin, the worst-case scenario index, the concentration penalty, and
+the `100 000` USDC enrollment-equity floor the engine applies. The typed
+calldata/return layout ships with the Solidity precompile interface in the public
+[`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo.
+
+### Disabling a precompile (governance)
+
+Governance can switch an individual MTF precompile **off** (and later back **on**)
+by a stake-weighted validator vote. A disabled precompile address stops returning a
+Core-derived value until a subsequent vote re-enables it; the set of disabled
+addresses is part of committed chain state, so every node agrees deterministically.
+
+The vote is **range-guarded**: the standard Ethereum precompiles (`0x01`–`0x0a` —
+`ecrecover`, `sha256`, `ripemd160`, `identity`, `modexp`, the bn256 / blake2f group)
+**cannot** be disabled — a vote targeting them is rejected at both proposal and
+enactment, so core EVM functionality can never be bricked. Only the MTF-specific
+precompiles (the `0x09xx` range above) are eligible. This is a validator-governed
+control, not a user action; it never appears on the `/exchange` path.
 
 ## Core ↔ EVM value transfers
 

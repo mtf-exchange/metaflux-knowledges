@@ -105,6 +105,7 @@ retail flow on top.
 
 ## See also
 
+- [Contract specifications](./contract-specifications.md) — per-contract spec (margin, mark, funding, increments, limits) + how to read each field live
 - [Funding rates](../concepts/funding-rates.md) — the hourly long↔short payment
 - [Mark prices](../concepts/mark-prices.md) / [oracle prices](../concepts/oracle-prices.md) — what values your position
 - [Order types](../concepts/order-types.md) — TIF, STP, triggers, TWAP, scale

@@ -113,6 +113,36 @@ Use Strict-Iso for:
 - Speculation budget you want firewalled from your hedged core book
 - Listings (MIP-3) where the maintenance ratio is conservative until liquidity builds
 
+## Governance-imposed strict isolation (market-level)
+
+The Strict-Iso mode above is a choice *you* make per asset. MetaFlux also lets
+**governance** impose strict isolation at the **market level** — a per-market risk
+flag that forces *every* participant in that market into isolated margin,
+regardless of their own preference. It is **not a user toggle**.
+
+When a market carries the governance strict-isolated flag:
+
+- **New positions open isolated.** At settlement, a fill on that market lands in
+  isolated margin mode, not cross — so its loss is contained to its own bucket and
+  it earns no [portfolio-margin](./portfolio-margin.md) netting credit.
+- **Cross opens are rejected.** An order that would open or grow a *cross* position
+  on that market is refused.
+- **You cannot switch it to cross.** A leverage / margin-mode change that targets
+  cross on that market is rejected.
+
+The flag is set by a **stake-weighted validator vote** (a per-market dynamic-risk
+parameter), not on the trading path. It lets the protocol ring-fence a market whose
+risk profile warrants it — new, thin, or volatile listings — so a blow-up there
+cannot drain cross-collateralised positions on other markets. The constraint is
+surfaced in the per-market metadata returned by
+[`/info`](../api/rest/info/perpetuals.md), so a client can show it before a user
+tries to open cross.
+
+Unlike the `onlyIsolated` deploy-time flag (fixed once when a
+[MIP-3](../mip/mip-3.md) market is created), the governance strict-isolated flag can
+be turned **on or off on a live market** by a later vote as its risk profile
+changes.
+
 ## When to use each
 
 | Goal | Mode |

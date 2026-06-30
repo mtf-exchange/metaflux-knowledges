@@ -3,8 +3,8 @@
 :::tip
 **Live on devnet.** EVM execution and CoreWriter actions are operational, as are
 the stateless MTF derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed
-read precompiles (querying the chain's own positions / book directly) and the
-cross-chain precompiles are upcoming. The [bridge](../bridge/) is live.
+read precompiles (querying the chain's own positions / book directly) are upcoming.
+The [bridge](../bridge/) is live.
 :::
 
 The MetaFlux EVM is a [revm](https://github.com/bluealloy/revm)-based **sidechain**
@@ -38,10 +38,9 @@ directly into the L1 it settles against.
 
 | Address | Role |
 |---------|------|
-| `0x3333…3333` | **CoreWriter** — submit L1 actions (`sendRawAction`) |
+| `0x3333…3333` | **CoreWriter** — submit L1 actions (`sendRawAction`), including the cross-chain `CrossChainSend` |
 | `0x0900`–`0x0904` | derivatives read precompiles (margin, NAV, ADL, mark-settle, RFQ) |
 | `0x0906`–`0x0908` | market-data read precompiles (BBO, L2 depth, inventory risk) |
-| `0x0a01`–`0x0a02` | cross-chain precompiles (send / verify) |
 
 ## JSON-RPC
 

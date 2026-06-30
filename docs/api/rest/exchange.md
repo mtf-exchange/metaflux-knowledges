@@ -315,7 +315,7 @@ disposition of each.
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` |
 | `FbaOrder` | `fba_submit` | Recognized-but-unmapped stub → `unsupported action` |
 | (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` |
-| (PM lifecycle) | `pm_enroll` / `pm_unenroll` / `pm_rebalance` | Recognized-but-unmapped stub → `unsupported action` |
+| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to [`user_portfolio_margin`](#user_portfolio_margin) (enroll / unenroll). `pm_rebalance` has been **removed** — rejected as an unknown action |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` |
 | (encrypted submit alt) | `encrypted_order_submit` | Stub; use [`submit_encrypted_order`](#submit_encrypted_order) instead |
 
@@ -1923,7 +1923,7 @@ here only to redirect integrators to the supported path.
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` | — |
 | `FbaOrder` | `fba_submit` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` | — |
-| (PM lifecycle) | `pm_enroll` / `pm_unenroll` / `pm_rebalance` | Recognized-but-unmapped stub → `unsupported action` | [`user_portfolio_margin`](#user_portfolio_margin) for enroll/unenroll |
+| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to the canonical enroll/unenroll action; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (encrypted submit alt) | `encrypted_order_submit` | Stub | [`submit_encrypted_order`](#submit_encrypted_order) |
 

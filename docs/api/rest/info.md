@@ -982,8 +982,9 @@ Response:
 | `oracle_weight_overrides[*].weights` | uint[] | Committed per-source weights for the asset |
 
 The `params` object carries the full governed-parameter set the vote machinery
-can move (fee distribution split, staking knobs, MIP-3 limits, risk caps, spot /
-EVM / bridge flags, …); each is the live committed value.
+can move (fee distribution split, staking knobs, MIP-3 limits, risk caps, per-asset
+funding period / cap, spot / EVM / bridge flags, the set of disabled EVM
+precompiles, …); each is the live committed value.
 
 ### `gov_proposals`
 
