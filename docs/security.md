@@ -126,6 +126,24 @@ For institutional / production users:
 | Audit your action_hash → commit reconciliation | Catch silent drops |
 | Test breaking-change migrations against testnet 60 days ahead | Avoid mainnet-day surprises |
 
+## Verifying release binaries
+
+Node release binaries are published with a detached GPG signature (`.asc`) produced by an offline release **root** key. Before running a downloaded `mtf-node`, verify it against that key:
+
+```sh
+# one-time: import the release root public key
+curl -fsSL https://binaries.mtf.exchange/testnet/pub_key.asc | gpg --import
+
+# verify the binary against its detached signature
+gpg --verify mtf-node.asc mtf-node
+```
+
+The signing key fingerprint is `5AF6597573B2E475B0C646BAD8E6D0B3D187F583`; confirm `gpg` reports it as the signer.
+
+:::info
+The node supervisor pins this same root key and refuses to stage or activate any binary whose `.asc` does not verify against it, so the network only ever upgrades to signed builds.
+:::
+
 ## What if the chain goes wrong
 
 Consensus halts (e.g. partition that prevents quorum) are operationally rare but possible. During a halt:
