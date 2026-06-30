@@ -93,6 +93,49 @@ else:
 
 (Skipped when `net_value ≤ 0` — the BOLE negative-equity path catches that account instead.)
 
+## Multi-collateral (cross-collateral haircut)
+
+By default, portfolio margin is collateralised in **USDC** only. Governance can
+additionally make selected **non-USDC spot balances** count as portfolio-margin
+collateral, after a **haircut** that discounts them for price risk.
+
+When an asset is in the eligible set with a haircut `h` (e.g. `0.9` ⇒ a 10 %
+haircut), a spot balance of that asset contributes
+
+```
+collateral_credit = balance × mark × h        # whole-USDC plane
+```
+
+to the account's portfolio-margin value. The credited balance is then **folded into
+the SPAN scenario grid as a long spot leg** (entry price == current mark, so it is
+not double-counted against its own mark). The same price-shock sweep that margins
+your derivatives therefore also stresses the collateral: a haircut asset that
+crashes reduces *both* your collateral value and your scenario worst-case, exactly
+as a real position would.
+
+This is **margin** collateral, not a loan — it is **decoupled** from the
+[Earn / borrow-lend](./earn.md) pool. Posting a non-USDC balance as PM collateral
+does not lend it out or earn yield; it only lets the risk engine recognise it when
+sizing your maintenance requirement.
+
+| Property | Behaviour |
+|----------|-----------|
+| Eligible set | Governed — only assets governance has approved count |
+| Haircut | Per-asset governance parameter; a higher haircut credits more of the balance |
+| Clearing eligibility | Setting the haircut to **zero** removes the asset from the eligible set |
+| Inclusion | Folded into the SPAN grid as a long spot leg at mark (no double-count) |
+| Relation to lending | None — independent of the Earn / borrow-lend pool |
+
+:::warning
+**Not yet enabled.** Multi-collateral PM is a **governance-gated** capability that
+activates at a network upgrade. Until the liquidation path that can **seize and
+sell non-USDC collateral** is in place, the eligible set stays empty and no asset
+carries a non-zero haircut — crediting collateral the protocol cannot yet liquidate
+would risk uncoverable bad debt. Treat this section as the **target model**; check
+the live (governed) eligible set before assuming any non-USDC asset counts toward
+PM.
+:::
+
 ## Enrollment
 
 ```json
