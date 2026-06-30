@@ -299,7 +299,7 @@ deployment.
 
 - [`markets`](../api/rest/info/perpetuals.md#markets) / [`market_info`](../api/rest/info/perpetuals.md#market_info) — the live per-market spec record
 - [`margin_table`](../api/rest/info/perpetuals.md#margin_table) · [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) · [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap)
-- [Perpetuals](./perpetuals.md) — the product overview
+- [Perpetuals](../products/perpetuals.md) — the product overview
 - [Margin modes](../concepts/margin-modes.md) · [Portfolio margin](../concepts/portfolio-margin.md) · [Tiered liquidation](../concepts/tiered-liquidation.md)
 - [Mark prices](../concepts/mark-prices.md) · [Oracle prices](../concepts/oracle-prices.md) · [Funding rates](../concepts/funding-rates.md)
 - [MIP-3](../mip/mip-3.md) — permissionless perp market deploy (how a new spec is created)
