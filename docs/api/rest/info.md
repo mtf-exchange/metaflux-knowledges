@@ -281,16 +281,15 @@ Fee rates are decimal **basis points** as strings (`"2.0"` = 2 bps = 0.02%). `bu
 Account-scoped resting orders across every perp book.
 
 ```json
-{ "type": "open_orders", "account_id": 42 }
+{ "type": "open_orders", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | yes |
 
-Either `account_id` (u64) or `address` (0x hex) identifies the account. When the
-request supplies `account_id`, it is echoed back in `data.account_id`.
+The account is identified by `address` (0x hex). Missing `address` →
+`400 {"error":"missing field address"}`.
 
 Response:
 
@@ -299,7 +298,6 @@ Response:
   "type": "open_orders",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "orders": [
       {
         "oid":          12345,
@@ -318,7 +316,6 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `orders[*].oid` | uint64 | Server order id |
 | `orders[*].market_id` | uint32 | Asset / market id the order rests on |
 | `orders[*].side` | `"bid"` / `"ask"` | Order side |
@@ -333,17 +330,16 @@ Account-scoped fill history, served directly from committed on-node state (a
 bounded per-account fill ring folded into the AppHash — no external indexer).
 
 ```json
-{ "type": "user_fills", "account_id": 42 }
+{ "type": "user_fills", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required | Description |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | one of `account_id` / `address` | Internal account id |
-| `address` | hex address | one of `account_id` / `address` | Account address |
+| `address` | hex address | yes | Account address |
 | `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring |
 
-Either `account_id` (u64) or `address` (0x hex) identifies the account. When the
-request supplies `account_id`, it is echoed back in `data.account_id`.
+The account is identified by `address` (0x hex). Missing `address` →
+`400 {"error":"missing field address"}`.
 
 Response:
 
@@ -352,10 +348,9 @@ Response:
   "type": "user_fills",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "fills": [
       {
-        "coin":           0,
+        "coin":           "BTC",
         "side":           "B",
         "px":             "67042.50",
         "sz":             "0.125",
@@ -381,8 +376,7 @@ a recent window, not all history. An account with no fills returns
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
-| `fills[*].coin` | uint32 | Asset / market id the fill executed on |
+| `fills[*].coin` | string | Market symbol the fill executed on |
 | `fills[*].side` | `"B"` / `"A"` | This leg's side token — `"B"` = buy/bid, `"A"` = sell/ask |
 | `fills[*].px` | Decimal string | Execution price, **decimal USDC** (human-readable) |
 | `fills[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
@@ -407,8 +401,7 @@ record's consensus `time`. Same fill-record shape.
 
 | Arg | Type | Required | Description |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | one of `account_id` / `address` | Internal account id |
-| `address` | hex address | one of `account_id` / `address` | Account address |
+| `address` | hex address | yes | Account address |
 | `start_time` | uint64 | no | Window start (ms, inclusive); filters on the fill `time`. Absent ⇒ open lower bound |
 | `end_time` | uint64 | no | Window end (ms, inclusive). Absent ⇒ open upper bound |
 
@@ -419,7 +412,6 @@ Response:
   "type": "user_fills_by_time",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "start_time": 1700000000000,
     "end_time":   1700003600000,
     "fills": [ /* same record shape as user_fills */ ]
@@ -430,7 +422,6 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `start_time` | uint64 \| null | Echoed window start (`null` if omitted) |
 | `end_time` | uint64 \| null | Echoed window end (`null` if omitted) |
 | `fills` | array | In-window fill records (same per-fill shape as [`user_fills`](#user_fills)), oldest-first |
@@ -568,13 +559,14 @@ Response:
 Approved agent / API wallets for an account.
 
 ```json
-{ "type": "agents", "account_id": 42 }
+{ "type": "agents", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | yes |
+
+Missing `address` → `400 {"error":"missing field address"}`.
 
 Response:
 
@@ -583,7 +575,6 @@ Response:
   "type": "agents",
   "data": {
     "address":    "0x<master>",
-    "account_id": 42,
     "agents": [
       { "agent": "0x<agent_addr>", "name": "trading-bot", "expires_at_ms": 1700000500000 }
     ]
@@ -594,7 +585,6 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved master address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `agents[*].agent` | hex address | Approved agent wallet address |
 | `agents[*].name` | string \| null | Agent label set at approval time; `null` if unset |
 | `agents[*].expires_at_ms` | uint64 \| null | Agent approval expiry (consensus ms); `null` for a never-expiring approval |
@@ -604,13 +594,14 @@ Response:
 Sub-accounts of an account.
 
 ```json
-{ "type": "sub_accounts", "account_id": 42 }
+{ "type": "sub_accounts", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | yes |
+
+Missing `address` → `400 {"error":"missing field address"}`.
 
 Response:
 
@@ -619,7 +610,6 @@ Response:
   "type": "sub_accounts",
   "data": {
     "address":    "0x<parent>",
-    "account_id": 42,
     "sub_accounts": [
       { "index": 0, "address": "0x<sub_addr>" }
     ]
@@ -630,7 +620,6 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved parent address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `sub_accounts[*].index` | uint32 | Sub-account index under the parent |
 | `sub_accounts[*].address` | hex address | Sub-account address |
 
@@ -848,14 +837,7 @@ State source: `c_staking.{total_stake, reward_rate_bps, current_epoch, validator
 
 ### `oracle_sources`
 
-The committed per-market oracle-source subset. Resolves the market by `asset_id`
-(u32) **OR** `coin` (symbol).
-
-```json
-{ "type": "oracle_sources", "asset_id": 0 }
-```
-
-Or by name:
+The committed per-market oracle-source subset. Resolves the market by `coin` (symbol).
 
 ```json
 { "type": "oracle_sources", "coin": "BTC" }
@@ -863,10 +845,10 @@ Or by name:
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `asset_id` | uint32 | one of `asset_id` / `coin` |
-| `coin` | symbol | one of `asset_id` / `coin` |
+| `coin` | symbol | yes |
 
-Missing both → `400`; unknown market → `404 {"error":"market not found"}`.
+Missing `coin` → `400 {"error":"missing field coin"}`; unknown market →
+`404 {"error":"market not found"}`.
 
 Response:
 
@@ -874,13 +856,12 @@ Response:
 {
   "type": "oracle_sources",
   "data": {
-    "asset_id":          0,
-    "name":              "BTC",
+    "coin":              "BTC",
     "oracle_set":        true,
-    "source_count":      3,
+    "source_count":      10,
     "num_sources":       10,
-    "enabled_sources":   [0, 2, 5],
-    "subset_mask":       37,
+    "enabled_sources":   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "subset_mask":       1023,
     "weights_committed": false
   }
 }
@@ -888,8 +869,7 @@ Response:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `asset_id` | uint32 | Echoed / resolved asset id |
-| `name` | string | Market symbol |
+| `coin` | string | Echoed / resolved market symbol |
 | `oracle_set` | bool | Whether the deployer explicitly confirmed the subset via `SetOracle` |
 | `source_count` | uint64 | Number of enabled sources (popcount of the mask) |
 | `num_sources` | uint8 | Total source slots (`NUM_ORACLE_SOURCES = 10`) |
@@ -1178,17 +1158,16 @@ Response:
 RFQs an account is party to — split into those it opened and those it quoted on. See the [RFQ concept](../../concepts/rfq.md).
 
 ```json
-{ "type": "rfq_user", "account_id": 42 }
+{ "type": "rfq_user", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | yes |
 
-Either `account_id` (u64) or `address` (0x hex) identifies the account; when the
-request supplies `account_id` it is echoed back in `data.account_id`. Neither
-present → `400`; malformed `address` → `400 {"error":"invalid hex"}`.
+The account is identified by `address` (0x hex). Missing `address` →
+`400 {"error":"missing field address"}`; malformed `address` →
+`400 {"error":"invalid hex"}`.
 
 Response:
 
@@ -1197,7 +1176,6 @@ Response:
   "type": "rfq_user",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "requested": [ /* <rfq>, same per-RFQ shape as rfq_open */ ],
     "quoted":    [ /* <rfq> */ ]
   }
@@ -1207,7 +1185,6 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `requested` | array&lt;rfq&gt; | RFQs this account opened (requester); same per-RFQ shape as [`rfq_open`](#rfq_open) |
 | `quoted` | array&lt;rfq&gt; | RFQs this account quoted on (appears as a `maker`); same per-RFQ shape |
 
@@ -1219,16 +1196,17 @@ returns a **200** with both lists empty (the established zeroed idiom).
 Live FBA pool plus the indicative clearing for one market. See the [FBA concept](../../concepts/fba.md).
 
 ```json
-{ "type": "fba_batch_state", "market_id": 3 }
+{ "type": "fba_batch_state", "coin": "BTC" }
 ```
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `market_id` | uint32 | yes |
+| `coin` | symbol | yes |
 
-Missing `market_id` → `400`. There is **no 404** for an unregistered market: FBA
-is per-market opt-in, so a market with no pool returns a **200** with zeroed
-fields (`enabled:false`, `period_ms:0`, empty `orders`, `indicative:null`).
+Missing `coin` → `400 {"error":"missing field coin"}`. There is **no 404** for an
+unregistered market: FBA is per-market opt-in, so a market with no pool returns a
+**200** with zeroed fields (`enabled:false`, `period_ms:0`, empty `orders`,
+`indicative:null`).
 
 Response:
 
@@ -1236,7 +1214,7 @@ Response:
 {
   "type": "fba_batch_state",
   "data": {
-    "market_id":      3,
+    "coin":           "BTC",
     "enabled":        true,
     "period_ms":      200,
     "min_lot":        "1",
@@ -1265,7 +1243,7 @@ Response:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `market_id` | uint32 | Echoed market id |
+| `coin` | string | Echoed market symbol |
 | `enabled` | bool | Whether FBA is on for this market |
 | `period_ms` | uint32 | Batch period |
 | `min_lot` | u128 string | Minimum lot size, 1e8 fixed-point |
@@ -1290,16 +1268,16 @@ Response:
 Portfolio-margin enrollment + last-computed scenario figures for an account. See [Portfolio margin](../../concepts/portfolio-margin.md).
 
 ```json
-{ "type": "pm_summary", "account_id": 42 }
+{ "type": "pm_summary", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | yes |
 
-Either `account_id` (u64) or `address` (0x hex); neither present → `400`. A
-non-enrolled account returns a **200** with `enrolled:false` and zeroed figures.
+The account is identified by `address` (0x hex). Missing `address` →
+`400 {"error":"missing field address"}`. A non-enrolled account returns a **200**
+with `enrolled:false` and zeroed figures.
 
 Response:
 
@@ -1308,7 +1286,6 @@ Response:
   "type": "pm_summary",
   "data": {
     "address":                     "0x<addr>",
-    "account_id":                  42,
     "enrolled":                    true,
     "enrolled_at_ms":              1000,
     "last_computed_block":         77,
@@ -1322,7 +1299,6 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
 | `enrolled` | bool | Whether the account is enrolled in portfolio margin |
 | `enrolled_at_ms` | uint64 | Enrollment timestamp (consensus ms); `0` when not enrolled |
 | `last_computed_block` | uint64 | Block height of the last PM scenario computation |
@@ -1341,8 +1317,8 @@ The following query types expose the node's committed-state snapshot surface. Ea
 ## General node snapshot query types
 
 Node snapshot reads that are not specific to one trading product — exchange status,
-frontend / open-order helpers, liquidation, rate limits, vaults, validators,
-multi-sig, and the aggregate `web_data2`.
+frontend / open-order helpers, liquidation, rate limits, vaults, validators, and
+multi-sig.
 
 ### `exchange_status`
 
@@ -1715,44 +1691,24 @@ Response:
 
 State source: node config `network.peers[].gossip` (published to `NodeReadState` at startup; NOT committed state, NOT folded into AppHash).
 
-### `web_data2`
+### `web_data2` — removed
 
-Composite "everything for the frontend" snapshot for an address. Required: `address` (0x hex). Composed from the other readers so shapes never drift.
+:::warning
+**`web_data2` has been REMOVED** (both the REST `/info` type and the WS channel).
+A request now returns `400 {"error":"unknown info type: web_data2"}`; the WS
+subscription returns `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
 
-```json
-{ "type": "web_data2", "address": "0x<addr>" }
-```
+Compose the equivalent view from the focused reads instead — they carry the same
+data with stable, independently-versioned shapes:
 
-Response:
-
-```json
-{
-  "type": "web_data2",
-  "data": {
-    "address": "0x<addr>",
-    "clearinghouse": {
-      "account_value": "1000000", "margin_used": "100000",
-      "positions": [ { "asset": 0, "size": "50", "entry_ntl": "2500", "mode": "cross", "lev": 10 } ]
-    },
-    "spot_balances": [ /* <spot_clearinghouse_state.balances> */ ],
-    "open_orders": [ /* <frontend_open_orders.orders> */ ],
-    "vault_equities": [ /* <user_vault_equities.equities> */ ],
-    "exchange_status": { /* <exchange_status.data> */ }
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `clearinghouse.account_value` | decimal string | Cross account value |
-| `clearinghouse.margin_used` | decimal string | Σ per-asset margin used |
-| `clearinghouse.positions` | object[] | Per-asset open positions |
-| `spot_balances` | object[] | Reuses `spot_clearinghouse_state.balances` |
-| `open_orders` | object[] | Reuses `frontend_open_orders.orders` |
-| `vault_equities` | object[] | Reuses `user_vault_equities.equities` |
-| `exchange_status` | object | Reuses `exchange_status.data` |
-
-State source: composite over the readers above.
+| Old `web_data2` section | Use instead |
+|-------------------------|-------------|
+| `clearinghouse` (margin + positions) | [`account_state`](#account_state) (REST) / `account_state` WS channel |
+| `spot_balances` | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (REST) / `spot_state` WS channel |
+| `open_orders` | [`frontend_open_orders`](#frontend_open_orders) |
+| `vault_equities` | [`user_vault_equities`](#user_vault_equities) |
+| `exchange_status` | [`exchange_status`](#exchange_status) |
+:::
 
 ## Errors
 
@@ -1761,9 +1717,9 @@ State source: composite over the readers above.
 | 200 | normal response | success (an **unknown address** on `account_state` etc. is a **200** with a zeroed record, NOT a 404) |
 | 400 | `{"error":"missing field \`type\`"}` | No `type` discriminator |
 | 400 | `{"error":"unknown info type: <X>"}` | Misspelled or unsupported `type` |
-| 400 | `{"error":"missing field: address"}` / `{"error":"missing field market_id"}` | Required type-specific arg omitted (casing varies by reader) |
+| 400 | `{"error":"missing field: address"}` / `{"error":"missing field coin"}` | Required type-specific arg omitted (casing varies by reader) |
 | 400 | `{"error":"invalid hex"}` | Address arg malformed |
-| 404 | `{"error":"market not found"}` | Asset id / coin name unknown (`market_info` only) |
+| 404 | `{"error":"market not found"}` | `coin` symbol unknown (`market_info` etc.) |
 | 404 | `{"error":"vault not found"}` | Vault address unknown (`vault_state` only) |
 | 405 | (no body) | Not POST |
 | 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | See [rate limits](../rate-limits.md) |
@@ -1810,8 +1766,11 @@ sequenceDiagram
 <details>
 <summary>Show FAQ</summary>
 
-**Q: Why both `asset_id` and `coin` accepted on `market_info`?**
-A: `asset_id` is canonical; `coin` is a convenience for human callers. Both resolve to the same record.
+**Q: How do I address a market — by id or by name?**
+A: By `coin` symbol (`"BTC"`). The legacy numeric `asset_id` / `market_id` request
+arguments were removed; only `coin` is accepted, and responses render coin symbols
+everywhere. (The signed `/exchange` write path still uses the numeric `asset` —
+that field is consensus-frozen and unrelated to these read args.)
 
 **Q: Do `user_fills` / `recent_trades` need an external indexer?**
 A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md).

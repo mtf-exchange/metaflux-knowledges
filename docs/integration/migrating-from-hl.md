@@ -34,6 +34,7 @@ There is one MTF-native surface; you call it through the SDK or build the envelo
 | `POST /info` `clearinghouseState` | [`account_state`](../api/rest/info.md#account_state) |
 | `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) / [`frontend_open_orders`](../api/rest/info.md#frontend_open_orders) |
 | `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
+| `POST /info` `candleSnapshot` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) (the standalone `candle` type is removed) |
 | WS `userEvents`, `l2Book`, `candle` | `user_events`, `l2_book`, `candles` (snake_case) — see [WS subscriptions](../api/ws/subscriptions.md) |
 
 The full catalogs are [`POST /exchange`](../api/rest/exchange.md) and [`POST /info`](../api/rest/info.md).

@@ -14,12 +14,20 @@
 
 ## Budgets
 
-| Budget | Limit (default) | Refill | Burst |
-|--------|-----------------|--------|-------|
-| Per-IP weight | 1200 weight / minute | 20 weight / second | 1200 (full bucket) |
-| Per-account QPS | 30 req / second | 30 / s | 60 |
-| Mempool actions per account | 50 outstanding | drains as actions commit | — |
-| WS subscriptions per connection | 256 | — | — |
+| Budget | Limit (default) | Refill | Burst | Exemption |
+|--------|-----------------|--------|-------|-----------|
+| Per-IP weight | 1200 weight / minute | 20 weight / second | 1200 (full bucket) | allowlisted IPs exempt |
+| Per-account `/exchange` bucket | 30 req / second | 30 / s | 60 | metaliquidity-set signers exempt |
+| Mempool actions per account | 50 outstanding | drains as actions commit | — | — |
+| WS subscriptions per connection | 64 | — | — | allowlisted connections exempt |
+
+- **Per-IP** covers anonymous read traffic (`/info`, WS subscribe); **allowlisted
+  IPs** (operator-designated market makers / infra) bypass it.
+- The **per-account bucket** applies to signed `/exchange` writes. Accounts on the
+  **metaliquidity operator set** (the whitelisted vault-strategy signers) are
+  **exempt** from the per-account bucket.
+- **WS**: at most **64 active subscriptions per connection**; a 65th subscribe is
+  rejected. Allowlisted connections are exempt from the cap.
 
 All limits are governance-controlled. A per-account budget snapshot is available
 via the native [`user_rate_limit`](./rest/info.md) read:
@@ -48,7 +56,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
     "refill":       30
   },
   "mempool_per_account": 50,
-  "ws_subs_per_conn":    256
+  "ws_subs_per_conn":    64
 }
 ```
 
@@ -57,14 +65,14 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 | Endpoint | Weight |
 |----------|--------|
 | `POST /info` (most types) | 1 |
-| `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
-| `POST /info` `userFills`, `historicalOrders` (paginated) | 2 |
+| `POST /info` `l2_book`, `markets` | 2 |
+| `POST /info` `user_fills`, `user_fills_by_time` | 2 |
 | `POST /exchange` | 5 |
 | WS `subscribe` | 1 |
 | WS published message | 0 |
 | WS `unsubscribe` | 0 |
 
-A client making one order per second and polling `clearinghouseState` once per second spends `5 + 1 = 6 weight/s = 360 weight/min` — well within budget.
+A client making one order per second and polling `account_state` once per second spends `5 + 1 = 6 weight/s = 360 weight/min` — well within budget.
 
 ## Per-account QPS
 
@@ -113,9 +121,9 @@ A `429` response with `retry_after_ms` tells you exactly when the bucket will ho
 
 ### Market-data consumer
 
-- Subscribe to WS channels (`l2Book`, `trades`, `userEvents`); do not poll.
+- Subscribe to WS channels (`l2_book`, `trades`, `user_events`); do not poll.
 - `subscribe` weight is 1, in-stream messages cost 0.
-- Reconnect with `resume_token` rather than re-subscribing all channels from scratch (subs spend weight again on the new connection).
+- On reconnect you re-subscribe from a fresh snapshot (there are no resume tokens); each subscribe spends weight again on the new connection, so keep connections long-lived. Stay within the **64-subscription** per-connection cap.
 
 ### High-frequency liquidator
 

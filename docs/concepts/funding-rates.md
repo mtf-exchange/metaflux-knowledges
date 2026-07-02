@@ -205,7 +205,7 @@ Per-market history:
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"funding_history","market_id":0}'
+  -d '{"type":"funding_history","coin":"BTC"}'
 ```
 
 Returns the ordered ring of `(ts_ms, premium)` samples (see
@@ -215,7 +215,7 @@ Returns the ordered ring of `(ts_ms, premium)` samples (see
 {
   "type": "funding_history",
   "data": {
-    "market_id": 0,
+    "coin": "BTC",
     "samples": [
       { "ts_ms": 1700000000000, "premium": "0.0015" },
       { "ts_ms": 1700000008000, "premium": "-0.0007" }

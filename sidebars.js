@@ -113,7 +113,7 @@ const sidebars = {
         {
           type: 'category',
           label: 'Reference',
-          items: ['api/errors', 'api/rate-limits'],
+          items: ['api/errors', 'api/rate-limits', 'api/migration'],
         },
       ],
     },

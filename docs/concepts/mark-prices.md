@@ -116,19 +116,19 @@ Consumers that use **last trade** instead of mark:
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"market_info","asset_id":0}'
+  -d '{"type":"market_info","coin":"BTC"}'
 ```
 
 The [`market_info`](../api/rest/info/perpetuals.md#market_info) read reports `mark_px` and
-`oracle_px` on the **whole-USDC plane** (e.g. `"67042.335"`), plus the
+`oracle_px` on the **human-decimal plane** (e.g. `"67042.335"`), plus the
 `mark_source` descriptor:
 
 ```json
 {
   "type": "market_info",
   "data": {
-    "asset_id":    0,
-    "mark_source": "MedianOfOraclesAndMid",
+    "coin":        "BTC",
+    "mark_source": "oracle_median",
     "mark_px":     "67042.335",
     "oracle_px":   "67042.335"
   }

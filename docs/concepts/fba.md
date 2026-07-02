@@ -168,21 +168,21 @@ t=1.0s   batch_id = 9877 opens
 
 The live FBA pool + indicative clearing is exposed on the node `/info` read path
 via [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — see that entry for
-the full response shape and field table. It takes `market_id` (u32). FBA is a
+the full response shape and field table. It takes `coin` (the market symbol). FBA is a
 per-market opt-in, so an unregistered market is **not a 404** — it returns a 200
 with zeroed fields (`enabled:false`, empty `orders`, `indicative:null`).
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"fba_batch_state","market_id":42}'
+  -d '{"type":"fba_batch_state","coin":"BTC"}'
 ```
 
 ```json
 {
   "type": "fba_batch_state",
   "data": {
-    "market_id":      42,
+    "coin":           "BTC",
     "enabled":        true,
     "period_ms":      1000,
     "min_lot":        "1",

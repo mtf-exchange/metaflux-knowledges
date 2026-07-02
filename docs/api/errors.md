@@ -67,7 +67,7 @@ All non-2xx responses on MTF-native endpoints use:
 | `error` | Triggered when |
 |---------|----------------|
 | `account not found` | `/info` queried with an address that has no on-chain state |
-| `market not found` | `market_id` / `coin` not in the registry |
+| `market not found` | `coin` symbol not in the registry |
 | `vault not found` | `vault_id` not present |
 | `order not found` | `Cancel` against an oid that was already cancelled / filled / never existed |
 

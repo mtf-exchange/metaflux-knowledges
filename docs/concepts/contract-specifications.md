@@ -35,7 +35,7 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Initial margin fraction** | `1 / max_leverage` | `init_margin_ratio` (bps) |
 | **Maintenance margin fraction** | per-market; **3% (300 bps)** baseline, or the dynamic-risk override | `maint_margin_ratio` (bps) |
 | **Max leverage** | per-market, `1..=50` at listing; per-account `updateLeverage` hard ceiling **100×** | `max_leverage` |
-| **Margin tiers** | per-market notional-banded ladder (leverage ↓ / maint ↑ as notional grows) | [`margin_table`](../api/rest/info/perpetuals.md#margin_table) |
+| **Margin tiers** | per-market notional-banded ladder (leverage ↓ / maint ↑ as notional grows) | `margin_tiers` (inline on [`market_info`](../api/rest/info/perpetuals.md#market_info) / [`markets`](../api/rest/info/perpetuals.md#markets)) |
 | **Mark price** | oracle-anchored median, clamped into the oracle band | `mark_px`, `mark_source` |
 | **Funding** | **per-asset discrete** settlement at the asset's period boundary; per-asset **±cap (default 2%)**; settled vs oracle | `funding{...}` |
 | **Funding impact notional** | depth to fill for the impact-price premium (default **$10,000**) | (Binance-formula markets) |
@@ -50,8 +50,10 @@ from**. For the mechanics behind a field, follow the link in its row.
 
 ## Reading a spec from the API
 
-One read returns the full per-market record for every registered perp. The same
-shape comes back for a single market via [`market_info`](../api/rest/info/perpetuals.md#market_info).
+One read returns the full universe: `markets` responds with `{ "perp": [ … ],
+"spot": { "pairs": […], "tokens": […] } }`. Each `perp[]` element is one
+per-market record — the same shape [`market_info`](../api/rest/info/perpetuals.md#market_info)
+returns for a single market by `coin`. One such record:
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
@@ -61,8 +63,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 
 ```json
 {
-  "asset_id": 0,
-  "name": "BTC",
+  "coin": "BTC",
   "kind": "perp",
   "sz_decimals": 5,
   "mark_px": "67042.33",
@@ -75,6 +76,10 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   "max_leverage": 50,
   "maint_margin_ratio": "300",
   "init_margin_ratio": "200",
+  "margin_tiers": [
+    { "max_open_interest": "100000", "max_leverage": 50, "maint_margin_ratio": "100" },
+    { "max_open_interest": null,     "max_leverage": 5,  "maint_margin_ratio": "1000" }
+  ],
   "strict_isolated": false,
   "funding": {
     "rate_per_hr": "...",
@@ -149,16 +154,19 @@ realized volatility), not a static table. A market's dynamic-risk override carri
 - `max_leverage` — the per-market leverage cap.
 - `maint_margin_ratio` — the per-market maintenance fraction.
 - `funding_rate_cap` — the per-market funding cap (below).
-- a **notional-banded tier ladder** — ascending bands, each `{lower_bound_notional,
-  max_leverage, maint_margin_ratio}`. The applicable tier is the **highest band
-  whose lower bound ≤ the position notional**: as a position grows, leverage steps
-  **down** and maintenance steps **up**, so large positions are margined harder
-  (HL-style).
+- a **notional-banded tier ladder** — ascending upper-bound bands, each
+  `{max_open_interest, max_leverage, maint_margin_ratio}`. The applicable tier is
+  the **first band whose `max_open_interest` upper bound the open interest does not
+  exceed** (`null` marks the unbounded top band): as open interest grows, leverage
+  steps **down** and maintenance steps **up**, so large books are margined harder.
 
-The [`margin_table`](../api/rest/info/perpetuals.md#margin_table) read returns the
-effective `{max_leverage, maint_margin_ratio, init_margin_ratio}` per asset (the
-override, else the static baseline). See [margin modes](../concepts/margin-modes.md)
-and [tiered liquidation](../concepts/tiered-liquidation.md).
+The ladder ships **inline** as `margin_tiers` on the
+[`market_info`](../api/rest/info/perpetuals.md#market_info) /
+[`markets`](../api/rest/info/perpetuals.md#markets) record — each tier
+`{max_open_interest: string|null, max_leverage, maint_margin_ratio: bps-string}`.
+(The standalone `margin_table` read has been removed.) See
+[margin modes](../concepts/margin-modes.md) and
+[tiered liquidation](../concepts/tiered-liquidation.md).
 
 ## Mark price
 
@@ -298,7 +306,7 @@ deployment.
 ## See also
 
 - [`markets`](../api/rest/info/perpetuals.md#markets) / [`market_info`](../api/rest/info/perpetuals.md#market_info) — the live per-market spec record
-- [`margin_table`](../api/rest/info/perpetuals.md#margin_table) · [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) · [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap)
+- `margin_tiers` (inline on [`market_info`](../api/rest/info/perpetuals.md#market_info)) · [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) · [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap)
 - [Perpetuals](../products/perpetuals.md) — the product overview
 - [Margin modes](../concepts/margin-modes.md) · [Portfolio margin](../concepts/portfolio-margin.md) · [Tiered liquidation](../concepts/tiered-liquidation.md)
 - [Mark prices](../concepts/mark-prices.md) · [Oracle prices](../concepts/oracle-prices.md) · [Funding rates](../concepts/funding-rates.md)

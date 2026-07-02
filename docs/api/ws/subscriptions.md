@@ -1,7 +1,14 @@
 # WS subscription channels
 
 :::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, and `web_data2` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids` takes neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids`, `explorer_block`, and `explorer_txs` take neither.
+
+:::warning
+**`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
+[`account_state`](#account_state) + [`spot_state`](#spot_state) + `order_updates`
+(or the REST focused reads). Subscribing to `web_data2` now returns
+`{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
+:::
 :::
 
 :::info
@@ -37,7 +44,8 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`: activated / finished / terminated), on change |
 | `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change |
 | `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — on change |
-| `web_data2` | **live** | `user`/`address` (required) | per-account composite UI snapshot — clearinghouse + spot balances + open orders + vault equities + exchange status — on change |
+| `explorer_block` | **live** | none | latest committed block header, on each new block |
+| `explorer_txs` | **live** | none | transactions in the latest committed block, on each new block |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -109,15 +117,36 @@ Frequency: change-driven — a frame is sent only when the top-of-book actually 
 
 ### `trades`
 
-Public trade tape for one market — one record per fill on that market, emitted on the commits where that market actually traded. `px`/`sz` are raw **1e8-plane** integer strings; `side` is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms); `tid` is a deterministic trade id; `users` is `[taker, maker]` (taker first, the aggressor).
+Public trade tape for one market. **Requires `coin`.** Each frame's `data` is an
+**array** of trade records; `px`/`sz` are raw **1e8-plane** integer strings; `side`
+is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms);
+`tid` is a deterministic trade id.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "trades", "coin": "BTC" } }
 ```
 
+**On-subscribe snapshot** (`is_snapshot: true`) — a **non-empty** array of the
+market's bounded recent prints (empty only if the market has never traded).
+Snapshot rows carry **`users: null`** — the counterparty addresses are not
+reconstructed for historical prints:
+
 ```json
-{ "channel": "trades", "data": { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker", "0x..maker"] } }
+{ "channel": "trades", "is_snapshot": true, "data": [
+  { "coin": "BTC", "side": "A", "px": "6164370000000", "sz": "24000", "time": 1735689500000, "tid": 4898317237641214538, "users": null }
+] }
 ```
+
+**Live pushes** (`is_snapshot: false`) — the new prints from the just-committed
+block; each row's `users` is `[taker, maker]` (taker first, the aggressor):
+
+```json
+{ "channel": "trades", "is_snapshot": false, "data": [
+  { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker", "0x..maker"] }
+] }
+```
+
+- `tid` may exceed 2⁵³ — parse it as a 64-bit / big integer, not a JS number.
 
 ### `active_asset_ctx`
 
@@ -259,7 +288,8 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
   "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
 ```
 
-- `status` ∈ `open` (resting; `sz` is the post-commit book remainder) / `filled` (a taker carries cumulative `filled_sz` + `avg_px`; a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests) / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`).
+- `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`).
+- On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are 1e8-plane decimal strings; `time` is consensus-ms; unknown fields are `null`.
 - **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
 
@@ -312,14 +342,16 @@ re-emits it only when that context changes.
 ```
 
 ```json
-{ "channel": "active_asset_data", "data": {
-  "address": "0x<addr>", "asset_id": 0, "leverage": 7, "margin_mode": "isolated",
-  "max_trade_size": "5000000000", "has_position": true } }
+{ "channel": "active_asset_data", "is_snapshot": true, "data": {
+  "address": "0x<addr>", "coin": "BTC", "leverage": 50, "margin_mode": "cross",
+  "mark_px": "61742.69625702", "max_trade_size": "0", "max_trade_szs": ["0", "0"],
+  "available_to_trade": ["0", "0"], "has_position": false } }
 ```
 
-- `margin_mode` ∈ `cross` / `isolated` / `strict_iso`; `max_trade_size` is the
-  OI-cap-derived size ceiling (raw-lot string); fields are identical to the REST
-  [`active_asset_data`](../rest/info.md) read.
+- Keyed by `coin` (symbol). `margin_mode` ∈ `cross` / `isolated` / `strict_iso`;
+  `max_trade_size` is the OI-cap-derived size ceiling, `max_trade_szs` /
+  `available_to_trade` are `[buy, sell]` pairs; fields are identical to the REST
+  [`active_asset_data`](../rest/info/perpetuals.md#active_asset_data) read.
 
 ### `account_state`
 
@@ -399,96 +431,75 @@ balance set (`[]` for an account with no spot holdings).
 
 Frequency: change-driven — a frame is sent only when the spot balances actually changed since the last commit; an unchanged account emits nothing this commit.
 
-### `web_data2`
+### `user_fundings`
 
-Per-account **composite** "everything for the frontend" snapshot — the perp
-clearinghouse summary, spot balances, open orders, vault equities, and the global
-exchange status for one account, all in one frame, pushed when it changes. Requires
-`user` (the 0x address; `address` is also accepted) — NOT a `coin`. The body is
-the byte-identical composite the REST [`web_data2`](../rest/info.md#web_data2)
-read returns (it composes the same sub-readers), so a WS push never drifts from
-that read. The initial snapshot is the live composite (zeroed-config defaults
-when the account has no funds / positions / orders), not an empty array.
+Per-account **realized funding payments** — one record each time funding settles
+against the account on a market. Requires `user` (the 0x address; `address` is
+also accepted) — NOT a `coin`. Each frame's `data` is an array of funding records
+from the just-committed settlement; the initial snapshot is `[]`.
 
 ```json
-{ "method": "subscribe", "subscription": { "type": "web_data2", "user": "0x<address>" } }
+{ "method": "subscribe", "subscription": { "type": "user_fundings", "user": "0x<address>" } }
 ```
 
 ```json
-{
-  "channel": "web_data2",
-  "data": {
-    "address": "0x<addr>",
-    "clearinghouse": {
-      "account_value": "10000",
-      "margin_used": "300",
-      "positions": [
-        { "asset": 0, "size": "600", "entry_ntl": "2500", "mode": "cross", "lev": 10 }
-      ]
-    },
-    "spot_balances": [
-      { "asset": 2, "name": "MTF", "total": "12.5", "hold": "0" }
-    ],
-    "open_orders": [
-      { "oid": 42, "market_id": 0, "side": "bid", "px": "6700000000000", "size": "10000000",
-        "tif": "gtc", "cloid": "0xab..", "trigger": null, "inserted_at_ms": 1735689600123 }
-    ],
-    "vault_equities": [
-      { "vault_id": 1, "vault_address": "0x<vault>", "shares": "1000", "equity": "1050" }
-    ],
-    "exchange_status": {
-      "spot_disabled": false,
-      "post_only_until_time_ms": 0,
-      "post_only_until_height": 0,
-      "scheduled_freeze_height": null,
-      "mip3_enabled": true,
-      "frozen": false,
-      "replay_complete": true
-    }
-  }
-}
+{ "channel": "user_fundings", "data": [
+  { "coin": "BTC", "payment": "-0.42", "szi": "600", "fundingRate": "0.0001", "time": 1735689600123 }
+] }
 ```
 
-The composite carries exactly these sections (each composed from the matching
-sub-reader, so the shapes never drift from the standalone reads):
+- `coin` — market symbol the payment settled on.
+- `payment` — the funding amount applied, **whole-USDC** decimal string, **signed**:
+  negative = the account paid, positive = the account received.
+- `szi` — the signed position size the payment was computed against (base units).
+- `fundingRate` — the per-asset rate applied at this settlement (decimal string).
+- `time` — settlement timestamp (consensus ms).
 
-- `address` — the canonical lowercase 0x address the frame is keyed on.
-- `clearinghouse` — the perp account summary: `account_value` (cross account
-  value, whole-USDC decimal string), `margin_used` (Σ per-asset maintenance
-  margin used, whole-USDC), and `positions[]`. Each position row is
-  `{asset, size, entry_ntl, mode, lev}`: `asset` is the numeric
-  market id, `size` is the signed 1e8-plane size string (one row per non-zero
-  leg, so a hedge-mode account reports both legs), `entry_ntl` is whole-USDC,
-  `mode` ∈ `cross` / `isolated` / `strict_iso`, `lev` is the
-  position's max leverage. Zero-size legs are omitted.
-- `spot_balances` — the `balances` array from [`spot_state`](#spot_state) /
-  REST `spot_clearinghouse_state`: one entry per held spot token,
-  `{asset, name, total, hold}`.
-- `open_orders` — the `orders` array from REST `frontend_open_orders`: one entry
-  per resting order **and** per parked TP/SL / stop trigger,
-  `{oid, market_id, side, px, size, tif, cloid, trigger, inserted_at_ms}`.
-  `side` ∈ `bid` / `ask`; `px` / `size` are 1e8-plane decimal strings; `tif` ∈
-  `alo` / `ioc` / `gtc` (or `trigger` for an off-book parked stop); `cloid` is the
-  client order id or `null`; `trigger` is `null` for a plain book order, otherwise
-  `{trigger_px, trigger_above}` (parked stops also carry `is_parked: true`).
-- `vault_equities` — the `equities` array from REST `user_vault_equities`: one
-  entry per vault the account has shares in,
-  `{vault_id, vault_address, shares, equity}` (`equity` is whole-USDC, `shares`
-  is a raw integer string). Empty when the account follows no vault.
-- `exchange_status` — the global trading-status scalars (same body as REST
-  `exchange_status`): `{spot_disabled, post_only_until_time_ms,
-  post_only_until_height, scheduled_freeze_height, mip3_enabled, frozen,
-  replay_complete}`. This block is identical for every subscriber on a given
-  commit.
+### `explorer_block`
 
-Frequency: change-driven — a frame is sent only when the composite actually changed since the last commit; a commit that leaves this account's composite untouched emits nothing.
+Latest committed **block header**, pushed on each new block. No `coin` / `user`
+parameter. Each frame's `data` is an array (the newly-committed header(s));
+`is_snapshot: true` on the first frame after subscribe.
 
-:::warning
-`web_data2` is per-account data but currently has **no authentication** — any
-connection can subscribe to any address. Do not treat it as private until the
-auth-at-subscribe gate lands; for authenticated reads use `post` with a signed
-action.
-:::
+```json
+{ "method": "subscribe", "subscription": { "type": "explorer_block" } }
+```
+
+```json
+{ "channel": "explorer_block", "is_snapshot": true, "data": [
+  { "height": 72399, "round": 72399, "epoch": 0, "proposer": 5,
+    "hash": "0x3a0572f514cb6bf4517c40b1511728d460b4f7c9b98a68932c6801f5aee80dfd",
+    "time": 1783009348137, "tx_count": 0 }
+] }
+```
+
+- `height` / `round` — committed block height / consensus round.
+- `epoch` — staking epoch.
+- `proposer` — proposing validator index.
+- `hash` — block hash (`0x`-prefixed).
+- `time` — block timestamp (consensus ms).
+- `tx_count` — number of transactions in the block.
+
+### `explorer_txs`
+
+Transactions in the latest committed block, pushed on each new block. No
+`coin` / `user` parameter. Each frame's `data` is an array of transaction
+records (empty for a block with no transactions); `is_snapshot: true` on the
+first frame after subscribe.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "explorer_txs" } }
+```
+
+```json
+{ "channel": "explorer_txs", "is_snapshot": false, "data": [
+  { "hash": "0x4660d9ccf52ef1abde5e03d1b3f1c110b948d2f71331f086239666781dbde91c" }
+] }
+```
+
+- Each row carries a `hash` field — the `0x` action hash of the transaction —
+  which is **empty (`""`)** for a **systemic** entry (an engine-internal action
+  with no user-signed hash). A block with no transactions pushes `"data": []`.
 
 ---
 

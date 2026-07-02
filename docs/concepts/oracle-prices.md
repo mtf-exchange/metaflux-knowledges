@@ -68,14 +68,14 @@ The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.3
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"market_info","asset_id":0}'
+  -d '{"type":"market_info","coin":"BTC"}'
 ```
 
 ```json
 {
   "type": "market_info",
   "data": {
-    "asset_id":  0,
+    "coin":      "BTC",
     "mark_px":   "67042.335",
     "oracle_px": "67042.335"
   }
@@ -87,7 +87,7 @@ The committed per-market source set is queryable via `oracle_sources` (the enabl
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"oracle_sources","asset_id":0}'
+  -d '{"type":"oracle_sources","coin":"BTC"}'
 ```
 
 The per-venue raw inputs and the exact weights used in a tick live in committed state; they are not (yet) broken out as wire fields beyond the source subset.

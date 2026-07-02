@@ -165,9 +165,9 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
   -d '{"type":"rfq_open"}'
 ```
 
-For RFQs a specific account is party to, `rfq_user` takes `account_id` (u64) or
-`address` (0x hex) and splits the result into `requested` (RFQs the account
-opened) and `quoted` (RFQs it quoted on):
+For RFQs a specific account is party to, `rfq_user` takes `address` (0x hex) and
+splits the result into `requested` (RFQs the account opened) and `quoted` (RFQs
+it quoted on):
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info \
