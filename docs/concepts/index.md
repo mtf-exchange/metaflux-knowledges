@@ -6,6 +6,12 @@ description: Core mechanisms — agent wallets, margin, liquidation, order types
 
 Plain-language explanations of MetaFlux's core mechanisms — what they do, how to use them, and what to expect under stress.
 
+:::tip
+**New here?** Start with the [Architecture map](./architecture.md) — a one-page
+overview of every component inside MetaFlux Core and how they fit together, each
+linking to its deep-dive page below.
+:::
+
 ## Read order for integrators
 
 1. [Agent wallets](./agent-wallets.md) — hot-key delegation, the standard market-maker setup

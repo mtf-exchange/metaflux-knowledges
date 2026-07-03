@@ -136,6 +136,8 @@ network and endpoints.
 
 ## Where to next
 
+- Want the big picture first? The [Architecture map](concepts/architecture.md)
+  names every component inside MetaFlux Core and links each to its deep dive.
 - Browse the [Concepts](concepts/) section for plain-language explanations of
   every core mechanism.
 - New to derivatives terms? The [Glossary](concepts/glossary.md) defines them all.

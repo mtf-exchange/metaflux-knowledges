@@ -19,6 +19,7 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 
 <div class="mtf-cardgrid">
 
+- [**Architecture**](./concepts/architecture.md) — a one-page map of the MetaFlux Core components and what each does
 - [**API reference**](./api/) — REST `/exchange` · `/info`, WebSocket, errors, rate limits
 - [**Concepts**](./concepts/) — margin, tiered liquidation, order types, funding, vaults, fees
 - [**Integration**](./integration/) — quickstart, signing, idempotency, error handling, SDKs

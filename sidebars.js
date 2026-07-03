@@ -33,6 +33,7 @@ const sidebars = {
       label: 'Concepts',
       link: {type: 'doc', id: 'concepts/index'},
       items: [
+        'concepts/architecture',
         {
           type: 'category',
           label: 'Trading',
