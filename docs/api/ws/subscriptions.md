@@ -1,7 +1,7 @@
 # WS subscription channels
 
 :::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `fills`, `user_events`, `candles`, `order_updates`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; `all_mids`, `explorer_block`, and `explorer_txs` take neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
 
 :::warning
 **`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
@@ -32,10 +32,12 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `trades` | **live** | `coin` (required) | committed-block fills, on new fills |
 | `active_asset_ctx` | **live** | `coin` (required) | per-market mark / oracle / funding / OI, on change |
 | `all_mids` | **live** | none | per-market mark, on change |
+| `markets` | **live** | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
 | `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
 | `candles` | **live** | `coin` + `interval` (both required) | committed-block fills folded into OHLCV bars, on change |
 | `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
+| `open_orders` | **live** | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
 | `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, on change |
 | `ledger_updates` | **live** | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), on change |
 | `active_asset_data` | **live** | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, on change |
@@ -127,9 +129,9 @@ is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (
 ```
 
 **On-subscribe snapshot** (`is_snapshot: true`) — a **non-empty** array of the
-market's bounded recent prints (empty only if the market has never traded).
-Snapshot rows carry **`users: null`** — the counterparty addresses are not
-reconstructed for historical prints:
+market's bounded recent prints (up to the **64** most-recent, newest-first;
+empty only if the market has never traded). Snapshot rows carry **`users: null`**
+— the counterparty addresses are not reconstructed for historical prints:
 
 ```json
 { "channel": "trades", "is_snapshot": true, "data": [
@@ -205,6 +207,61 @@ Global mid map — every market's mark price, pushed when the mids change. Keyed
 ```json
 { "channel": "all_mids", "data": { "mids": { "BTC": "66703.35", "ETH": "1856.49", "SOL": "73.95", "MTF": "5" } } }
 ```
+
+### `markets`
+
+Global per-market **dynamic** state tape — every market's live mark / oracle / mid price, funding premium, open interest, 24h ticker, and halted flag, one row per market. GLOBAL: takes **no `coin` and no `user`** (like [`all_mids`](#all_mids)). The rows share the REST [`markets`](../rest/info/perpetuals.md#markets) dynamic builder, so the WS feed and the REST read never drift.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "markets" } }
+```
+
+The **on-subscribe** frame (`is_snapshot: true`) is an **array of every market's row** (perp **and** spot):
+
+```json
+{ "channel": "markets", "is_snapshot": true, "data": [
+  { "coin": "BTC", "kind": "perp", "mark_px": "66735.25", "oracle_px": "66700",
+    "mid_px": "66735.30", "premium": "0.0015",
+    "funding": { "rate_per_hr": "0", "cap_per_hr": "400", "interval_ms": 3600000, "next_payment_ts": 0 },
+    "open_interest": "50000", "day_ntl_vlm": "530", "prev_day_px": "66000",
+    "change_24h": "0.01", "halted": false },
+  { "coin": "BTC/USDC", "kind": "spot", "mark_px": "66730", "mid_px": "66731",
+    "day_ntl_vlm": "58000", "prev_day_px": "66000" }
+] }
+```
+
+Each subsequent **push** (`is_snapshot: false`) carries the **changed rows only** — the full row for each market whose row moved this commit, unchanged markets omitted (a quiet commit pushes nothing):
+
+```json
+{ "channel": "markets", "is_snapshot": false, "data": [
+  { "coin": "BTC", "kind": "perp", "mark_px": "70000", "oracle_px": "70000",
+    "mid_px": "70001", "premium": "0.0015",
+    "funding": { "rate_per_hr": "0", "cap_per_hr": "400", "interval_ms": 3600000, "next_payment_ts": 0 },
+    "open_interest": "50000", "day_ntl_vlm": "530", "prev_day_px": "66000",
+    "change_24h": "0.06", "halted": false }
+] }
+```
+
+So the **snapshot is all rows** and a **delta is the changed rows only** — demux each row on its `(coin, kind)` and replace it in your local table. Every row self-labels `kind` (`"perp"` / `"spot"`). Perp rows carry:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coin` | string | Market symbol (join key) |
+| `kind` | `"perp"` | Market kind (join key) |
+| `mark_px` | Decimal string | Mark price, **whole-USDC**, tick-snapped (`"0"` when unset) |
+| `oracle_px` | Decimal string | Index price, **whole-USDC**, tick-snapped (`"0"` when unset) |
+| `mid_px` | Decimal string | Real order-book mid, **whole-USDC**, tick-snapped — **omitted** when the book is one-sided (never sent as `null`) |
+| `premium` | Decimal string \| null | Latest funding premium sample, an **8-decimal** string (truncated toward zero); `null` when no sample exists |
+| `funding` | object | `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block |
+| `open_interest` | Decimal string | Current open interest, whole-unit size |
+| `day_ntl_vlm` | Decimal string | Rolling-24h notional volume (whole-USDC) |
+| `prev_day_px` | Decimal string \| null | Mark ~24h ago (whole-USDC); `null` when no 24h-ago sample |
+| `change_24h` | Decimal string \| null | Signed 24h change fraction (`"0.05"` = +5%); `null` when no prior px |
+| `halted` | bool | Whether the market is halted |
+
+Spot rows carry only the fields with a spot analogue — `coin`, `kind` (`"spot"`), `mark_px`, `mid_px` (omitted when one-sided), `day_ntl_vlm`, `prev_day_px`; the perp-only fields (`oracle_px` / `premium` / `funding` / `open_interest` / `change_24h` / `halted`) are absent.
+
+Frequency: change-driven — a delta frame lands only on commits where at least one market's row moved; a commit that changes nothing emits nothing.
 
 ### `fills` <a id="fills"></a>
 
@@ -293,6 +350,26 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are 1e8-plane decimal strings; `time` is consensus-ms; unknown fields are `null`.
 - **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
 
+### `open_orders`
+
+Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client simply **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "open_orders", "user": "0x<address>" } }
+```
+
+The snapshot is an **array** of records, each in the same fixed shape as an [`order_updates`](#order_updates) `status: "open"` element — `[]` when the account has no resting orders:
+
+```json
+{ "channel": "open_orders", "is_snapshot": true, "data": [ {
+  "order": { "coin": "BTC", "side": "B", "limit_px": "100", "sz": "600", "orig_sz": null,
+             "oid": 42, "cloid": null, "tif": "GTC", "reduce_only": false },
+  "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
+```
+
+- Each element is one resting order: the nested `order` object (`coin`, `side`, `limit_px`, `sz` = remaining size, `orig_sz`, `oid`, `cloid`, `tif`, `reduce_only`), with `filled_sz` / `avg_px` / `reason` all `null` (a standing order, not an event) and `time` the order's insertion timestamp (consensus ms). On this snapshot `orig_sz` is `null` (the placed size is not re-derived for a standing order) and `reduce_only` is `false`; `cloid` is the client id or `null`. `limit_px` is whole-USDC, `sz` is size-plane.
+- Because every frame is a full snapshot, `is_snapshot` is always `true` here — treat each frame as the account's complete current resting set, not an incremental change.
+
 ### `notifications`
 
 Per-account margin / liquidation notices, derived by diffing consecutive committed states. Requires `user`. One array frame per affected commit; initial snapshot `[]`.
@@ -316,7 +393,7 @@ Per-account margin / liquidation notices, derived by diffing consecutive committ
 
 ### `ledger_updates`
 
-Per-account money movement, attributed to its **cause** (read from the committed block payload — a record appears only when the action applied). Requires `user`; initial snapshot `[]`.
+Per-account money movement, attributed to its **cause** (read from the committed block payload — a record appears only when the action applied). Requires `user`. The on-subscribe snapshot is an **array** of the account's most-recent ledger records, **newest-first**, bounded to the last **100** (`[]` when the account has no recent records); each subsequent push is an array holding the new record(s) for the just-committed block.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "ledger_updates", "user": "0x<address>" } }

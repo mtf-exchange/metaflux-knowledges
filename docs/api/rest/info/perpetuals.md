@@ -46,7 +46,7 @@ Response:
     "mark_px":            "61550.2",
     "oracle_px":          "61501.7",
     "mid_px":             "61669.4",
-    "premium":            "0.002092254091868169703988434",
+    "premium":            "0.00209225",
     "tick_size":          "0.1",
     "step_size":          "0.00001",
     "min_order":          "0.00001",
@@ -123,17 +123,40 @@ decimals, which are set by the price tick (`tick_size`). The two are independent
 axes.
 :::
 
+`market_info` returns the **full** record — the union of the **dynamic** fields
+served by [`markets`](#markets) (`mark_px`, `oracle_px`, `mid_px`, `premium`,
+`funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`)
+and the **static** fields served by [`markets_meta`](#markets_meta) (`sz_decimals`,
+`tick_size`, `step_size`, `min_order`, `max_leverage`, the margin ratios,
+`margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `mark_source`,
+`fba_enabled`, `asset_id`). See those two reads for per-field semantics.
+
 ### `markets`
 
-The whole trading universe — every registered perp market and the spot
-pair/token registry — in one call. No parameters.
+Every registered market's **live (dynamic)** state — the per-commit fields that
+move every block (mark / oracle / mid price, funding premium, open interest, the
+rolling-24h ticker, `halted`) plus the `(coin, kind)` join keys — together with
+the spot pair/token registry. The long-lived **static** metadata (precision grids,
+leverage / margin ladders, mark source, trade-control flags) is served separately
+by [`markets_meta`](#markets_meta); [`market_info`](#market_info) returns both
+halves for a single coin.
 
 ```json
 { "type": "markets" }
 ```
 
-The `data` payload is an **object** with a `perp` array and a `spot`
-`{pairs, tokens}` object. `perp` records are ordered deterministically by
+Filter to one product with `kind` (absent ⇒ both sections):
+
+```json
+{ "type": "markets", "kind": "perp" }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only |
+
+The `data` payload is an **object** with a `perp` array (each a **dynamic** row)
+and a `spot` `{pairs, tokens}` object. `perp` rows are ordered deterministically by
 ascending market id; `spot.pairs` / `spot.tokens` in pair-/token-id order.
 
 Response (truncated to one entry per list):
@@ -144,42 +167,23 @@ Response (truncated to one entry per list):
   "data": {
     "perp": [
       {
-        "coin":               "BTC",
-        "kind":               "perp",
-        "sz_decimals":        5,
-        "mark_px":            "61521.1",
-        "oracle_px":          "61529.3",
-        "mid_px":             "61669.4",
-        "premium":            "0.0018587069078513525296511006",
-        "tick_size":          "0.1",
-        "step_size":          "0.00001",
-        "min_order":          "0.00001",
-        "max_leverage":       50,
-        "maint_margin_ratio": "1320",
-        "init_margin_ratio":  "200",
-        "margin_tiers": [
-          { "max_open_interest": "100000",  "max_leverage": 50, "maint_margin_ratio": "100" },
-          { "max_open_interest": "500000",  "max_leverage": 20, "maint_margin_ratio": "250" },
-          { "max_open_interest": "2000000", "max_leverage": 10, "maint_margin_ratio": "500" },
-          { "max_open_interest": null,      "max_leverage": 5,  "maint_margin_ratio": "1000" }
-        ],
+        "coin":            "BTC",
+        "kind":            "perp",
+        "mark_px":         "61521.1",
+        "oracle_px":       "61529.3",
+        "mid_px":          "61669.4",
+        "premium":         "0.0018587",
         "funding": {
           "rate_per_hr":     "20",
           "cap_per_hr":      "1120",
           "interval_ms":     3600000,
           "next_payment_ts": 1783011600000
         },
-        "mark_source":     "oracle_median",
-        "fba_enabled":     false,
         "open_interest":   "0.02346",
         "day_ntl_vlm":     "3772.890084",
-        "change_24h":      "-0.00300293",
         "prev_day_px":     "61719.4",
-        "disable_open":    false,
-        "disable_close":   false,
-        "halted":          false,
-        "strict_isolated": false,
-        "asset_id":        0
+        "change_24h":      "-0.00300293",
+        "halted":          false
       }
     ],
     "spot": {
@@ -204,42 +208,123 @@ Response (truncated to one entry per list):
 }
 ```
 
-Each `perp` element is the same rich per-market record [`market_info`](#market_info)
-returns for a single coin — built from the same builder, so the single and bulk
-shapes never drift.
+Each `perp` row is the **dynamic** half of the [`market_info`](#market_info)
+bundle — built from the same builder, so the two never drift; the **static**
+counterpart lives on [`markets_meta`](#markets_meta), joined on `(coin, kind)`.
+`mid_px` is **omitted** from a row when the book is one-sided (never sent as
+`null`). The live WS [`markets`](../../ws/subscriptions.md#markets) channel streams
+these same dynamic rows (a full snapshot on subscribe, then changed-row deltas).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `perp[*].coin` | string | Market symbol, e.g. `"BTC"` (the key everywhere) |
-| `perp[*].kind` | `"perp"` | Market kind (lowercase) |
-| `perp[*].sz_decimals` | uint8 | Size display decimals |
-| `perp[*].mark_px` | Decimal string | On-book mark, **human-decimal plane** (oracle fallback; `"0"` if unset) |
-| `perp[*].oracle_px` | Decimal string | Index price, human-decimal plane (`"0"` if unset) |
-| `perp[*].mid_px` | Decimal string \| null | Order-book mid `(best_bid + best_ask) / 2`, tick-snapped; `null` when one-sided / empty |
-| `perp[*].premium` | Decimal string \| null | Latest committed funding premium sample (signed); `null` when none |
-| `perp[*].tick_size` | Decimal string | Minimum price increment (human-decimal, e.g. `"0.1"`) |
-| `perp[*].step_size` | Decimal string | Minimum size increment / lot size (human-decimal) |
-| `perp[*].min_order` | Decimal string | Minimum order size (human-decimal) |
-| `perp[*].max_leverage` | uint8 | Maximum leverage (tier-0 ceiling) |
-| `perp[*].maint_margin_ratio` | bps string | Base maintenance-margin ratio, decimal bps |
-| `perp[*].init_margin_ratio` | bps string | Base initial-margin ratio, decimal bps |
-| `perp[*].margin_tiers` | array | Notional-banded leverage ladder (see [`market_info`](#market_info)); each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
+| `perp[*].coin` | string | Market symbol, e.g. `"BTC"` (the join key) |
+| `perp[*].kind` | `"perp"` | Market kind (lowercase, join key) |
+| `perp[*].mark_px` | Decimal string | On-book mark, **human-decimal plane**, tick-snapped (oracle fallback; `"0"` if unset) |
+| `perp[*].oracle_px` | Decimal string | Index price, human-decimal plane, tick-snapped (`"0"` if unset) |
+| `perp[*].mid_px` | Decimal string | Order-book mid `(best_bid + best_ask) / 2`, human-decimal, tick-snapped; **omitted** when one-sided / empty |
+| `perp[*].premium` | Decimal string \| null | Latest committed funding premium sample (signed), an **8-decimal** string (truncated toward zero); `null` when none |
 | `perp[*].funding.rate_per_hr` | bps string | Latest hourly funding-rate sample (pre-cap), decimal bps |
 | `perp[*].funding.cap_per_hr` | bps string | Per-hour funding-rate cap, decimal bps |
 | `perp[*].funding.interval_ms` | uint64 | Per-asset funding cadence (1h = `3600000`) |
 | `perp[*].funding.next_payment_ts` | uint64 | Next aligned funding-settlement boundary (epoch-ms); `0` until the first sample |
-| `perp[*].mark_source` | string | Mark-price descriptor (e.g. `"oracle_median"`) |
-| `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].open_interest` | Decimal string | Current open interest (size units) |
 | `perp[*].day_ntl_vlm` | Decimal string | 24h notional volume |
-| `perp[*].change_24h` | Decimal string | 24h price change (fraction, signed) |
 | `perp[*].prev_day_px` | Decimal string \| null | Price 24h ago; `null` if unknown |
-| `perp[*].disable_open` / `disable_close` | bool | Open / close disabled for this market |
+| `perp[*].change_24h` | Decimal string \| null | 24h price change (fraction, signed); `null` when no prior px |
 | `perp[*].halted` | bool | Market halted |
-| `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
-| `perp[*].asset_id` | uint32 | **DEPRECATED** indexer-shim field — do not build against it |
 | `spot.pairs` | array | Spot pair registry (same rows as [`spot_meta`](./spot.md#spot_meta) `pairs`, plus live `mark_px` / `mid_px` / `day_ntl_vlm`) |
 | `spot.tokens` | array | Spot token registry (same rows as [`spot_meta`](./spot.md#spot_meta) `tokens`) |
+
+The **static** per-market fields (`sz_decimals`, `tick_size`, `step_size`,
+`min_order`, `max_leverage`, `maint_margin_ratio`, `init_margin_ratio`,
+`margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `mark_source`,
+`fba_enabled`, `asset_id`) are **not** on this read — fetch them from
+[`markets_meta`](#markets_meta). For the spot pair / token field semantics see
+[`spot_meta`](./spot.md#spot_meta).
+
+### `markets_meta`
+
+Every registered market's **static** metadata — the long-lived fields a market
+publishes once and rarely changes (precision grids, leverage / margin ladders,
+trade-control flags, mark source) plus the `(coin, kind)` join keys — together
+with the spot pair/token registry. The static counterpart to [`markets`](#markets):
+the two halves together cover every field [`market_info`](#market_info) returns, so
+a client can cache the static half and poll only the dynamic [`markets`](#markets)
+half. Same optional `kind` filter.
+
+```json
+{ "type": "markets_meta" }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only |
+
+The `data` payload is an **object** with a `perp` array (each a **static** row) and
+the same `spot` `{pairs, tokens}` object [`markets`](#markets) returns. `perp` rows
+are ordered by ascending market id.
+
+Response (perp truncated to one entry; the `spot` section is identical to
+[`markets`](#markets)):
+
+```json
+{
+  "type": "markets_meta",
+  "data": {
+    "perp": [
+      {
+        "coin":               "BTC",
+        "kind":               "perp",
+        "sz_decimals":        5,
+        "tick_size":          "0.1",
+        "step_size":          "0.00001",
+        "min_order":          "0.00001",
+        "max_leverage":       50,
+        "maint_margin_ratio": "1320",
+        "init_margin_ratio":  "200",
+        "margin_tiers": [
+          { "max_open_interest": "100000",  "max_leverage": 50, "maint_margin_ratio": "100" },
+          { "max_open_interest": "500000",  "max_leverage": 20, "maint_margin_ratio": "250" },
+          { "max_open_interest": "2000000", "max_leverage": 10, "maint_margin_ratio": "500" },
+          { "max_open_interest": null,      "max_leverage": 5,  "maint_margin_ratio": "1000" }
+        ],
+        "strict_isolated": false,
+        "disable_open":    false,
+        "disable_close":   false,
+        "mark_source":     "oracle_median",
+        "fba_enabled":     false,
+        "asset_id":        0
+      }
+    ],
+    "spot": { "pairs": [ /* … same as `markets` */ ], "tokens": [ /* … */ ] }
+  }
+}
+```
+
+Each `perp` row is the **static** half of the [`market_info`](#market_info)
+bundle, joined to its dynamic [`markets`](#markets) row on `(coin, kind)`. None of
+the per-commit dynamic fields (`mark_px`, `oracle_px`, `mid_px`, `premium`,
+`funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`)
+appear here.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `perp[*].coin` | string | Market symbol (the join key) |
+| `perp[*].kind` | `"perp"` | Market kind (lowercase, join key) |
+| `perp[*].sz_decimals` | uint8 | Size display decimals |
+| `perp[*].tick_size` | Decimal string | Minimum price increment (human-decimal, e.g. `"0.1"`) |
+| `perp[*].step_size` | Decimal string | Minimum size increment / lot size (human-decimal) |
+| `perp[*].min_order` | Decimal string | Minimum order size (human-decimal) |
+| `perp[*].max_leverage` | uint8 | Max leverage (the margin-tier ladder's top rung) |
+| `perp[*].maint_margin_ratio` | bps string | Base maintenance-margin ratio, decimal bps |
+| `perp[*].init_margin_ratio` | bps string | Base initial-margin ratio, decimal bps |
+| `perp[*].margin_tiers` | array | Notional-banded leverage ladder (see [`market_info`](#market_info)); each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
+| `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
+| `perp[*].disable_open` / `disable_close` | bool | Open / close disabled for this market |
+| `perp[*].mark_source` | string | Mark-price descriptor (e.g. `"oracle_median"`) |
+| `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
+| `perp[*].asset_id` | uint32 | **DEPRECATED** indexer-shim field — do not build against it |
+| `spot.pairs` / `spot.tokens` | array | Spot pair / token registry, identical to [`markets`](#markets) (see [`spot_meta`](./spot.md#spot_meta)) |
 
 For the spot pair / token field semantics see [`spot_meta`](./spot.md#spot_meta).
 
