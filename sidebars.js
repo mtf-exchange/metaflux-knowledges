@@ -72,6 +72,7 @@ const sidebars = {
         },
         'concepts/earn',
         'concepts/tokenomics',
+        'concepts/system-addresses',
         'concepts/glossary',
       ],
     },
