@@ -76,8 +76,8 @@ L'agrégateur ne cannibalise pas MIP-3 : les traders professionnels continuent d
 
 Les revenus d'internalisation alimentent la **même cascade de distribution des frais que MIP-3** — il n'existe pas d'économie MIP-4 séparée. Conformément au [modèle de frais](../concepts/fees.md), les revenus de l'agrégateur s'écoulent comme suit :
 
-- **80 %** — rachat et destruction (réduit l'offre effective)
-- **10 %** — validateurs
+- **70 %** — rachat et destruction (réduit l'offre effective)
+- **20 %** — validateurs, qui le distribuent à leurs stakers sous forme de dividende
 - **10 %** — Fondation / Trésorerie
 
 Du côté de la clientèle de détail, les frais de code builder (plafonnés à 8 bps) constituent le siège économique naturel pour qu'une interface de détail monétise son flux d'ordres — le même mécanisme qu'un courtier de détail.

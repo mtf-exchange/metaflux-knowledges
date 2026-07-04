@@ -6,7 +6,7 @@
 
 ## 概览
 
-持有 MTF，委托给验证者，即可赚取协议增发奖励及手续费分成。在 `lock_period` 期限内，质押资产保持流动性；解除质押需等待 `7 days` 才能完全释放。行为不端的验证者将遭到罚没（Slash），委托人也将承担相应的部分损失。
+持有 MTF，委托给验证者，即可赚取质押奖励。奖励的持续来源是协议手续费收入：手续费先流向验证者——即[手续费回购](./fees.md)中 **20% 的验证者份额**——验证者再扣除佣金后将该份额下发给质押者。早期阶段由一笔额度有限的国库启动引导预算补足（绝不增发新代币）。在 `lock_period` 期限内，质押资产保持流动性；解除质押需等待 `7 days` 才能完全释放。行为不端的验证者将遭到罚没（Slash），委托人也将承担相应的部分损失。
 
 ## 参与角色
 
@@ -14,7 +14,7 @@
 |------|------|
 | **验证者** | 运行共识节点，提出区块，参与投票。须自质押金额高于 `min_self_bond`（默认 10 万 MTF）。 |
 | **委托人** | 持有 MTF，选择验证者进行委托，所得奖励扣除验证者佣金后归己。 |
-| **协议** | 每个区块增发奖励，按质押比例分配。 |
+| **协议** | 每个区块按质押比例分发奖励：来源为手续费收入中的验证者份额，加上国库启动引导预算。 |
 
 ## 质押流程
 
@@ -98,14 +98,14 @@ sequenceDiagram
 
 | 来源 | 发放节奏 | 分配方式 |
 |------|----------|----------|
-| 协议增发 | 每区块 | `emission_per_block × stake_share × (1 - validator_commission)` |
-| 手续费收入（国库 → 质押者） | 每 Epoch | `treasury_inflow × staker_share × stake_share × (1 - commission)` |
+| 手续费收入——回购中的验证者份额（手续费 → 验证者 → 质押者） | 每 Epoch | `validator_share_inflow × stake_share × (1 - commission)` |
+| 启动引导奖励（国库出资，早期阶段） | 每区块 | `reward_per_block × stake_share × (1 - validator_commission)` |
 
-`emission_per_block`：由治理设定，当前值可通过 `staking_state` 查询获取。  
-`staker_share`（国库分配比例）：由治理设定，默认值为 `50%`。  
+手续费收入是持续来源：根据[手续费飞轮](./fees.md)，回购所得的 MTF 按 **70% 销毁 / 20% 验证者 / 10% 国库** 分配，其中 20% 的验证者份额在扣除佣金后下发给质押者。  
+`reward_per_block`：由治理设定，从国库启动引导资金池中支出——**并非新增发行**；当前值可通过 `staking_state` 查询获取。  
 `validator_commission`：各验证者自行设定，治理规定上限为 `20%`。
 
-奖励以 MTF（增发部分）和 USDC（手续费收入部分）分别计算，领取时两者一并返回。`staking_state` 会显示各币种的待领取金额。
+奖励以 MTF（启动引导奖励）和 USDC（手续费收入）分别计算，领取时两者一并返回。`staking_state` 会显示各币种的待领取金额。
 
 ## 锁定期
 
@@ -166,7 +166,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_sum
 
 ## APR 估算
 
-[`staking_apr`](../api/rest/info.md#staking_apr) `/info` 查询类型为**实时数据**——返回区块奖励效应实际生效的增发 APR，以及对应的已承诺参数：
+[`staking_apr`](../api/rest/info.md#staking_apr) `/info` 查询类型为**实时数据**——返回区块奖励效应实际生效的启动引导奖励 APR，以及对应的已承诺参数：
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
@@ -196,6 +196,8 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 即：总质押量不超过 5000 万 MTF 时，APR 固定为 **8%**；超出后按 1/√stake 衰减（质押越多，每位质押者的分成越少）。`governance_rate_bps` 为已承诺参数，但**并不**直接用于奖励计算——两者同时对外展示，便于观察差异。APR 为**税前总收益率**，未扣除各验证者佣金（`is_gross_pre_commission: true`）。
 
+该区块起始奖励效应由国库启动引导预算出资（参见[代币经济学](./tokenomics.md)）——质押奖励从不依赖新增发行。随着手续费收入的增长，[手续费回购](./fees.md)中 20% 的验证者份额将成为主要奖励来源。
+
 委托人的实际净 APR：
 
 ```
@@ -220,7 +222,7 @@ sequenceDiagram
     participant U as user
     participant V as validator V
     Note over U,V: T=0 — user delegates 1000 MTF to validator V<br/>active stake on V: prev + 1000
-    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (emission * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
+    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (block_reward * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
     U->>V: T+30 days — Claim { V }
     Note over U,V: 18 MTF + 5 USDC paid out (assuming ~18% APR + fee share)
     U->>V: T+30 days + 1s — Undelegate { V, 1000 }
@@ -234,7 +236,7 @@ sequenceDiagram
 
 - [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)（Devnet 上已支持的操作变体）
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
-- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — 实际生效的增发 APR 及已承诺参数
+- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — 实际生效的启动引导奖励 APR 及已承诺参数
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — 全协议质押聚合数据（`staking.*`）
 - [手续费](./fees.md) — 手续费收入是质押奖励来源之一
 
@@ -252,7 +254,7 @@ A：不需要，但你也可以使用代理钱包。代理钱包可调用 `Deleg
 **Q：我可以取消解绑吗？**  
 A：不可以——一旦提交，必须等满完整的 `lock_period`。如果预计需要将质押转移到其他地方，建议提前使用再委托操作。
 
-**Q：启动时 MTF 代币从何而来？**  
-A：创世分配 + 每区块增发。具体分配方式请参阅[代币经济学文档]（即将发布）。协议不会任意空投——增发是唯一持续来源。
+**Q：质押奖励从何而来？**  
+A：手续费收入是持续来源：验证者获得[手续费回购](./fees.md)中 **20% 的验证者份额**（70% 销毁 / 20% 验证者 / 10% 国库），并在扣除佣金后分发给各自的质押者。早期阶段由一笔额度有限的国库启动引导预算补足。协议**绝不为奖励增发新的 MTF**——唯一的供应调节手段是每年的人口重新锚定（[代币经济学](./tokenomics.md)）。
 
 </details>

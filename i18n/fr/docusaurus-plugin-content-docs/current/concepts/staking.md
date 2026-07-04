@@ -6,7 +6,7 @@
 
 ## En bref
 
-Détenez des MTF, déléguez à un validateur, percevez les émissions du protocole ainsi qu'une part des revenus de frais. Le stake est liquide jusqu'au `lock_period` ; le retrait du stake prend `7 days` pour être entièrement libéré. Le slashing s'applique aux validateurs qui se comportent mal ; les délégateurs subissent une exposition partielle au slash.
+Détenez des MTF, déléguez à un validateur, percevez des récompenses de staking. La source pérenne est le revenu des frais du protocole : les frais financent les validateurs — la **part de 20 % des validateurs** du [rachat des frais](./fees.md) — et les validateurs financent les stakers, en leur reversant cette part déduction faite de la commission. Au démarrage, ce revenu est complété par un budget d'amorçage fini financé par la trésorerie (jamais de nouvelle émission). Le stake est liquide jusqu'au `lock_period` ; le retrait du stake prend `7 days` pour être entièrement libéré. Le slashing s'applique aux validateurs qui se comportent mal ; les délégateurs subissent une exposition partielle au slash.
 
 ## Acteurs
 
@@ -14,7 +14,7 @@ Détenez des MTF, déléguez à un validateur, percevez les émissions du protoc
 |------|-------------|
 | **Validateur** | Exploite un nœud de consensus, propose des blocs, vote. Doit se lier soi-même au-dessus du `min_self_bond` (100 000 MTF par défaut). |
 | **Délégateur** | Détient des MTF, choisit un validateur, perçoit des récompenses déduction faite de la commission du validateur. |
-| **Protocole** | Émet des récompenses par bloc ; les distribue proportionnellement au stake. |
+| **Protocole** | Distribue les récompenses par bloc, au prorata du stake : la part des validateurs sur les revenus de frais plus le budget d'amorçage de la trésorerie. |
 
 ## Flux de staking
 
@@ -98,14 +98,14 @@ Transfère les délégations arrivées à maturité (dont la période de blocage
 
 | Source | Périodicité | Part |
 |--------|-------------|------|
-| Émission du protocole | Par bloc | `emission_per_block × stake_share × (1 - validator_commission)` |
-| Revenus de frais (trésorerie → stakers) | Par époque | `treasury_inflow × staker_share × stake_share × (1 - commission)` |
+| Revenus de frais — part des validateurs sur le rachat (frais → validateurs → stakers) | Par époque | `validator_share_inflow × stake_share × (1 - commission)` |
+| Récompenses d'amorçage (financées par la trésorerie, phase initiale) | Par bloc | `reward_per_block × stake_share × (1 - validator_commission)` |
 
-`emission_per_block` : défini par la gouvernance ; valeur actuelle dans la requête `staking_state`.
-`staker_share` de la trésorerie : définie par la gouvernance, par défaut `50%`.
+Les revenus de frais sont la source pérenne : conformément à [la boucle vertueuse des frais](./fees.md), les MTF rachetés se répartissent en **70 % brûlage / 20 % validateurs / 10 % trésorerie**, et la part de 20 % des validateurs est reversée aux stakers déduction faite de la commission.
+`reward_per_block` : défini par la gouvernance, prélevé sur le fonds d'amorçage de la trésorerie — **pas une nouvelle émission** ; valeur actuelle dans la requête `staking_state`.
 `validator_commission` : par validateur, plafonnée à `20%` par la gouvernance.
 
-Les récompenses sont calculées en MTF (émissions) et en USDC (revenus de frais) — la réclamation retourne les deux. `staking_state` indique le montant en attente dans chaque devise.
+Les récompenses sont calculées en MTF (récompenses d'amorçage) et en USDC (revenus de frais) — la réclamation retourne les deux. `staking_state` indique le montant en attente dans chaque devise.
 
 ## Période de blocage
 
@@ -168,7 +168,7 @@ Critères de sélection :
 ## Estimation de l'APR
 
 Le type de requête `/info` [`staking_apr`](../api/rest/info.md#staking_apr) est **en temps réel** —
-il retourne l'APR d'émission effectif réellement appliqué par l'effet de récompense begin-block,
+il retourne l'APR effectif des récompenses d'amorçage réellement appliqué par l'effet de récompense begin-block,
 ainsi que ses entrées validées :
 
 ```bash
@@ -199,6 +199,8 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 Soit un taux fixe de **8%** à ou en-dessous de 50 M MTF stakés, décroissant ∝ 1/√stake au-delà (plus de stake = part par staker plus faible). `governance_rate_bps` est validé mais **NON** consommé par l'effet de récompense — les deux sont exposés afin que l'écart soit observable. L'APR est **brut**, avant commission par validateur (`is_gross_pre_commission: true`).
 
+Cet effet de récompense begin-block est financé par le budget d'amorçage de la trésorerie (voir la [tokenomique](./tokenomics.md)) — les récompenses de staking ne reposent jamais sur une nouvelle émission. À mesure que les revenus de frais augmentent, la part de 20 % des validateurs du [rachat des frais](./fees.md) devient la source de récompenses dominante.
+
 APR net pour un délégateur :
 
 ```
@@ -223,7 +225,7 @@ sequenceDiagram
     participant U as user
     participant V as validator V
     Note over U,V: T=0 — user delegates 1000 MTF to validator V<br/>active stake on V: prev + 1000
-    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (emission * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
+    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (block_reward * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
     U->>V: T+30 days — Claim { V }
     Note over U,V: 18 MTF + 5 USDC paid out (assuming ~18% APR + fee share)
     U->>V: T+30 days + 1s — Undelegate { V, 1000 }
@@ -237,7 +239,7 @@ sequenceDiagram
 
 - [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md) (variantes d'action supportées sur le devnet)
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
-- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR d'émission effectif + entrées validées
+- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR effectif des récompenses d'amorçage + entrées validées
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — agrégats de staking à l'échelle du protocole (`staking.*`)
 - [Frais](./fees.md) — les revenus de frais constituent l'une des sources de récompenses de staking
 
@@ -255,7 +257,7 @@ R : Non — mais vous pouvez en utiliser un. Les portefeuilles agents peuvent ap
 **Q : Puis-je annuler un déblocage ?**
 R : Non — une fois soumis, vous attendez la durée complète du `lock_period`. Utilisez plutôt la redélégation si vous aviez anticipé avoir besoin du stake ailleurs.
 
-**Q : D'où proviennent les tokens MTF au lancement ?**
-R : Allocations de genèse + émission par bloc. Consultez la [documentation sur la tokenomique] (à venir) pour la distribution. Le protocole n'effectue pas d'airdrop arbitraire — les émissions sont la seule source continue.
+**Q : D'où proviennent les récompenses de staking ?**
+R : Les revenus de frais sont la source pérenne : les validateurs reçoivent la **part de 20 % des validateurs** du [rachat des frais](./fees.md) (70 % brûlage / 20 % validateurs / 10 % trésorerie) et la distribuent à leurs stakers déduction faite de la commission. Au démarrage, un budget d'amorçage fini financé par la trésorerie vient la compléter. Le protocole **ne frappe jamais de nouveaux MTF pour les récompenses** — le seul levier d'offre est le réancrage annuel sur la population ([tokenomique](./tokenomics.md)).
 
 </details>

@@ -76,8 +76,8 @@ The aggregator does not cannibalize MIP-3: pro traders keep trading the MIP-3 bo
 
 Internalization revenue feeds the **same fee-distribution waterfall as MIP-3** — there is no separate MIP-4 economics. Per [the fee model](../concepts/fees.md), aggregator revenue flows:
 
-- **80%** — buyback-and-burn (reduces effective supply)
-- **10%** — validators
+- **70%** — buyback-and-burn (reduces effective supply)
+- **20%** — validators, who distribute it to their stakers as the dividend
 - **10%** — Foundation / Treasury
 
 On the retail side, the builder-code fee (capped at 8 bps) is the natural economic seat for a retail UI to charge — the same place a retail broker monetizes its order flow.

@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-Mantén MTF, delega a un validador y obtén emisiones del protocolo más una parte de los ingresos por comisiones. El stake es líquido hasta el `lock_period`; el unstake tarda `7 days` en liberarse por completo. El slashing se aplica a los validadores que incumplan las reglas; los delegadores asumen una exposición parcial al slash.
+Mantén MTF, delega a un validador y obtén recompensas de staking. La fuente continua son los ingresos por comisiones del protocolo: las comisiones financian a los validadores — la **parte del 20% de los validadores** de la [recompra de comisiones](./fees.md) — y los validadores financian a los stakers, transmitiendo esa parte hacia abajo menos la comisión. Al principio, esto se complementa con un presupuesto de arranque finito financiado por la tesorería (nunca nueva emisión). El stake es líquido hasta el `lock_period`; el unstake tarda `7 days` en liberarse por completo. El slashing se aplica a los validadores que incumplan las reglas; los delegadores asumen una exposición parcial al slash.
 
 ## Actores
 
@@ -14,7 +14,7 @@ Mantén MTF, delega a un validador y obtén emisiones del protocolo más una par
 |------|-------------|
 | **Validador** | Ejecuta un nodo de consenso, propone bloques y vota. Debe auto-vincular un monto superior a `min_self_bond` (por defecto 100k MTF). |
 | **Delegador** | Mantiene MTF, elige un validador y obtiene recompensas descontando la comisión del validador. |
-| **Protocolo** | Emite recompensas por bloque; las distribuye proporcionalmente al stake. |
+| **Protocolo** | Distribuye recompensas por bloque, proporcionalmente al stake: la parte de los validadores de los ingresos por comisiones más el presupuesto de arranque de la tesorería. |
 
 ## Flujo de staking
 
@@ -98,14 +98,14 @@ Transfiere las desvinculaciones que han madurado (cuyo período de bloqueo ha ex
 
 | Fuente | Cadencia | Parte |
 |--------|---------|-------|
-| Emisión del protocolo | Por bloque | `emission_per_block × stake_share × (1 - validator_commission)` |
-| Ingresos por comisiones (tesorería → stakers) | Por época | `treasury_inflow × staker_share × stake_share × (1 - commission)` |
+| Ingresos por comisiones — parte de los validadores en la recompra (comisiones → validadores → stakers) | Por época | `validator_share_inflow × stake_share × (1 - commission)` |
+| Recompensas de arranque (financiadas por la tesorería, fase inicial) | Por bloque | `reward_per_block × stake_share × (1 - validator_commission)` |
 
-`emission_per_block`: definido por gobernanza; valor actual en la consulta `staking_state`.
-`staker_share` de la tesorería: definido por gobernanza, valor predeterminado `50%`.
+Los ingresos por comisiones son la fuente continua: según [el flywheel de comisiones](./fees.md), el MTF recomprado se reparte en **70% quema / 20% validadores / 10% tesorería**, y el 20% de los validadores se transmite a los stakers menos la comisión.
+`reward_per_block`: definido por gobernanza, extraído del fondo de arranque de la tesorería — **no es nueva emisión**; valor actual en la consulta `staking_state`.
 `validator_commission`: por validador, limitado al `20%` por gobernanza.
 
-Las recompensas se calculan en MTF (emisiones) y USDC (ingresos por comisiones) — la reclamación devuelve ambas. `staking_state` muestra los importes pendientes en cada divisa.
+Las recompensas se calculan en MTF (recompensas de arranque) y USDC (ingresos por comisiones) — la reclamación devuelve ambas. `staking_state` muestra los importes pendientes en cada divisa.
 
 ## Período de bloqueo
 
@@ -168,7 +168,7 @@ Criterios de selección:
 ## Estimación del APR
 
 El tipo de consulta [`staking_apr`](../api/rest/info.md#staking_apr) de `/info` está **activo en tiempo real** —
-devuelve el APR de emisión efectivo que aplica el efecto de recompensa del begin-block,
+devuelve el APR efectivo de recompensa de arranque que aplica el efecto de recompensa del begin-block,
 junto con sus valores de entrada confirmados:
 
 ```bash
@@ -199,6 +199,8 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 Es decir, un **8%** fijo en/por debajo de 50M MTF en stake, que decae ∝ 1/√stake por encima de ese umbral (más stake = menor participación por staker). `governance_rate_bps` está confirmado pero **NO** lo consume el efecto de recompensa — ambos valores se exponen para que la divergencia sea observable. El APR es **bruto**, antes de la comisión por validador (`is_gross_pre_commission: true`).
 
+Este efecto de recompensa del begin-block se financia con el presupuesto de arranque de la tesorería (véase [tokenomics](./tokenomics.md)) — las recompensas de staking nunca dependen de nueva emisión. A medida que crecen los ingresos por comisiones, la parte del 20% de los validadores de la [recompra de comisiones](./fees.md) se convierte en la fuente de recompensas dominante.
+
 APR neto para un delegador:
 
 ```
@@ -223,7 +225,7 @@ sequenceDiagram
     participant U as user
     participant V as validator V
     Note over U,V: T=0 — user delegates 1000 MTF to validator V<br/>active stake on V: prev + 1000
-    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (emission * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
+    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (block_reward * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
     U->>V: T+30 days — Claim { V }
     Note over U,V: 18 MTF + 5 USDC paid out (assuming ~18% APR + fee share)
     U->>V: T+30 days + 1s — Undelegate { V, 1000 }
@@ -237,7 +239,7 @@ sequenceDiagram
 
 - [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (variantes de acción admitidas en devnet)
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
-- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR de emisión efectivo + valores de entrada confirmados
+- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — APR efectivo de recompensa de arranque + valores de entrada confirmados
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — agregados de staking a nivel de protocolo (`staking.*`)
 - [Comisiones](./fees.md) — los ingresos por comisiones son una de las fuentes de recompensas de staking
 
@@ -255,7 +257,7 @@ R: No — aunque puedes usar una. Las carteras de agente pueden llamar a `Delega
 **P: ¿Puedo cancelar una desvinculación?**
 R: No — una vez enviada, debes esperar el `lock_period` completo. Usa Redelegate si anticipas necesitar el stake en otro lugar.
 
-**P: ¿De dónde provienen los tokens MTF al lanzamiento?**
-R: Asignaciones de génesis + emisión por bloque. Consulta [la documentación de tokenomics] (próximamente) para la distribución. El protocolo no realiza airdrops arbitrarios — las emisiones son la única fuente continua.
+**P: ¿De dónde provienen las recompensas de staking?**
+R: Los ingresos por comisiones son la fuente continua: los validadores reciben la **parte del 20% de los validadores** de la [recompra de comisiones](./fees.md) (70% quema / 20% validadores / 10% tesorería) y la distribuyen a sus stakers menos la comisión. Al principio, un presupuesto de arranque finito financiado por la tesorería la complementa. El protocolo **nunca acuña nuevo MTF para recompensas** — la única palanca de oferta es el reanclaje anual a la población ([tokenomics](./tokenomics.md)).
 
 </details>

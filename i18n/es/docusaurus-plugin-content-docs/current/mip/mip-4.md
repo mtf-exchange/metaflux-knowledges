@@ -76,8 +76,8 @@ El agregador no canibaliza a MIP-3: los traders profesionales siguen operando en
 
 Los ingresos de internalización alimentan la **misma cascada de distribución de comisiones que MIP-3** — no existe una economía separada para MIP-4. Según [el modelo de comisiones](../concepts/fees.md), los ingresos del agregador se distribuyen:
 
-- **80%** — recompra y quema (reduce la oferta efectiva)
-- **10%** — validadores
+- **70%** — recompra y quema (reduce la oferta efectiva)
+- **20%** — validadores, que lo distribuyen a sus stakers como el dividendo
 - **10%** — Fundación / Tesorería
 
 En el lado minorista, la comisión por código de builder (con límite de 8 bps) es el asiento económico natural para que una interfaz minorista cobre — el mismo lugar donde un broker minorista monetiza su flujo de órdenes.

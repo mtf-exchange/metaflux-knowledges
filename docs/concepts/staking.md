@@ -8,7 +8,7 @@ registration are active and verified end-to-end across consensus on the
 
 ## TL;DR
 
-Hold MTF, delegate to a validator, earn protocol emissions + a share of fee revenue. Stake is liquid up to the `lock_period`; unstake takes `7 days` to fully release. Slashing applies to validators who misbehave; delegators face partial slash exposure.
+Hold MTF, delegate to a validator, earn staking rewards. The ongoing source is protocol fee revenue: fees fund validators — the **20% validator share** of the [fee buyback](./fees.md) — and validators fund stakers, passing that share down minus commission. Early on this is topped up by a finite treasury-funded bootstrap budget (never new issuance). Stake is liquid up to the `lock_period`; unstake takes `7 days` to fully release. Slashing applies to validators who misbehave; delegators face partial slash exposure.
 
 ## Actors
 
@@ -16,7 +16,7 @@ Hold MTF, delegate to a validator, earn protocol emissions + a share of fee reve
 |------|-------------|
 | **Validator** | Runs a consensus node, proposes blocks, votes. Must self-bond above `min_self_bond` (default 100k MTF). |
 | **Delegator** | Holds MTF, picks a validator, earns rewards minus the validator's commission. |
-| **Protocol** | Emits rewards per block; distributes per-stake. |
+| **Protocol** | Distributes rewards per block, pro-rata to stake: the validator share of fee revenue plus the treasury bootstrap budget. |
 
 ## Staking flow
 
@@ -100,14 +100,14 @@ Sweep matured undelegations (those whose lock period has passed) back to MTF bal
 
 | Source | Cadence | Share |
 |--------|---------|-------|
-| Protocol emission | Per-block | `emission_per_block × stake_share × (1 - validator_commission)` |
-| Fee revenue (treasury → stakers) | Per-epoch | `treasury_inflow × staker_share × stake_share × (1 - commission)` |
+| Fee revenue — validator share of the buyback (fees → validators → stakers) | Per-epoch | `validator_share_inflow × stake_share × (1 - commission)` |
+| Bootstrap rewards (treasury-funded, early phase) | Per-block | `reward_per_block × stake_share × (1 - validator_commission)` |
 
-`emission_per_block`: governance-set; current value in `staking_state` query.
-`staker_share` of treasury: governance-set, default `50%`.
+Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), bought-back MTF splits **70% burn / 20% validators / 10% treasury**, and the validator 20% is passed down to stakers minus commission.
+`reward_per_block`: governance-set, drawn from the treasury bootstrap pool — **not new issuance**; current value in `staking_state` query.
 `validator_commission`: per-validator, capped at `20%` by governance.
 
-Rewards are computed in MTF (emissions) and USDC (fee revenue) — claim returns both. `staking_state` shows pending in each currency.
+Rewards are computed in MTF (bootstrap rewards) and USDC (fee revenue) — claim returns both. `staking_state` shows pending in each currency.
 
 ## Lock period
 
@@ -170,8 +170,8 @@ Pick by:
 ## APR estimation
 
 The [`staking_apr`](../api/rest/info.md#staking_apr) `/info` query type is **live** —
-it returns the effective emission APR the begin-block reward effect actually
-applies, plus its committed inputs:
+it returns the effective bootstrap-reward APR the begin-block reward effect
+actually applies, plus its committed inputs:
 
 ```bash
 curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
@@ -204,6 +204,11 @@ stake = lower per-staker share). `governance_rate_bps` is committed but **NOT
 consumed** by the reward effect — both are surfaced so the divergence is
 observable. APR is **gross**, pre per-validator commission (`is_gross_pre_commission: true`).
 
+This begin-block reward effect is funded from the treasury bootstrap budget
+(see [tokenomics](./tokenomics.md)) — staking rewards never rely on new
+issuance. As fee revenue grows, the 20% validator share of the
+[fee buyback](./fees.md) becomes the dominant reward source.
+
 Net APR for a delegator:
 
 ```
@@ -228,7 +233,7 @@ sequenceDiagram
     participant U as user
     participant V as validator V
     Note over U,V: T=0 — user delegates 1000 MTF to validator V<br/>active stake on V: prev + 1000
-    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (emission * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
+    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (block_reward * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
     U->>V: T+30 days — Claim { V }
     Note over U,V: 18 MTF + 5 USDC paid out (assuming ~18% APR + fee share)
     U->>V: T+30 days + 1s — Undelegate { V, 1000 }
@@ -242,7 +247,7 @@ sequenceDiagram
 
 - [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (supported action variants on devnet)
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
-- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective emission APR + committed inputs
+- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective bootstrap-reward APR + committed inputs
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)
 - [Fees](./fees.md) — fee revenue is one of the staking reward sources
 
@@ -260,7 +265,7 @@ A: No — but you can use one. Agent wallets can call `Delegate` / `Undelegate` 
 **Q: Can I cancel an unbonding?**
 A: No — once submitted, you wait the full `lock_period`. Redelegate instead if you anticipated needing the stake elsewhere.
 
-**Q: Where do MTF tokens come from at launch?**
-A: Genesis allocations + emission per block. See [tokenomics docs] (coming) for distribution. The protocol does not airdrop arbitrarily — emissions are the only ongoing source.
+**Q: Where do staking rewards come from?**
+A: Fee revenue is the ongoing source: validators receive the **20% validator share** of the [fee buyback](./fees.md) (70% burn / 20% validators / 10% treasury) and distribute it to their stakers minus commission. Early on, a finite treasury-funded bootstrap budget tops this up. The protocol **never mints new MTF for rewards** — the only supply lever is the annual population re-peg ([tokenomics](./tokenomics.md)).
 
 </details>
