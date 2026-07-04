@@ -13,8 +13,10 @@ parameters and can be updated by governance.
 Every fill charges a maker and a taker fee, set by the [Fee schedule](./fee-schedule.md).
 A builder credit can route a share to the order-flow originator, and a referrer
 credit can route a share of the taker fee to a referrer. After maker rebates are
-paid, the protocol uses the remaining fee revenue to **buy back MTF**, then splits
-the bought MTF **70% burn / 20% validators / 10% treasury**. Fees are deducted from
+paid, the protocol splits the remaining fee revenue **~70% buyback / ~20%
+validators / ~10% treasury**. The buyback share buys MTF on the open market and
+locks it forever in a keyless protocol address — permanently removing it from
+circulation. Fees are deducted from
 your balance at fill time and shown in [`userFills`](../api/rest/info.md#user_fills).
 
 ## How a fee is computed
@@ -75,43 +77,50 @@ Collected fees flow through one value-accrual pipeline:
 flowchart TD
     fill["fill: taker + maker fees collected"]
     rebate["pay maker rebates first"]
-    buyback["buy back MTF with the rest"]
-    burn["70% → burn (removed from supply)"]
-    validators["20% → validators<br/>(distributed to their stakers)"]
-    treasury["10% → treasury"]
+    split["split the remaining fee revenue"]
+    buyback["~70% → buy back MTF"]
+    sink["bought MTF → locked forever in a keyless address<br/>(removed from circulation)"]
+    validators["~20% → validators<br/>(who reward their stakers)"]
+    treasury["~10% → treasury"]
 
     fill --> rebate
-    rebate --> buyback
-    buyback --> burn
-    buyback --> validators
-    buyback --> treasury
+    rebate --> split
+    split --> buyback
+    split --> validators
+    split --> treasury
+    buyback --> sink
 ```
 
 1. **Maker rebates are paid first.** Negative net maker rates (see the
    [Fee schedule](./fee-schedule.md)) are settled out of the fees collected on the
    same flow.
-2. **The remainder buys back MTF, never above a manipulation-resistant ceiling.**
-   All fee revenue left after rebates is used to buy MTF on the open market by
-   matching resting sell orders on the MTF/USDC book, lowest price first, and the
-   protocol never pays above a price ceiling. When MTF has an external mark, that
-   ceiling is the oracle-bounded mark plus a governance-set slippage allowance.
-   When it does not, the ceiling is anchored to a smoothed average of the
-   protocol's *own* recent buyback execution prices — a self-referential reference
-   that no third party can move by trading, only by making the protocol itself
-   execute higher, which is rate-limited to a small per-round step and can be
-   hard-capped to a fixed band by a governance-set reference price. Sell orders
-   priced above the ceiling are skipped and the unspent balance carries to the next
-   round; if no trustworthy reference exists yet, the buyback defers rather than
-   buying at an unverified price. In fast-moving markets it may lag price by design.
-3. **The bought-back MTF splits 70 / 20 / 10:**
-   - **70% is burned** — permanently removed from circulation (deflationary).
-   - **20% goes to validators**, who distribute it to their stakers. This is the
-     **staker dividend** — fee revenue reaches stakers via their validator's share.
-   - **10% goes to the treasury** (and absorbs rounding dust so the split is
-     leak-free).
+2. **The fee revenue splits ~70 / ~20 / ~10.** After rebates, the remaining fee
+   revenue is split three ways: **~70% buyback, ~20% validators, ~10% treasury**
+   (the treasury share absorbs rounding dust so the split is leak-free).
+3. **The ~70% buyback buys MTF, never above a manipulation-resistant ceiling.**
+   The buyback share is used to buy MTF on the open market by matching resting
+   sell orders on the MTF/USDC book, lowest price first, and the protocol never
+   pays above a price ceiling. When MTF has an external mark, that ceiling is the
+   oracle-bounded mark plus a governance-set slippage allowance. When it does not,
+   the ceiling is anchored to a smoothed average of the protocol's *own* recent
+   buyback execution prices — a self-referential reference no third party can move
+   by trading, only by making the protocol itself execute higher, which is
+   rate-limited to a small per-round step and can be hard-capped to a fixed band by
+   a governance-set reference price. Sell orders priced above the ceiling are
+   skipped and the unspent balance carries to the next round; if no trustworthy
+   reference exists yet, the buyback defers rather than buying at an unverified
+   price. In fast-moving markets it may lag price by design.
+4. **Every MTF the buyback acquires is locked forever.** The bought-back MTF is
+   sent to a keyless protocol address it can never leave — so it is permanently
+   removed from the circulating float. This is the deflationary force: real
+   exchange revenue continuously buys MTF and takes it out of circulation, at a
+   rate that scales with trading volume. (The token's headline total supply is a
+   separate figure and is not changed by the buyback.)
+5. **Validators reward their stakers from the ~20% validator share.** The staker
+   dividend is funded from the validator fee share, not from the bought-back MTF.
 
-Cumulative pool totals (bought-back-and-burned MTF, validator pool, treasury) are
-tracked in committed state and exposed on the read path via
+Cumulative pool totals (MTF bought back and locked out of circulation, validator
+pool, treasury) are tracked in committed state and exposed on the read path via
 [`protocol_metrics`](../api/rest/info.md#protocol_metrics):
 
 ```bash
@@ -198,8 +207,9 @@ at each fill event.
 
 **Q: Are fees paid in USDC or in MTF?**
 A: You pay in the fill currency (USDC for perps; the received leg for spot). The
-protocol then uses fee revenue to buy back MTF, and it is the bought-back MTF that
-is burned and distributed.
+protocol splits that fee revenue ~70/20/10; the ~70% buyback share buys MTF on the
+open market and locks it out of circulation, while the validator and treasury
+shares stay in the fill currency.
 
 **Q: Is there a min-fee floor?**
 A: No floor. A tiny fill computes a sub-cent fee (rounded down on display, charged

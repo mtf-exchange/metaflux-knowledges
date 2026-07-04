@@ -23,14 +23,16 @@ runs a perpetuals DEX core and an EVM sidechain. MTF does five things:
 2. **Fee discount** — staking MTF discounts your taker trading fee by tier.
 3. **Security** — staked MTF is the validator stake that secures consensus.
 4. **Governance** — staked MTF is the voting weight over protocol parameters.
-5. **Value accrual** — net protocol fees buy MTF on the open market; **70% of
-   every buyback is burned**, tying the token's scarcity to exchange volume.
+5. **Value accrual** — ~70% of net protocol fees buy MTF on the open market and
+   lock **all** of it away forever, tying the token's circulating scarcity to
+   exchange volume.
 
 The economic frame is **fee-driven deflation**. Net trading fees (after maker
-rebates) buy MTF on the open market; the bought-back MTF is split **70% burned,
-20% to validators who pass it to their stakers as a revenue-share, 10% treasury**.
-Staking — especially **time-locked, vote-escrow-style** staking — earns a fee
-discount **and a share of that buyback**, pulling supply off the float into the
+rebates) are split **~70% buyback, ~20% validators, ~10% treasury**. The ~70%
+buyback buys MTF on the open market and locks **all** of it in a keyless address
+forever — removed from circulation. Staking — especially **time-locked,
+vote-escrow-style** staking — earns a fee discount **and a share of the validator
+fee revenue**, pulling supply off the float into the
 hands of long-term participants who secure the chain. Upper-tier benefits are
 **time-weighted**: the longer you lock, the larger your effective weight, discount
 tier, and revenue-share slice. A **flexible (no-lock)** lane gives market makers
@@ -92,17 +94,17 @@ for itself out of reduced trading costs.
 
 ### 2b. Staking → MTF revenue-share
 
-On top of the fee discount, **locked** stakers receive a **revenue-share** paid in
-**MTF**. It is delivered through the validator channel: **20% of every buyback**
-(MTF bought back with net fee revenue) goes to validators, who distribute it to
-their **stakers / delegators**. Your slice is pro-rata by your **time-weighted
-effective weight**, so longer locks earn a disproportionately larger share.
+On top of the fee discount, **locked** stakers receive a **revenue-share**. It is
+delivered through the validator channel: **~20% of net fee revenue** goes to
+validators, who distribute a share to their **stakers / delegators**. Your slice
+is pro-rata by your **time-weighted effective weight**, so longer locks earn a
+disproportionately larger share.
 
 The revenue-share **requires a lock of at least 1 month** — flexible (no-lock)
 stakers earn **0** revenue-share (they still get the basic fee discount). This is
-not a separate fee pool: it is the validators' 20% share of the bought-back MTF,
-passed through to those who staked with them. See
-[Value accrual & flywheel](#value-accrual--flywheel) for the full buyback split.
+not a separate fee pool: it is the validators' ~20% fee share, passed through to
+those who staked with them. See
+[Value accrual & flywheel](#value-accrual--flywheel) for the full fee split.
 
 ### 3. Staking → consensus security (proof-of-stake)
 
@@ -121,20 +123,22 @@ fee tiers, emission rate, risk parameters, vault whitelists, market listings —
 moved by on-chain votes weighted by stake. See [Governance scope](#governance)
 below.
 
-### 5. Fee value accrual → buyback, then burn
+### 5. Fee value accrual → buyback & permanent lock
 
-Protocol trading fees are converted into MTF and then split. After maker rebates
-and any referrer/builder credits are paid **off the top**, **all** remaining net
-fee revenue is used to **buy MTF on the open market up to a manipulation-resistant,
-governance-anchored price ceiling** (in fast-moving markets the buyback may lag
-price by design, since it never overpays a thin or manipulated book). The
-bought-back MTF is then split **70% burned / 20% to validators (who pass it to
-their stakers) / 10% treasury**. So trading volume creates real, recurring buy pressure on MTF, and
-**70% of every buyback is destroyed forever** while 20% becomes the staker
-revenue-share and 10% funds the treasury.
+Protocol trading fees are split. After maker rebates and any referrer/builder
+credits are paid **off the top**, the remaining net fee revenue is split **~70%
+buyback / ~20% validators / ~10% treasury**. The ~70% buyback share **buys MTF on
+the open market up to a manipulation-resistant, governance-anchored price ceiling**
+(in fast-moving markets the buyback may lag price by design, since it never
+overpays a thin or manipulated book), and **all** of the MTF it acquires is locked
+forever in a keyless address — removed from circulation. So trading volume creates
+real, recurring buy pressure on MTF and continuously pulls MTF out of the float,
+while ~20% funds the validator-delivered staker revenue-share and ~10% funds the
+treasury.
 
 This is the keystone of the model: it is **not** an abstract supply burn, it is
-real exchange revenue market-buying MTF and then destroying the bought tokens. The
+real exchange revenue market-buying MTF and then locking the bought tokens away
+forever. The
 deflation rate is a direct function of trading volume. The full step-by-step flow
 and the split are in [Value accrual & flywheel](#value-accrual--flywheel); the
 fee mechanics are on the [Fees](./fees.md#burn-buyback-and-burn) page.
@@ -315,9 +319,9 @@ and fee revenue, never by the re-peg.
 ## Value accrual & flywheel
 
 The token's value is wired to exchange activity through a reinforcing loop. The
-core feedback is **volume → fees → buy back MTF → 70% burn / 20% to validators
-(→ stakers) / 10% treasury → scarcity + staker yield**, with PoS security as the
-stabilizing ring around it.
+core feedback is **volume → fees → split ~70% buyback / ~20% validators (→ stakers)
+/ ~10% treasury → the buyback locks MTF out of circulation → scarcity + staker
+yield**, with PoS security as the stabilizing ring around it.
 
 ### How fee revenue becomes token value — the flow
 
@@ -327,22 +331,24 @@ The value-accrual path is a clean four-step pipeline:
 2. **Pay maker rebates first.** The maker-rebate subsidy comes **off the top** —
    it is paid out of collected fees before anything else (referral / builder
    credits also settle here). What remains is the **net fee revenue**.
-3. **Buy back MTF.** **All** remaining net fee revenue is used to **buy MTF on the
-   open market**. This is real, recurring buy pressure proportional to exchange
-   volume — there is no idle fee pool, the entire net take is converted into MTF.
-4. **Split the bought-back MTF** three ways:
+3. **Split the net fee revenue** three ways:
 
-| Destination | Share of the bought-back MTF | What happens |
-|-------------|-----------------------------:|--------------|
-| **Burn** | **70%** | Permanently destroyed — removed from supply forever. Pure deflation. |
-| **Validators → stakers** | **20%** | Distributed to validators, who pass it through to **their own stakers / delegators**. This **is** the staker revenue-share — delivered through the validator channel, not a separate pool. |
-| **Treasury** | **10%** | Protocol reserve, governance-controlled. |
+| Destination | Share of net fee revenue | What happens |
+|-------------|-------------------------:|--------------|
+| **Buyback** | **~70%** | Buys MTF on the open market and locks **every** bought token forever in a keyless address — permanently removed from circulation. Pure deflation. |
+| **Validators → stakers** | **~20%** | Goes to validators, who pass a share through to **their own stakers / delegators**. This **is** the staker revenue-share — delivered through the validator channel, not a separate pool. |
+| **Treasury** | **~10%** | Protocol reserve, governance-controlled. |
 
-So **70% of every buyback is burned**, 20% becomes the staker revenue-share (paid
-in MTF, routed via validators to their delegators), and 10% funds the treasury.
-Because the inputs are bought MTF, **all three legs create buy pressure first**,
-then either destroy the token (burn) or hand it to long-term participants
-(stakers via validators) and the treasury.
+4. **The ~70% buyback buys MTF and locks it away.** The buyback share is real,
+   recurring buy pressure proportional to exchange volume, and every token it
+   acquires leaves the circulating float for good.
+
+So **~70% of net fee revenue buys MTF that is locked out of circulation forever**,
+~20% becomes the validator-delivered staker revenue-share, and ~10% funds the
+treasury. Because the ~70% leg is bought MTF, it **creates buy pressure first**,
+then locks that MTF out of circulation; the ~20% validator and ~10% treasury legs
+are fee revenue delivered to long-term participants (stakers via validators) and
+the protocol reserve.
 
 ```text
             ┌──────────────┐    trading fees   ┌──────────────┐
@@ -379,9 +385,10 @@ then either destroy the token (burn) or hand it to long-term participants
 
 Read the loop as three reinforcing rings:
 
-1. **The burn ring (deflation).** Volume produces fees; net fees buy MTF; **70% of
-   the bought MTF is burned**. More volume → more buyback → more burn → less supply
-   → scarcer token. This is the primary value-accrual path and it is **already
+1. **The burn ring (deflation).** Volume produces fees; ~70% of net fees buys MTF;
+   **all** of that MTF is locked out of circulation forever. More volume → more
+   buyback → more MTF removed from the float → scarcer token. This is the primary
+   value-accrual path and it is **already
    live**.
 
 2. **The revenue-share ring (cash flow to lockers).** **20% of the bought-back
@@ -420,7 +427,7 @@ is on the dedicated [Staking](./staking.md) page.
 | Benefit | Source | Notes |
 |---------|--------|-------|
 | **Taker-fee discount** | Ten-rung grade ladder by **time-weighted effective weight** | 5%→50% off taker, [Section Chief→Premier / President / General Secretary](./fee-schedule.md#3-staking-discount-tiers-mtf-staked) |
-| **MTF revenue-share** | **20% of every buyback**, paid in MTF via your validator | Routed through validators to their delegators; weighted by your time-weighted stake |
+| **Staker revenue-share** | **~20% of net fee revenue**, via your validator | Routed through validators to their delegators; weighted by your time-weighted stake |
 | **Staking yield** | Reward bootstrap (early) + fee-revenue share (ongoing) | Stake-curve APR, observable live |
 | **Consensus weight** | Validator stake / delegation | Secures the chain, slashable |
 | **Governance weight** | Staked MTF = vote weight | See [Governance](#governance) |
@@ -635,8 +642,8 @@ Two sources, in order of dominance over the chain's life:
 1. **Early:** the staking-reward bootstrap funded from the combined
    treasury/community/ecosystem/validators pool, paying a stake-curve APR that is
    high when little is staked and decays as stake grows.
-2. **Ongoing — the MTF revenue-share.** **20% of every buyback** (MTF bought back
-   with net fee revenue) goes to validators, who distribute it to their **locked
+2. **Ongoing — the staker revenue-share.** **~20% of net fee revenue** goes to
+   validators, who distribute a share to their **locked
    stakers / delegators**, weighted by time-weighted effective weight. This is the
    dividend; it is funded by real exchange volume, not dilution, and grows with
    the venue. **Locked stakers (≥ 1 month) only** — flexible stakers earn the fee
@@ -728,13 +735,14 @@ yield target. Combined with the buyback burn — a **separate, faster** deflatio
 force — the design intent is a **net-deflationary** token at steady-state volume.
 
 **Q: How does fee revenue become token value?**
-A: Net trading fees (after maker rebates are paid off the top) are used to **buy
-MTF on the open market**. The bought-back MTF is split **70% burned / 20% to
-validators (passed to their stakers as the revenue-share) / 10% treasury**. So
+A: Net trading fees (after maker rebates are paid off the top) are split **~70%
+buyback / ~20% validators / ~10% treasury**. The ~70% buyback share buys MTF on the
+open market and locks all of it out of circulation forever; the ~20% validator
+share funds the staker revenue-share. So
 volume → buyback → 70% destroyed, 20% to lockers, 10% treasury.
 
 **Q: What is the staker revenue-share / dividend?**
-A: It is the validators' **20% of every buyback**, distributed in MTF to their
+A: It is the validators' **~20% net-fee-revenue share**, distributed to their
 stakers / delegators, pro-rata by **time-weighted effective weight**. It is not a
 separate pool — it rides the validator channel. It **requires a lock of at least
 1 month**; flexible stakers earn none.
@@ -777,7 +785,7 @@ yield.
 **Q: How does the fee discount interact with the burn?**
 A: They reinforce each other. The discount and the revenue-share pull traders into
 holding and locking MTF (demand + lockup) and lower their cost to trade (more
-volume), and more volume means more net fees buying back MTF — feeding both the
-70% burn and the 20% staker revenue-share.
+volume), and more volume means more net fees — feeding both the ~70% buyback that
+locks MTF out of circulation and the ~20% validator-delivered staker revenue-share.
 
 </details>
