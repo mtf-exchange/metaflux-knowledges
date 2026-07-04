@@ -90,9 +90,19 @@ flowchart TD
 1. **Maker rebates are paid first.** Negative net maker rates (see the
    [Fee schedule](./fee-schedule.md)) are settled out of the fees collected on the
    same flow.
-2. **The remainder buys back MTF.** All fee revenue left after rebates is used to
-   market-buy MTF at the protocol mark. This creates buy pressure and converts fee
-   revenue into MTF before it is distributed.
+2. **The remainder buys back MTF, never above a manipulation-resistant ceiling.**
+   All fee revenue left after rebates is used to buy MTF on the open market by
+   matching resting sell orders on the MTF/USDC book, lowest price first, and the
+   protocol never pays above a price ceiling. When MTF has an external mark, that
+   ceiling is the oracle-bounded mark plus a governance-set slippage allowance.
+   When it does not, the ceiling is anchored to a smoothed average of the
+   protocol's *own* recent buyback execution prices — a self-referential reference
+   that no third party can move by trading, only by making the protocol itself
+   execute higher, which is rate-limited to a small per-round step and can be
+   hard-capped to a fixed band by a governance-set reference price. Sell orders
+   priced above the ceiling are skipped and the unspent balance carries to the next
+   round; if no trustworthy reference exists yet, the buyback defers rather than
+   buying at an unverified price. In fast-moving markets it may lag price by design.
 3. **The bought-back MTF splits 70 / 20 / 10:**
    - **70% is burned** — permanently removed from circulation (deflationary).
    - **20% goes to validators**, who distribute it to their stakers. This is the

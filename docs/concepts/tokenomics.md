@@ -125,9 +125,11 @@ below.
 
 Protocol trading fees are converted into MTF and then split. After maker rebates
 and any referrer/builder credits are paid **off the top**, **all** remaining net
-fee revenue is used to **buy MTF on the open market**. The bought-back MTF is then
-split **70% burned / 20% to validators (who pass it to their stakers) / 10%
-treasury**. So trading volume creates real, recurring buy pressure on MTF, and
+fee revenue is used to **buy MTF on the open market up to a manipulation-resistant,
+governance-anchored price ceiling** (in fast-moving markets the buyback may lag
+price by design, since it never overpays a thin or manipulated book). The
+bought-back MTF is then split **70% burned / 20% to validators (who pass it to
+their stakers) / 10% treasury**. So trading volume creates real, recurring buy pressure on MTF, and
 **70% of every buyback is destroyed forever** while 20% becomes the staker
 revenue-share and 10% funds the treasury.
 
