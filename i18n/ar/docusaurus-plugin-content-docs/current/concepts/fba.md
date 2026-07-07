@@ -169,7 +169,7 @@ t=1.0s   batch_id = 9877 opens
 تُعرَض حوضة FBA الحية والتسوية الاستشارية على مسار القراءة `/info` للعقدة عبر [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — راجع ذلك الإدخال للاطلاع على شكل الاستجابة الكاملة وجدول الحقول. يقبل `market_id` (u32). FBA اشتراك اختياري لكل سوق، لذا فإن السوق غير المسجَّل **ليس 404** — يُعيد 200 بحقول مُصفَّرة (`enabled:false`، `orders` فارغة، `indicative:null`).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"fba_batch_state","market_id":42}'
 ```

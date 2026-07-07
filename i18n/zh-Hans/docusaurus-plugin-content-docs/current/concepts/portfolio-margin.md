@@ -168,7 +168,7 @@ penalty = trunc( 200 × 1000 / 10000 ) = $20      # 10% of the over-concentrated
 ## 查询
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<addr>"}'
 ```

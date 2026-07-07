@@ -25,7 +25,7 @@
 через нативный вызов [`user_rate_limit`](./rest/info.md):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```

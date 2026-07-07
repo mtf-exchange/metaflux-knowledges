@@ -139,7 +139,7 @@ Mesures d'atténuation :
 ## Sélection du validateur
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 Retourne l'ensemble de validateurs actifs (`{epoch, total_stake, n_active, validators[]}`);
@@ -172,7 +172,7 @@ il retourne l'APR effectif des récompenses d'amorçage réellement appliqué pa
 ainsi que ses entrées validées :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 ```
 
 ```json

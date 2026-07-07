@@ -73,7 +73,7 @@ flowchart TD
 Накопленные итоги пулов (выкупленный и сожжённый MTF, пул валидаторов, казначейство) фиксируются в зафиксированном состоянии и доступны через API по пути чтения [`protocol_metrics`](../api/rest/info.md#protocol_metrics):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
 ```
 
 Поскольку дивиденд стейкера выплачивается через долю валидатора, стейкайте больше MTF (или делегируйте валидатору), чтобы получать большую долю — см. [Стейкинг](./staking.md).
@@ -95,10 +95,10 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metr
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your personal tier and recent volume — MTF-native (gateway default path)
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 ```
 

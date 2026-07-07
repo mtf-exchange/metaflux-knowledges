@@ -164,7 +164,7 @@ Una maestra puede mantener el margen clásico mientras una sub opera con PM; est
 ## Consulta
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"sub_accounts","address":"0x<master>"}'
 ```
 

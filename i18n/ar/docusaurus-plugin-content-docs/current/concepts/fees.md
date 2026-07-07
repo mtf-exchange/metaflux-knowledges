@@ -73,7 +73,7 @@ flowchart TD
 تُتابَع إجمالي المجمَّعات التراكمية (MTF المُعاد شراؤه والمحروق، ومجمَّع المحققين، والخزينة) في الحالة المُثبَّتة وتُعرَض في مسار القراءة عبر [`protocol_metrics`](../api/rest/info.md#protocol_metrics):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
 ```
 
 نظرًا لأن عائد المخزِّنين يُسلَّم عبر حصة المحقق، خزِّن المزيد من MTF (أو فوِّض إلى محقق) للحصول على حصة أكبر — راجع [التخزين](./staking.md).
@@ -95,10 +95,10 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metr
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your personal tier and recent volume — MTF-native
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 ```
 

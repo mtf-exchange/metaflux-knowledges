@@ -19,7 +19,7 @@ Un único endpoint, múltiples tipos. Despacha según el campo `type` del cuerpo
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/info
+POST  https://api.<net>.mtf.exchange/info
 ```
 
 | Ruta | Forma en wire |

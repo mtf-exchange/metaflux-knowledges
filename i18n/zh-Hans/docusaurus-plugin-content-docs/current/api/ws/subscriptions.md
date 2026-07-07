@@ -5,7 +5,7 @@
 :::
 
 :::info
-**频道名称采用 snake_case（MTF 原生格式）。** 这是节点 `/ws` 原生接口，因此频道名称均为 snake_case（如 `l2_book`、`user_events` 等）。网关在 `<net>-gateway.mtf.exchange/ws` 上提供相同的原生 WS 接口。
+**频道名称采用 snake_case（MTF 原生格式）。** 这是节点 `/ws` 原生接口，因此频道名称均为 snake_case（如 `l2_book`、`user_events` 等）。网关在 `api.<net>.mtf.exchange/ws` 上提供相同的原生 WS 接口。
 :::
 
 帧协议与 HL 一致；**频道名称采用 MTF 原生 snake_case**。订阅方式如下：

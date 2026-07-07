@@ -53,7 +53,7 @@ MetaFlux هي طبقة L1 مستقلة، وليست إصدارًا من HL. وق
 ### 3. عنوان URL الأساسي
 
 ```
-MTF: https://<net>-gateway.mtf.exchange/{info,exchange,ws}
+MTF: https://api.<net>.mtf.exchange/{info,exchange,ws}
 ```
 
 البوابة هي نقطة الدخول الموحدة للسطح الأصلي لـ MTF. وعند تشغيل العقدة بنفسك، يُخدَّم نفس السطح على `http://localhost:8080`.
@@ -117,7 +117,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://testnet-gateway.mtf.exchange',
+  baseUrl:    'https://api.devnet.mtf.exchange',
   chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
 });
 

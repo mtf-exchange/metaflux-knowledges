@@ -15,7 +15,7 @@ Un seul appel `POST /faucet` attribue **3 000 USDC** en collatéral croisé **et
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/faucet
+POST  https://api.<net>.mtf.exchange/faucet
 ```
 
 Si vous exécutez le nœud vous-même, la même route `/faucet` est accessible directement à
@@ -41,7 +41,7 @@ La route n'est intégrée au routeur principal de l'API que lorsque la configura
 | `amount` | uint64 (USDC entier) | non | Montant USDC facultatif ; **plafonné vers le bas** à la valeur maximale configurée (3 000) — une valeur plus élevée est ramenée à 3 000, jamais au-delà. `0` est rejeté. MTF (10) est fixe quoi qu'il arrive. |
 
 ```bash
-curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -s -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```

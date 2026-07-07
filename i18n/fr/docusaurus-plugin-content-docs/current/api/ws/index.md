@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Les noms de canaux sont en snake_case (natif MTF).** La surface `/ws` du nœud est native MTF, donc les noms de canaux sur le fil sont en snake_case : `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. La passerelle dessert ce même WS natif sur `<net>-gateway.mtf.exchange/ws`.
+**Les noms de canaux sont en snake_case (natif MTF).** La surface `/ws` du nœud est native MTF, donc les noms de canaux sur le fil sont en snake_case : `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. La passerelle dessert ce même WS natif sur `api.<net>.mtf.exchange/ws`.
 :::
 
 ## En bref
@@ -15,7 +15,7 @@ Une seule connexion WS multiplexe les abonnements à de nombreux canaux. Le prot
 ## URL
 
 ```
-wss://<net>-gateway.mtf.exchange/ws
+wss://api.<net>.mtf.exchange/ws
 ```
 
 Le WS natif MTF (canaux en snake_case) est desservi par la passerelle sur `/ws`. La porte d'entrée de la passerelle termine le TLS (`wss://`). Si vous opérez votre propre nœud, le même WS natif est servi en clair sur `ws://localhost:8080/ws` — le protocole de trames est identique dans les deux cas.

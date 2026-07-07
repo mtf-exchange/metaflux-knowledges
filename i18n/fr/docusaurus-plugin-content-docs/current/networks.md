@@ -21,12 +21,12 @@ La passerelle constitue l'unique point d'entrée public. La surface MTF-native e
 
 | Service | Point de terminaison |
 |---------|----------------------|
-| Porte d'entrée passerelle | `https://devnet-gateway.mtf.exchange` |
+| Porte d'entrée passerelle | `https://api.devnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet/testnet) | `POST /faucet` |
-| WS passerelle (natif) | `wss://devnet-gateway.mtf.exchange/ws` |
-| Explorateur | `https://devnet.mtf.exchange/explorer` |
+| WS passerelle (natif) | `wss://api.devnet.mtf.exchange/ws` |
+| Explorateur | `https://app.mtf.exchange/explorer` |
 | Statut | `https://status.mtf.exchange/devnet` |
 
 Vous exécutez le nœud vous-même ? Le nœud expose directement la même surface native à
@@ -49,7 +49,7 @@ Devnet/testnet uniquement — la route **n'est jamais montée sur le mainnet** (
 L'attribution a le statut **`"queued"`** — mise en file d'attente pour le prochain bloc, de sorte que le solde est mis à jour après ~1 bloc, et non de façon synchrone. Contrat complet : [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}

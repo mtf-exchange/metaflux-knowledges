@@ -27,7 +27,7 @@ via la lecture native [`user_rate_limit`](./rest/info.md) sur le chemin par déf
 `/hl`) :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```

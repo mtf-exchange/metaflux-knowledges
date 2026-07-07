@@ -66,7 +66,7 @@
 تُبلَّغ `oracle_px` المُركَّبة على **مستوى USDC الكامل** (مثلًا `"67042.335"`) عبر استعلام [`market_info`](../api/rest/info/perpetuals.md#market_info) إلى جانب `mark_px`:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```
@@ -85,7 +85,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 مجموعة المصادر المُلتزم بها لكل سوق قابلة للاستعلام عبر `oracle_sources` (مجموعة المنصات المُفعَّلة للسوق):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"oracle_sources","asset_id":0}'
 ```

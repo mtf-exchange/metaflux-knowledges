@@ -170,7 +170,7 @@ t=1.0s   batch_id = 9877 открыт
 через [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — полная структура ответа и таблица полей приведены там. Принимает `market_id` (u32). FBA подключается по каждому рынку отдельно, поэтому незарегистрированный рынок возвращает **не 404** — он вернёт 200 с нулевыми полями (`enabled:false`, пустой `orders`, `indicative:null`).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"fba_batch_state","market_id":42}'
 ```

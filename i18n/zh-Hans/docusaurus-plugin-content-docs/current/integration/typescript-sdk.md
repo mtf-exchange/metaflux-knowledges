@@ -15,7 +15,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const c = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | 十六进制字符串或 `Uint8Array` | 是（未设置 `signer` 时） | 32 字节 secp256k1 私钥 |
 | `signer` | `Signer` | 是（未设置 `privateKey` 时） | 自定义签名器（HSM / WalletConnect / Ledger） |
 | `senderAddress` | 十六进制地址 | 可选 | 若设置，将作为 `sender` 使用；签名器地址用于恢复签名方。适用于[代理钱包模式](./agent-wallets-howto.md)。 |
-| `baseUrl` | string | 是 | 网关入口（`https://<net>-gateway.mtf.exchange`）。SDK 使用 MTF-native 协议，由网关在 `/info` · `/exchange` · `/ws` 提供。自行运行节点时请指向 `http://localhost:8080`。详见[网络列表](../networks.md)。 |
+| `baseUrl` | string | 是 | 网关入口（`https://api.<net>.mtf.exchange`）。SDK 使用 MTF-native 协议，由网关在 `/info` · `/exchange` · `/ws` 提供。自行运行节点时请指向 `http://localhost:8080`。详见[网络列表](../networks.md)。 |
 | `chainId` | number | 是 | 各网络对应的 Chain ID，详见[网络列表](../networks.md) |
 | `timeoutMs` | number | 可选（默认 5000） | HTTP 超时时间（毫秒） |
 | `nonceFn` | `() => number` | 可选（默认 `Date.now`） | 自定义 nonce 生成函数 |
@@ -167,7 +167,7 @@ class HsmSigner implements Signer {
 
 const c = new MetaFluxClient({
   signer:      new HsmSigner(),
-  baseUrl:     'https://devnet-gateway.mtf.exchange',
+  baseUrl:     'https://api.devnet.mtf.exchange',
   chainId:     31337,
 });
 ```
@@ -182,7 +182,7 @@ SDK 将已哈希的 `signed_hash` 直接传递给 `Signer.sign`——你的 HSM 
 const agent = new MetaFluxClient({
   privateKey:    agentPrivKey,
   senderAddress: masterAddress,  // ← master is the sender
-  baseUrl:       'https://devnet-gateway.mtf.exchange',
+  baseUrl:       'https://api.devnet.mtf.exchange',
   chainId:       31337,
 });
 

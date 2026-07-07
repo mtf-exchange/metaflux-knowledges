@@ -164,7 +164,7 @@ A master can keep classical while a sub goes PM; useful when one sub runs a hedg
 ## Querying
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"sub_accounts","address":"0x<master>"}'
 ```
 

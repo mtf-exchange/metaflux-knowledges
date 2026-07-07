@@ -25,7 +25,7 @@ Posting a system action's native tag returns `400 unsupported action`.
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/exchange
+POST  https://api.<net>.mtf.exchange/exchange
 ```
 
 | Path | Wire shape |

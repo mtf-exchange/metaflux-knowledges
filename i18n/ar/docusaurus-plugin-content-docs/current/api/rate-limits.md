@@ -24,7 +24,7 @@
 جميع الحدود تخضع للحوكمة. يمكن الاطلاع على لقطة ميزانية الحساب عبر قراءة [`user_rate_limit`](./rest/info.md) الأصلية على مسار البوابة الافتراضي (تُظهر البوابة أيضًا نفس البيانات بصيغة `userRateLimit` متوافقة مع HL تحت `/hl`):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```

@@ -19,7 +19,7 @@ use metaflux_client::{Client, ClientOpts, OrderParams, Side, Tif};
 async fn run() -> anyhow::Result<()> {
     let c = Client::new(ClientOpts {
         private_key: std::env::var("PRIVATE_KEY")?.parse()?,
-        base_url:    "https://devnet-gateway.mtf.exchange".into(),  // MTF-native is the gateway default path
+        base_url:    "https://api.devnet.mtf.exchange".into(),  // MTF-native is the gateway default path
         chain_id:    31337,
         ..Default::default()
     })?;
@@ -52,7 +52,7 @@ pub struct ClientOpts {
     /// Override `sender` address. Used for agent-wallet pattern.
     pub sender_address: Option<Address>,
 
-    /// Gateway front door (`https://<net>-gateway.mtf.exchange`). The SDK speaks
+    /// Gateway front door (`https://api.<net>.mtf.exchange`). The SDK speaks
     /// MTF-native, served by the gateway at `/info` · `/exchange` · `/ws`.
     /// Running the node yourself? Point at `http://localhost:8080`.
     pub base_url:       String,
@@ -219,7 +219,7 @@ let c = Client::new(ClientOpts {
 let agent_client = Client::new(ClientOpts {
     private_key:    Some(agent_priv),
     sender_address: Some(master_addr),    // ← master is sender
-    base_url:       "https://devnet-gateway.mtf.exchange".into(),
+    base_url:       "https://api.devnet.mtf.exchange".into(),
     chain_id:       31337,
     ..Default::default()
 })?;

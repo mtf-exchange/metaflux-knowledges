@@ -147,7 +147,7 @@ L'adresse du coffre est permanente en chaîne ; même un coffre vide persiste (l
 ### Consulter
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"vault_state","vault":"0x<vault>"}'
 ```
 

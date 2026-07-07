@@ -139,7 +139,7 @@ Medidas de mitigación:
 ## Selección de validador
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 Devuelve el conjunto activo de validadores (`{epoch, total_stake, n_active, validators[]}`);
@@ -172,7 +172,7 @@ devuelve el APR efectivo de recompensa de arranque que aplica el efecto de recom
 junto con sus valores de entrada confirmados:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 ```
 
 ```json

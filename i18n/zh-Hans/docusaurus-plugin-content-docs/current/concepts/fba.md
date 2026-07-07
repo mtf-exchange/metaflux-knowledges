@@ -169,7 +169,7 @@ t=1.0s   batch_id = 9877 opens
 实时 FBA 池状态及指示性结算价格通过节点 `/info` 只读路径的 [`fba_batch_state`](../api/rest/info.md#fba_batch_state) 接口获取——详细响应结构和字段说明请参见该条目。接口参数为 `market_id`（u32）。由于 FBA 是按市场选择启用的，未注册的市场**不会返回 404**——而是返回 200，但所有字段清零（`enabled:false`，`orders` 为空，`indicative:null`）。
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"fba_batch_state","market_id":42}'
 ```

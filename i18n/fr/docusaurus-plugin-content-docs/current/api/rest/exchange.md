@@ -17,7 +17,7 @@ Soumettre le tag natif d'une action système renvoie `400 unsupported action`.
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/exchange
+POST  https://api.<net>.mtf.exchange/exchange
 ```
 
 | Chemin | Format sur le fil |

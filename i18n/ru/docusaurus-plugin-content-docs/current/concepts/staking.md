@@ -139,7 +139,7 @@ sequenceDiagram
 ## Выбор валидатора
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 Возвращает активный набор валидаторов (`{epoch, total_stake, n_active, validators[]}`);
@@ -170,7 +170,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_sum
 Тип запроса [`staking_apr`](../api/rest/info.md#staking_apr) через `/info` является **актуальным** — он возвращает эффективный APR вознаграждений первоначального стимулирования, который фактически применяется эффектом вознаграждения при открытии блока, а также связанные с ним входные параметры:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 ```
 
 ```json

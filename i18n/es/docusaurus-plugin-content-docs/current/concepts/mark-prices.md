@@ -114,7 +114,7 @@ Consumidores que usan el **precio de la última operación** en lugar del mark:
 ## Consulta
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```

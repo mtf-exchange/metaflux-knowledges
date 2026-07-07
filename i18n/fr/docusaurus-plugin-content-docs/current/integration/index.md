@@ -40,7 +40,7 @@ Pour les autres langages (Python, Go, Java, C++ …), implémentez la signature 
 
 Consultez [networks](../networks.md) pour la référence complète par réseau.
 
-La passerelle (`https://<net>-gateway.mtf.exchange`) est le point d'entrée public unique.
+La passerelle (`https://api.<net>.mtf.exchange`) est le point d'entrée public unique.
 
 | Chemin | Sert | Rôle |
 |------|--------|---------|

@@ -40,7 +40,7 @@ Para otros lenguajes (Python, Go, Java, C++ …), implementa la firma EIP-712 ty
 
 Consulta [redes](../networks.md) para la referencia completa por red.
 
-El gateway (`https://<net>-gateway.mtf.exchange`) es el único punto de entrada público.
+El gateway (`https://api.<net>.mtf.exchange`) es el único punto de entrada público.
 
 | Ruta | Sirve | Propósito |
 |------|--------|---------|

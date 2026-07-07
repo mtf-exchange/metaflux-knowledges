@@ -49,7 +49,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const master = new MetaFluxClient({
   privateKey: process.env.MASTER_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -103,7 +103,7 @@ const agent = new MetaFluxClient({
   privateKey:     agentPrivateKey.toString('hex'),  // agent signs
   signerAddress:  agentAddress,
   senderAddress:  master.address,                   // sender = master
-  baseUrl:        'https://devnet-gateway.mtf.exchange',
+  baseUrl:        'https://api.devnet.mtf.exchange',
   chainId:        31337,
 });
 
@@ -117,7 +117,7 @@ The SDK's `signerAddress / senderAddress` distinction is how it knows to fill `s
 
 ```typescript
 const sig = signEip712(action, agentPrivateKey, chainId);
-await fetch('https://devnet-gateway.mtf.exchange/exchange', {
+await fetch('https://api.devnet.mtf.exchange/exchange', {
   method:  'POST',
   headers: { 'content-type': 'application/json' },
   body: JSON.stringify({

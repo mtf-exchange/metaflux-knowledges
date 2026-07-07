@@ -5,7 +5,7 @@ description: REST and WebSocket surface — the MTF-native protocol, backed by t
 # API Reference
 
 One MTF-native protocol, served by the gateway front door
-(`https://<net>-gateway.mtf.exchange`).
+(`https://api.<net>.mtf.exchange`).
 
 | Surface | Where | Notes |
 |---------|-------|-------|

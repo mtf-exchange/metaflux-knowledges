@@ -66,7 +66,7 @@
 合成后的 `oracle_px` 以**整 USDC 精度**（如 `"67042.335"`）通过 [`market_info`](../api/rest/info/perpetuals.md#market_info) 接口返回，同时附带 `mark_px`：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```
@@ -85,7 +85,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 已生效的每市场来源集合可通过 `oracle_sources` 查询（某市场已启用的交易所子集）：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"oracle_sources","asset_id":0}'
 ```

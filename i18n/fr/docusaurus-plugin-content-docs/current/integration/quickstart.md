@@ -18,11 +18,11 @@ La passerelle est l'unique point d'entrée public, desservant la surface MTF-nat
 
 | Service | URL (devnet) |
 |---------|--------------|
-| Porte d'entrée de la passerelle | `https://devnet-gateway.mtf.exchange` |
+| Porte d'entrée de la passerelle | `https://api.devnet.mtf.exchange` |
 | MTF-natif | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet) | `POST /faucet` |
-| Explorateur | `https://devnet.mtf.exchange/explorer` |
+| Explorateur | `https://app.mtf.exchange/explorer` |
 
 > Le faucet **n'est pas** un service séparé — il s'agit de la route `POST /faucet` sur la
 > porte d'entrée de la passerelle. Vous faites tourner le nœud vous-même ? La même surface native
@@ -34,7 +34,7 @@ Consultez [réseaux](../networks.md) pour la liste complète incluant le testnet
 ## Étape 1 — Obtenir des USDC devnet
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -50,7 +50,7 @@ Les appels curl bruts ci-dessous utilisent le format **MTF-native** sur la passe
 communiquent sur cette même surface native — le SDK se contente de construire l'enveloppe signée pour vous.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -66,7 +66,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -88,7 +88,7 @@ console.log('order id:', result.oid);
 Curl brut (format MTF-native — vous construisez la signature vous-même ; voir [signature](./signing.md)) :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -126,7 +126,7 @@ spot ouverts via [`POST /info`](../api/rest/info.md) ; annulez avec
 ## Étape 3 — Vérifier que l'ordre est dans le carnet
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -150,7 +150,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

@@ -155,7 +155,7 @@ El estado del motor RFQ se expone en la ruta de lectura `/info` del nodo mediant
 `rfq_open` no requiere **parámetros** y devuelve todos los RFQs abiertos junto con sus cotizaciones de creadores:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open"}'
 ```
@@ -163,7 +163,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 Para los RFQs en los que una cuenta específica participa, `rfq_user` acepta `account_id` (u64) o `address` (hex 0x) y divide el resultado en `requested` (RFQs abiertos por la cuenta) y `quoted` (RFQs en los que cotizó):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","address":"0x..."}'
 ```

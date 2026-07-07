@@ -139,7 +139,7 @@ sequenceDiagram
 ## اختيار المدقق
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 يُعيد مجموعة المدققين النشطة (`{epoch, total_stake, n_active, validators[]}`);
@@ -171,7 +171,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_sum
 يُعيد APR المكافآت التمهيدية الفعلي الذي يطبّقه تأثير مكافأة بداية الكتلة فعليًا، بالإضافة إلى مدخلاته المُلتزَمة:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 ```
 
 ```json

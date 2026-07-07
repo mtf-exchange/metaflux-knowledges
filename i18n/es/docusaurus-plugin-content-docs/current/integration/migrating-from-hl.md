@@ -53,7 +53,7 @@ El dominio EIP-712 de MTF usa `name = "MetaFlux"`, `version = "1"`, `verifyingCo
 ### 3. URL base
 
 ```
-MTF: https://<net>-gateway.mtf.exchange/{info,exchange,ws}
+MTF: https://api.<net>.mtf.exchange/{info,exchange,ws}
 ```
 
 El gateway es la única puerta de entrada para la superficie MTF-native. Si ejecutas el nodo tú mismo, la misma superficie se sirve en `http://localhost:8080`.
@@ -117,7 +117,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://testnet-gateway.mtf.exchange',
+  baseUrl:    'https://api.devnet.mtf.exchange',
   chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
 });
 

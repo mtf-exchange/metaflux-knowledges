@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. The gateway serves this same native WS at `<net>-gateway.mtf.exchange/ws`.
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`.
 :::
 
 ## TL;DR
@@ -15,7 +15,7 @@ A single WS connection multiplexes subscriptions to many channels. The frame pro
 ## URL
 
 ```
-wss://<net>-gateway.mtf.exchange/ws
+wss://api.<net>.mtf.exchange/ws
 ```
 
 MTF-native WS (snake_case channels) is served by the gateway at `/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.

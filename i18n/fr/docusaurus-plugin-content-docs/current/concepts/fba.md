@@ -169,7 +169,7 @@ t=1.0s   batch_id = 9877 ouvre
 Le pool FBA en direct et la liquidation indicative sont exposés sur le chemin de lecture `/info` du nœud via [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — consultez cette entrée pour la structure complète de la réponse et le tableau des champs. Il prend `market_id` (u32). Le FBA étant une activation par marché, un marché non enregistré ne retourne **pas une 404** — il renvoie un 200 avec des champs à zéro (`enabled:false`, `orders` vide, `indicative:null`).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"fba_batch_state","market_id":42}'
 ```

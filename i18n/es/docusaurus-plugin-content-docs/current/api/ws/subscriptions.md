@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Los nombres de canal van en snake_case (nativo de MTF).** Esta es la superficie nativa del nodo `/ws`, por lo que los nombres de canal en el protocolo son snake_case (`l2_book`, `user_events`, …). El gateway sirve este mismo WS nativo en `<net>-gateway.mtf.exchange/ws`.
+**Los nombres de canal van en snake_case (nativo de MTF).** Esta es la superficie nativa del nodo `/ws`, por lo que los nombres de canal en el protocolo son snake_case (`l2_book`, `user_events`, …). El gateway sirve este mismo WS nativo en `api.<net>.mtf.exchange/ws`.
 :::
 
 El protocolo de trama sigue el de HL; los **nombres de canal son snake_case nativos de MTF**. La suscripción se realiza con:

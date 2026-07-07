@@ -12,7 +12,7 @@
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `<net>-gateway.mtf.exchange/ws`.
+**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`.
 :::
 
 The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**. You subscribe with:

@@ -40,7 +40,7 @@ For other languages (Python, Go, Java, C++ …), implement the EIP-712 typed-dat
 
 See [networks](../networks.md) for the full per-network reference.
 
-The gateway (`https://<net>-gateway.mtf.exchange`) is the single public front door.
+The gateway (`https://api.<net>.mtf.exchange`) is the single public front door.
 
 | Path | Serves | Purpose |
 |------|--------|---------|

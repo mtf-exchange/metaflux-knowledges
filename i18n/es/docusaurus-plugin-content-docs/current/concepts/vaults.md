@@ -145,7 +145,7 @@ La dirección de la bóveda permanece en la cadena de forma permanente; incluso 
 ### Consulta
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"vault_state","vault":"0x<vault>"}'
 ```
 

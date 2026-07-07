@@ -15,7 +15,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const c = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -35,7 +35,7 @@ new MetaFluxClient(opts: ClientOpts)
 | `privateKey` | hex string OR `Uint8Array` | sí (salvo que se defina `signer`) | Clave privada secp256k1 de 32 bytes |
 | `signer` | `Signer` | sí (salvo que se defina `privateKey`) | Firmante personalizado (HSM / WalletConnect / Ledger) |
 | `senderAddress` | hex address | opcional | Si se establece, se usa como `sender`; la dirección del firmante se emplea como firmante recuperado. Para el [patrón de agente-wallet](./agent-wallets-howto.md). |
-| `baseUrl` | string | sí | Punto de entrada del gateway (`https://<net>-gateway.mtf.exchange`). El SDK utiliza el protocolo MTF-native, servido por el gateway en `/info` · `/exchange` · `/ws`. ¿Ejecutas el nodo tú mismo? Apunta a `http://localhost:8080`. Consulta [redes](../networks.md). |
+| `baseUrl` | string | sí | Punto de entrada del gateway (`https://api.<net>.mtf.exchange`). El SDK utiliza el protocolo MTF-native, servido por el gateway en `/info` · `/exchange` · `/ws`. ¿Ejecutas el nodo tú mismo? Apunta a `http://localhost:8080`. Consulta [redes](../networks.md). |
 | `chainId` | number | sí | Según la red — véase [redes](../networks.md) |
 | `timeoutMs` | number | opcional (por defecto 5000) | Tiempo de espera HTTP |
 | `nonceFn` | `() => number` | opcional (por defecto `Date.now`) | Generador de nonce personalizado |
@@ -170,7 +170,7 @@ class HsmSigner implements Signer {
 
 const c = new MetaFluxClient({
   signer:      new HsmSigner(),
-  baseUrl:     'https://devnet-gateway.mtf.exchange',
+  baseUrl:     'https://api.devnet.mtf.exchange',
   chainId:     31337,
 });
 ```
@@ -185,7 +185,7 @@ Para el [patrón de agente-wallet](./agent-wallets-howto.md):
 const agent = new MetaFluxClient({
   privateKey:    agentPrivKey,
   senderAddress: masterAddress,  // ← master is the sender
-  baseUrl:       'https://devnet-gateway.mtf.exchange',
+  baseUrl:       'https://api.devnet.mtf.exchange',
   chainId:       31337,
 });
 

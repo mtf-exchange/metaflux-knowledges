@@ -21,12 +21,12 @@
 
 | الخدمة | نقطة النهاية |
 |--------|-------------|
-| البوابة الرئيسية | `https://devnet-gateway.mtf.exchange` |
+| البوابة الرئيسية | `https://api.devnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | الصنبور (devnet/testnet) | `POST /faucet` |
-| Gateway WS (native) | `wss://devnet-gateway.mtf.exchange/ws` |
-| المستكشف | `https://devnet.mtf.exchange/explorer` |
+| Gateway WS (native) | `wss://api.devnet.mtf.exchange/ws` |
+| المستكشف | `https://app.mtf.exchange/explorer` |
 | الحالة | `https://status.mtf.exchange/devnet` |
 
 هل تشغّل العقدة بنفسك؟ تخدم العقدة الواجهة الأصلية ذاتها مباشرةً على
@@ -49,7 +49,7 @@
 بعد ~كتلة واحدة تقريبًا، وليس بشكل فوري. المرجع الكامل: [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}

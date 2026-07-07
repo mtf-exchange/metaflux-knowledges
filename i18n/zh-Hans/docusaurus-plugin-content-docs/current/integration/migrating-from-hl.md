@@ -53,7 +53,7 @@ MTF 的 EIP-712 domain 使用 `name = "MetaFlux"`、`version = "1"`、`verifying
 ### 3. Base URL
 
 ```
-MTF: https://<net>-gateway.mtf.exchange/{info,exchange,ws}
+MTF: https://api.<net>.mtf.exchange/{info,exchange,ws}
 ```
 
 网关是 MTF 原生接口的唯一入口。若自行运行节点，相同的接口在 `http://localhost:8080` 提供。
@@ -117,7 +117,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://testnet-gateway.mtf.exchange',
+  baseUrl:    'https://api.devnet.mtf.exchange',
   chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
 });
 

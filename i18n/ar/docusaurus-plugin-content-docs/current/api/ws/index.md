@@ -5,7 +5,7 @@
 :::
 
 :::info
-**أسماء القنوات بتنسيق snake_case (الأصيل في MTF).** سطح `/ws` للعقدة هو الأصيل في MTF، لذا تأتي أسماء القنوات على السلك بتنسيق snake_case: `l2_book` و`bbo` و`trades` و`active_asset_ctx` و`fills` و`candles` و`user_events`. تخدم البوابة نفس WS الأصيل على `<net>-gateway.mtf.exchange/ws`.
+**أسماء القنوات بتنسيق snake_case (الأصيل في MTF).** سطح `/ws` للعقدة هو الأصيل في MTF، لذا تأتي أسماء القنوات على السلك بتنسيق snake_case: `l2_book` و`bbo` و`trades` و`active_asset_ctx` و`fills` و`candles` و`user_events`. تخدم البوابة نفس WS الأصيل على `api.<net>.mtf.exchange/ws`.
 :::
 
 ## ملخص سريع
@@ -15,7 +15,7 @@
 ## عنوان URL
 
 ```
-wss://<net>-gateway.mtf.exchange/ws
+wss://api.<net>.mtf.exchange/ws
 ```
 
 يُخدَّم WS الأصيل في MTF (قنوات snake_case) من البوابة على المسار `/ws`. تُنهي البوابة الأمامية تشفير TLS (`wss://`). عند تشغيل العقدة بنفسك، يُقدَّم WS الأصيل ذاته عبر الاتصال العادي على `ws://localhost:8080/ws` — بروتوكول الإطارات متطابق في كلتا الحالتين.

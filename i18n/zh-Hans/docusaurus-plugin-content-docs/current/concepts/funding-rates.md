@@ -180,7 +180,7 @@ short 0.5 BTC:
 市场维度的历史记录：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"funding_history","market_id":0}'
 ```

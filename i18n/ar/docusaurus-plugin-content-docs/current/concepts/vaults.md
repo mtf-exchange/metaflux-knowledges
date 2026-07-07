@@ -145,7 +145,7 @@ mgmt_per_block = management_fee_bps / 1e4 / (blocks_per_year)
 ### الاستعلام
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"vault_state","vault":"0x<vault>"}'
 ```
 

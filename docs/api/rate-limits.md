@@ -33,7 +33,7 @@ All limits are governance-controlled. A per-account budget snapshot is available
 via the native [`user_rate_limit`](./rest/info.md) read:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"user_rate_limit","address":"0x<addr>"}'
 ```

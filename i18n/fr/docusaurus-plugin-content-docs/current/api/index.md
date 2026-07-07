@@ -5,7 +5,7 @@ description: "Surface REST et WebSocket — le protocole MTF-native, adossé à 
 # Référence API
 
 Un seul protocole MTF-native, desservi par la passerelle d'entrée
-(`https://<net>-gateway.mtf.exchange`).
+(`https://api.<net>.mtf.exchange`).
 
 | Surface | Emplacement | Notes |
 |---------|-------------|-------|

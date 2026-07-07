@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Los nombres de canal usan snake_case (nativo de MTF).** La interfaz `/ws` del nodo es nativa de MTF, por lo que los nombres de canal en el wire son snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. El gateway sirve este mismo WS nativo en `<net>-gateway.mtf.exchange/ws`.
+**Los nombres de canal usan snake_case (nativo de MTF).** La interfaz `/ws` del nodo es nativa de MTF, por lo que los nombres de canal en el wire son snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. El gateway sirve este mismo WS nativo en `api.<net>.mtf.exchange/ws`.
 :::
 
 ## Resumen rápido
@@ -15,7 +15,7 @@ Una única conexión WS multiplexa suscripciones a múltiples canales. El protoc
 ## URL
 
 ```
-wss://<net>-gateway.mtf.exchange/ws
+wss://api.<net>.mtf.exchange/ws
 ```
 
 El WS nativo de MTF (canales snake_case) lo sirve el gateway en `/ws`. La puerta de entrada del gateway termina TLS (`wss://`). Si ejecuta el nodo usted mismo, el mismo WS nativo se sirve en texto plano en `ws://localhost:8080/ws` — el protocolo de frames es idéntico en ambos casos.

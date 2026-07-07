@@ -15,7 +15,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const c = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -170,7 +170,7 @@ class HsmSigner implements Signer {
 
 const c = new MetaFluxClient({
   signer:      new HsmSigner(),
-  baseUrl:     'https://devnet-gateway.mtf.exchange',
+  baseUrl:     'https://api.devnet.mtf.exchange',
   chainId:     31337,
 });
 ```
@@ -185,7 +185,7 @@ SDK передаёт уже захешированный `signed_hash` в `Signe
 const agent = new MetaFluxClient({
   privateKey:    agentPrivKey,
   senderAddress: masterAddress,  // ← master is the sender
-  baseUrl:       'https://devnet-gateway.mtf.exchange',
+  baseUrl:       'https://api.devnet.mtf.exchange',
   chainId:       31337,
 });
 

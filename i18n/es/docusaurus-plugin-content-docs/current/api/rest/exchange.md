@@ -15,7 +15,7 @@ Toda acción **de usuario** que muta estado — colocar orden, cancelar, depósi
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/exchange
+POST  https://api.<net>.mtf.exchange/exchange
 ```
 
 | Ruta | Forma wire |

@@ -173,7 +173,7 @@ habilitación por mercado, por lo que un mercado no registrado **no devuelve 404
 con campos en cero (`enabled:false`, `orders` vacío, `indicative:null`).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"fba_batch_state","market_id":42}'
 ```

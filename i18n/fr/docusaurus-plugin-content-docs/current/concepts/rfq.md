@@ -155,7 +155,7 @@ L'état du moteur RFQ est exposé sur le chemin de lecture `/info` du nœud via 
 `rfq_open` ne prend **aucun paramètre** et retourne tous les RFQ ouverts avec leurs cotations de teneurs associées :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open"}'
 ```
@@ -163,7 +163,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 Pour les RFQ auxquels un compte spécifique est partie, `rfq_user` prend un `account_id` (u64) ou une `address` (hex 0x) et divise le résultat en `requested` (RFQ ouverts par le compte) et `quoted` (RFQ sur lesquels il a coté) :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","address":"0x..."}'
 ```

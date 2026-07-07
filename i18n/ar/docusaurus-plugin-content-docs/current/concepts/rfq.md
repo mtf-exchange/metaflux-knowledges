@@ -155,7 +155,7 @@ sequenceDiagram
 لا يأخذ `rfq_open` **أي معاملات** ويُعيد جميع طلبات RFQ المفتوحة مع عروض الصانعين المرتبطة بها:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open"}'
 ```
@@ -163,7 +163,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 لطلبات RFQ التي يكون حساب معين طرفاً فيها، يأخذ `rfq_user` المعاملة `account_id` (u64) أو `address` (0x hex) ويقسم النتيجة إلى `requested` (طلبات RFQ التي فتحها الحساب) و`quoted` (طلبات RFQ التي قدم عليها عروضاً):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","address":"0x..."}'
 ```

@@ -114,7 +114,7 @@ mark_T       = clamp(candidate, prior_mark - max_step, prior_mark + max_step)
 ## 查询接口
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```

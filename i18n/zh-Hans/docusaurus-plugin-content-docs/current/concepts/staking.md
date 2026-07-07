@@ -139,7 +139,7 @@ sequenceDiagram
 ## 验证者筛选
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 返回活跃验证者集合（`{epoch, total_stake, n_active, validators[]}`），每条记录包含：
@@ -169,7 +169,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_sum
 [`staking_apr`](../api/rest/info.md#staking_apr) `/info` 查询类型为**实时数据**——返回区块奖励效应实际生效的启动引导奖励 APR，以及对应的已承诺参数：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 ```
 
 ```json

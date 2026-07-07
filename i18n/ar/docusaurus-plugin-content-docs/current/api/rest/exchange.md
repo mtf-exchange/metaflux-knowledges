@@ -15,7 +15,7 @@
 ## عنوان URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/exchange
+POST  https://api.<net>.mtf.exchange/exchange
 ```
 
 | المسار | شكل البيانات |

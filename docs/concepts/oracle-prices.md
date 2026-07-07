@@ -66,7 +66,7 @@ The composed `oracle_px` is published **once per block**, derived from the conse
 The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`market_info`](../api/rest/info/perpetuals.md#market_info) read, alongside `mark_px`:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","coin":"BTC"}'
 ```
@@ -85,7 +85,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 The committed per-market source set is queryable via `oracle_sources` (the enabled-venue subset for a market):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"oracle_sources","coin":"BTC"}'
 ```

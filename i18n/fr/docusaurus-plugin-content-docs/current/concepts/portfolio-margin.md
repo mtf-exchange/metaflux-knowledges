@@ -168,7 +168,7 @@ Un portefeuille plus équilibré où aucun actif unique ne dépasse 50 % de la v
 ## Interrogation
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<addr>"}'
 ```

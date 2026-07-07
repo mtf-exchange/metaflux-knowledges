@@ -5,7 +5,7 @@ description: "Superficie REST y WebSocket — el protocolo MTF-native, respaldad
 # Referencia de API
 
 Un único protocolo MTF-native, servido por la puerta de entrada del gateway
-(`https://<net>-gateway.mtf.exchange`).
+(`https://api.<net>.mtf.exchange`).
 
 | Superficie | Dónde | Notas |
 |---------|-------|-------|

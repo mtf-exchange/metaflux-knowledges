@@ -66,7 +66,7 @@ El `oracle_px` compuesto se publica **una vez por bloque**, derivado del timesta
 El `oracle_px` compuesto se reporta en el **plano de USDC enteros** (p. ej. `"67042.335"`) mediante la lectura [`market_info`](../api/rest/info/perpetuals.md#market_info), junto con `mark_px`:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```
@@ -85,7 +85,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 El conjunto de fuentes comprometido por mercado es consultable mediante `oracle_sources` (el subconjunto de venues habilitadas para un mercado):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"oracle_sources","asset_id":0}'
 ```

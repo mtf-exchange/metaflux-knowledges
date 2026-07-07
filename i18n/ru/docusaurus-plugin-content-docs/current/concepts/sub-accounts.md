@@ -164,7 +164,7 @@ flowchart LR
 ## Запрос данных
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"sub_accounts","address":"0x<master>"}'
 ```
 

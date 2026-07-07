@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Имена каналов в snake_case (нативный формат MTF).** Эндпоинт `/ws` ноды использует нативный формат MTF, поэтому имена каналов передаются в snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Шлюз предоставляет этот же нативный WS по адресу `<net>-gateway.mtf.exchange/ws`.
+**Имена каналов в snake_case (нативный формат MTF).** Эндпоинт `/ws` ноды использует нативный формат MTF, поэтому имена каналов передаются в snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. Шлюз предоставляет этот же нативный WS по адресу `api.<net>.mtf.exchange/ws`.
 :::
 
 ## Кратко
@@ -15,7 +15,7 @@
 ## URL
 
 ```
-wss://<net>-gateway.mtf.exchange/ws
+wss://api.<net>.mtf.exchange/ws
 ```
 
 Нативный WS MTF (каналы в snake_case) обслуживается шлюзом по адресу `/ws`. Точка входа шлюза терминирует TLS (`wss://`). При самостоятельном запуске ноды нативный WS доступен без шифрования по адресу `ws://localhost:8080/ws` — протокол кадров идентичен в обоих случаях.

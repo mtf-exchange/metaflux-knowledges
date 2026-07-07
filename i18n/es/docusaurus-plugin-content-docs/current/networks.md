@@ -21,12 +21,12 @@ El gateway es la única puerta de entrada pública. La superficie MTF-native se 
 
 | Servicio | Endpoint |
 |---------|----------|
-| Puerta de entrada del gateway | `https://devnet-gateway.mtf.exchange` |
+| Puerta de entrada del gateway | `https://api.devnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet/testnet) | `POST /faucet` |
-| Gateway WS (nativo) | `wss://devnet-gateway.mtf.exchange/ws` |
-| Explorador | `https://devnet.mtf.exchange/explorer` |
+| Gateway WS (nativo) | `wss://api.devnet.mtf.exchange/ws` |
+| Explorador | `https://app.mtf.exchange/explorer` |
 | Estado | `https://status.mtf.exchange/devnet` |
 
 ¿Ejecutas el nodo localmente? El nodo expone la misma interfaz nativa directamente en
@@ -50,7 +50,7 @@ La concesión queda en estado **`"queued"`** — programada para el siguiente bl
 tras ~1 bloque, no de forma sincrónica. Contrato completo: [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}

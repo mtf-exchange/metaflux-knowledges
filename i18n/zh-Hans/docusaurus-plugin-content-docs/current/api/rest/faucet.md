@@ -15,7 +15,7 @@ description: Devnet/测试网测试水龙头 — 一次性发放测试 USDC + MT
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/faucet
+POST  https://api.<net>.mtf.exchange/faucet
 ```
 
 若自行运行节点，同一 `/faucet` 路由可直接通过 `http://localhost:8080` 访问。
@@ -40,7 +40,7 @@ POST  https://<net>-gateway.mtf.exchange/faucet
 | `amount` | uint64（整数 USDC） | 否 | 可选 USDC 发放量；**只能向下限制**，不超过配置的上限（3000）— 传入更大的值会被截断至 3000，不可超过上限。`0` 会被拒绝。MTF（10）为固定数量，不受影响。 |
 
 ```bash
-curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -s -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```

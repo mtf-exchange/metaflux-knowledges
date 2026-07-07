@@ -18,11 +18,11 @@ The gateway is the single public front door, serving the MTF-native surface.
 
 | Service | URL (devnet) |
 |---------|--------------|
-| Gateway front door | `https://devnet-gateway.mtf.exchange` |
+| Gateway front door | `https://api.devnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Faucet (devnet) | `POST /faucet` |
-| Explorer | `https://devnet.mtf.exchange/explorer` |
+| Explorer | `https://app.mtf.exchange/explorer` |
 
 > The faucet is **not** a separate service — it's the `POST /faucet` route on the
 > gateway front door. Running the node yourself? The same native surface
@@ -34,7 +34,7 @@ See [networks](../networks.md) for the full list including testnet and (post-lau
 ## Step 1 — Get devnet USDC
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -51,7 +51,7 @@ The raw curls below speak **MTF-native** on the gateway (snake_case types like
 native surface — the SDK just builds the signed envelope for you.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -67,7 +67,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -89,7 +89,7 @@ console.log('order id:', result.oid);
 Raw curl (MTF-native shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -127,7 +127,7 @@ spot orders back via [`POST /info`](../api/rest/info.md); cancel with
 ## Step 3 — Check the order is on the book
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -151,7 +151,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

@@ -21,7 +21,7 @@ en la puerta principal del gateway, junto a las rutas nativas `/info` + `/exchan
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/faucet
+POST  https://api.<net>.mtf.exchange/faucet
 ```
 
 Si ejecutas el nodo tú mismo, la misma ruta `/faucet` se sirve directamente en
@@ -49,7 +49,7 @@ handler y es estructuralmente inalcanzable desde el árbol del handler de `/exch
 | `amount` | uint64 (USDC enteros) | no | Concesión opcional de USDC; **limita HACIA ABAJO** respecto al máximo configurado (3000) — un valor mayor se recorta a 3000, nunca por encima. `0` es rechazado. Los MTF (10) son fijos independientemente. |
 
 ```bash
-curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -s -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```

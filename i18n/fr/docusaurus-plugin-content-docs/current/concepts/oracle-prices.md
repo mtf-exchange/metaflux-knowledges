@@ -66,7 +66,7 @@ Le `oracle_px` composé est publié **une fois par bloc**, dérivé de l'horodat
 Le `oracle_px` composé est renvoyé dans le **plan USDC entier** (ex. `"67042.335"`) par la lecture [`market_info`](../api/rest/info/perpetuals.md#market_info), aux côtés de `mark_px` :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"market_info","asset_id":0}'
 ```
@@ -85,7 +85,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/info \
 L'ensemble de sources validé par marché est interrogeable via `oracle_sources` (le sous-ensemble de places activées pour un marché) :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"oracle_sources","asset_id":0}'
 ```

@@ -5,7 +5,7 @@
 :::
 
 :::info
-**Les noms de canaux sont en snake_case (natif MTF).** Il s'agit de la surface native du nœud `/ws`, donc les noms de canaux sur le fil sont en snake_case (`l2_book`, `user_events`, …). La passerelle dessert ce même WS natif sur `<net>-gateway.mtf.exchange/ws`.
+**Les noms de canaux sont en snake_case (natif MTF).** Il s'agit de la surface native du nœud `/ws`, donc les noms de canaux sur le fil sont en snake_case (`l2_book`, `user_events`, …). La passerelle dessert ce même WS natif sur `api.<net>.mtf.exchange/ws`.
 :::
 
 Le protocole de trame reflète celui de HL ; les **noms de canaux sont en snake_case natif MTF**. L'abonnement s'effectue via :

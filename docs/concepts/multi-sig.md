@@ -160,7 +160,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 ## Querying
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_to_multi_sig_signers","user":"0x<multisig>"}'
 ```
 

@@ -19,7 +19,7 @@ description: "POST /info 只读端点——查询类型、请求/响应信封及
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/info
+POST  https://api.<net>.mtf.exchange/info
 ```
 
 | 路径 | 数据格式 |

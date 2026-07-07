@@ -18,11 +18,11 @@
 
 | Сервис | URL (devnet) |
 |---------|--------------|
-| Шлюз (точка входа) | `https://devnet-gateway.mtf.exchange` |
+| Шлюз (точка входа) | `https://api.devnet.mtf.exchange` |
 | MTF-нативный | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Фасет (devnet) | `POST /faucet` |
-| Обозреватель | `https://devnet.mtf.exchange/explorer` |
+| Обозреватель | `https://app.mtf.exchange/explorer` |
 
 > Фасет — **не** отдельный сервис, это маршрут `POST /faucet` на шлюзе.
 > Запускаете собственный узел? Та же нативная поверхность
@@ -34,7 +34,7 @@
 ## Шаг 1 — Получить USDC в devnet
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -51,7 +51,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/faucet \
 используют ту же нативную поверхность — SDK просто собирает подписанный конверт за вас.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -67,7 +67,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -89,7 +89,7 @@ console.log('order id:', result.oid);
 Пример через curl (MTF-нативный формат — подпись формируете самостоятельно; см. [Подписание](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -127,7 +127,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/exchange \
 ## Шаг 3 — Убедиться, что ордер стоит в книге
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -151,7 +151,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

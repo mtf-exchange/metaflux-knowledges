@@ -124,7 +124,7 @@ pool, treasury) are tracked in committed state and exposed on the read path via
 [`protocol_metrics`](../api/rest/info.md#protocol_metrics):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
 ```
 
 Because the staker dividend is delivered through the validator share, stake more
@@ -160,10 +160,10 @@ pay it as part of the loss settled on close, flagged on the liquidation fills in
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your personal tier and recent volume — MTF-native
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 ```
 

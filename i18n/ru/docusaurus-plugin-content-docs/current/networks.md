@@ -21,12 +21,12 @@
 
 | Сервис | Эндпоинт |
 |--------|----------|
-| Точка входа шлюза | `https://devnet-gateway.mtf.exchange` |
+| Точка входа шлюза | `https://api.devnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | Кран (devnet/testnet) | `POST /faucet` |
-| WebSocket шлюза (native) | `wss://devnet-gateway.mtf.exchange/ws` |
-| Обозреватель | `https://devnet.mtf.exchange/explorer` |
+| WebSocket шлюза (native) | `wss://api.devnet.mtf.exchange/ws` |
+| Обозреватель | `https://app.mtf.exchange/explorer` |
 | Статус | `https://status.mtf.exchange/devnet` |
 
 Запускаете ноду самостоятельно? Нода предоставляет те же нативные эндпоинты напрямую по адресу
@@ -49,7 +49,7 @@
 Выдача имеет статус **`"queued"`** — средства поставлены в очередь на следующий блок, поэтому баланс обновляется примерно через 1 блок, а не мгновенно. Полная спецификация: [`POST /faucet`](api/rest/faucet.md).
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}

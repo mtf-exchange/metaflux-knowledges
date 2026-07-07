@@ -18,11 +18,11 @@
 
 | 服务 | URL（devnet） |
 |---------|--------------|
-| 网关入口 | `https://devnet-gateway.mtf.exchange` |
+| 网关入口 | `https://api.devnet.mtf.exchange` |
 | MTF 原生 | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | 水龙头（devnet） | `POST /faucet` |
-| 浏览器 | `https://devnet.mtf.exchange/explorer` |
+| 浏览器 | `https://app.mtf.exchange/explorer` |
 
 > 水龙头**不是**独立服务——它就是网关入口上的 `POST /faucet` 路由。如果你自行运行节点，相同的原生接口（`/info` · `/exchange` · `/ws` · `/faucet`）也会直接在 `http://localhost:8080` 提供服务。详见 [`POST /faucet`](../api/rest/faucet.md)。
 
@@ -31,7 +31,7 @@
 ## 第一步 — 获取 devnet USDC
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -42,7 +42,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/faucet \
 下面的原始 curl 示例在网关上使用 **MTF 原生**格式（snake_case 类型如 `account_state` / `open_orders`）。`@metaflux/sdk` 示例使用相同的原生接口——SDK 只是替你构建已签名的信封。
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -58,7 +58,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -80,7 +80,7 @@ console.log('order id:', result.oid);
 原始 curl（MTF 原生格式——需自行构建签名；参见[签名](./signing.md)）：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -111,7 +111,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/exchange \
 ## 第三步 — 确认订单已进入委托簿
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -135,7 +135,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

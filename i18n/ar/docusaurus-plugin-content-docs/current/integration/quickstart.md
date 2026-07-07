@@ -18,11 +18,11 @@
 
 | الخدمة | عنوان URL (devnet) |
 |---------|--------------|
-| مدخل البوابة الرئيسي | `https://devnet-gateway.mtf.exchange` |
+| مدخل البوابة الرئيسي | `https://api.devnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
 | الصنبور (devnet) | `POST /faucet` |
-| المستعرض | `https://devnet.mtf.exchange/explorer` |
+| المستعرض | `https://app.mtf.exchange/explorer` |
 
 > الصنبور **ليس** خدمة منفصلة — بل هو مسار `POST /faucet` على مدخل البوابة الرئيسي. هل تشغّل العقدة بنفسك؟ السطح الأصلي ذاته (`/info` · `/exchange` · `/ws` · `/faucet`) يُخدَّم مباشرةً على `http://localhost:8080`. انظر [`POST /faucet`](../api/rest/faucet.md).
 
@@ -31,7 +31,7 @@
 ## الخطوة 1 — احصل على USDC في devnet
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -44,7 +44,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/faucet \
 تتحدّث طلبات curl الخام أدناه بروتوكول **MTF-native** على البوابة (أنواع snake_case مثل `account_state` / `open_orders`). أمثلة `@metaflux/sdk` تتحدّث نفس السطح الأصلي — تكتفي الحزمة ببناء الغلاف الموقّع نيابةً عنك.
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -60,7 +60,7 @@ import { MetaFluxClient } from '@metaflux/sdk';
 
 const client = new MetaFluxClient({
   privateKey: process.env.PRIVATE_KEY!,
-  baseUrl:    'https://devnet-gateway.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
   chainId:    31337,
 });
 
@@ -82,7 +82,7 @@ console.log('order id:', result.oid);
 طلب curl الخام (شكل MTF-native — عليك بناء التوقيع بنفسك؛ انظر [التوقيع](./signing.md)):
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -113,7 +113,7 @@ curl -X POST https://devnet-gateway.mtf.exchange/exchange \
 ## الخطوة 3 — تحقق من وجود الأمر في دفتر الطلبات
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -137,7 +137,7 @@ await client.exchange.cancel({ asset: btcId, oid: result.oid });
 
 ```bash
 # raw curl
-curl -X POST https://devnet-gateway.mtf.exchange/exchange \
+curl -X POST https://api.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 

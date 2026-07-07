@@ -141,7 +141,7 @@ Mitigations:
 ## Validator selection
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 Returns the active validator set (`{epoch, total_stake, n_active, validators[]}`);
@@ -174,7 +174,7 @@ it returns the effective bootstrap-reward APR the begin-block reward effect
 actually applies, plus its committed inputs:
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 ```
 
 ```json

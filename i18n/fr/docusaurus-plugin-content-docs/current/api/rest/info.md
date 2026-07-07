@@ -19,7 +19,7 @@ Un seul point de terminaison, multi-type. Le routage s'effectue sur le champ `ty
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/info
+POST  https://api.<net>.mtf.exchange/info
 ```
 
 | Chemin | Format wire |

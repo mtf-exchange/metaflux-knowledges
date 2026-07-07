@@ -22,7 +22,7 @@ path.
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/faucet
+POST  https://api.<net>.mtf.exchange/faucet
 ```
 
 Running the node yourself, the same `/faucet` route is served directly at
@@ -50,7 +50,7 @@ structurally unreachable from the `/exchange` handler tree.
 | `amount` | uint64 (whole USDC) | no | Optional USDC grant; **caps DOWNWARD** at the configured max (3000) — a larger value clamps to 3000, never above. `0` is rejected. MTF (10) is fixed regardless. |
 
 ```bash
-curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -s -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```

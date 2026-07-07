@@ -15,7 +15,7 @@ description: صنبور اختبار Devnet/testnet — منح لمرة واحد
 ## عنوان URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/faucet
+POST  https://api.<net>.mtf.exchange/faucet
 ```
 
 عند تشغيل العقدة محليًّا، يُخدَّم المسار `/faucet` ذاته مباشرةً على:
@@ -41,7 +41,7 @@ POST  https://<net>-gateway.mtf.exchange/faucet
 | `amount` | uint64 (USDC بالوحدات الصحيحة) | لا | منحة USDC اختيارية؛ **تُخفَّض** إلى الحد الأقصى المُعيَّن (3000) — أي قيمة أعلى تُقيَّد إلى 3000 ولا تتجاوزه أبدًا. القيمة `0` مرفوضة. كمية MTF (10) ثابتة بصرف النظر عن هذا الحقل. |
 
 ```bash
-curl -s -X POST https://devnet-gateway.mtf.exchange/faucet \
+curl -s -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```

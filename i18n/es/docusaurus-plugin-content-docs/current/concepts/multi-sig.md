@@ -160,7 +160,7 @@ Hasta que el SDK esté disponible, los integradores deben implementar su propio 
 ## Consulta
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_to_multi_sig_signers","user":"0x<multisig>"}'
 ```
 

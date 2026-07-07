@@ -73,7 +73,7 @@ flowchart TD
 累计池总量（已回购销毁的 MTF、验证者池、国库）记录在提交状态中，可通过读取路径 [`protocol_metrics`](../api/rest/info.md#protocol_metrics) 查询：
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
 ```
 
 质押分红通过验证者份额发放，质押更多 MTF（或委托给验证者）可获得更大份额——详见[质押](./staking.md)。
@@ -95,10 +95,10 @@ curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metr
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your personal tier and recent volume — MTF-native
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 ```
 

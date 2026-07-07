@@ -5,7 +5,7 @@
 :::
 
 :::info
-**频道名称采用 snake_case（MTF 原生格式）。** 节点的 `/ws` 接入面是 MTF 原生的，因此频道的线路名称为 snake_case：`l2_book`、`bbo`、`trades`、`active_asset_ctx`、`fills`、`candles`、`user_events`。网关在 `<net>-gateway.mtf.exchange/ws` 上提供相同的原生 WS 接口。
+**频道名称采用 snake_case（MTF 原生格式）。** 节点的 `/ws` 接入面是 MTF 原生的，因此频道的线路名称为 snake_case：`l2_book`、`bbo`、`trades`、`active_asset_ctx`、`fills`、`candles`、`user_events`。网关在 `api.<net>.mtf.exchange/ws` 上提供相同的原生 WS 接口。
 :::
 
 ## 概述
@@ -15,7 +15,7 @@
 ## 连接地址
 
 ```
-wss://<net>-gateway.mtf.exchange/ws
+wss://api.<net>.mtf.exchange/ws
 ```
 
 MTF 原生 WS（snake_case 频道）由网关在 `/ws` 路径提供。网关入口负责 TLS 终止（`wss://`）。若自行运行节点，相同的原生 WS 以明文形式在 `ws://localhost:8080/ws` 上提供——帧协议完全一致。

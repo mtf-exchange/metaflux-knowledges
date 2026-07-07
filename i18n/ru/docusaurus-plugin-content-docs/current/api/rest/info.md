@@ -19,7 +19,7 @@ description: "Эндпоинт чтения POST /info — типы запрос
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/info
+POST  https://api.<net>.mtf.exchange/info
 ```
 
 | Путь | Формат данных |

@@ -19,7 +19,7 @@ Single endpoint, multi-type. Dispatches on the request body's `type` field. Read
 ## URL
 
 ```
-POST  https://<net>-gateway.mtf.exchange/info
+POST  https://api.<net>.mtf.exchange/info
 ```
 
 | Path | Wire shape |

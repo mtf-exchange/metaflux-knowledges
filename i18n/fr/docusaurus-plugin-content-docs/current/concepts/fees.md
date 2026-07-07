@@ -73,7 +73,7 @@ flowchart TD
 Les totaux cumulatifs des pools (MTF rachetés et détruits, pool validateurs, trésorerie) sont suivis dans l'état engagé et exposés en lecture via [`protocol_metrics`](../api/rest/info.md#protocol_metrics) :
 
 ```bash
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"protocol_metrics"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
 ```
 
 Le dividende staker étant versé via la part validateur, staker davantage de MTF (ou déléguer à un validateur) permet d'en recevoir une part plus importante — voir [Staking](./staking.md).
@@ -95,10 +95,10 @@ Les clôtures par liquidation transitent par le chemin standard des frais taker 
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://devnet-gateway.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your personal tier and recent volume — MTF-native (gateway default path)
-curl -X POST https://devnet-gateway.mtf.exchange/info \
+curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 ```
 
