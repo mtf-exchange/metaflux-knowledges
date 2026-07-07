@@ -46,6 +46,11 @@ rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
 *downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
+> The faucet is a **devnet/testnet convenience only**. To fund a real account
+> with bridged USDC, deposit through the MetaBridge custody bridge — call the
+> source chain's `deposit(mtfDest, amount)` (never a plain transfer to the
+> custody address). See [bridge → deposit](../bridge/index.md#deposit-source-chain--metaflux).
+
 The raw curls below speak **MTF-native** on the gateway (snake_case types like
 `account_state` / `open_orders`). The `@metaflux/sdk` examples speak the same
 native surface — the SDK just builds the signed envelope for you.

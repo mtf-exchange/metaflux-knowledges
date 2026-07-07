@@ -55,6 +55,37 @@ MetaFlux:
 The `Deposit` event is byte-compatible with the L1 deterministic `message_id`:
 `keccak256(chain ‖ direction ‖ user ‖ asset ‖ amount ‖ dst ‖ nonce)`.
 
+:::danger Always call `deposit` — never send tokens straight to the custody address
+The MetaFlux recipient is carried **only** as the `mtfDest` argument of the
+`deposit` call, and validators only attest the `Deposit`/`DepositEvent` that call
+emits. A plain token transfer to the custody address (an ERC-20 `transfer`, or a
+bare SPL token transfer) emits **no** deposit event and carries **no**
+destination — there is nothing for the validators to attribute, so it is **not
+credited and not recoverable**. There is no memo-based fallback. Bridge in only
+by calling the contract's `deposit` function.
+:::
+
+**Encoding the MetaFlux destination (`mtfDest`).** `mtfDest` is your 20-byte
+MetaFlux (L1) address — the same address you sign and trade with.
+
+- **EVM (Base / Arbitrum)** — pass the 20-byte address directly:
+  `deposit(address mtfDest, uint256 amount)`, after `USDC.approve(bridge, amount)`.
+- **Solana** — the instruction takes a fixed 32-byte field, so left-pad the
+  address: `mtf_dest = 12 zero bytes ‖ 20-byte address` (the low 20 bytes are the
+  recipient). A zero recipient is rejected on-chain, so a mis-padded destination
+  fails fast rather than crediting the wrong account.
+
+`amount` is in USDC base units — **6 decimals** on every source chain (100 USDC =
+`100_000000`). The custody contract / program address for each chain is in the
+[Deployments](#deployments) table below.
+
+**When the credit lands.** Only **finalized** source-chain deposits are attested
+(the watchers gate on the chain's `finalized` tag, so a reorg cannot mint
+unbacked L1 balance). After the source chain finalizes your deposit and the
+validator set reaches ⅔ stake-weighted attestation, the L1 credits `mtfDest`
+**exactly once** (idempotent by `message_id`). A given deposit is never
+double-credited, even across a validator-set rotation.
+
 ### Withdraw (MetaFlux → source chain)
 
 ```
