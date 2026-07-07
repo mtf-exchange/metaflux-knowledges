@@ -110,8 +110,8 @@ USDC (y otros activos) se puentean a través del **puente de custodia MetaBridge
 
 | Cadena | Estado |
 |-------|--------|
-| Base | **activo en Base Sepolia** (`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)); mainnet pre-auditoría |
-| Solana | **activo en devnet** (programa `metabridge-solana` [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet)); mainnet pre-auditoría |
+| Base | **activo en Base Sepolia** (`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-auditoría |
+| Solana | **activo en devnet** (programa `metabridge-solana` [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet)); mainnet pre-auditoría |
 | Arbitrum | planificado |
 
 Consulta [bridge](./bridge/) para el flujo de depósito/retiro y la tabla de despliegues.

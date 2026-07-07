@@ -103,8 +103,8 @@ USDC（及其他资产）通过 **MetaBridge 托管跨链桥**进行跨链——
 
 | 链 | 状态 |
 |----|------|
-| Base | **Base Sepolia 已上线**（`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)）；主网待审计 |
-| Solana | **Devnet 已上线**（`metabridge-solana` 程序 [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet)）；主网待审计 |
+| Base | **Base Sepolia 已上线**（`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)）；主网待审计 |
+| Solana | **Devnet 已上线**（`metabridge-solana` 程序 [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet)）；主网待审计 |
 | Arbitrum | 计划中 |
 
 充值/提现流程及合约部署表详见[跨链桥](./bridge/)。

@@ -2,7 +2,7 @@
 
 :::info
 **Statut.** Le bridge de dépôt USDC MetaBridge est **en ligne sur Base Sepolia** (testnet,
-`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)),
+`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)),
 et un programme de dépôt Solana est en ligne sur **devnet** selon le même modèle. Les deux
 directions sont vérifiées de bout en bout sur Base Sepolia : un vrai dépôt
 (watcher → cosign → cosignataire auto-enregistré → crédit au quorum ⅔) et un
@@ -109,8 +109,8 @@ Base (two-phase: request → claim):
 
 | Réseau | Contrat | Adresse |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
-| Solana **devnet** | `metabridge-solana` | [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet) |
+| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
 | Base / Solana mainnet | — | (pré-audit) |
 
 Conserve en dépôt l'USDC Base Sepolia de Circle (`0x036CbD…f3dCF7e`) ; **ensemble de

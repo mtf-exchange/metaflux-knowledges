@@ -2,7 +2,7 @@
 
 :::info
 **Статус.** Кастодиальный бридж MetaBridge USDC **запущен в сети Base Sepolia** (тестнет,
-`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)),
+`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)),
 а программа кастодиального бриджа на Solana работает в **devnet** по той же модели. Оба
 направления проверены сквозным тестированием на Base Sepolia: реальный депозит
 (наблюдатель → совместная подпись → автоматическая регистрация косайнера → ⅔-кворум кредитования) и полный
@@ -102,8 +102,8 @@ Base (two-phase: request → claim):
 
 | Сеть | Контракт | Адрес |
 |------|----------|-------|
-| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
-| Solana **devnet** | `metabridge-solana` | [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet) |
+| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
 | Base / Solana mainnet | — | (до аудита) |
 
 Хранит USDC Circle в Base Sepolia (`0x036CbD…f3dCF7e`); **набор валидаторов ⅔ взвешенных по доле, без администратора**

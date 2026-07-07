@@ -2,7 +2,7 @@
 
 :::info
 **Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet,
-`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)),
+`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)),
 and a Solana custody program live on **devnet** under the same model. Both
 directions are verified end-to-end on Base Sepolia: a real deposit
 (watcher → cosign → auto-registered cosigner → ⅔-quorum credit) and a full
@@ -104,8 +104,9 @@ Base (two-phase: request → claim):
 
 | Network | Contract | Address |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
-| Solana **devnet** | `metabridge-solana` | [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet) |
+| Base **Sepolia** | `MetaBridgeUSDC` (MetaBridgeAlpha) | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Arbitrum **Sepolia** | `MetaBridgeUSDC` (MetaBridgeAlpha) | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.arbiscan.io/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
 | Base / Solana mainnet | — | (pre-audit) |
 
 Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted

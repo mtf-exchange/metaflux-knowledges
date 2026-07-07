@@ -111,9 +111,9 @@ USDC (and other assets) bridge via the **MetaBridge custody bridge** — validat
 
 | Chain | Status |
 |-------|--------|
-| Base | **live on Base Sepolia** (`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)); mainnet pre-audit |
-| Solana | **live on devnet** (`metabridge-solana` program [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet)); mainnet pre-audit |
-| Arbitrum | planned |
+| Base | **live on Base Sepolia** (`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-audit |
+| Solana | **live on devnet** (`metabridge-solana` program [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet)); mainnet pre-audit |
+| Arbitrum | **live on Arbitrum Sepolia** (`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.arbiscan.io/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-audit |
 
 See [bridge](./bridge/) for the deposit / withdraw flow + the deployment table.
 

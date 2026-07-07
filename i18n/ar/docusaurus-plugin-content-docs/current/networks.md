@@ -109,8 +109,8 @@ curl -X POST https://api.devnet.mtf.exchange/faucet \
 
 | السلسلة | الحالة |
 |---------|--------|
-| Base | **مباشر على Base Sepolia** (`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af))؛ الشبكة الرئيسية قيد المراجعة الأمنية |
-| Solana | **مباشر على devnet** (برنامج `metabridge-solana` [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet))؛ الشبكة الرئيسية قيد المراجعة الأمنية |
+| Base | **مباشر على Base Sepolia** (`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00))؛ الشبكة الرئيسية قيد المراجعة الأمنية |
+| Solana | **مباشر على devnet** (برنامج `metabridge-solana` [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet))؛ الشبكة الرئيسية قيد المراجعة الأمنية |
 | Arbitrum | مخطط له |
 
 راجع [الجسر](./bridge/) للاطلاع على تدفق الإيداع والسحب وجدول النشر.

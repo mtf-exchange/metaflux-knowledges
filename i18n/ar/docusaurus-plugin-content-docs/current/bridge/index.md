@@ -2,7 +2,7 @@
 
 :::info
 **الحالة.** جسر الحضانة MetaBridge USDC **يعمل على Base Sepolia** (شبكة الاختبار،
-`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af))،
+`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00))،
 إلى جانب برنامج حضانة Solana يعمل على **devnet** وفق النموذج ذاته. تم التحقق من
 كلا الاتجاهين من طرف إلى طرف على Base Sepolia: إيداع حقيقي
 (المراقب → التوقيع المشترك → التوقيع التلقائي المسجَّل → ائتمان بنصاب ⅔)، وجولة
@@ -101,8 +101,8 @@ Base (two-phase: request → claim):
 
 | الشبكة | العقد | العنوان |
 |--------|-------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
-| Solana **devnet** | `metabridge-solana` | [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet) |
+| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
 | Base / Solana mainnet | — | (قبل المراجعة) |
 
 تحتضن USDC Base Sepolia الصادرة عن Circle (`0x036CbD…f3dCF7e`)؛ **مجموعة مدققين

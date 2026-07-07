@@ -1,7 +1,7 @@
 # 跨链桥
 
 :::info
-**状态。** MetaBridge USDC 托管跨链桥**已在 Base Sepolia 测试网上线**（`MetaBridgeUSDC` v3 [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af)），Solana 托管程序同样以相同模型运行于 **devnet**。两个方向均已在 Base Sepolia 上完成端到端验证：实际充值流程（监听器 → 联署 → 自动注册联署方 → ⅔ 权重法定人数确认入账）和完整的提现往返流程（L1 联署 → 中继循环 → 链上 `batchWithdraw` → 争议窗口 → `claim`）。已加固项包括：Gas 分摊的 `batchWithdraw`/`batchClaim`、部分成功批处理、双重时间+区块数争议窗口、验证者热/冷密钥隔离、两阶段验证者轮换机制（窗口期内任意单一热验证者可 **cancel** 一票否决）、以及跨 EVM 合约、Solana 程序和 L1 精确到字节的域+纪元绑定签名（跨语言已知答案向量验证）。Arbitrum 上线和主网前安全审计仍在推进中。
+**状态。** MetaBridge USDC 托管跨链桥**已在 Base Sepolia 测试网上线**（`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)），Solana 托管程序同样以相同模型运行于 **devnet**。两个方向均已在 Base Sepolia 上完成端到端验证：实际充值流程（监听器 → 联署 → 自动注册联署方 → ⅔ 权重法定人数确认入账）和完整的提现往返流程（L1 联署 → 中继循环 → 链上 `batchWithdraw` → 争议窗口 → `claim`）。已加固项包括：Gas 分摊的 `batchWithdraw`/`batchClaim`、部分成功批处理、双重时间+区块数争议窗口、验证者热/冷密钥隔离、两阶段验证者轮换机制（窗口期内任意单一热验证者可 **cancel** 一票否决）、以及跨 EVM 合约、Solana 程序和 L1 精确到字节的域+纪元绑定签名（跨语言已知答案向量验证）。Arbitrum 上线和主网前安全审计仍在推进中。
 :::
 
 MetaFlux 通过 **MetaBridge** 完成**所有资产（包括 USDC）的跨链转移**。MetaBridge 是一个由 MetaFlux 验证者签名的托管式跨链桥（等同于 HL-Bridge2 模型）。关键路径上**不依赖任何第三方跨链桥，也不依赖 Circle CCTP**。
@@ -67,8 +67,8 @@ Base (two-phase: request → claim):
 
 | 网络 | 合约 | 地址 |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af`](https://sepolia.basescan.org/address/0xaCF3d88013b6Bd5022cF8e8259Bd1326Ee8B73Af) |
-| Solana **devnet** | `metabridge-solana` | [`Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB`](https://solscan.io/account/Db5KYqPTFv3naxWTx83EzXQaZPMmbbAbaWHbZxK71sLB?cluster=devnet) |
+| Base **Sepolia** | `MetaBridgeUSDC` (v3) | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
 | Base / Solana 主网 | — | （审计前） |
 
 托管 Circle 的 Base Sepolia USDC（`0x036CbD…f3dCF7e`）；**⅔ 权重验证者集，无管理员**（所有特权操作均需验证者联署），300 秒 + 150 区块的双重争议窗口。域分离 + 纪元绑定签名。合约及部署操作手册存放于 [`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) 仓库；L1 侧的联署/入账逻辑保留在节点中。目前为审计前测试网，**请勿用于承载真实价值的场景**。
