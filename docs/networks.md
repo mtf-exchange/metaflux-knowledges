@@ -40,7 +40,7 @@ EVM RPC at `http://localhost:8545`. Those are the self-hosted ports, not public 
 | EIP-712 domain `version` | `"1"` |
 | EIP-712 domain `verifyingContract` | `0x0000000000000000000000000000000000000000` |
 
-USDC bridging: via the **MetaBridge custody bridge** ([bridge](./bridge/)), not Circle CCTP. Testnet deposits use the Base Sepolia `MetaBridgeUSDC` deployment + Circle's Base Sepolia test USDC.
+USDC bridging: via the **MetaBridge custody bridge** ([bridge](./bridge/)), not Circle CCTP. Testnet deposits use the Base Sepolia `MetaBridgeAlpha` deployment + Circle's Base Sepolia test USDC.
 
 ### Faucet
 
@@ -111,9 +111,9 @@ USDC (and other assets) bridge via the **MetaBridge custody bridge** — validat
 
 | Chain | Status |
 |-------|--------|
-| Base | **live on Base Sepolia** (`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-audit |
+| Base | **live on Base Sepolia** (`MetaBridgeAlpha` [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-audit |
 | Solana | **live on devnet** (`metabridge-solana` program [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet)); mainnet pre-audit |
-| Arbitrum | **live on Arbitrum Sepolia** (`MetaBridgeUSDC` (MetaBridgeAlpha) [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.arbiscan.io/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-audit |
+| Arbitrum | **live on Arbitrum Sepolia** (`MetaBridgeAlpha` [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.arbiscan.io/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)); mainnet pre-audit |
 
 See [bridge](./bridge/) for the deposit / withdraw flow + the deployment table.
 
