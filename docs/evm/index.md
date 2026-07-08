@@ -48,3 +48,12 @@ Standard `eth_*` JSON-RPC at `POST /evm` on the gateway; the chain reports its o
 id via `eth_chainId` (see [Networks & chain IDs](../networks.md)). Deployable
 contracts live in the public
 [`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo.
+
+### Transaction submission
+
+Transactions are submitted via the standard Ethereum method `eth_sendRawTransaction`
+with an RLP-encoded signed transaction. The network verifies that the signature
+recovers to the declared sender address — this is a deterministic security check that
+prevents unsigned or malformed transactions from entering the chain. Standard EVM
+clients and wallets that correctly sign transactions see no change; the verification
+is automatic and transparent.
