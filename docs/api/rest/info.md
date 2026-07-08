@@ -899,8 +899,8 @@ denominator and every tally, matching the on-chain enactment check.
 
 ### `gov_state`
 
-The live governance surface — stake-quorum context, pending `voteGlobal` rounds,
-open `govPropose` proposals, and the CURRENT value of every governed parameter.
+The live governance surface — stake-quorum context, pending parameter-change
+vote rounds, open proposals, and the CURRENT value of every governed parameter.
 No parameters.
 
 ```json
@@ -954,7 +954,7 @@ Response:
 | `pending_vote_global[*].votes[*].stake` | decimal string | The voter's stake |
 | `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | Vote submission timestamp (consensus ms) |
 | `pending_vote_global[*].leading_stake` | decimal string | Largest stake pooled behind a single payload in this round |
-| `open_proposals[*].proposal_id` | uint64 | govPropose round id |
+| `open_proposals[*].proposal_id` | uint64 | Proposal round id |
 | `open_proposals[*].voters` | uint64 | Number of votes cast |
 | `open_proposals[*].aye_stake` / `nay_stake` | decimal string | Stake voting aye / nay |
 | `params` | object | Current value of every governed parameter (each a committed scalar) |
@@ -969,7 +969,7 @@ precompiles, …); each is the live committed value.
 ### `gov_proposals`
 
 Every ACTIVE governance proposal across ALL vote categories (not just
-`voteGlobal`), each with its live per-payload stake tally and distance to the ⅔
+direct parameter votes), each with its live per-payload stake tally and distance to the ⅔
 quorum. The cross-category "what is being voted on right now, and how close is
 it" view. No parameters.
 
@@ -1029,7 +1029,7 @@ Response:
 | `proposals[*].payloads[*].payload_hex` | hex string | A distinct voted payload (no `0x` prefix) |
 | `proposals[*].payloads[*].stake` | decimal string | Active stake pooled behind that payload |
 | `proposals[*].payloads[*].meets_quorum` | bool | Whether this payload alone reaches quorum |
-| `proposals[*].proposal` | object \| null | The typed govPropose record when the round opened via `govPropose`, else `null` |
+| `proposals[*].proposal` | object \| null | The typed proposal record when the round opened via a proposal, else `null` |
 | `proposals[*].proposal.kind` | uint | Governed-parameter kind id |
 | `proposals[*].proposal.kind_name` | string \| null | Decoded kind name (snake_case), `null` if unknown |
 | `proposals[*].proposal.value` | decimal string | Proposed value |
@@ -1076,7 +1076,7 @@ Response:
 | `enacted[*].kind` | uint | Governed-parameter kind id |
 | `enacted[*].kind_name` | string \| null | Decoded kind name (snake_case), `null` if unknown |
 | `enacted[*].value` | decimal string | Enacted value |
-| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Source track — `govPropose`/`govVote` vs direct `voteGlobal` |
+| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Source track — proposal-tracked vs direct parameter vote |
 | `enacted[*].enacted_at_ms` | uint64 | Enactment timestamp (consensus ms) |
 | `enacted[*].description` | string | Human-readable summary of the change |
 

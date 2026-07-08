@@ -877,7 +877,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 ### `gov_state`
 
-Живой интерфейс управления — контекст кворума по стейку, ожидающие раунды `voteGlobal`, открытые предложения `govPropose` и ТЕКУЩЕЕ значение каждого управляемого параметра. Параметры не требуются.
+Живой интерфейс управления — контекст кворума по стейку, ожидающие раунды голосований по изменению параметров, открытые предложения и ТЕКУЩЕЕ значение каждого управляемого параметра. Параметры не требуются.
 
 ```json
 { "type": "gov_state" }
@@ -930,7 +930,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `pending_vote_global[*].votes[*].stake` | decimal string | Стейк голосующего |
 | `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | Временная метка подачи голоса (мс консенсуса) |
 | `pending_vote_global[*].leading_stake` | decimal string | Наибольший стейк, собранный за единое содержимое в данном раунде |
-| `open_proposals[*].proposal_id` | uint64 | Идентификатор раунда govPropose |
+| `open_proposals[*].proposal_id` | uint64 | Идентификатор раунда предложения |
 | `open_proposals[*].voters` | uint64 | Количество поданных голосов |
 | `open_proposals[*].aye_stake` / `nay_stake` | decimal string | Стейк, голосующий «за» / «против» |
 | `params` | object | Текущее значение каждого управляемого параметра (каждый — зафиксированный скаляр) |
@@ -942,7 +942,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 ### `gov_proposals`
 
 Все АКТИВНЫЕ предложения по управлению по ВСЕМ категориям голосования (не только
-`voteGlobal`), каждое с живым подсчётом стейка по содержимому и расстоянием до кворума ⅔. Представление типа «что сейчас ставится на голосование и насколько близко к принятию» в разрезе всех категорий. Параметры не требуются.
+прямые голосования по параметрам), каждое с живым подсчётом стейка по содержимому и расстоянием до кворума ⅔. Представление типа «что сейчас ставится на голосование и насколько близко к принятию» в разрезе всех категорий. Параметры не требуются.
 
 ```json
 { "type": "gov_proposals" }
@@ -1000,7 +1000,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `proposals[*].payloads[*].payload_hex` | hex string | Отдельный проголосованный вариант содержимого (без префикса `0x`) |
 | `proposals[*].payloads[*].stake` | decimal string | Активный стейк, собранный за данный вариант |
 | `proposals[*].payloads[*].meets_quorum` | bool | Набирает ли данный вариант кворум самостоятельно |
-| `proposals[*].proposal` | object \| null | Типизированная запись govPropose, если раунд был открыт через `govPropose`, иначе `null` |
+| `proposals[*].proposal` | object \| null | Типизированная запись предложения, если раунд был открыт через предложение, иначе `null` |
 | `proposals[*].proposal.kind` | uint | Числовой идентификатор типа управляемого параметра |
 | `proposals[*].proposal.kind_name` | string \| null | Декодированное наименование типа (snake_case), `null` если неизвестно |
 | `proposals[*].proposal.value` | decimal string | Предлагаемое значение |
@@ -1045,7 +1045,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `enacted[*].kind` | uint | Числовой идентификатор типа управляемого параметра |
 | `enacted[*].kind_name` | string \| null | Декодированное наименование типа (snake_case), `null` если неизвестно |
 | `enacted[*].value` | decimal string | Принятое значение |
-| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Источник принятия — `govPropose`/`govVote` vs прямой `voteGlobal` |
+| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Источник принятия — отслеживается предложением vs прямое голосование по параметру |
 | `enacted[*].enacted_at_ms` | uint64 | Временная метка принятия решения (мс консенсуса) |
 | `enacted[*].description` | string | Читаемое описание изменения |
 

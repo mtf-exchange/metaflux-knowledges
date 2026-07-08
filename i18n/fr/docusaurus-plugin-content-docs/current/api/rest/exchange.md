@@ -260,7 +260,7 @@ Une position spot à effet de levier est **isolée par `(compte, paire)`** : le 
 |--------|---------|-----------|
 | [`submit_encrypted_order`](#submit_encrypted_order) | Texte chiffré d'un ordre chiffré par seuil | signataire / agent |
 
-### Vaults & Métaliquidité
+### Vaults
 
 | `type` | Finalité | Signataire |
 |--------|---------|-----------|
@@ -268,8 +268,6 @@ Une position spot à effet de levier est **isolée par `(compte, paire)`** : le 
 | [`vault_transfer`](#vault_transfer) | Transfert d'amorçage par le leader | signataire / agent |
 | [`vault_modify`](#vault_modify) | Mise à jour de la configuration du vault réservée au leader | signataire / agent |
 | [`vault_withdraw`](#vault_withdraw) | Rachat de parts par un follower | signataire / agent |
-| [`REDACTED`](#REDACTED) | Vote de liste blanche MLP | clé validateur |
-| [`REDACTED`](#REDACTED) | Enregistrer / révoquer un opérateur de stratégie | vault leader |
 
 ### Retraits via bridge
 
@@ -300,7 +298,6 @@ disposition de chacun.
 | `UsdcTransfer` / `SpotTransfer` | — | Les flux de transfert utilisateur à utilisateur ne sont pas bridgés |
 | `WithdrawUsdc` | — | Nom d'ébauche ; le retrait externe est [`mb_withdraw`](#mb_withdraw) |
 | `BorrowLend` | — | Non bridgé |
-| `REDACTED` | — | Action validateur/système ; passe par le chemin de consensus, jamais par `/exchange` |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Stub reconnu mais non mappé → `unsupported action` |
 | `FbaOrder` | `fba_submit` | Stub reconnu mais non mappé → `unsupported action` |
 | (distribution vault) | `vault_distribute` | Handler partiel/stub ; non bridgé sur `/exchange` |
@@ -1676,52 +1673,6 @@ Renvoie le montant versé en centimes USD ainsi que les parts brûlées.
 
 ---
 
-### `REDACTED`
-
-Vote de gouvernance des validateurs MIP-2 : définit l'appartenance d'une adresse à la liste blanche MLP. **Autorisé aux validateurs** — le signataire récupéré doit être un validateur ; la modification prend effet une fois que le quorum de mise des validateurs est atteint.
-
-```json
-{
-  "type": "REDACTED",
-  "params": {
-    "address": "0x00000000000000000000000000000000000000aa",
-    "allowed": true
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | Adresse MLP dont l'appartenance est modifiée |
-| `allowed` | bool | `true` = ajouter à la liste blanche ; `false` = retirer |
-
----
-
-### `REDACTED`
-
-Action MIP-2 réservée au leader du coffre : enregistre ou révoque un opérateur de stratégie hors chaîne en tant qu'agent approuvé d'un coffre Metaliquidity. **Autorisé au leader du coffre** lors de la soumission ; l'opérateur doit figurer dans la liste blanche MLP.
-
-```json
-{
-  "type": "REDACTED",
-  "params": {
-    "vault_id":      4,
-    "operator":      "0x00000000000000000000000000000000000000bb",
-    "allowed":       true,
-    "expires_at_ms": null
-  }
-}
-```
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `vault_id` | uint64 | Identifiant du coffre Metaliquidity cible |
-| `operator` | hex address | Clé de stratégie hors chaîne (doit être dans la liste blanche MLP) |
-| `allowed` | bool | `true` = enregistrer comme agent approuvé ; `false` = révoquer |
-| `expires_at_ms` | uint64 \| null | Expiration optionnelle de l'approbation ; `null` = sans expiration |
-
----
-
 ### `core_evm_transfer`
 
 Déplace des USDC du **registre de compensation Core** vers le côté **MetaFluxEVM** : débite la garantie croisée USDC de l'expéditeur sur Core et frappe les USDC EVM à 6 décimales (après conversion d'échelle) à l'adresse `destination` lors du prochain bloc EVM. L'équivalent MTF d'un transfert d'actif Core → EVM. **Autorisé par l'expéditeur** — pas de champ `owner` ; le signataire récupéré est le compte débité. Une signature d'agent agit donc sur le **propre compte de l'agent**, jamais sur celui du maître, ce qui en fait une opération effectivement réservée au maître (cohérent avec le [tableau des signataires](#signed-by-semantics)).
@@ -1842,7 +1793,6 @@ Les noms d'action provisoires suivants **ne sont pas** câblés sur le gestionna
 | `UsdcTransfer` / `SpotTransfer` | — | Flux de transfert pair-à-pair non pontés | — |
 | `WithdrawUsdc` | — | Nom provisoire ; pas un tag natif | [`mb_withdraw`](#mb_withdraw) retire la garantie croisée USDC en externe |
 | `BorrowLend` | — | Non ponté | — |
-| `REDACTED` | — | Action validateur/système ; chemin de consensus uniquement | — |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Stub reconnu mais non mappé → `unsupported action` | — |
 | `FbaOrder` | `fba_submit` | Stub reconnu mais non mappé → `unsupported action` | — |
 | (distribution de coffre) | `vault_distribute` | Gestionnaire partiel/stub ; non ponté sur `/exchange` | — |

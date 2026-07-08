@@ -126,8 +126,6 @@ digest      = keccak256( 0x19 0x01 ‖ domainSeparator ‖ hashStruct )
 | `create_vault` | `MetaFluxTransaction:CreateVault(string metafluxChain,string name,uint64 lockPeriodSecs,uint8 kind,uint64 nonce)` |
 | `vault_modify` | `MetaFluxTransaction:VaultModify(string metafluxChain,uint64 vaultId,string newName,uint64 nonce)` |
 | `spot_margin_close` | `MetaFluxTransaction:SpotMarginClose(string metafluxChain,uint32 pair,uint64 limitPx,uint64 nonce)` |
-| `REDACTED` | `MetaFluxTransaction:REDACTED(string metafluxChain,address account,bool allowed,uint64 nonce)` |
-| `REDACTED` | `MetaFluxTransaction:REDACTED(string metafluxChain,uint64 vaultId,address operator,bool allowed,uint64 expiresAtMs,uint64 nonce)` |
 
 特定字段说明：
 

@@ -73,7 +73,7 @@ Per stream (perp / spot / token-register), the auction has:
 - **Decay** — how the minimum bid declines if a slot is unclaimed (governance, default linear over 24 h)
 - **Refund window** — how long after slot close losing bidders can claim refunds (governance, default 7 days)
 
-All three are governance-mutable via the `SetGlobal` action (MIP-3 builder-governance globals: `SetGasAuctionDuration`, `SetMinDeployStake`, `SetGasAuctionMinBid`, `SetDeployerFeeCap`, `SetPerMarketLimits`, `SetEnableMip3`).
+All three are governance-mutable (MIP-3 builder-governance globals).
 
 ## After deploy
 

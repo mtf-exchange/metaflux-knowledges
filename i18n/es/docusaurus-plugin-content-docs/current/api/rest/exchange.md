@@ -221,8 +221,6 @@ Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: 
 | [`vault_transfer`](#vault_transfer) | Transferencia de semilla del líder | remitente / agente |
 | [`vault_modify`](#vault_modify) | Actualización de configuración del vault exclusiva del líder | remitente / agente |
 | [`vault_withdraw`](#vault_withdraw) | Redención de participaciones del seguidor | remitente / agente |
-| [`REDACTED`](#REDACTED) | Voto de lista blanca MLP | clave de validador |
-| [`REDACTED`](#REDACTED) | Registrar / revocar un operador de estrategia | líder de vault |
 
 ### Retiros mediante bridge
 
@@ -246,7 +244,6 @@ Estos nombres de acción aparecen en borradores anteriores, pero **no están pue
 | `UsdcTransfer` / `SpotTransfer` | — | Los flujos de transferencia entre usuarios no están puenteados |
 | `WithdrawUsdc` | — | Nombre del borrador; el retiro externo es [`mb_withdraw`](#mb_withdraw) |
 | `BorrowLend` | — | No puenteado |
-| `REDACTED` | — | Acción de validador/sistema; va por la ruta de consenso, nunca por `/exchange` |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Stub reconocido pero sin mapeo → `unsupported action` |
 | `FbaOrder` | `fba_submit` | Stub reconocido pero sin mapeo → `unsupported action` |
 | (distribución de vault) | `vault_distribute` | Manejador parcial/stub; no puenteado en `/exchange` |
@@ -1602,52 +1599,6 @@ Devuelve los centavos de USD pagados y las participaciones quemadas.
 
 ---
 
-### `REDACTED`
-
-Voto de gobernanza del validador MIP-2: establecer la pertenencia de una dirección a la lista blanca de MLP. **Autorizado por validadores** — el firmante recuperado debe ser un validador; el cambio se aplica una vez alcanzado el quórum de participación de validadores.
-
-```json
-{
-  "type": "REDACTED",
-  "params": {
-    "address": "0x00000000000000000000000000000000000000aa",
-    "allowed": true
-  }
-}
-```
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `address` | dirección hex | Dirección MLP cuya pertenencia se está configurando |
-| `allowed` | bool | `true` = añadir a la lista blanca; `false` = eliminar |
-
----
-
-### `REDACTED`
-
-Acción del líder del vault MIP-2: registrar o revocar un operador de estrategia fuera de cadena como agente aprobado de un vault de Metaliquidity. **Autorizado por el líder del vault** en el momento del envío; el operador debe estar en la lista blanca de MLP.
-
-```json
-{
-  "type": "REDACTED",
-  "params": {
-    "vault_id":      4,
-    "operator":      "0x00000000000000000000000000000000000000bb",
-    "allowed":       true,
-    "expires_at_ms": null
-  }
-}
-```
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `vault_id` | uint64 | ID del vault Metaliquidity de destino |
-| `operator` | dirección hex | Clave de estrategia fuera de cadena (debe estar en la lista blanca de MLP) |
-| `allowed` | bool | `true` = registrar como agente aprobado; `false` = revocar |
-| `expires_at_ms` | uint64 \| null | Expiración opcional de la aprobación; `null` = nunca expira |
-
----
-
 ### `core_evm_transfer`
 
 Mueve USDC del **ledger de compensación Core** al lado **MetaFluxEVM**: debita el colateral cruzado de USDC del remitente en Core y acuña el USDC EVM de 6 decimales con conversión de escala en `destination` en el siguiente bloque EVM. El equivalente MTF de una transferencia de activos Core → EVM. **Autorizado por el remitente** — sin campo `owner`; el firmante recuperado es la cuenta debitada. Una firma de agente actúa, por tanto, sobre la **propia cuenta del agente**, nunca sobre la del maestro, por lo que esto es efectivamente exclusivo del maestro (coherente con la [tabla de firmantes](#signed-by-semantics)).
@@ -1764,7 +1715,6 @@ Los siguientes nombres de acción en borrador **no** están conectados al maneja
 | `UsdcTransfer` / `SpotTransfer` | — | Flujos de transferencia entre usuarios no transferidos por puente | — |
 | `WithdrawUsdc` | — | Nombre en borrador; no es una etiqueta nativa | [`mb_withdraw`](#mb_withdraw) retira colateral cruzado USDC externamente |
 | `BorrowLend` | — | No transferido por puente | — |
-| `REDACTED` | — | Acción de validador/sistema; solo por ruta de consenso | — |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Stub reconocido pero no mapeado → `unsupported action` | — |
 | `FbaOrder` | `fba_submit` | Stub reconocido pero no mapeado → `unsupported action` | — |
 | (distribución de vault) | `vault_distribute` | Manejador parcial/stub; no transferido por puente en `/exchange` | — |

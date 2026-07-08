@@ -73,7 +73,7 @@ Par flux (perp / au comptant / enregistrement de token), l'enchère dispose des 
 - **Décroissance** — rythme de baisse de l'offre minimale si un slot n'est pas attribué (gouvernance, valeur par défaut linéaire sur 24 h)
 - **Fenêtre de remboursement** — durée après la clôture du slot pendant laquelle les soumissionnaires perdants peuvent réclamer leur remboursement (gouvernance, valeur par défaut 7 jours)
 
-Ces trois paramètres sont modifiables par la gouvernance via l'action `SetGlobal` (variables globales de gouvernance des développeurs MIP-3 : `SetGasAuctionDuration`, `SetMinDeployStake`, `SetGasAuctionMinBid`, `SetDeployerFeeCap`, `SetPerMarketLimits`, `SetEnableMip3`).
+Ces trois paramètres sont modifiables par la gouvernance (variables globales de gouvernance des développeurs MIP-3).
 
 ## Après le déploiement
 

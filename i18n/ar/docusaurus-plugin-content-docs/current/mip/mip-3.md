@@ -73,7 +73,7 @@ POST /info { "type": "mip3_active_bids" }
 - **الاضمحلال** — كيفية انخفاض الحد الأدنى للعرض إذا لم تُطالَب بفتحة (الحوكمة، الافتراضي خطي على مدى 24 ساعة)
 - **نافذة الاسترداد** — المدة بعد إغلاق الفتحة التي يمكن فيها لمقدمي العروض الخاسرين المطالبة بالاسترداد (الحوكمة، الافتراضي 7 أيام)
 
-كلها قابلة للتعديل عبر الحوكمة من خلال إجراء `SetGlobal` (متغيرات حوكمة منشئي MIP-3 العالمية: `SetGasAuctionDuration` و`SetMinDeployStake` و`SetGasAuctionMinBid` و`SetDeployerFeeCap` و`SetPerMarketLimits` و`SetEnableMip3`).
+كلها قابلة للتعديل عبر حوكمة البروتوكول (متغيرات حوكمة منشئي MIP-3 العالمية: `SetGasAuctionDuration` و`SetMinDeployStake` و`SetGasAuctionMinBid` و`SetDeployerFeeCap` و`SetPerMarketLimits` و`SetEnableMip3`).
 
 ## بعد النشر
 

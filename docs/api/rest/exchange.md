@@ -270,7 +270,7 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 |--------|---------|-----------|
 | [`submit_encrypted_order`](#submit_encrypted_order) | Threshold-encrypted order ciphertext | sender / agent |
 
-### Vaults & Metaliquidity
+### Vaults
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
@@ -278,8 +278,6 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`vault_transfer`](#vault_transfer) | Leader seed transfer | sender / agent |
 | [`vault_modify`](#vault_modify) | Leader-only vault config update | sender / agent |
 | [`vault_withdraw`](#vault_withdraw) | Follower share redemption | sender / agent |
-| [`REDACTED`](#REDACTED) | MLP whitelist vote | validator key |
-| [`REDACTED`](#REDACTED) | Register / revoke a strategy operator | vault leader |
 
 ### Bridge withdrawals
 
@@ -311,7 +309,6 @@ disposition of each.
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |
 | `BorrowLend` | — | Not bridged |
-| `REDACTED` | — | Validator/system action; goes via the consensus path, never `/exchange` |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` |
 | `FbaOrder` | `fba_submit` | Recognized-but-unmapped stub → `unsupported action` |
 | (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` |
@@ -1698,56 +1695,6 @@ Returns USD-cents paid out and shares burnt.
 
 ---
 
-### `REDACTED`
-
-MIP-2 validator governance vote: set an address's membership in the MLP
-whitelist. **Validator-authorized** — the recovered signer must be a validator;
-the change applies once a validator-stake quorum is reached.
-
-```json
-{
-  "type": "REDACTED",
-  "params": {
-    "address": "0x00000000000000000000000000000000000000aa",
-    "allowed": true
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | MLP address whose membership is being set |
-| `allowed` | bool | `true` = add to whitelist; `false` = remove |
-
----
-
-### `REDACTED`
-
-MIP-2 vault-leader action: register or revoke an off-chain strategy operator as an
-approved agent of a Metaliquidity vault. **Vault-leader-authorized** at dispatch;
-the operator must be in the MLP whitelist.
-
-```json
-{
-  "type": "REDACTED",
-  "params": {
-    "vault_id":      4,
-    "operator":      "0x00000000000000000000000000000000000000bb",
-    "allowed":       true,
-    "expires_at_ms": null
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `vault_id` | uint64 | Target Metaliquidity vault id |
-| `operator` | hex address | Off-chain strategy key (must be MLP-whitelisted) |
-| `allowed` | bool | `true` = register as approved agent; `false` = revoke |
-| `expires_at_ms` | uint64 \| null | Optional approval expiry; `null` = never expires |
-
----
-
 ### `core_evm_transfer`
 
 Move USDC from the **Core clearing ledger** to the **MetaFluxEVM** side: debits
@@ -1919,7 +1866,6 @@ here only to redirect integrators to the supported path.
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
 | `WithdrawUsdc` | — | Draft name; not a native tag | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
 | `BorrowLend` | — | Not bridged | — |
-| `REDACTED` | — | Validator/system action; consensus path only | — |
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` | — |
 | `FbaOrder` | `fba_submit` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` | — |

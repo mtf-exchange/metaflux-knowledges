@@ -73,7 +73,7 @@ Por flujo (perpetuos / al contado / registro de token), la subasta tiene:
 - **Decaimiento** — cómo declina la oferta mínima si un slot queda sin reclamar (gobernanza, predeterminado lineal a lo largo de 24 h)
 - **Ventana de reembolso** — cuánto tiempo después del cierre del slot pueden los postores perdedores reclamar reembolsos (gobernanza, predeterminado 7 días)
 
-Los tres son modificables por gobernanza a través de la acción `SetGlobal` (variables globales de gobernanza de desarrolladores MIP-3: `SetGasAuctionDuration`, `SetMinDeployStake`, `SetGasAuctionMinBid`, `SetDeployerFeeCap`, `SetPerMarketLimits`, `SetEnableMip3`).
+Los tres son modificables por gobernanza.
 
 ## Después del despliegue
 

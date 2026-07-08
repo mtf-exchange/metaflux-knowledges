@@ -110,7 +110,7 @@ Pour chaque action, le **type primaire** est `MetaFluxTransaction:<Action>` et l
 | `usd_class_transfer` | `MetaFluxTransaction:UsdClassTransfer(string metafluxChain,string ntl,bool toPerp,uint64 nonce)` |
 | `withdraw` | `MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uint32 destinationChainId,bool useCctp,uint64 nonce)` |
 
-### Compte, staking, coffre et Metaliquidity
+### Compte, staking et coffre
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -127,8 +127,6 @@ Pour chaque action, le **type primaire** est `MetaFluxTransaction:<Action>` et l
 | `create_vault` | `MetaFluxTransaction:CreateVault(string metafluxChain,string name,uint64 lockPeriodSecs,uint8 kind,uint64 nonce)` |
 | `vault_modify` | `MetaFluxTransaction:VaultModify(string metafluxChain,uint64 vaultId,string newName,uint64 nonce)` |
 | `spot_margin_close` | `MetaFluxTransaction:SpotMarginClose(string metafluxChain,uint32 pair,uint64 limitPx,uint64 nonce)` |
-| `REDACTED` | `MetaFluxTransaction:REDACTED(string metafluxChain,address account,bool allowed,uint64 nonce)` |
-| `REDACTED` | `MetaFluxTransaction:REDACTED(string metafluxChain,uint64 vaultId,address operator,bool allowed,uint64 expiresAtMs,uint64 nonce)` |
 
 Remarques sur des champs spécifiques :
 

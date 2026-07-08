@@ -73,7 +73,7 @@ POST /info { "type": "mip3_active_bids" }
 - **衰减率** — 若槽位无人认领，最低出价的下降方式（治理配置，默认 24 小时内线性衰减）
 - **退款窗口期** — 槽位结束后，落败竞价方可申请退款的时限（治理配置，默认 7 天）
 
-以上三项均可通过 `SetGlobal` 动作由治理修改（MIP-3 开发者治理全局参数：`SetGasAuctionDuration`、`SetMinDeployStake`、`SetGasAuctionMinBid`、`SetDeployerFeeCap`、`SetPerMarketLimits`、`SetEnableMip3`）。
+以上三项均可由治理修改。
 
 ## 部署后
 
