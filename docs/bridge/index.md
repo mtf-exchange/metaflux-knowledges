@@ -55,14 +55,21 @@ MetaFlux:
 The `Deposit` event is byte-compatible with the L1 deterministic `message_id`:
 `keccak256(chain ‖ direction ‖ user ‖ asset ‖ amount ‖ dst ‖ nonce)`.
 
-:::danger Always call `deposit` — never send tokens straight to the custody address
-The MetaFlux recipient is carried **only** as the `mtfDest` argument of the
-`deposit` call, and validators only attest the `Deposit`/`DepositEvent` that call
-emits. A plain token transfer to the custody address (an ERC-20 `transfer`, or a
-bare SPL token transfer) emits **no** deposit event and carries **no**
-destination — there is nothing for the validators to attribute, so it is **not
-credited and not recoverable**. There is no memo-based fallback. Bridge in only
-by calling the contract's `deposit` function.
+:::danger `deposit` is the safe path — a raw transfer credits the SENDER (self-custody only)
+The recommended way in is the contract's `deposit(mtfDest, amount)` call: it
+credits the MetaFlux address you pass as `mtfDest`, so it works from **any**
+wallet, including an exchange withdrawal.
+
+On **EVM chains (Base)** a plain USDC `transfer` straight to the custody address
+is now **also** credited — but to the **sender's own address** (the watcher
+indexes the `Transfer(→ custody)` log; a bare transfer carries no `mtfDest`).
+That is safe **only** from a self-custody wallet whose address you also control
+on MetaFlux. A transfer sent from an **exchange (Coinbase, Binance, …) or a
+contract wallet** credits THAT address — you do not control it on MetaFlux and
+the funds are **unrecoverable**. When in doubt, use `deposit(mtfDest, amount)`.
+
+**Solana** has no raw-transfer credit yet — bridge in only via the program's
+`deposit`.
 :::
 
 **Encoding the MetaFlux destination (`mtfDest`).** `mtfDest` is your 20-byte
