@@ -6,9 +6,9 @@
 
 Une énumération complète des codes de statut HTTP, des conventions de chaînes d'erreur, des causes profondes et des mesures correctives. En cas de doute sur la façon de traiter une réponse non-`202`, commencez par consulter cette page.
 
-## Résumé
+## Résumé {#tldr}
 
-- **2xx** — succès. Notez que les points de terminaison compatibles HL renvoient `200 OK` même en cas d'erreur applicative et le signalent dans le corps (`{"status":"err"}`). Les points de terminaison natifs MTF utilisent des codes de statut appropriés.
+- **2xx** — succès. Les points de terminaison natifs MTF utilisent des codes de statut HTTP appropriés pour signaler les erreurs, et non des indicateurs d'erreur dans le corps.
 - **400** — bogue côté client : requête malformée, format de signature invalide, variante d'action inconnue. Ne pas réessayer sans corriger.
 - **401** — échec d'authentification de la signature. Récupérez l'adresse localement et vérifiez.
 - **404** — ressource inexistante. Fréquent sur `/info` lorsque le compte, le marché ou le coffre interrogé n'a jamais été observé.
@@ -17,7 +17,7 @@ Une énumération complète des codes de statut HTTP, des conventions de chaîne
 - **429** — limite de débit atteinte. Attendre et réessayer conformément à `retry_after_ms`.
 - **5xx** — erreur côté serveur. Réessayer avec un backoff exponentiel ; des échecs persistants indiquent un incident côté opérateur.
 
-## Structure du corps de réponse
+## Structure du corps de réponse {#body-shape}
 
 Toutes les réponses non-2xx sur les points de terminaison natifs MTF suivent ce format :
 
@@ -31,17 +31,9 @@ Toutes les réponses non-2xx sur les points de terminaison natifs MTF suivent ce
 
 `detail` et `retry_after_ms` ne sont présents que lorsqu'ils s'appliquent. Le champ `error` est l'identifiant stable — conservez votre gestionnaire d'erreurs indexé sur lui.
 
-Les points de terminaison compatibles HL (`/info`, `/exchange` sur la passerelle) encapsulent tout dans :
+## Catalogue {#catalog}
 
-```json
-{ "status": "ok"|"err", "response": ... }
-```
-
-avec `status: "err"` portant une chaîne dans `response` pour les erreurs applicatives à HTTP 200. Les erreurs de transport (JSON malformé, mauvaise méthode) remontent toujours en 4xx.
-
-## Catalogue
-
-### 400 — mauvaise requête
+### 400 — mauvaise requête {#400--bad-request}
 
 | `error` | Déclenché lorsque | Mesure corrective |
 |---------|-------------------|-------------------|
@@ -58,7 +50,7 @@ avec `status: "err"` portant une chaîne dans `response` pour les erreurs applic
 | `unknown info type: <X>` | Le `type` de `/info` n'est pas reconnu | Consulter la [référence info](./rest/info.md) |
 | `chain_id mismatch` | Le champ chainId d'un wrapper multi-sig ne correspond pas au réseau | Faire correspondre le `chainId` du réseau |
 
-### 401 — non autorisé (échec de signature)
+### 401 — non autorisé (échec de signature) {#401--unauthorized-signature-failed}
 
 | `error` | Déclenché lorsque | Mesure corrective |
 |---------|-------------------|-------------------|
@@ -70,24 +62,24 @@ avec `status: "err"` portant une chaîne dans `response` pour les erreurs applic
 | `multisig threshold not met` | L'action interne a moins de `threshold` signatures valides | Collecter davantage de signatures |
 | `multisig duplicate signer` | La même adresse signe deux fois dans un wrapper multi-sig | Chaque signataire doit être distinct |
 
-### 404 — non trouvé
+### 404 — non trouvé {#404--not-found}
 
 | `error` | Déclenché lorsque |
 |---------|-------------------|
 | `account not found` | `/info` interrogé avec une adresse qui n'a pas d'état on-chain |
-| `market not found` | `market_id` / `coin` absent du registre |
+| `market not found` | Symbole `coin` absent du registre |
 | `vault not found` | `vault_id` non présent |
 | `order not found` | `Cancel` appliqué à un oid déjà annulé / exécuté / inexistant |
 
-Pour les requêtes `/info`, l'endpoint natif MTF renvoie `404` ; l'endpoint compatible HL renvoie `200` avec `{"status":"err","response":"<msg>"}` (convention HL).
+Pour les requêtes `/info`, MTF-native renvoie `404` lorsque la ressource demandée est inconnue.
 
-### 405 — méthode non autorisée
+### 405 — méthode non autorisée {#405--method-not-allowed}
 
 | `error` | Déclenché lorsque |
 |---------|-------------------|
 | (aucun corps) | Utilisation de `GET` sur un point de terminaison `POST` (ou vice versa) |
 
-### 422 — entité non traitable
+### 422 — entité non traitable {#422--unprocessable-entity}
 
 La requête était bien formée et la signature valide, mais l'action elle-même est logiquement invalide.
 
@@ -102,7 +94,7 @@ La requête était bien formée et la signature valide, mais l'action elle-même
 | `insufficient balance` | Le retrait / transfert dépasse le solde disponible | Vérifier `clearinghouseState` au préalable |
 | `out of bounds: <param>` | Limite de gouvernance violée (ex. : plafond de financement sur `PerpDeployGasAuctionBid`) | Utiliser une valeur dans la limite publiée |
 
-### 429 — limite de débit atteinte
+### 429 — limite de débit atteinte {#429--rate-limited}
 
 ```json
 { "error": "rate limit exceeded", "scope": "per_ip"|"per_account", "retry_after_ms": 1200 }
@@ -116,7 +108,7 @@ La requête était bien formée et la signature valide, mais l'action elle-même
 
 Voir [limites de débit](./rate-limits.md) pour les budgets et la gestion des rafales.
 
-### 503 — service indisponible
+### 503 — service indisponible {#503--service-unavailable}
 
 | `error` | Cause | Mesure corrective |
 |---------|-------|-------------------|
@@ -124,9 +116,9 @@ Voir [limites de débit](./rate-limits.md) pour les budgets et la gestion des ra
 | `gateway not ready` | La passerelle démarre / échoue aux vérifications de santé | Réessayer avec backoff ; vérifier le [statut](../networks.md#status) |
 | `node downstream unreachable` | La passerelle a perdu la connexion au nœud | Côté opérateur ; backoff et surveiller le statut |
 
-### Erreurs à l'exécution (hors HTTP, dans le flux d'événements)
+### Erreurs à l'exécution (hors HTTP, dans le flux d'événements) {#commit-time-errors-not-http-in-event-stream}
 
-Certains échecs surviennent après `202 Accepted` car ils ne sont détectables qu'en contexte d'exécution de bloc. Ils apparaissent sur le canal WS `orderEvents` / `userEvents` sous la forme `{"error":"<reason>", "action_hash":"0x..."}`.
+Certains échecs surviennent après `202 Accepted` car ils ne sont détectables qu'en contexte d'exécution de bloc. Ils apparaissent sur le canal WS `order_updates` / `user_events` sous la forme `{"error":"<reason>", "action_hash":"0x..."}`.
 
 | `error` | Cause |
 |---------|-------|
@@ -136,7 +128,7 @@ Certains échecs surviennent après `202 Accepted` car ils ne sont détectables 
 | `evicted_under_cap_pressure` | Admis mais expulsé du mempool avant la proposition de bloc |
 | `liquidation_pre_empted` | Le compte est passé en T1+ entre l'admission et la distribution |
 
-## Arbre de décision
+## Arbre de décision {#decision-tree}
 
 ```mermaid
 flowchart TD
@@ -156,7 +148,7 @@ flowchart TD
     CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted — the failure<br/>is at execution"]
 ```
 
-## Voir aussi
+## Voir aussi {#see-also}
 
 - [`POST /exchange`](./rest/exchange.md) — chemin d'écriture
 - [`POST /info`](./rest/info.md) — chemin de lecture

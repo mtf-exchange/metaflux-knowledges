@@ -11,7 +11,7 @@ Signed `/exchange` actions are **unchanged**. Work through the checklist below
 before upgrading a client.
 :::
 
-## At a glance
+## At a glance {#at-a-glance}
 
 | Area | Old | New |
 |------|-----|-----|
@@ -23,7 +23,7 @@ before upgrading a client.
 | Recent trades by window | — | **`trades_by_time`** (new) |
 | WS subscription cap | 256 / connection | **64 / connection** |
 
-## 1. Markets are addressed by `coin`
+## 1. Markets are addressed by `coin` {#1-markets-are-addressed-by-coin}
 
 Every market-scoped read now resolves the market by its **`coin` symbol**. The
 numeric `asset_id` / `market_id` request arguments are **removed** — a request
@@ -47,7 +47,7 @@ Responses echo the `coin` symbol (e.g. `recent_trades` rows carry
 a deprecated indexer shim — **do not build against it**; it may be dropped
 without a wire-version bump.
 
-## 2. Accounts are addressed by `address`
+## 2. Accounts are addressed by `address` {#2-accounts-are-addressed-by-address}
 
 Account-scoped reads no longer accept `account_id`; pass `address` (0x hex).
 
@@ -61,7 +61,7 @@ Affected reads: `open_orders`, `user_fills`, `user_fills_by_time`, `agents`,
 
 The `account_id` echo field is gone from these responses.
 
-## 3. Removed query types
+## 3. Removed query types {#3-removed-query-types}
 
 | Removed | Returns now | Use instead |
 |---------|-------------|-------------|
@@ -70,7 +70,7 @@ The `account_id` echo field is gone from these responses.
 | `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](./rest/info.md#account_state) + [`spot_clearinghouse_state`](./rest/info/spot.md#spot_clearinghouse_state) + [`frontend_open_orders`](./rest/info.md#frontend_open_orders) + [`user_vault_equities`](./rest/info.md#user_vault_equities) + [`exchange_status`](./rest/info.md#exchange_status) |
 | `web_data2` (WS channel) | `unknown channel: web_data2` | `account_state` + `spot_state` WS channels |
 
-## 4. `margin_tiers` — inline notional-banded ladder
+## 4. `margin_tiers` — inline notional-banded ladder {#4-margin_tiers--inline-notional-banded-ladder}
 
 The maintenance-margin ladder now rides **inline** on each market record as
 `margin_tiers`, an ascending list of upper-bound bands:
@@ -93,7 +93,7 @@ The maintenance-margin ladder now rides **inline** on each market record as
 Tier = the first band whose `max_open_interest` bound is not exceeded. Leverage
 falls and maintenance rises as open interest grows.
 
-## 5. New: `trades_by_time`
+## 5. New: `trades_by_time` {#5-new-trades_by_time}
 
 Recent public prints for one market over a `[start_time, end_time]` window (the
 bounded ring; deep history via the gateway archive):
@@ -104,7 +104,7 @@ bounded ring; deep history via the gateway archive):
 
 Rows share the [`recent_trades`](./rest/info/perpetuals.md#recent_trades) shape.
 
-## 6. `markets` shape
+## 6. `markets` shape {#6-markets-shape}
 
 `markets.data` is now an **object**, not an array:
 
@@ -113,9 +113,9 @@ Rows share the [`recent_trades`](./rest/info/perpetuals.md#recent_trades) shape.
   "spot": { "pairs": [ /* … */ ], "tokens": [ /* … */ ] } } }
 ```
 
-Each `perp[]` element is the same record `market_info` returns for one `coin`.
+Each `perp[]` element carries a market's **dynamic** fields only — the same dynamic subset `market_info` includes for one `coin`. The **static** fields (precision grids, leverage/margin ladders, trade-control flags) live separately on [`markets_meta`](./rest/info/perpetuals.md#markets_meta); `market_info` returns the union of both.
 
-## 7. WebSocket changes
+## 7. WebSocket changes {#7-websocket-changes}
 
 - **`web_data2` channel removed** — see the replacement above.
 - **`trades`**: `data` is an **array**; the on-subscribe frame
@@ -134,7 +134,7 @@ Each `perp[]` element is the same record `market_info` returns for one `coin`.
   `candles`, `all_mids`, `active_asset_ctx`, `active_asset_data`,
   `explorer_block`, `explorer_txs`.
 
-## 8. `predicted_fundings` semantics
+## 8. `predicted_fundings` semantics {#8-predicted_fundings-semantics}
 
 Keyed by `coin`; each entry is
 `{coin, predicted_rate, next_funding_time}`:
@@ -147,7 +147,7 @@ Funding settles **discretely** at per-asset boundaries (1h default); the
 `funding_history` samples remain the raw premium ring. `market_info.funding`
 carries `interval_ms` (per-asset cadence) and `next_payment_ts` (the boundary).
 
-## 9. Rate limits
+## 9. Rate limits {#9-rate-limits}
 
 - Per-IP: **1200 weight / minute** — allowlisted IPs exempt.
 - Per-account `/exchange` token bucket — **metaliquidity-set signers exempt**.
@@ -156,7 +156,7 @@ carries `interval_ms` (per-asset cadence) and `next_payment_ts` (the boundary).
 
 See [rate limits](./rate-limits.md).
 
-## 10. Unchanged
+## 10. Unchanged {#10-unchanged}
 
 - **Order / trade ids**: `oid`, `tid`, `cloid` are unchanged (`tid` is a `u64` —
   parse as a big integer, it can exceed 2⁵³).
@@ -165,7 +165,7 @@ See [rate limits](./rate-limits.md).
   `coin`/`address` change is a **read-API** change only; it does **not** affect
   how you sign an order or cancel. See [`POST /exchange`](./rest/exchange.md).
 
-## See also
+## See also {#see-also}
 
 - [`POST /info`](./rest/info.md) · [perpetual queries](./rest/info/perpetuals.md) · [spot & margin queries](./rest/info/spot.md)
 - [WS subscriptions](./ws/subscriptions.md)

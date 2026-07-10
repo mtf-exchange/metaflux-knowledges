@@ -6,9 +6,9 @@ description: "Requêtes en lecture POST /info pour les marchés au comptant, la 
 
 Requêtes en lecture pour les marchés [au comptant](../../../products/spot.md), la [marge sur comptant](../../../products/spot-margin.md) avec effet de levier, et le pool [Earn](../../../concepts/earn.md). Même endpoint `POST /info` et même enveloppe que la [page de base](../info.md).
 
-## Types de requêtes spot, marge sur comptant & Earn
+## Types de requêtes spot, marge sur comptant & Earn {#spot-spot-margin--earn-query-types}
 
-### `spot_meta`
+### Univers des paires au comptant et registre des jetons {#spot_meta}
 
 Univers des paires au comptant + registre par jeton. Aucun paramètre.
 
@@ -66,7 +66,7 @@ autonome de ce jeton est actif (seul USDC l'est, sur Devnet).
 
 Source d'état : `Exchange.mip3_spot_pair_specs` (paires) + `Exchange.mip3_spot_token_specs` (jetons).
 
-### `spot_clearinghouse_state`
+### Soldes des jetons au comptant par compte {#spot_clearinghouse_state}
 
 Soldes des jetons au comptant par compte. Paramètre requis : `address` (hex 0x).
 
@@ -98,7 +98,7 @@ un jeton intégralement bloqué avec un solde disponible nul apparaît quand mê
 plage par compte (pas un parcours complet de la table). Source d'état :
 `locus.spot_clearinghouse.{balances, reserved}` (les deux indexés par `(owner, asset)`).
 
-### `spot_margin_state`
+### Toutes les positions de marge sur comptant pour un compte {#spot_margin_state}
 
 :::info
 **Disponible sur Devnet (aperçu).** Surface de lecture pour la [marge sur comptant](../../../products/spot-margin.md) avec effet de levier ; consultez la page produit pour les limitations de cette version aperçu.
@@ -144,7 +144,7 @@ Réponse :
 
 Les positions sont listées dans l'ordre des ids de paire. Un compte sans position renvoie un tableau `accounts` vide.
 
-### `earn_state`
+### Pools de prêt Earn et participation d'un compte {#earn_state}
 
 :::info
 **Disponible sur Devnet (aperçu).** Surface de lecture pour les pools de prêt [Earn](../../../concepts/earn.md) ; consultez la page produit pour les limitations de cette version aperçu.
@@ -199,7 +199,7 @@ Réponse :
 
 Les pools sont listés dans l'ordre des ids d'actif. Omettre `user` supprime les champs `user_shares` / `user_value`.
 
-### `spot_deploy_state`
+### État de l'enchère de déploiement de paire au comptant {#spot_deploy_state}
 
 État de l'enchère de déploiement de paire au comptant MIP-1. Aucun paramètre.
 
@@ -231,7 +231,7 @@ Réponse :
 Source d'état : `Exchange.spot_pair_deploy_gas_auction`.
 
 
-## Voir aussi
+## Voir aussi {#see-also}
 
 - [`POST /info`](../info.md) — l'endpoint de lecture de base (enveloppe, conventions, requêtes de compte et d'infrastructure)
 - [Requêtes perpétuelles](./perpetuals.md) — lectures des marchés à terme perpétuels

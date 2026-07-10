@@ -8,7 +8,7 @@ description: "El endpoint de lectura POST /info — tipos de consulta, sobre, y 
 **Estado.** Estructura **estable**. Los tipos de consulta se añaden con el tiempo; el sobre está consolidado.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Un único endpoint, múltiples tipos. Despacha según el campo `type` del cuerpo de la solicitud. Solo lectura — nunca muta estado, nunca requiere firma.
 
@@ -16,7 +16,7 @@ Un único endpoint, múltiples tipos. Despacha según el campo `type` del cuerpo
 **Dividido por producto.** Las consultas de lectura de mercados de contratos perpetuos están en [consultas de perpetuos](./info/perpetuals.md); las consultas de lectura de spot, margen spot y Earn están en [consultas spot y margen](./info/spot.md). Esta página cubre el sobre, las convenciones, y las lecturas de cuenta/gobernanza/vault/validador.
 :::
 
-## URL
+## URL {#url}
 
 ```
 POST  https://api.<net>.mtf.exchange/info
@@ -29,7 +29,7 @@ POST  https://api.<net>.mtf.exchange/info
 El gateway sirve el `/info` nativo MTF. Si ejecuta el nodo usted mismo, el mismo
 `/info` nativo se sirve directamente en `http://localhost:8080`.
 
-## Sobre
+## Sobre {#envelope}
 
 Solicitud:
 
@@ -46,9 +46,9 @@ Respuesta:
 Ante un `type` desconocido: `400 Bad Request` con `{"error":"unknown info type: <X>"}`.
 Ante un recurso desconocido (p. ej. id de vault desconocido): `404 Not Found` con `{"error":"<resource> not found"}`.
 
-## Tipos de consulta
+## Tipos de consulta {#query-types}
 
-### `node_info`
+### Identidad estática del nodo y versión de protocolo {#node_info}
 
 Identidad estática del nodo + versión de protocolo. Sin parámetros.
 
@@ -87,7 +87,7 @@ Respuesta:
 
 Estos son campos **por nodo** (identidad del nodo / runtime), NO estado de consenso, por lo que pueden diferir legítimamente entre nodos.
 
-### `account_state`
+### Margen, posiciones y saldos por cuenta {#account_state}
 
 Instantánea por cuenta.
 
@@ -177,7 +177,7 @@ Una cuenta con posiciones añade entradas bajo `positions`:
 | `balances.usdc` | Decimal string | **Refleja `account_value`** (el colateral USDC cruzado), NO un saldo USDC spot independiente |
 | `balances.spot` | object | Saldos de tokens spot distintos de USDC, indexados por **nombre del token** (p. ej. `"MTF"`); cada valor es un objeto `{total, hold}` (`hold` = garantía en custodia bloqueada detrás de órdenes spot en reposo; disponible para gastar = `total − hold`); vacío si no hay ninguno |
 
-### `margin_summary`
+### Resumen ligero de cuenta solo con margen {#margin_summary}
 
 **Solo los escalares de margen** — `account_state` sin el recorrido de `positions[]` ni el
 escaneo de balances spot. La llamada adecuada para un sondeo frecuente de salud de liquidación (un
@@ -194,7 +194,7 @@ semántica de campos idéntica a los campos homónimos de
 [`account_state`](#account_state) (calculados por el mismo helper compartido, por lo que los dos
 nunca discrepan).
 
-### `vault_state`
+### TVL, precio de participación y estrategia por vault {#vault_state}
 
 Instantánea por vault.
 
@@ -221,7 +221,7 @@ Respuesta:
 }
 ```
 
-### `staking_state`
+### Estado de staking y delegación por cuenta {#staking_state}
 
 ```json
 { "type": "staking_state", "address": "0x<addr>" }
@@ -250,7 +250,7 @@ Respuesta:
 }
 ```
 
-### `fee_schedule`
+### Comisiones maker y taker por nivel de volumen {#fee_schedule}
 
 ```json
 { "type": "fee_schedule" }
@@ -274,23 +274,22 @@ Respuesta:
 }
 ```
 
-Las tasas de comisión son **puntos básicos** decimales como cadenas (`"2.0"` = 2 bps = 0,02%). `burn_ratio` es una fracción decimal (`"0.30"` = 30% de las comisiones quemadas). Ver [comisiones](../../concepts/fees.md).
+Las tasas de comisión son **puntos básicos** decimales expresados como cadenas con un dígito fraccionario (p. ej. `"2.0"` = 2 bps = 0,02%, `"0.5"` = 0,5 bps = 0,005%), lo que permite una precisión fina por debajo del punto básico. `burn_ratio` es una fracción decimal (`"0.30"` = 30% de las comisiones quemadas). Ver [comisiones](../../concepts/fees.md).
 
-### `open_orders`
+### Órdenes en reposo de la cuenta en todos los libros de perpetuos {#open_orders}
 
-Órdenes en reposo abiertas de la cuenta en todos los libros de contratos perpetuos.
+Órdenes en reposo de la cuenta en todos los libros de contratos perpetuos.
 
 ```json
-{ "type": "open_orders", "account_id": 42 }
+{ "type": "open_orders", "address": "0x<addr>" }
 ```
 
 | Arg | Tipo | Requerido |
 |-----|------|----------|
-| `account_id` | uint64 | uno de `account_id` / `address` |
-| `address` | hex address | uno de `account_id` / `address` |
+| `address` | hex address | sí |
 
-`account_id` (u64) o `address` (hex con prefijo 0x) identifican la cuenta. Cuando la
-solicitud incluye `account_id`, este se devuelve en `data.account_id`.
+La cuenta se identifica mediante `address` (hex con prefijo 0x). Si falta `address` →
+`400 {"error":"missing field address"}`.
 
 Respuesta:
 
@@ -299,7 +298,6 @@ Respuesta:
   "type": "open_orders",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "orders": [
       {
         "oid":          12345,
@@ -318,7 +316,6 @@ Respuesta:
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección de cuenta resuelta |
-| `account_id` | uint64 | Devuelto solo cuando la solicitud usó `account_id` |
 | `orders[*].oid` | uint64 | Id de orden del servidor |
 | `orders[*].market_id` | uint32 | Id del activo / mercado en que reposa la orden |
 | `orders[*].side` | `"bid"` / `"ask"` | Lado de la orden |
@@ -327,23 +324,22 @@ Respuesta:
 | `orders[*].cloid` | hex string \| null | Id de orden del cliente con el que se colocó la orden (`0x` + 32 caracteres hex); `null` si la orden no especificó ninguno |
 | `orders[*].inserted_at_ms` | uint64 | Marca de tiempo de colocación / inserción (ms de consenso) |
 
-### `user_fills`
+### Historial reciente de ejecuciones de una cuenta {#user_fills}
 
-Historial de ejecuciones de la cuenta, servido directamente desde el estado comprometido en el nodo (un
-anillo de ejecuciones acotado por cuenta plegado en el AppHash — sin indexador externo).
+Historial de ejecuciones de la cuenta, servido directamente desde el estado confirmado en el nodo (un
+anillo de ejecuciones acotado por cuenta, incorporado al AppHash — sin indexador externo).
 
 ```json
-{ "type": "user_fills", "account_id": 42 }
+{ "type": "user_fills", "address": "0x<addr>" }
 ```
 
 | Arg | Tipo | Requerido | Descripción |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | uno de `account_id` / `address` | Id interno de cuenta |
-| `address` | hex address | uno de `account_id` / `address` | Dirección de cuenta |
+| `address` | hex address | sí | Dirección de la cuenta |
 | `limit` | uint32 | no | Limita el número de registros **más recientes** devueltos; ausente / `0` ⇒ el anillo completo |
 
-`account_id` (u64) o `address` (hex con prefijo 0x) identifican la cuenta. Cuando la
-solicitud incluye `account_id`, este se devuelve en `data.account_id`.
+La cuenta se identifica mediante `address` (hex con prefijo 0x). Si falta `address` →
+`400 {"error":"missing field address"}`.
 
 Respuesta:
 
@@ -352,10 +348,9 @@ Respuesta:
   "type": "user_fills",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "fills": [
       {
-        "coin":           0,
+        "coin":           "BTC",
         "side":           "B",
         "px":             "67042.50",
         "sz":             "0.125",
@@ -381,8 +376,7 @@ una ventana reciente, no el historial completo. Una cuenta sin ejecuciones devue
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección de cuenta resuelta |
-| `account_id` | uint64 | Devuelto solo cuando la solicitud usó `account_id` |
-| `fills[*].coin` | uint32 | Id del activo / mercado en que se ejecutó la operación |
+| `fills[*].coin` | string | Símbolo del mercado en que se ejecutó la operación |
 | `fills[*].side` | `"B"` / `"A"` | Token del lado de este tramo — `"B"` = compra/bid, `"A"` = venta/ask |
 | `fills[*].px` | Decimal string | Precio de ejecución, **USDC decimal** (legible por humanos) |
 | `fills[*].sz` | Decimal string | Tamaño ejecutado, **unidades base** (unidad entera) |
@@ -393,10 +387,10 @@ una ventana reciente, no el historial completo. Una cuenta sin ejecuciones devue
 | `fills[*].closed_pnl` | Decimal string | PnL realizado en la porción cerrada, **USDC decimal** (con signo) |
 | `fills[*].dir` | string | Etiqueta de dirección, p. ej. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Tamaño del tramo con signo ANTES de la ejecución, **unidades base** (unidad entera, con signo) |
-| `fills[*].block` | uint64 | Altura de bloque comprometida en que se liquidó la ejecución (localizador en cadena) |
+| `fills[*].block` | uint64 | Altura de bloque confirmada en que se liquidó la ejecución (localizador en cadena) |
 | `fills[*].hash` | hex string | Hash de la transacción de la orden originadora, hex con prefijo `0x` — permite rastrear la ejecución en cadena |
 
-### `user_fills_by_time`
+### Historial de ejecuciones filtrado por ventana temporal {#user_fills_by_time}
 
 Como [`user_fills`](#user_fills), pero filtrado a una ventana temporal sobre el campo
 `time` de consenso de cada registro. Mismo esquema de registro de ejecución.
@@ -405,10 +399,9 @@ Como [`user_fills`](#user_fills), pero filtrado a una ventana temporal sobre el 
 { "type": "user_fills_by_time", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
 ```
 
-| Arg | Type | Required | Description |
+| Arg | Tipo | Requerido | Descripción |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | one of `account_id` / `address` | ID de cuenta interna |
-| `address` | hex address | one of `account_id` / `address` | Dirección de la cuenta |
+| `address` | hex address | sí | Dirección de la cuenta |
 | `start_time` | uint64 | no | Inicio de la ventana (ms, inclusive); filtra por el campo `time` de la ejecución. Ausente ⇒ límite inferior abierto |
 | `end_time` | uint64 | no | Fin de la ventana (ms, inclusive). Ausente ⇒ límite superior abierto |
 
@@ -419,7 +412,6 @@ Respuesta:
   "type": "user_fills_by_time",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "start_time": 1700000000000,
     "end_time":   1700003600000,
     "fills": [ /* same record shape as user_fills */ ]
@@ -427,15 +419,14 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección de cuenta resuelta |
-| `account_id` | uint64 | Devuelto en el eco solo cuando la solicitud usó `account_id` |
 | `start_time` | uint64 \| null | Inicio de ventana en el eco (`null` si se omitió) |
 | `end_time` | uint64 \| null | Fin de ventana en el eco (`null` si se omitió) |
 | `fills` | array | Registros de ejecución dentro de la ventana (mismo esquema por ejecución que [`user_fills`](#user_fills)), del más antiguo al más reciente |
 
-### `order_status`
+### Consultar el ciclo de vida de una orden individual {#order_status}
 
 Consulta del ciclo de vida de una orden individual por `oid` (ID de orden del servidor) **o** `cloid` (ID
 de orden del cliente). Lee los libros en vivo, el registro de disparadores y el anillo de ejecuciones confirmadas
@@ -451,10 +442,10 @@ O por ID de orden del cliente:
 { "type": "order_status", "cloid": "0x000000000000000000000000cafef00d" }
 ```
 
-| Arg | Type | Required | Description |
+| Arg | Tipo | Requerido | Descripción |
 |-----|------|----------|-------------|
-| `oid` | uint64 | one of `oid` / `cloid` | ID de orden del servidor |
-| `cloid` | hex string | one of `oid` / `cloid` | ID de orden del cliente — `0x` + 32 caracteres hexadecimales |
+| `oid` | uint64 | uno de `oid` / `cloid` | ID de orden del servidor |
+| `cloid` | hex string | uno de `oid` / `cloid` | ID de orden del cliente — `0x` + 32 caracteres hexadecimales |
 
 Si ninguno está presente → `400 {"error":"missing field oid or cloid"}`. Un `cloid`
 malformado → `400`. La resolución se detiene en el primer resultado encontrado, en este orden: orden activa en reposo
@@ -524,14 +515,14 @@ de disparadores y el anillo de ejecuciones están indexados por `oid`):
 { "type": "order_status", "data": { "status": "unknown" } }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | Estado de ciclo de vida resuelto |
 | `order` | object | Presente en `"resting"` — `oid`, `market_id`, `side` (`"bid"`/`"ask"`), `px` / `size` (cadenas decimales de punto fijo), `inserted_at_ms`, `cloid` (hex \| null) |
 | `trigger` | object | Presente en `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (cadenas decimales de punto fijo), `trigger_above` (bool: disparar cuando el precio mark cruza hacia arriba), `registered_at_ms`, `fired` (bool) |
 | `fill` | object | Presente en `"filled"` — el registro de ejecución coincidente (ver [`user_fills`](#user_fills)) |
 
-### `block_info`
+### Metadatos del último bloque confirmado {#block_info}
 
 Metadatos del bloque confirmado. No requiere argumentos (`height` se acepta pero se ignora —
 el estado de lectura conserva únicamente el contexto confirmado más reciente).
@@ -555,7 +546,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `height` | uint64 | Altura del último bloque confirmado |
 | `round` | uint64 | Ronda de consenso de ese bloque |
@@ -563,18 +554,19 @@ Respuesta:
 | `timestamp_ms` | uint64 | Marca de tiempo del bloque (ms de consenso) |
 | `block_hash` | hex string (32 bytes) | Hash de bloque confirmado real (ahora integrado en el estado de lectura — ya no es el marcador de posición de ceros) |
 
-### `agents`
+### Billeteras de agente aprobadas para una cuenta {#agents}
 
-Agentes aprobados / billeteras API para una cuenta.
+Agentes / billeteras API aprobados para una cuenta.
 
 ```json
-{ "type": "agents", "account_id": 42 }
+{ "type": "agents", "address": "0x<addr>" }
 ```
 
-| Arg | Type | Required |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | sí |
+
+Si falta `address` → `400 {"error":"missing field address"}`.
 
 Respuesta:
 
@@ -583,7 +575,6 @@ Respuesta:
   "type": "agents",
   "data": {
     "address":    "0x<master>",
-    "account_id": 42,
     "agents": [
       { "agent": "0x<agent_addr>", "name": "trading-bot", "expires_at_ms": 1700000500000 }
     ]
@@ -591,26 +582,26 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección maestra resuelta |
-| `account_id` | uint64 | Devuelto en el eco solo cuando la solicitud usó `account_id` |
 | `agents[*].agent` | hex address | Dirección de la billetera del agente aprobado |
 | `agents[*].name` | string \| null | Etiqueta del agente definida al momento de la aprobación; `null` si no se estableció |
 | `agents[*].expires_at_ms` | uint64 \| null | Vencimiento de la aprobación del agente (ms de consenso); `null` para una aprobación sin fecha de vencimiento |
 
-### `sub_accounts`
+### Lista de sub-cuentas de una cuenta {#sub_accounts}
 
 Sub-cuentas de una cuenta.
 
 ```json
-{ "type": "sub_accounts", "account_id": 42 }
+{ "type": "sub_accounts", "address": "0x<addr>" }
 ```
 
-| Arg | Type | Required |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `address` | hex address | sí |
+
+Si falta `address` → `400 {"error":"missing field address"}`.
 
 Respuesta:
 
@@ -619,7 +610,6 @@ Respuesta:
   "type": "sub_accounts",
   "data": {
     "address":    "0x<parent>",
-    "account_id": 42,
     "sub_accounts": [
       { "index": 0, "address": "0x<sub_addr>" }
     ]
@@ -627,14 +617,13 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección del padre resuelta |
-| `account_id` | uint64 | Devuelto en el eco solo cuando la solicitud usó `account_id` |
 | `sub_accounts[*].index` | uint32 | Índice de la sub-cuenta bajo el padre |
 | `sub_accounts[*].address` | hex address | Dirección de la sub-cuenta |
 
-### `protocol_metrics`
+### Contadores y acumuladores a nivel de protocolo {#protocol_metrics}
 
 Acumuladores y contadores confirmados a nivel de protocolo. Sin parámetros. Todos los campos se
 leen directamente del estado `Exchange` confirmado (contadores, pools de comisiones, reservas BOLE,
@@ -691,7 +680,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `counters.total_orders` | uint64 | Órdenes admitidas a lo largo de toda la vida del protocolo |
 | `counters.total_fills` | uint64 | Ejecuciones acumuladas en toda la vida del protocolo (la única señal de operación detallada — es un **conteo**, no un nocional) |
@@ -729,7 +718,7 @@ de volumen. Los contadores son registros de actividad monotónicos, no cantidade
 
 Fuente de estado: `locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + tamaños de registro.
 
-### `user_fees`
+### Nivel de comisión y volumen por cuenta {#user_fees}
 
 Comisión por cuenta / nivel de volumen. Requerido: `account_id` (u64) **O** `address` (0x hex).
 
@@ -737,10 +726,10 @@ Comisión por cuenta / nivel de volumen. Requerido: `account_id` (u64) **O** `ad
 { "type": "user_fees", "account_id": 42 }
 ```
 
-| Arg | Type | Required |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
+| `account_id` | uint64 | uno de `account_id` / `address` |
+| `address` | hex address | uno de `account_id` / `address` |
 
 Si ninguno está presente → `400`. Una cuenta sin estado de comisiones devuelve un **200** con
 volúmenes en cero y los bps del nivel base — el patrón estándar de ceros establecido.
@@ -765,7 +754,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección de cuenta resuelta |
 | `account_id` | uint64 | Devuelto en el eco solo cuando la solicitud usó `account_id` |
@@ -788,7 +777,7 @@ los bps efectivos.
 
 Fuente de estado: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + la escala de niveles por volumen confirmada.
 
-### `staking_apr`
+### APR efectivo de staking y sus parámetros {#staking_apr}
 
 Tasa de emisión de staking anual efectiva y sus parámetros comprometidos. Sin parámetros.
 
@@ -845,27 +834,20 @@ el APR neto de un delegador individual es `effective_apr × (1 − commission)`.
 
 Fuente de estado: `c_staking.{total_stake, reward_rate_bps, current_epoch, validators}` + la curva de emisión.
 
-### `oracle_sources`
+### Subconjunto de fuentes de oráculo por mercado {#oracle_sources}
 
-El subconjunto de fuentes de oráculo comprometido por mercado. Resuelve el mercado por `asset_id`
-(u32) **O** `coin` (símbolo).
-
-```json
-{ "type": "oracle_sources", "asset_id": 0 }
-```
-
-O por nombre:
+El subconjunto de fuentes de oráculo comprometido por mercado. Resuelve el mercado por `coin` (símbolo).
 
 ```json
 { "type": "oracle_sources", "coin": "BTC" }
 ```
 
-| Argumento | Tipo | Requerido |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `asset_id` | uint32 | uno de `asset_id` / `coin` |
-| `coin` | symbol | uno de `asset_id` / `coin` |
+| `coin` | symbol | sí |
 
-Si faltan ambos → `400`; mercado desconocido → `404 {"error":"market not found"}`.
+Si falta `coin` → `400 {"error":"missing field coin"}`; mercado desconocido →
+`404 {"error":"market not found"}`.
 
 Respuesta:
 
@@ -873,13 +855,12 @@ Respuesta:
 {
   "type": "oracle_sources",
   "data": {
-    "asset_id":          0,
-    "name":              "BTC",
+    "coin":              "BTC",
     "oracle_set":        true,
-    "source_count":      3,
+    "source_count":      10,
     "num_sources":       10,
-    "enabled_sources":   [0, 2, 5],
-    "subset_mask":       37,
+    "enabled_sources":   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "subset_mask":       1023,
     "weights_committed": false
   }
 }
@@ -887,27 +868,26 @@ Respuesta:
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `asset_id` | uint32 | Id de activo devuelto/resuelto |
-| `name` | string | Símbolo del mercado |
+| `coin` | string | Símbolo de mercado devuelto en el eco / resuelto |
 | `oracle_set` | bool | Si el desplegador confirmó explícitamente el subconjunto mediante `SetOracle` |
 | `source_count` | uint64 | Número de fuentes habilitadas (popcount de la máscara) |
 | `num_sources` | uint8 | Número total de ranuras de fuentes (`NUM_ORACLE_SOURCES = 10`) |
-| `enabled_sources` | uint8[] | Índices de bits activos de la máscara de subconjunto (ranuras de fuentes habilitadas) |
+| `enabled_sources` | uint8[] | Índices de bits activos de la máscara de subconjunto (las ranuras de fuentes habilitadas) |
 | `subset_mask` | uint16 | `oracle_source_subset_mask` de 10 bits comprometida (bit `i` activo ⇒ la fuente `i` alimenta la mediana) |
 | `weights_committed` | bool | Siempre `false` — los pesos por fuente NO están comprometidos (ver indicador) |
 
 :::warning
 **Solo la máscara de bits numérica está en cadena — los NOMBRES y PESOS de los proveedores NO están
-comprometidos** (`weights_committed: false`). Las 10 identidades de fuente son
-fijas en el protocolo de forma off-chain y sus pesos son
-fijos en el protocolo, por lo que el estado comprometido solo contiene la máscara de bits del subconjunto. Esta consulta
+comprometidos** (`weights_committed: false`). Las 10 identidades de fuente están
+fijas en el protocolo de forma off-chain y sus pesos también están
+fijos en el protocolo, por lo que el estado comprometido solo contiene la máscara de bits del subconjunto. Esta lectura
 expone `enabled_sources` como **índices de bit**, no como proveedores con nombre, y no emite
-lista de pesos por proveedor en lugar de fabricar una.
+ninguna lista de pesos por proveedor en lugar de fabricar una.
 :::
 
 Fuente de estado: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
 
-## Tipos de consulta de gobernanza
+## Tipos de consulta de gobernanza {#governance-query-types}
 
 La superficie de gobernanza en cadena: la maquinaria de votación activa (`gov_state`), la
 vista de propuestas pendientes entre categorías con distancia al quórum (`gov_proposals`), y
@@ -916,10 +896,10 @@ comprometido de `Exchange`; mismo envelope `{type, data}`. El quórum de stake e
 (ponderado por stake); los validadores **inhabilitados** (jailed) quedan excluidos del denominador
 de stake activo y de cada recuento, en consonancia con la verificación de promulgación en cadena.
 
-### `gov_state`
+### Estado de gobernanza en vivo y parámetros actuales {#gov_state}
 
-La superficie de gobernanza en vivo — contexto de quórum por stake, rondas `voteGlobal` pendientes,
-propuestas `govPropose` abiertas y el valor ACTUAL de cada parámetro gobernado.
+La superficie de gobernanza en vivo — contexto de quórum por stake, rondas de votación de cambio de
+parámetros pendientes, propuestas abiertas, y el valor ACTUAL de cada parámetro gobernado.
 Sin parámetros.
 
 ```json
@@ -973,7 +953,7 @@ Respuesta:
 | `pending_vote_global[*].votes[*].stake` | Cadena decimal | Stake del votante |
 | `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | Marca de tiempo de envío del voto (ms de consenso) |
 | `pending_vote_global[*].leading_stake` | Cadena decimal | Mayor stake acumulado detrás de un único payload en esta ronda |
-| `open_proposals[*].proposal_id` | uint64 | Id de ronda govPropose |
+| `open_proposals[*].proposal_id` | uint64 | Id de ronda de propuesta |
 | `open_proposals[*].voters` | uint64 | Número de votos emitidos |
 | `open_proposals[*].aye_stake` / `nay_stake` | Cadena decimal | Stake votando a favor / en contra |
 | `params` | object | Valor actual de cada parámetro gobernado (cada uno como escalar comprometido) |
@@ -982,14 +962,15 @@ Respuesta:
 
 El objeto `params` contiene el conjunto completo de parámetros gobernados que la maquinaria de
 votación puede modificar (distribución de comisiones, parámetros de staking, límites MIP-3, topes de riesgo,
-indicadores de spot / EVM / bridge, …); cada uno es el valor comprometido en vigor.
+período/tope de financiamiento por activo, indicadores de spot / EVM / bridge, el conjunto de precompilados EVM
+deshabilitados, …); cada uno es el valor comprometido en vigor.
 
-### `gov_proposals`
+### Propuestas de gobernanza activas y estado del quórum {#gov_proposals}
 
 Todas las propuestas de gobernanza ACTIVAS en TODAS las categorías de voto (no solo
-`voteGlobal`), cada una con su recuento de stake por payload en vivo y distancia al quórum ⅔.
-Vista transversal de categorías de "qué se está votando ahora mismo y a qué distancia está".
-Sin parámetros.
+las votaciones directas de parámetros), cada una con su recuento de stake por payload en vivo y su
+distancia al quórum ⅔. La vista transversal de categorías de "qué se está votando ahora mismo y a qué
+distancia está". Sin parámetros.
 
 ```json
 { "type": "gov_proposals" }
@@ -1047,7 +1028,7 @@ Respuesta:
 | `proposals[*].payloads[*].payload_hex` | Cadena hex | Un payload votado distinto (sin prefijo `0x`) |
 | `proposals[*].payloads[*].stake` | Cadena decimal | Stake activo acumulado detrás de ese payload |
 | `proposals[*].payloads[*].meets_quorum` | bool | Si este payload por sí solo alcanza el quórum |
-| `proposals[*].proposal` | object \| null | El registro govPropose tipado cuando la ronda se abrió mediante `govPropose`, de lo contrario `null` |
+| `proposals[*].proposal` | object \| null | El registro de propuesta tipado cuando la ronda se abrió mediante una propuesta; en caso contrario, `null` |
 | `proposals[*].proposal.kind` | uint | Id de tipo de parámetro gobernado |
 | `proposals[*].proposal.kind_name` | string \| null | Nombre de tipo decodificado (snake_case), `null` si se desconoce |
 | `proposals[*].proposal.value` | Cadena decimal | Valor propuesto |
@@ -1055,7 +1036,7 @@ Respuesta:
 | `proposals[*].proposal.proposer` | Dirección hex | Cuenta que abrió la propuesta |
 | `proposals[*].proposal.opened_at_ms` | uint64 | Marca de tiempo de apertura de la propuesta (ms de consenso) |
 
-### `gov_history`
+### Historial de cambios de parámetros promulgados por gobernanza {#gov_history}
 
 El historial de auditoría de gobernanza promulgada (anillo acotado, del más antiguo al más reciente) — cada entrada
 demuestra que un parámetro FUE MODIFICADO por gobernanza en cadena respecto a su valor génesis. Sin
@@ -1094,13 +1075,13 @@ Respuesta:
 | `enacted[*].kind` | uint | Id de tipo de parámetro gobernado |
 | `enacted[*].kind_name` | string \| null | Nombre de tipo decodificado (snake_case), `null` si se desconoce |
 | `enacted[*].value` | Cadena decimal | Valor promulgado |
-| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Vía de origen — `govPropose`/`govVote` vs `voteGlobal` directo |
+| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Vía de origen — seguimiento por propuesta frente a votación directa de parámetro |
 | `enacted[*].enacted_at_ms` | uint64 | Marca de tiempo de promulgación (ms de consenso) |
 | `enacted[*].description` | string | Resumen legible del cambio |
 
 El anillo tiene un límite según la cota del registro promulgado en cadena, por lo que representa una ventana reciente, no todo el historial.
 
-## Tipos de consulta avanzados (RFQ / FBA / margen de cartera)
+## Tipos de consulta avanzados (RFQ / FBA / margen de cartera) {#advanced-query-types-rfq--fba--portfolio-margin}
 
 Estos leen el estado en vivo de los motores de RFQ, FBA y margen de cartera — complementan
 los indicadores `market_info.fba_enabled` / `account_state.pm_enabled` con el estado
@@ -1109,7 +1090,7 @@ los precios y tamaños de RFQ + FBA son cadenas de enteros en **punto fijo 1e8**
 plano de libro/órdenes, idéntico al de [`open_orders`](#open_orders) / [`l2_book`](./info/perpetuals.md#l2_book)),
 **no** USDC enteros; las magnitudes de margen de cartera son cadenas de enteros en **centavos de USD**.
 
-### `rfq_open`
+### Solicitudes RFQ abiertas y cotizaciones de maker {#rfq_open}
 
 Todas las solicitudes RFQ abiertas con sus cotizaciones de maker. Sin parámetros. Consulte el [concepto RFQ](../../concepts/rfq.md).
 
@@ -1170,22 +1151,21 @@ Respuesta:
 | `rfqs[*].quotes[*].valid_until_ms` | uint64 | Plazo de validez de la cotización (ms de consenso) |
 | `rfqs[*].quotes[*].submitted_at_ms` | uint64 | Marca de tiempo de envío de la cotización (ms de consenso) |
 
-### `rfq_user`
+### RFQs solicitados o cotizados por una cuenta {#rfq_user}
 
 RFQs en los que una cuenta participa — divididos entre los que ella misma abrió y aquellos en los que cotizó. Consulte el [concepto de RFQ](../../concepts/rfq.md).
 
 ```json
-{ "type": "rfq_user", "account_id": 42 }
+{ "type": "rfq_user", "address": "0x<addr>" }
 ```
 
-| Arg | Type | Required |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `account_id` | uint64 | uno de `account_id` / `address` |
-| `address` | hex address | uno de `account_id` / `address` |
+| `address` | hex address | sí |
 
-`account_id` (u64) o `address` (hex 0x) identifican la cuenta; cuando la solicitud
-proporciona `account_id`, este se repite en `data.account_id`. Si no se proporciona
-ninguno → `400`; `address` con formato incorrecto → `400 {"error":"invalid hex"}`.
+La cuenta se identifica mediante `address` (hex con prefijo 0x). Si falta `address` →
+`400 {"error":"missing field address"}`; si `address` tiene formato incorrecto →
+`400 {"error":"invalid hex"}`.
 
 Respuesta:
 
@@ -1194,39 +1174,37 @@ Respuesta:
   "type": "rfq_user",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
-    "requested": [ /* <rfq>, misma estructura por RFQ que rfq_open */ ],
+    "requested": [ /* <rfq>, same per-RFQ shape as rfq_open */ ],
     "quoted":    [ /* <rfq> */ ]
   }
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección de cuenta resuelta |
-| `account_id` | uint64 | Devuelto solo cuando la solicitud usó `account_id` |
 | `requested` | array&lt;rfq&gt; | RFQs que esta cuenta abrió (solicitante); misma estructura por RFQ que [`rfq_open`](#rfq_open) |
 | `quoted` | array&lt;rfq&gt; | RFQs en los que esta cuenta cotizó (aparece como `maker`); misma estructura por RFQ |
 
 Cada lista itera de forma determinista por `rfq_id`. Una cuenta que no participa en
-ningún RFQ devuelve un **200** con ambas listas vacías (el idioma canónico de campos
-en cero).
+ningún RFQ devuelve un **200** con ambas listas vacías (el patrón establecido de campos en cero).
 
-### `fba_batch_state`
+### Pool FBA activo y liquidación indicativa {#fba_batch_state}
 
 Pool FBA activo más la liquidación indicativa para un mercado. Consulte el [concepto de FBA](../../concepts/fba.md).
 
 ```json
-{ "type": "fba_batch_state", "market_id": 3 }
+{ "type": "fba_batch_state", "coin": "BTC" }
 ```
 
-| Arg | Type | Required |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `market_id` | uint32 | sí |
+| `coin` | symbol | sí |
 
-`market_id` ausente → `400`. **No existe 404** para un mercado no registrado: FBA es
-opt-in por mercado, por lo que un mercado sin pool devuelve un **200** con campos en
-cero (`enabled:false`, `period_ms:0`, `orders` vacío, `indicative:null`).
+Si falta `coin` → `400 {"error":"missing field coin"}`. **No existe 404** para un
+mercado no registrado: FBA es opt-in por mercado, por lo que un mercado sin pool devuelve un
+**200** con campos en cero (`enabled:false`, `period_ms:0`, `orders` vacío,
+`indicative:null`).
 
 Respuesta:
 
@@ -1234,7 +1212,7 @@ Respuesta:
 {
   "type": "fba_batch_state",
   "data": {
-    "market_id":      3,
+    "coin":           "BTC",
     "enabled":        true,
     "period_ms":      200,
     "min_lot":        "1",
@@ -1261,9 +1239,9 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `market_id` | uint32 | Id de mercado repetido |
+| `coin` | string | Símbolo de mercado devuelto en el eco |
 | `enabled` | bool | Indica si FBA está activo para este mercado |
 | `period_ms` | uint32 | Período del lote |
 | `min_lot` | u128 string | Tamaño mínimo de lote, punto fijo 1e8 |
@@ -1283,21 +1261,21 @@ Respuesta:
 | `indicative.clearing_px` | i128 string | Precio de liquidación uniforme indicativo, punto fijo 1e8 |
 | `indicative.matched_size` | u128 string | Tamaño que se liquidaría a `clearing_px`, punto fijo 1e8 |
 
-### `pm_summary`
+### Inscripción en margen de cartera y cifras de escenario {#pm_summary}
 
 Inscripción en margen de cartera + últimas cifras de escenario calculadas para una cuenta. Consulte [Margen de cartera](../../concepts/portfolio-margin.md).
 
 ```json
-{ "type": "pm_summary", "account_id": 42 }
+{ "type": "pm_summary", "address": "0x<addr>" }
 ```
 
-| Arg | Type | Required |
+| Arg | Tipo | Requerido |
 |-----|------|----------|
-| `account_id` | uint64 | uno de `account_id` / `address` |
-| `address` | hex address | uno de `account_id` / `address` |
+| `address` | hex address | sí |
 
-`account_id` (u64) o `address` (hex 0x); si no se proporciona ninguno → `400`. Una
-cuenta no inscrita devuelve un **200** con `enrolled:false` y cifras en cero.
+La cuenta se identifica mediante `address` (hex con prefijo 0x). Si falta `address` →
+`400 {"error":"missing field address"}`. Una cuenta no inscrita devuelve un **200**
+con `enrolled:false` y cifras en cero.
 
 Respuesta:
 
@@ -1306,7 +1284,6 @@ Respuesta:
   "type": "pm_summary",
   "data": {
     "address":                     "0x<addr>",
-    "account_id":                  42,
     "enrolled":                    true,
     "enrolled_at_ms":              1000,
     "last_computed_block":         77,
@@ -1317,10 +1294,9 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `address` | hex address | Dirección de cuenta resuelta |
-| `account_id` | uint64 | Devuelto solo cuando la solicitud usó `account_id` |
 | `enrolled` | bool | Indica si la cuenta está inscrita en margen de cartera |
 | `enrolled_at_ms` | uint64 | Marca de tiempo de inscripción (ms de consenso); `0` si no está inscrita |
 | `last_computed_block` | uint64 | Altura de bloque del último cálculo de escenario PM |
@@ -1332,15 +1308,15 @@ La pérdida en el peor escenario se omite intencionalmente: no se persiste en el
 estado confirmado, y recalcularla requeriría volver a ejecutar el barrido de
 escenarios, lo cual no es una operación de solo lectura.
 
-## Tipos de consulta de instantánea de nodo
+## Tipos de consulta de instantánea de nodo {#node-snapshot-query-types}
 
 Los siguientes tipos de consulta exponen la superficie de instantánea del estado confirmado del nodo. Cada uno lee el `core_state::Exchange` confirmado y utiliza el mismo sobre `{type, data}` y las convenciones nativas de MTF (valores monetarios en cadena decimal, direcciones hex `0x`, ids de activos `u32`, orden `BTreeMap`). Búsquedas indexadas por clave (por dirección / activo), no escaneos O(N), salvo cuando el conjunto es inherentemente pequeño (mercados / vaults / validadores) o ya está indexado (`liquidatable` mediante el índice BOLE). Las lecturas de instantáneas de spot / margen-spot / Earn tienen su propia página ([consultas de spot y margen](./info/spot.md)); las lecturas de mercados de contratos perpetuos están en la página de [consultas de perpetuos](./info/perpetuals.md). Las lecturas de instantáneas generales (transversales) se detallan a continuación.
 
-## Tipos de consulta de instantánea de nodo generales
+## Tipos de consulta de instantánea de nodo generales {#general-node-snapshot-query-types}
 
-Lecturas de instantánea de nodo que no son específicas de un producto de trading — estado del exchange, helpers de frontend / órdenes abiertas, liquidación, límites de tasa, vaults, validadores, multi-firma y el `web_data2` agregado.
+Lecturas de instantánea de nodo que no son específicas de un producto de trading — estado del exchange, helpers de frontend / órdenes abiertas, liquidación, límites de tasa, vaults, validadores y multi-firma.
 
-### `exchange_status`
+### Estado global de trading del exchange {#exchange_status}
 
 Estado global del trading. Sin parámetros.
 
@@ -1363,7 +1339,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `spot_disabled` | bool | Trading spot deshabilitado globalmente |
 | `post_only_until_time_ms` | uint64 | Fin de la ventana post-only (ms de consenso); `0` = ninguna |
@@ -1373,7 +1349,7 @@ Respuesta:
 
 Fuente de estado: `spot_disabled`, `post_only_until_*`, `scheduled_freeze_height`, `mip3_market_specs` / `mip3_spot_pair_specs`.
 
-### `frontend_open_orders`
+### Órdenes abiertas con detalle de TIF y disparador {#frontend_open_orders}
 
 Similar a `open_orders`, pero incluye el detalle `tif` / `cloid` / `trigger` de cada orden. Requerido: `address` (hex 0x).
 
@@ -1400,7 +1376,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `orders[*].oid` | uint64 | Id de orden en cadena |
 | `orders[*].market_id` | uint32 | Id de activo |
@@ -1413,7 +1389,7 @@ Respuesta:
 
 Fuente de estado: órdenes en libro por mercado + `Exchange.trigger_registry`.
 
-### `vault_summaries`
+### Resumen de todos los vaults {#vault_summaries}
 
 Resumen de todos los vaults. Sin parámetros.
 
@@ -1434,7 +1410,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `vaults[*].id` | uint64 | Id del vault |
 | `vaults[*].address` / `leader` | hex address | Dirección en cadena del vault / líder |
@@ -1446,7 +1422,7 @@ Fuente de estado: `Exchange.user_vaults`.
 
 > **MARCADO.** `tvl` utiliza la marca de máximo histórico como proxy del NAV; el NAV completo requiere el motor de emparejamiento + el oráculo.
 
-### `user_vault_equities`
+### Vaults en los que un usuario ha depositado {#user_vault_equities}
 
 Vaults en los que un usuario ha depositado + participación / patrimonio. Requerido: `address` (hex 0x).
 
@@ -1466,7 +1442,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `equities[*].vault_id` | uint64 | Id del vault |
 | `equities[*].vault_address` | hex address | Dirección del vault |
@@ -1475,7 +1451,7 @@ Respuesta:
 
 Fuente de estado: `user_vaults[*].follower_shares[addr]` (indexado por vault).
 
-### `leading_vaults`
+### Vaults liderados por el usuario {#leading_vaults}
 
 Vaults liderados por el usuario. Requerido: `address` (hex 0x). Devuelve la misma estructura de fila que `vault_summaries`.
 
@@ -1491,7 +1467,7 @@ Respuesta:
 
 Fuente de estado: `Exchange.user_vaults` filtrado por `leader == addr`.
 
-### `user_rate_limit`
+### Estadísticas de acciones y presupuesto de límite de tasa de un usuario {#user_rate_limit}
 
 Estadísticas de acciones / presupuesto de límite de tasa de un usuario. Requerido: `address` (hex 0x).
 
@@ -1508,7 +1484,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `last_nonce` | uint64 | Último nonce de acción aceptado |
 | `pending_count` | uint32 | Recuento de acciones pendientes (en vuelo) |
@@ -1516,7 +1492,7 @@ Respuesta:
 
 Fuente de estado: `locus.user_action_registry[addr]` (`UserActionStats`); cuenta ausente → ceros.
 
-### `delegator_summary`
+### Resumen de staking para una dirección {#delegator_summary}
 
 Resumen de staking para una dirección. Requerido: `address` (hex 0x).
 
@@ -1536,7 +1512,7 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `total_delegated` | decimal string | Suma de delegaciones activas |
 | `pending_withdrawal` | decimal string | Suma de undelegaciones pendientes |
@@ -1545,7 +1521,7 @@ Respuesta:
 
 Fuente de estado: `c_staking.{delegations, pending_undelegations, delegator_rewards}`.
 
-### `max_builder_fee`
+### Techo de comisión de constructor aprobado {#max_builder_fee}
 
 Techo de comisión de constructor aprobado para `(address, builder)`. Requerido: `address` (hex 0x) + `builder` (hex 0x).
 
@@ -1562,16 +1538,16 @@ Respuesta:
 }
 ```
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
 | `max_fee_bps` | uint32 | Techo en bps aprobado; `0` si no está aprobado |
 | `approved` | bool | Indica si `(address, builder)` es un par aprobado |
 
 Fuente de estado: `locus.fee_tracker.approved_builders[addr][builder]` (indexado).
 
-### `user_to_multi_sig_signers`
+### Configuración multifirma para una dirección {#user_to_multi_sig_signers}
 
-Configuración multifirma para una dirección. Requerido: `address` (hex 0x).
+Multisig config para una dirección. Requerido: `address` (hex 0x).
 
 ```json
 { "type": "user_to_multi_sig_signers", "address": "0x<addr>" }
@@ -1594,7 +1570,7 @@ Respuesta:
 
 Fuente de estado: `multi_sig_tracker.configs[addr]` (`MultiSigConfig`).
 
-### `user_role`
+### Rol derivado de una cuenta {#user_role}
 
 Rol derivado de la cuenta. Requerido: `address` (hex 0x).
 
@@ -1614,7 +1590,7 @@ Respuesta:
 
 Precedencia: `vault` (una `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (agente aprobado de algún maestro) → `user` (tiene estado de usuario / config / entrada spot) → `missing`.
 
-### `validator_l1_votes`
+### Metadatos actuales de voto de oráculo por validador {#validator_l1_votes}
 
 Votos L1 actuales del validador. Sin parámetros.
 
@@ -1643,7 +1619,7 @@ Respuesta:
 
 Fuente de estado: `validator_l1_vote_tracker.round_to_votes`. El contenido del voto son bytes opacos de oráculo (decodificados por el Módulo H) — la interfaz de lectura expone metadatos, no el contenido sin procesar.
 
-### `validator_summaries`
+### Instantánea de stake y estado por validador {#validator_summaries}
 
 Instantánea por validador (HL `validatorSummaries`). Sin parámetros. Lista todos los validadores en `c_staking.validators` confirmado (un conjunto pequeño y acotado) en el orden `BTreeMap` confirmado.
 
@@ -1691,7 +1667,7 @@ Respuesta:
 
 Fuente de estado: `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` no se rastrean en cadena — se omiten en lugar de fabricarse.
 
-### `gossip_root_ips`
+### Endpoints de pares semilla de gossip configurados {#gossip_root_ips}
 
 Endpoints de pares raíz/semilla de gossip configurados (HL `gossipRootIps`). Sin parámetros. Topología de red, **no** estado confirmado: en el arranque, el tiempo de ejecución publica los endpoints `network.peers[].gossip` de este nodo en la capa de lectura. Un nodo en solitario no tiene pares → vacío de forma honesta.
 
@@ -1711,55 +1687,35 @@ Respuesta:
 
 Fuente de estado: configuración del nodo `network.peers[].gossip` (publicada en `NodeReadState` al arrancar; NO es estado confirmado, NO se incorpora al AppHash).
 
-### `web_data2`
+### `web_data2` — eliminado {#web_data2--removed}
 
-Instantánea compuesta de "todo para el frontend" para una dirección. Requerido: `address` (hex 0x). Se compone a partir de los demás lectores para que las estructuras nunca diverjan.
+:::warning
+**`web_data2` fue ELIMINADO** (tanto el tipo REST `/info` como el canal WS).
+Una solicitud ahora devuelve `400 {"error":"unknown info type: web_data2"}`; la
+suscripción WS devuelve `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
 
-```json
-{ "type": "web_data2", "address": "0x<addr>" }
-```
+Componga la vista equivalente a partir de las lecturas específicas en su lugar — llevan
+los mismos datos con estructuras estables y versionadas de forma independiente:
 
-Respuesta:
+| Sección antigua de `web_data2` | Use en su lugar |
+|-------------------------|-------------|
+| `clearinghouse` (margen + posiciones) | [`account_state`](#account_state) (REST) / canal WS `account_state` |
+| `spot_balances` | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (REST) / canal WS `spot_state` |
+| `open_orders` | [`frontend_open_orders`](#frontend_open_orders) |
+| `vault_equities` | [`user_vault_equities`](#user_vault_equities) |
+| `exchange_status` | [`exchange_status`](#exchange_status) |
+:::
 
-```json
-{
-  "type": "web_data2",
-  "data": {
-    "address": "0x<addr>",
-    "clearinghouse": {
-      "account_value": "1000000", "margin_used": "100000",
-      "positions": [ { "asset": 0, "size": "50", "entry_ntl": "2500", "mode": "cross", "lev": 10 } ]
-    },
-    "spot_balances": [ /* <spot_clearinghouse_state.balances> */ ],
-    "open_orders": [ /* <frontend_open_orders.orders> */ ],
-    "vault_equities": [ /* <user_vault_equities.equities> */ ],
-    "exchange_status": { /* <exchange_status.data> */ }
-  }
-}
-```
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `clearinghouse.account_value` | decimal string | Valor de la cuenta cruzada |
-| `clearinghouse.margin_used` | decimal string | Σ margen utilizado por activo |
-| `clearinghouse.positions` | object[] | Posiciones abiertas por activo |
-| `spot_balances` | object[] | Reutiliza `spot_clearinghouse_state.balances` |
-| `open_orders` | object[] | Reutiliza `frontend_open_orders.orders` |
-| `vault_equities` | object[] | Reutiliza `user_vault_equities.equities` |
-| `exchange_status` | object | Reutiliza `exchange_status.data` |
-
-Fuente de estado: composición sobre los lectores anteriores.
-
-## Errores
+## Errores {#errors}
 
 | HTTP | Cuerpo | Causa |
 |------|------|-------|
-| 200 | respuesta normal | éxito (una **dirección desconocida** en `account_state` etc. devuelve **200** con un registro en cero, NO un 404) |
+| 200 | respuesta normal | éxito (una **dirección desconocida** en `account_state`, etc., devuelve un **200** con un registro en cero, NO un 404) |
 | 400 | `{"error":"missing field \`type\`"}` | Sin discriminador `type` |
 | 400 | `{"error":"unknown info type: <X>"}` | `type` mal escrito o no soportado |
-| 400 | `{"error":"missing field: address"}` / `{"error":"missing field market_id"}` | Argumento requerido específico del tipo omitido (las mayúsculas varían según el lector) |
+| 400 | `{"error":"missing field: address"}` / `{"error":"missing field coin"}` | Argumento requerido específico del tipo omitido (las mayúsculas varían según el lector) |
 | 400 | `{"error":"invalid hex"}` | Argumento de dirección malformado |
-| 404 | `{"error":"market not found"}` | ID de activo / nombre de moneda desconocido (solo `market_info`) |
+| 404 | `{"error":"market not found"}` | Símbolo `coin` desconocido (`market_info`, etc.) |
 | 404 | `{"error":"vault not found"}` | Dirección de vault desconocida (solo `vault_state`) |
 | 405 | (sin cuerpo) | No es POST |
 | 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | Ver [límites de velocidad](../rate-limits.md) |
@@ -1770,13 +1726,13 @@ Fuente de estado: composición sobre los lectores anteriores.
 para una dirección que nunca ha aparecido en cadena — nunca devuelven 404.
 :::
 
-## Consistencia de lectura tras escritura
+## Consistencia de lectura tras escritura {#read-after-write-consistency}
 
 `/info` lee desde el bloque confirmado más reciente. Un `POST /exchange` admitido en el tiempo `T` no es visible en `/info` hasta que el líder confirma el bloque que lo contiene (normalmente <200 ms con el tick predeterminado).
 
 Para semántica de lectura de lo que uno mismo escribe, suscríbase al [canal WS `userEvents`](../ws/subscriptions.md#userevents); los eventos admitidos y luego confirmados llegan en orden, eliminando la necesidad de hacer polling.
 
-## Secuencia — consultar una cuenta, ver tu propia orden
+## Secuencia — consultar una cuenta, ver tu propia orden {#sequence--query-an-account-see-your-own-order}
 
 ```mermaid
 sequenceDiagram
@@ -1795,22 +1751,26 @@ sequenceDiagram
     gateway-->>client: 200 [order present]
 ```
 
-## Véase también
+## Véase también {#see-also}
 
 - [`POST /exchange`](./exchange.md) — ruta de escritura
 - [`POST /faucet`](./faucet.md) — fondos de prueba en devnet/testnet (USDC + MTF)
 - [Suscripciones WS](../ws/subscriptions.md) — equivalentes push
 
-## Preguntas frecuentes
+## Preguntas frecuentes {#faq}
 
 <details>
 <summary>Mostrar preguntas frecuentes</summary>
 
-**P: ¿Por qué se aceptan tanto `asset_id` como `coin` en `market_info`?**
-R: `asset_id` es el canónico; `coin` es una comodidad para los llamantes humanos. Ambos resuelven al mismo registro.
+**P: ¿Cómo se identifica un mercado — por id o por nombre?**
+R: Por el símbolo `coin` (`"BTC"`). Los argumentos numéricos heredados `asset_id` /
+`market_id` de la solicitud fueron eliminados; solo se acepta `coin`, y las respuestas
+muestran símbolos `coin` en todas partes. (La ruta de escritura firmada `/exchange`
+sigue usando el `asset` numérico — ese campo está congelado por consenso y no tiene
+relación con estos argumentos de lectura.)
 
 **P: ¿Necesitan `user_fills` / `recent_trades` un indexador externo?**
-R: No. Ambos leen una cinta confirmada en el nodo (un anillo de llenados acotado por cuenta y un anillo de operaciones acotado por mercado, incorporados al AppHash), por lo que cualquier nodo sirve registros reales directamente — no se necesita ningún indexador externo. Los anillos son acotados, por lo que conservan una ventana reciente; para una alimentación en vivo ininterrumpida, suscríbase a los [canales WS](../ws/subscriptions.md).
+R: No. Ambos leen una cinta confirmada en el nodo (un anillo de ejecuciones acotado por cuenta y un anillo de operaciones acotado por mercado, incorporados al AppHash), por lo que cualquier nodo sirve registros reales directamente — no se necesita ningún indexador externo. Los anillos son acotados, por lo que conservan una ventana reciente; para una alimentación en vivo ininterrumpida, suscríbase a los [canales WS](../ws/subscriptions.md).
 
 **P: ¿Es la respuesta determinista entre nodos?**
 R: Sí. Cualquier nodo honesto devuelve respuestas idénticas para la misma consulta a la misma altura confirmada. Los nodos con diferentes alturas de confirmación pueden diferir. Los campos de identidad por nodo (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) NO son estado de consenso y legítimamente difieren. Use [`block_info`](#block_info) para ver la altura a la que un nodo ha confirmado.

@@ -9,14 +9,14 @@ Cadence and budgets may still be tuned before launch.
 How long each EVM↔Core interaction takes, so a bot can reason about confirmation
 windows.
 
-## Block cadence
+## Block cadence {#block-cadence}
 
 One unified block per consensus round, at a **sub-second** cadence — there is no
 separate slow lane, so trading, transfers, CoreWriter calls, precompile reads, AND
 contract deployments all confirm in the same round. `block.timestamp` is
 consensus-derived (see [Execution model](execution-model.md)).
 
-## EVM → Core (CoreWriter)
+## EVM → Core (CoreWriter) {#evm--core-corewriter}
 
 1. The contract calls `sendRawAction`; the call burns gas and emits `RawAction`
    immediately.
@@ -29,7 +29,7 @@ consensus-derived (see [Execution model](execution-model.md)).
 Design implication: treat a CoreWriter action as **fire-and-confirm-later**, never
 as a synchronous call.
 
-## Core → EVM (credits)
+## Core → EVM (credits) {#core--evm-credits}
 
 A Core→EVM credit (`SpotCredit` / `BridgeMint`) is materialized as a system
 pseudo-transaction on a **subsequent** block, ordered by L1 round and bounded by an
@@ -37,7 +37,7 @@ elastic per-block system-gas slice (see
 [Core ↔ EVM transfers](core-evm-transfers.md)). It is **not** visible in the same
 block that triggered it; expect it within a small number of blocks.
 
-## Precompile reads
+## Precompile reads {#precompile-reads}
 
 `staticcall` precompile reads return within the calling block. Today the read
 precompiles are **stateless quoting** helpers (they compute over inputs the caller
@@ -45,7 +45,7 @@ supplies); **live Core-state-backed reads** (querying the chain's own
 positions / book directly) are upcoming, at which point a read reflects Core as of
 the calling block.
 
-## See also
+## See also {#see-also}
 
 - [Execution model](execution-model.md)
 - [Core ↔ EVM transfers](core-evm-transfers.md)

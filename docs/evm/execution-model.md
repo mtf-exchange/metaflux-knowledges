@@ -12,7 +12,7 @@ partitioned into **parallel conflict-strata**, so throughput scales with cores a
 **every transaction class — including contract deployments — confirms in the same
 sub-second round**.
 
-## One block, parallel strata
+## One block, parallel strata {#one-block-parallel-strata}
 
 - **One block per consensus round** at a sub-second cadence. There is no 60-second
   heavy-block lane: a contract deployment or a fat settlement lands in the very
@@ -26,7 +26,7 @@ sub-second round**.
   execution as a plain in-order replay, so it is **identical on every honest node**
   regardless of core count or thread scheduling.
 
-## Block formation
+## Block formation {#block-formation}
 
 `ASSEMBLE → PARTITION → EXECUTE → COMMIT`:
 
@@ -40,7 +40,7 @@ sub-second round**.
 4. **Commit** — finalized writes commit in transaction-index order; the state root
    is taken over the committed state.
 
-## Gas & fees
+## Gas & fees {#gas--fees}
 
 - An **aggregate per-block gas limit** (anti-DoS ceiling) plus a **per-transaction
   gas cap**. The per-tx cap absorbs the old heavy-block role: deploys / `CREATE`
@@ -52,7 +52,7 @@ sub-second round**.
 - Cadence is paced by consensus rounds; `block.timestamp` is consensus-derived
   (deterministic — no wall clock).
 
-## MEV-resistant trading (opt-in, per market)
+## MEV-resistant trading (opt-in, per market) {#mev-resistant-trading-opt-in-per-market}
 
 Market microstructure is a first-class concern, so MEV resistance is a property of
 **block construction**, not a fee-market afterthought — and it is opt-in per market:
@@ -73,7 +73,7 @@ Clearing runs on the MetaFlux Core matching engine; the EVM block **synchronizes
 its trade-intent flow to that auction — there is exactly **one** clearing path, not
 a duplicate inside the EVM.
 
-## Confirmation tiers
+## Confirmation tiers {#confirmation-tiers}
 
 - **Final** (consensus) confirmation each round — the only tier that enters
   committed state.
@@ -81,7 +81,7 @@ a duplicate inside the EVM.
   is **not** part of consensus. Risk-bearing actions — bridge mints, withdrawals —
   rely on **final** confirmation only.
 
-## See also
+## See also {#see-also}
 
 - [Interacting with Core](interacting-with-core.md) — precompiles (read) + CoreWriter (write)
 - [Core ↔ EVM transfers](core-evm-transfers.md)

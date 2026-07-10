@@ -6,9 +6,9 @@ description: POST /info read queries for spot markets, leveraged spot margin, an
 
 Read queries for [spot](../../../products/spot.md) markets, leveraged [spot margin](../../../products/spot-margin.md), and the [Earn](../../../concepts/earn.md) pool. Same `POST /info` endpoint and envelope as the [base page](../info.md).
 
-## Spot, spot-margin & Earn query types
+## Spot, spot-margin & Earn query types {#spot-spot-margin--earn-query-types}
 
-### `spot_meta`
+### Spot pair universe and token registry {#spot_meta}
 
 Spot pair universe + per-token registry. No parameters.
 
@@ -66,7 +66,7 @@ token's standalone book is live (only USDC is, on devnet).
 
 State source: `Exchange.mip3_spot_pair_specs` (pairs) + `Exchange.mip3_spot_token_specs` (tokens).
 
-### `spot_clearinghouse_state`
+### Per-account spot token balances {#spot_clearinghouse_state}
 
 Per-account spot token balances. Required: `address` (0x hex).
 
@@ -98,7 +98,7 @@ a token that is entirely held with zero spendable still appears. Range-scanned
 per account (not a full-table walk). State source:
 `locus.spot_clearinghouse.{balances, reserved}` (both keyed by `(owner, asset)`).
 
-### `spot_margin_state`
+### Every spot-margin position for an account {#spot_margin_state}
 
 :::info
 **Available on devnet (preview).** Read surface for leveraged [spot margin](../../../products/spot-margin.md); see the concept page for the preview caveats.
@@ -144,7 +144,7 @@ Response:
 
 Positions are listed in pair-id order. An account with no positions returns an empty `accounts` array.
 
-### `earn_state`
+### Earn lending pools and account stake {#earn_state}
 
 :::info
 **Available on devnet (preview).** Read surface for the [Earn](../../../concepts/earn.md) lending pools; see the concept page for the preview caveats.
@@ -199,7 +199,7 @@ Response:
 
 Pools are listed in asset-id order. Omitting `user` drops the `user_shares` / `user_value` fields.
 
-### `spot_deploy_state`
+### Spot-pair-deploy gas-auction state {#spot_deploy_state}
 
 MIP-1 spot-pair-deploy gas-auction state. No parameters.
 
@@ -231,7 +231,7 @@ Response:
 State source: `Exchange.spot_pair_deploy_gas_auction`.
 
 
-## See also
+## See also {#see-also}
 
 - [`POST /info`](../info.md) — the base read endpoint (envelope, conventions, account & infra queries)
 - [Perpetual queries](./perpetuals.md) — perp-market reads

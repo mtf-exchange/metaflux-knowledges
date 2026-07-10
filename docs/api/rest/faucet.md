@@ -10,7 +10,7 @@ nothing. It is **structurally refused on mainnet** (chain id `8964`): the route
 is never even mounted there. Never depend on it in a production flow.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 One `POST /faucet` claim grants **3000 USDC** cross-collateral **and 10 MTF** spot
 tokens (token id `104`) to an arbitrary address. **Once-ever per address.** The
@@ -19,7 +19,7 @@ validator system actions, not committed synchronously). Served as `POST /faucet`
 on the gateway front door, alongside the native `/info` + `/exchange` default
 path.
 
-## URL
+## URL {#url}
 
 ```
 POST  https://api.<net>.mtf.exchange/faucet
@@ -38,7 +38,7 @@ The route is merged into the main API router only when the node's faucet config
 is **enabled AND off mainnet**. It carries its own handler state and is
 structurally unreachable from the `/exchange` handler tree.
 
-## Request
+## Request {#request}
 
 ```json
 { "address": "0x00000000000000000000000000000000000ca11e" }
@@ -55,9 +55,9 @@ curl -s -X POST https://api.devnet.mtf.exchange/faucet \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```
 
-## Response
+## Response {#response}
 
-### `200 OK` — queued
+### `200 OK` — queued {#200-ok--queued}
 
 ```json
 {
@@ -86,7 +86,7 @@ later to see the balance:
 { "account_value": "3000", "balances": { "usdc": "3000", "spot": { "MTF": "10" } }, ... }
 ```
 
-### Errors
+### Errors {#errors}
 
 | HTTP | Body | Cause |
 |------|------|-------|
@@ -103,7 +103,7 @@ later to see the balance:
 { "error": "address already funded" }   // HTTP 429
 ```
 
-## Limits
+## Limits {#limits}
 
 - **Once-ever per address.** Tracked in an in-memory set (resets on node restart;
   devnet is ephemeral). A second claim for the same address — even from a different
@@ -114,7 +114,7 @@ later to see the balance:
 - **USDC cap.** The optional `amount` only caps downward; you can never get more
   than the configured 3000 USDC.
 
-## Why this is NOT on `/exchange`
+## Why this is NOT on `/exchange` {#why-this-is-not-on-exchange}
 
 The faucet's two credits are **system / privileged actions**
 (`SystemUserModify`, `SystemSpotSend`) — minting collateral and spot out of
@@ -126,7 +126,7 @@ validator address as sender so the `require_system_authority` check admits them.
 There is no code path from the public user mempool to this queue. See
 [never expose system actions on /exchange](./exchange.md#non-bridged-actions).
 
-## Determinism boundary
+## Determinism boundary {#determinism-boundary}
 
 Everything in the faucet HTTP edge is non-deterministic (wall-clock IP throttle,
 host-local claimed-set). The ONLY values that cross into consensus are the
@@ -134,7 +134,7 @@ recipient + amounts in the two system actions, which flow through the unchanged
 deterministic handlers. The host-local rate-limit / claimed-set state is never
 hashed into the AppHash.
 
-## See also
+## See also {#see-also}
 
 - [`POST /info`](./info.md) — read `account_state` / `spot_clearinghouse_state` to confirm the credit
 - [`POST /exchange`](./exchange.md) — the user-action write path (system actions like the faucet's credits never transit it)

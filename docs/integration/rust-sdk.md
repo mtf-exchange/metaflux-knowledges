@@ -4,7 +4,7 @@
 **Preview.** The `metaflux-client` crate ships before mainnet; the API shape below is committed.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 ```toml
 [dependencies]
@@ -39,7 +39,7 @@ async fn run() -> anyhow::Result<()> {
 
 The client is `Send + Sync` and works in any async context.
 
-## ClientOpts
+## ClientOpts {#clientopts}
 
 ```rust
 pub struct ClientOpts {
@@ -62,11 +62,11 @@ pub struct ClientOpts {
 }
 ```
 
-## Modules
+## Modules {#modules}
 
 The client exposes three modules: `info`, `exchange`, `ws`.
 
-### `info`
+### `info` {#info}
 
 ```rust
 c.info.meta().await?;
@@ -85,7 +85,7 @@ c.info.user_fees().await?;
 
 All return strongly-typed responses; no raw JSON handling required.
 
-### `exchange`
+### `exchange` {#exchange}
 
 ```rust
 c.exchange.order(OrderParams { .. }).await?;
@@ -127,7 +127,7 @@ support leverage or isolated margin in V1 — spot trading uses the
 reserved-balance escrow model via the spot order path instead.
 :::
 
-### `ws`
+### `ws` {#ws}
 
 ```rust
 let ws = c.ws();
@@ -149,7 +149,7 @@ while let Some(event) = user.next().await {
 
 The WS client returns `Stream<Item = Result<Event<T>>>`-shaped subscription handles. Drop the handle to unsubscribe.
 
-## Numeric types
+## Numeric types {#numeric-types}
 
 Public-spec scaled integers (fixed-point price/size, USDC base units) are wrapped in dedicated types that prevent accidental float arithmetic:
 
@@ -166,7 +166,7 @@ let price = PriceE8::from_str("10050000000")?;
 let notional = price.0 * size.0 / 10u128.pow(8);
 ```
 
-## Error handling
+## Error handling {#error-handling}
 
 ```rust
 pub enum ClientError {
@@ -194,7 +194,7 @@ match result {
 
 See [error handling](./error-handling.md).
 
-## Custom signer
+## Custom signer {#custom-signer}
 
 ```rust
 use metaflux_client::Signer;
@@ -216,7 +216,7 @@ let c = Client::new(ClientOpts {
 })?;
 ```
 
-## Agent-signing client
+## Agent-signing client {#agent-signing-client}
 
 ```rust
 let agent_client = Client::new(ClientOpts {
@@ -231,17 +231,17 @@ let agent_client = Client::new(ClientOpts {
 agent_client.exchange.order(p).await?;
 ```
 
-## Concurrency
+## Concurrency {#concurrency}
 
 The client is `Send + Sync` and intended to be wrapped in `Arc<Client>` for sharing across tasks. Internal connection pool handles HTTP concurrency; WS subscriptions are per-call.
 
 Nonce generation is monotonic — if you want truly-deterministic nonces across many tasks, supply a `nonce_fn` that pulls from an external counter (Redis, atomic).
 
-## Logging
+## Logging {#logging}
 
 The crate emits structured logs via the standard structured-logging ecosystem. Set the subscriber in your binary; the client doesn't pin a backend.
 
-## Features
+## Features {#features}
 
 ```toml
 [dependencies]
@@ -256,7 +256,7 @@ metaflux-client = { version = "0.1", features = ["ws"] }
 | `tls-pure` | yes | Pure-Rust TLS backend (default) |
 | `tls-native` | no | System TLS backend |
 
-## Examples
+## Examples {#examples}
 
 Repository at `mtf-exchange/metaflux-client-rust` ships:
 
@@ -265,14 +265,14 @@ Repository at `mtf-exchange/metaflux-client-rust` ships:
 - `examples/risk_watcher.rs` — pattern from [risk-watcher](./risk-watcher.md)
 - `examples/agent_rotation.rs` — full rotation workflow
 
-## See also
+## See also {#see-also}
 
 - [Quickstart](./quickstart.md)
 - [Signing](./signing.md)
 - [Agent wallets howto](./agent-wallets-howto.md)
 - [TypeScript SDK](./typescript-sdk.md)
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

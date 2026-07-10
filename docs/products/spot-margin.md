@@ -11,13 +11,13 @@ The full deposit → borrow → leveraged-buy → close loop AND automatic
 Leverage works on devnet; do not assume production safety at scale.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Spot margin lets you **borrow quote (USDC) against collateral to buy spot with leverage**, instead of paying 100% upfront. The borrowed USDC comes from the [Earn](../concepts/earn.md) pool, you pay **interest** on it, and the position carries a **maintenance margin** and a **liquidation price** like a perp.
 
 In the first release spot margin is **isolated per pair** — each leveraged spot position posts its own margin and is liquidated on its own, separate from your perp cross account.
 
-## How it works
+## How it works {#how-it-works}
 
 ```
 1. Post collateral (USDC) for the pair — a pure loss buffer.
@@ -37,9 +37,9 @@ allows **one open position per `(account, pair)`** (no add-on); the open IOC
 **instantly repays any unspent borrow**, so the outstanding loan equals only what
 the buy actually spent.
 
-### Action surface
+### Action surface {#action-surface}
 
-The six [`/exchange`](../api/rest/exchange.md#spot-margin--earn) actions (all
+The four [`/exchange`](../api/rest/exchange.md#spot-margin--earn) actions (all
 sender-authorized) drive the loop. Confirm committed state via
 [`/info` `spot_margin_state`](../api/rest/info/spot.md#spot_margin_state).
 
@@ -50,7 +50,7 @@ sender-authorized) drive the loop. Confirm committed state via
 | [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close) | IOC-sell the held base, repay principal + interest, return the remainder |
 | [`spot_margin_withdraw`](../api/rest/exchange.md#spot_margin_withdraw) | Withdraw free collateral (full when flat; initial-margin-gated while open) |
 
-### Margin
+### Margin {#margin}
 
 ```
 position_value   = base_held × mark_px
@@ -76,11 +76,11 @@ constant, and a pair does not enable spot margin until its ratio is calibrated.
 calibrated risk parameters rejects every spot-margin action for it
 (`spot margin not enabled for pair`).
 
-### Interest
+### Interest {#interest}
 
 Borrowed USDC accrues interest at a per-pair rate (`spot_borrow_rate_bps`, annualised, accrued every block). Interest flows to the [Earn](../concepts/earn.md) pool, lifting its per-share value — that is the lenders' yield. In the first release the rate is **fixed**; a utilisation-based curve is a later upgrade.
 
-### Liquidation
+### Liquidation {#liquidation}
 
 **Live on devnet.** Every block the chain re-values each margin account at the
 pair's spot mark (the book's last trade price) and forced-closes any account
@@ -113,7 +113,7 @@ pool's supplied total is reduced (floored at zero), which lowers share value.
 The conservative per-pair maintenance ratio and the automatic liquidator exist
 to make that shortfall rare.
 
-## Fees
+## Fees {#fees}
 
 A spot-margin position carries three distinct charges:
 
@@ -130,7 +130,7 @@ are per-pair governance parameters; query them via
 [`/info spot_margin_state`](../api/rest/info/spot.md#spot_margin_state) and the spot
 [`fee_schedule`](../api/rest/info.md#fee_schedule).
 
-## Collateral scope
+## Collateral scope {#collateral-scope}
 
 | Release | Collateral | Liquidation blast radius |
 |---|---|---|
@@ -139,17 +139,17 @@ are per-pair governance parameters; query them via
 
 Isolated-per-pair keeps the first release contained: a leveraged spot blow-up cannot reach your perp cross balance.
 
-## Relationship to Earn
+## Relationship to Earn {#relationship-to-earn}
 
 Spot-margin borrowers are the **demand side**; [Earn](../concepts/earn.md) depositors are the **supply side**. Borrow interest paid by spot-margin traders is exactly the yield Earn depositors receive. See [Earn](../concepts/earn.md) for the yield calculation.
 
-## See also
+## See also {#see-also}
 
 - [Earn](../concepts/earn.md) — the lending pool that funds spot-margin borrows, and how yield is computed
 - [Margin modes](../concepts/margin-modes.md) — margin model shared with perps
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — the liquidation ladder + insurance waterfall
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

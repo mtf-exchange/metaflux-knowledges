@@ -17,7 +17,7 @@ The read-precompile / write-contract split lets an EVM contract compose directly
 with live L1 state — quote against the chain's own formulas, then act on the
 clearinghouse — without leaving the VM.
 
-## Writing to Core — CoreWriter
+## Writing to Core — CoreWriter {#writing-to-core--corewriter}
 
 Submit an L1 action by calling **CoreWriter** at
 `0x3333333333333333333333333333333333333333`:
@@ -52,7 +52,7 @@ must self-recover and treat the `RawAction` event as the only causal link betwee
 the EVM call and the L1 outcome.
 :::
 
-### Actions
+### Actions {#actions}
 
 CoreWriter exposes 20 L1 actions (id, big-endian, in the `uint24` slot above):
 
@@ -84,7 +84,7 @@ The typed parameter structs and a ready-to-use Solidity caller live in the publi
 the on-chain CoreWriter at `0x3333…` is the production target (in tests a
 deterministic Solidity stand-in emits the same `RawAction` payload).
 
-## Reading Core — precompiles
+## Reading Core — precompiles {#reading-core--precompiles}
 
 Each precompile is a `staticcall` to a fixed address with a hand-rolled,
 big-endian **packed** input (not Solidity ABI). Sizes and prices are on the
@@ -107,7 +107,7 @@ result, so a contract can reproduce a Core calculation off the chain's own
 formulas. **Live Core-state-backed reads** (querying the chain's own positions /
 book directly) are upcoming.
 
-### `portfolio_margin_eval` (v1 ABI)
+### `portfolio_margin_eval` (v1 ABI) {#portfolio_margin_eval-v1-abi}
 
 The `0x0900` margin precompile delegates to the **same SPAN engine** that margins
 live accounts (see [portfolio margin](../concepts/portfolio-margin.md)), so an
@@ -121,7 +121,7 @@ the `100 000` USDC enrollment-equity floor the engine applies. The typed
 calldata/return layout ships with the Solidity precompile interface in the public
 [`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo.
 
-### Disabling a precompile (governance)
+### Disabling a precompile (governance) {#disabling-a-precompile-governance}
 
 Governance can switch an individual MTF precompile **off** (and later back **on**)
 by a stake-weighted validator vote. A disabled precompile address stops returning a
@@ -135,7 +135,7 @@ enactment, so core EVM functionality can never be bricked. Only the MTF-specific
 precompiles (the `0x09xx` range above) are eligible. This is a validator-governed
 control, not a user action; it never appears on the `/exchange` path.
 
-## Core ↔ EVM value transfers
+## Core ↔ EVM value transfers {#core--evm-value-transfers}
 
 - **Into Core** from an EVM contract: `SpotSend` / `SendAsset` / `UsdClassTransfer`
   / `VaultTransfer` via CoreWriter (above).
@@ -143,7 +143,7 @@ control, not a user action; it never appears on the `/exchange` path.
   [MetaBridge custody bridge](../bridge/), which releases on the destination chain
   on a ⅔ validator co-signature.
 
-## See also
+## See also {#see-also}
 
 - [Bridge](../bridge/) — cross-chain custody (the `CrossChainSend` destination)
 - [Mark prices](../concepts/mark-prices.md) — the 1e8 fixed-point price plane the precompiles use

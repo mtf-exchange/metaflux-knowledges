@@ -4,11 +4,11 @@
 **Stable.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 MetaFlux supports a full ladder of order primitives — limit, IOC, ALO, FOK, market, stop-loss, take-profit, trigger limits, TWAP, scale, and reduce-only — plus self-trade-prevention (STP) modes that gate matching against your own orders. Every variant is a `POST /exchange { type: "Order", ... }` shape; specialised flows like TWAP and Scale use their own action variants.
 
-## Time-in-force
+## Time-in-force {#time-in-force}
 
 | TIF | Behaviour | Use when |
 |-----|-----------|----------|
@@ -24,7 +24,7 @@ Buy 1 BTC @ 100.5 Alo      →  IF any ask ≤ 100.5  THEN reject  ELSE rest
 Buy 1 BTC @ 100.5 Fok      →  IF total ≥ 1.0 @ ≤ 100.5  THEN fill  ELSE reject
 ```
 
-## Reduce-only
+## Reduce-only {#reduce-only}
 
 `reduce_only: true` rejects the order at admission if filling it would **grow** the absolute position size. Useful for protective exits — a reduce-only stop-loss can't accidentally flip you long-to-short.
 
@@ -37,7 +37,7 @@ buy  0.5 reduce_only=true   →  rejected: would grow long to 1.5
 
 Reduce-only is evaluated **at commit**, not admission, when the position is read from the latest committed state. A racing fill that closes your position between admit and dispatch can cause a commit-time `reduce_only_violation_post_admit` (see [errors](../api/errors.md#commit-time-errors-not-http-in-event-stream)).
 
-## Self-trade prevention
+## Self-trade prevention {#self-trade-prevention}
 
 If a new order would match against an existing order from the same `sender`, STP kicks in.
 
@@ -64,7 +64,7 @@ result:
 
 STP is enforced at the match step, so it works across asset side, price, and time. STP only considers orders signed against the same `sender` — orders from agents under the same master count.
 
-## Triggers
+## Triggers {#triggers}
 
 A **trigger order** is a resting condition that, when met, fires an inner order onto the book.
 
@@ -98,7 +98,7 @@ stateDiagram-v2
 
 Triggers are evaluated on every mark-price update (each commit). They survive across blocks and across restarts.
 
-## Grouping
+## Grouping {#grouping}
 
 `Order { grouping: ... }` groups legs into a family.
 
@@ -110,7 +110,7 @@ Triggers are evaluated on every mark-price update (each commit). They survive ac
 
 Use `PositionTpsl` for "I always want a stop on my net position" — the same TPSL braces stay armed as you add to or trim the position.
 
-## Scale orders
+## Scale orders {#scale-orders}
 
 `ScaleOrder` places a ladder of limit orders.
 
@@ -138,7 +138,7 @@ Shapes:
 
 Each leg gets an auto-assigned `cloid` derived from `cloid_prefix + leg_index`. Cancel the whole ladder by cancelling each leg, or use [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) with the prefix's expansion.
 
-## TWAP
+## TWAP {#twap}
 
 `TwapOrder` schedules slices over `duration_ms`.
 
@@ -159,13 +159,13 @@ Slices are submitted by the protocol; nothing for the client to do after submitt
 
 TWAP is cancellable mid-run via `TwapCancel`; already-filled slices stay filled, future slices stop.
 
-## Market orders
+## Market orders {#market-orders}
 
 There is no distinct "market" action — a "market order" is an `Ioc` limit at an extreme price (`MAX_PRICE` for buys, `0` for sells). The SDKs do this for you when you call `marketBuy(...)`. The book matches at whatever liquidity exists; uncrossed remainder is cancelled.
 
 Caveat: ALL market orders are subject to the **mark-price band** — if the best ask is 5% above mark, your market buy will fill the available liquidity up to `mark × (1 + band_pct)` and cancel the remainder. See [mark prices](./mark-prices.md).
 
-## Order lifecycle state machine
+## Order lifecycle state machine {#order-lifecycle-state-machine}
 
 ```mermaid
 stateDiagram-v2
@@ -183,7 +183,7 @@ stateDiagram-v2
 
 Each state transition emits a corresponding event on [`userEvents`](../api/ws/subscriptions.md#userevents) (order-lifecycle events ride this channel).
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -196,7 +196,7 @@ Each state transition emits a corresponding event on [`userEvents`](../api/ws/su
 
 </details>
 
-## Examples — TypeScript
+## Examples — TypeScript {#examples--typescript}
 
 ```typescript
 // limit buy, GTC, post-only
@@ -228,14 +228,14 @@ await client.scale({
 });
 ```
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange`](../api/rest/exchange.md) — full per-variant schemas
 - [Margin modes](./margin-modes.md)
 - [Mark prices](./mark-prices.md) — how triggers fire
 - [Tiered liquidation](./tiered-liquidation.md) — how positions are managed under stress
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

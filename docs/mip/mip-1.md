@@ -10,14 +10,14 @@ counterpart to [MIP-3](./mip-3.md)'s permissionless **perp** deployment — the
 analogous primitive on established on-chain venues is a separate proposal from
 the perp one, and MetaFlux mirrors that split.
 
-## Why this exists
+## Why this exists {#why-this-exists}
 
 Spot listing, like perp listing, is part of the protocol rather than a curated
 team decision. Anyone can register a token symbol and stand up a spot market by
 winning the relevant gas auction and supplying seed parameters — no allow-list,
 no review committee.
 
-## Flow
+## Flow {#flow}
 
 Spot deployment is the `spotDeploy` action, dispatched by a `SpotDeployKind`
 sub-variant covering the full pair lifecycle:
@@ -36,7 +36,7 @@ pair). Each bid escrows a USDC amount (refunded on loss minus a small fee) and
 carries the market spec. Auction parameters (decay, refund window, slot interval)
 are governance-configurable and shared with the MIP-3 machinery.
 
-## Note on numbering
+## Note on numbering {#note-on-numbering}
 
 In the current implementation the `spotDeploy` actions live in the same module as
 the `perpDeploy` actions and were historically labelled "MIP-3". Per the

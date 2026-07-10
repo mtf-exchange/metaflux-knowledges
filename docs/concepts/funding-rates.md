@@ -4,7 +4,7 @@
 **Stable.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Perpetual positions accrue funding proportional to the perp's **premium over the oracle** — measured from the depth-weighted **impact price**, not a single trade — plus a small baseline **interest** term. Longs pay shorts when the perp trades above the oracle; shorts pay longs when below.
 
@@ -12,15 +12,15 @@ Funding **settles discretely, once per asset's funding period** — each market 
 
 > This is a **discrete, per-asset** model: funding is paid in one step at each asset's period boundary — not continuously, and not on a single network-wide hourly clock. It supersedes an earlier scheme that swept a tiny pro-rata payment every few seconds.
 
-## Why funding exists
+## Why funding exists {#why-funding-exists}
 
 Perps have no expiry, so there's no arbitrage force to peg them to the underlying. Funding does that job: when perp price drifts above spot, longs pay, which incentivises shorts and disincentivises longs until the perp drifts back down. The protocol never takes either side — it's user-to-user.
 
-## Formula
+## Formula {#formula}
 
 > The TL;DR above is the conceptual model. The numbers below are the **implemented** values. Where the prose and the code differ, the code wins; the differences are flagged inline.
 
-### How it's computed
+### How it's computed {#how-its-computed}
 
 The funding **rate** is driven by a **deterministic EMA** of the premium (impact price − oracle), refreshed continuously from committed state. The **settlement** — the actual transfer between longs and shorts — happens **discretely, once per asset's funding period** (default 1 h, governance-configurable per asset).
 
@@ -29,7 +29,7 @@ Two effects run the cycle:
 - **rate update** — folds the latest premium sample into the per-asset premium-index EMA each begin-block, then derives and clamps the rate. A live, smoothed rate is therefore available for display at any time.
 - **settlement** — at each asset's funding-period boundary, settles every open position in that market against the cumulative funding index, moving the full period's accrued funding between position owners.
 
-#### 0. Premium basis — the impact price (not the last trade)
+#### 0. Premium basis — the impact price (not the last trade) {#0-premium-basis--the-impact-price-not-the-last-trade}
 
 The per-block **premium sample** is the gap between the perp's **impact price** and the oracle:
 
@@ -41,7 +41,7 @@ impact_bid/ask = VWAP of walking the committed book to fill a fixed notional (de
 
 Using the *impact* price — the volume-weighted price to fill a real clip — rather than the last trade or the best quote means a single print, or a one-lot order at a silly price, **cannot** move funding: you have to move genuine depth. This mirrors the reference perp design. (A legacy per-market mode instead samples `premium = (mark − oracle)/oracle`; new and migrated markets use the impact basis above.)
 
-#### 1. Premium index EMA (per market)
+#### 1. Premium index EMA (per market) {#1-premium-index-ema-per-market}
 
 The premium is smoothed by a **deterministic EMA** (the *premium index*). The accumulator stores a fixed-point fraction `(num, denom)` — no floats, exact `rust_decimal::Decimal` arithmetic so node-to-node state is bit-identical. Each sample folds in as:
 
@@ -57,7 +57,7 @@ value  = num / denom
 
 > **Status:** the funding loop runs entirely from committed market state — no external premium feeder. Each begin-block the rate driver samples the premium (the impact-vs-oracle premium above, one sample per perp market), folds it into the per-asset premium-index EMA, derives the rate (interest + clamp), and caps it. At each asset's funding-period boundary, settlement advances the cumulative funding index and moves `size × Δindex` between position owners' balances (zero-sum: longs pay shorts or vice versa, no mint/burn). Conservation- and determinism-checked end to end.
 
-#### 2. Rate from the premium index (interest + clamp)
+#### 2. Rate from the premium index (interest + clamp) {#2-rate-from-the-premium-index-interest--clamp}
 
 The funding rate is **not** the raw premium index. The smoothed index `premium_idx` is combined with a baseline **interest** term through a per-step clamp:
 
@@ -70,7 +70,7 @@ funding = premium_idx + clamp( interest − premium_idx, −clamp, +clamp )
 
 When the premium index is small, funding drifts toward the `interest` baseline; when the premium is large, the `premium_idx` term dominates and the clamp bounds how hard the interest pulls back each step. Both `interest` and `clamp` are per-asset governance-overridable. (The legacy per-market mode instead reads the EMA value directly as the rate, with no interest/clamp transform.)
 
-#### 3. Per-period cap
+#### 3. Per-period cap {#3-per-period-cap}
 
 The funding accrued over a period is clamped to the per-asset cap before it settles:
 
@@ -81,7 +81,7 @@ funding = clamp(funding, −cap_per_period, +cap_per_period)
 
 The cap is a per-market governance parameter: a `dynamic_risk_overrides[asset].funding_rate_cap` replaces the `0.02` default when set. Because settlement is per-period, the cap bounds the **total** funding charged at each settlement to ±2% of notional (default), independent of how long the asset's period is.
 
-#### 4. Payment (per position, per period)
+#### 4. Payment (per position, per period) {#4-payment-per-position-per-period}
 
 Funding accrues into a cumulative index per market; each position carries its last-settled index (`funding_entry`). Settlement runs at the asset's **period boundary** (`boundary = floor(ts_ms / period_ms) * period_ms`): a market settles only when its boundary has advanced since the last settlement, and it then applies the **full period's** accrued funding:
 
@@ -107,7 +107,7 @@ funding_entry := cum_global      # roll forward at the period boundary
 
 > ⚠️ **Settlement model.** Funding **settles discretely, once per asset's funding period** (default 1 h, governance-configurable per asset — e.g. 8 h for BTC, 1 h for a meme market), not continuously and not on a single network-wide hourly clock. The amount charged at each settlement is the funding accrued over that whole period, capped at a per-asset **±2%** default. The EMA `decay` is **0.5**; the rate itself is refreshed continuously so a live value is always available for display.
 
-## Settlement cadence
+## Settlement cadence {#settlement-cadence}
 
 Each perpetual market has its own **funding period** (`funding_period_ms`, default 1 h), set per asset by governance. Settlement is **discrete**: the protocol settles a market only when the current consensus timestamp crosses that asset's next period boundary, and it then charges the **full period's** accrued funding in one step. Different markets settle on their own clocks — a market on an 8 h period and a market on a 1 h period are independent.
 
@@ -123,7 +123,7 @@ Payments settle as balance adjustments — no on-chain trade, no fee. They show 
 
 > **Known timing gap.** Mid-period account value and health do **not** reflect funding that has accrued but not yet settled — pending funding lands as a single discrete step at the period boundary, not smoothly. The size of that step is bounded by the per-asset cap (≤2% of notional per period by default), so the jump is small; but a position sitting near a liquidation band should account for the next settlement landing as a step rather than a gradual drift.
 
-## Gating when the oracle is untrusted
+## Gating when the oracle is untrusted {#gating-when-the-oracle-is-untrusted}
 
 Funding **settles against the oracle**, so a price the protocol does not trust must not drive a payment. Each period the premium sample is *gated*: it is skipped (sampled as **0**) when
 
@@ -137,7 +137,7 @@ A skipped sample is folded as 0, so the premium-index EMA **decays toward 0** an
 **This is why you can see a large mark↔oracle gap with funding ≈ 0.** If a market's oracle feed is broken or distrusted, funding is gated off and decays to 0 — even while the [mark](./mark-prices.md#mark-vs-oracle--why-they-diverge) (which is built from the book and external perps) sits far from the last good oracle. A wide gap with ~0 funding is the protocol *declining to charge funding off a bad oracle*, not a funding bug.
 :::
 
-## Worked example
+## Worked example {#worked-example}
 
 Market: BTC perp on an 8 h funding period, current state (oracle plane in whole USDC):
 
@@ -168,7 +168,7 @@ short 0.5 BTC:
 
 (Payment uses `size_signed * oracle_px * (cum_global - funding_entry)`; here `Δcum` is the funding accrued since the position last settled.) The transfer lands once at the period boundary; the ±2% per-period cap bounds the most a single settlement can charge.
 
-## Funding caps & dynamic limits
+## Funding caps & dynamic limits {#funding-caps--dynamic-limits}
 
 | Parameter | Default | Source / override |
 |-----------|---------|-------------------|
@@ -181,7 +181,7 @@ short 0.5 BTC:
 
 The per-asset `funding_rate_multiplier` is auto-driven from 30-day realized volatility by the dynamic-risk engine, scaling the premium sample before it enters the EMA.
 
-### Per-asset funding config (governance)
+### Per-asset funding config (governance) {#per-asset-funding-config-governance}
 
 A market's funding period and oracle basis are set per asset by a stake-weighted
 validator vote (`set_funding_config`):
@@ -196,7 +196,7 @@ So a major market can be put on an 8 h period while a fast-moving listing runs o
 1 h period, independently. The per-asset `funding_rate_cap` override (the ±2%
 default above) is a separate dynamic-risk parameter, voted the same way.
 
-## Funding history
+## Funding history {#funding-history}
 
 Per-account history via [`POST /info user_fills`](../api/rest/info.md) — funding payments appear with `kind: "funding"` and the relevant asset.
 
@@ -226,13 +226,13 @@ Returns the ordered ring of `(ts_ms, premium)` samples (see
 
 A dedicated `fundingTicks` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available); poll [`funding_history`](../api/rest/info/perpetuals.md#funding_history) meanwhile.
 
-## What funding doesn't do
+## What funding doesn't do {#what-funding-doesnt-do}
 
 - **No relation to fees.** Funding is user-to-user; fees are maker/taker rebates to the venue. See [fees](./fees.md).
 - **No interest on collateral.** USDC balance does not accrue interest from funding. Funding is purely about closing the mark-oracle gap.
 - **Not predictable across long windows.** Funding can flip sign hour-to-hour. Don't model it as a constant carry.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -243,14 +243,14 @@ A dedicated `fundingTicks` WS channel is on the [WS roadmap](../api/ws/subscript
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Mark prices](./mark-prices.md) — how `oracle` is derived
 - [Tiered liquidation](./tiered-liquidation.md) — funding payments adjust `account_value`, which moves `health`
 - [`fundingTicks` WS channel (roadmap)](../api/ws/subscriptions.md#roadmap--not-yet-available)
 - [Fees](./fees.md) — separate from funding
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

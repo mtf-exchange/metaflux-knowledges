@@ -9,11 +9,11 @@ run end-to-end on **devnet today** (see the
 per-pair maintenance ratios are still being calibrated.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Deposit USDC into the **Earn pool** and earn yield. The pool lends USDC to [spot-margin](../products/spot-margin.md) borrowers, who pay interest; that interest accrues to the pool and lifts the value of your **shares**. There is **no claim step** — yield compounds continuously into your share value, and you realise it when you withdraw.
 
-## How it works — share / NAV model
+## How it works — share / NAV model {#how-it-works--share--nav-model}
 
 When you deposit you receive **shares** priced at the pool's current net asset value per share (NAV). Interest paid by borrowers raises the pool's total value, so each share is worth progressively more USDC.
 
@@ -29,7 +29,7 @@ withdraw S shares → receive  S × share_price  USDC
 
 Because interest inflates `pool_value` (not the share count), `share_price` rises monotonically while loans perform — every holder's shares appreciate at the same rate, with no claim race and no per-user accounting.
 
-## The earning calculation
+## The earning calculation {#the-earning-calculation}
 
 Your earnings are the appreciation of your shares between deposit and withdrawal:
 
@@ -45,7 +45,7 @@ pool_value         += interest_this_block
 share_price         = pool_value / total_shares          # recomputed
 ```
 
-### Effective APY
+### Effective APY {#effective-apy}
 
 Not all deposited USDC is lent at once — only the **utilised** fraction earns the borrow rate. So the yield a depositor sees is the borrow rate scaled by utilisation:
 
@@ -62,7 +62,7 @@ depositor_APY  ≈ borrow_APR × utilisation × (1 − protocol_fee)
 
 Example: a 12% borrow APR at 50% utilisation, no protocol fee → depositor APY ≈ 6%. All arithmetic is fixed-point (`Decimal`), no floating point.
 
-## Deposit / withdraw
+## Deposit / withdraw {#deposit--withdraw}
 
 Both actions are sender-authorized on the public
 [`/exchange`](../api/rest/exchange.md#spot-margin--earn) path; `asset` is the
@@ -94,7 +94,7 @@ lent out) rejects the withdrawal until borrowers repay. This guarantees a suppli
 can always exit up to what is not lent out, and never strands the borrow ledger
 under-collateralized.
 
-## Risk
+## Risk {#risk}
 
 Earn is **not risk-free**. If a [spot-margin](../products/spot-margin.md) position is closed
 at a loss that the borrower's collateral cannot cover, the **shortfall is socialized
@@ -108,13 +108,13 @@ buffer; an insurance-buffer waterfall ahead of suppliers is planned but not yet
 wired. There is also **liquidity risk**: redemptions are bounded by idle liquidity,
 so a fully-utilised pool cannot be exited until borrowers repay.
 
-## See also
+## See also {#see-also}
 
 - [Spot margin](../products/spot-margin.md) — the borrowers whose interest is your yield
 - [Tiered liquidation](./tiered-liquidation.md) — the insurance waterfall that protects the pool
 - [Vaults](./vaults.md) — a different yield product (strategy-traded LP capital), not a lending pool
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

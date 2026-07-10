@@ -18,9 +18,9 @@ These market reads echo the `coin` symbol in their responses. (Only the signed
 consensus-frozen; see [`POST /exchange`](../exchange.md).)
 :::
 
-## Perpetual query types
+## Perpetual query types {#perpetual-query-types}
 
-### `market_info`
+### Get per-market metadata {#market_info}
 
 Per-market metadata. Resolve the market by its `coin` symbol.
 
@@ -131,7 +131,7 @@ and the **static** fields served by [`markets_meta`](#markets_meta) (`sz_decimal
 `margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `mark_source`,
 `fba_enabled`, `asset_id`). See those two reads for per-field semantics.
 
-### `markets`
+### Get live state for all markets {#markets}
 
 Every registered market's **live (dynamic)** state — the per-commit fields that
 move every block (mark / oracle / mid price, funding premium, open interest, the
@@ -242,7 +242,7 @@ The **static** per-market fields (`sz_decimals`, `tick_size`, `step_size`,
 [`markets_meta`](#markets_meta). For the spot pair / token field semantics see
 [`spot_meta`](./spot.md#spot_meta).
 
-### `markets_meta`
+### Get static metadata for all markets {#markets_meta}
 
 Every registered market's **static** metadata — the long-lived fields a market
 publishes once and rarely changes (precision grids, leverage / margin ladders,
@@ -328,7 +328,7 @@ appear here.
 
 For the spot pair / token field semantics see [`spot_meta`](./spot.md#spot_meta).
 
-### `l2_book`
+### Get aggregated order book levels {#l2_book}
 
 Market-scoped aggregated bid/ask levels.
 
@@ -366,7 +366,7 @@ market returns empty `bids` / `asks` arrays.
 | `bids[*].size` / `asks[*].size` | u128 string | Summed size at the level |
 | `bids[*].n_orders` / `asks[*].n_orders` | uint64 | Resting orders at the level |
 
-### `recent_trades`
+### Get recent public trades {#recent_trades}
 
 Market-scoped public trade tape, served directly from committed on-node state
 (a bounded per-market trade ring folded into the AppHash — no external indexer).
@@ -421,7 +421,7 @@ a recent window, not all history. An unknown / never-traded market returns
 | `trades[*].block` | uint64 | Committed block height the trade settled in (on-chain locator) |
 | `trades[*].hash` | hex string | Transaction hash of the originating order, `0x`-prefixed hex — lets a print be traced on-chain |
 
-### `trades_by_time`
+### Get trades in a time window {#trades_by_time}
 
 Like [`recent_trades`](#recent_trades), but filtered to a `[start_time, end_time]`
 window over the per-market trade ring — the bounded recent window. For deep
@@ -466,7 +466,7 @@ Response:
 oldest-first. `start_time` / `end_time` are echoed back (either `null` when
 omitted). An out-of-window / never-traded market returns `"trades": []`.
 
-### `candle_snapshot`
+### Get historical OHLCV candles {#candle_snapshot}
 
 Historical OHLCV bars for `(coin, interval)`. The single candle query
 (the standalone `candle` type has been **removed**): archive-first —
@@ -524,7 +524,7 @@ with no history (or no archive/fold source wired).
 | `v` | Decimal string | **Base-asset volume** — Σ traded size in the bar (size units, NOT notional) |
 | `n` | uint64 | Trade (fill) count in the bar |
 
-### `funding_history`
+### Get funding premium history {#funding_history}
 
 Market-scoped funding premium samples (the premium ring).
 
@@ -569,7 +569,7 @@ the signed cap. An unknown / empty market returns `"samples": []`.
 | `samples[*].premium` | decimal string | Raw funding premium sample, pre-clamp (signed) |
 | `samples[*].funding_rate` | decimal string | Realized rate = `premium` clamped to the per-asset cap (signed) |
 
-### `predicted_fundings`
+### Get predicted funding rates {#predicted_fundings}
 
 Per-market predicted funding rate + next settlement time, across every registered
 perp market. No parameters.
@@ -609,7 +609,7 @@ cadence / boundary see [`market_info`](#market_info) `funding.interval_ms` /
 `funding.next_payment_ts`.
 :::
 
-### `mip3_active_bids`
+### Get perp-deploy gas-auction state {#mip3_active_bids}
 
 MIP-3 permissionless perp-deploy gas-auction snapshot. No parameters.
 
@@ -652,7 +652,7 @@ Response:
 | `bids[*].submitted_at_ms` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
 
-### `liquidatable`
+### List accounts flagged for liquidation {#liquidatable}
 
 Accounts currently flagged for liquidation. No parameters.
 
@@ -678,7 +678,7 @@ State source: `Exchange.bole_index.tier` (the BOLE needs-action index — **not*
 
 > **FLAGGED.** `bole_index` is `#[serde(skip)]` derived, non-canonical state, rebuilt by a full scan on first use / after snapshot load. On a freshly published snapshot it is empty until the runtime has run the BOLE pass at least once.
 
-### `active_asset_data`
+### Get a user's market trading limits {#active_asset_data}
 
 A user's per-market leverage / margin-mode / max trade size. Required: `address`
 (0x hex) + `coin` (symbol).
@@ -720,7 +720,7 @@ Response:
 | `available_to_trade` | [decimal string, decimal string] | Notional available to open `[buy, sell]` |
 | `has_position` | bool | Whether the user has a non-zero position on this market |
 
-### `max_market_order_ntls`
+### Get max market-order notional caps {#max_market_order_ntls}
 
 Per-asset max market-order notional. No parameters.
 
@@ -746,7 +746,7 @@ State source: per-market `PerpAnnotation.oi_cap`, else `default_mip3_limits.max_
 
 > **FLAGGED.** No dedicated per-asset "max market-order notional" field exists in committed state; the OI cap is the closest committed risk ceiling, reported in **size** units (the matching layer converts to notional at the live mark).
 
-### `perps_at_open_interest_cap`
+### List assets at the open-interest cap {#perps_at_open_interest_cap}
 
 Assets whose open interest is at/over the cap. No parameters.
 
@@ -766,7 +766,7 @@ Response:
 
 State source: per-book `open_interest` vs `PerpAnnotation.oi_cap` (books with no positive cap are skipped).
 
-### `margin_table` — removed
+### `margin_table` — removed {#margin_table--removed}
 
 :::warning
 **`margin_table` has been REMOVED.** The margin ladder now rides **inline** on
@@ -778,7 +778,7 @@ top tier. A `margin_table` request now returns
 `400 {"error":"unknown info type: margin_table"}`.
 :::
 
-### `perp_dexs`
+### List perp DEXs {#perp_dexs}
 
 List the perp DEX(es). No parameters.
 
@@ -801,7 +801,7 @@ Response:
 State source: `Exchange.perp_dexs`.
 
 
-## See also
+## See also {#see-also}
 
 - [`POST /info`](../info.md) — the base read endpoint (envelope, conventions, account & infra queries)
 - [Spot & margin queries](./spot.md) — spot / spot-margin / Earn reads

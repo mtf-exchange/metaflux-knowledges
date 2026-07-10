@@ -12,7 +12,7 @@ ordering (larger-maintenance leg first) is computed identically across validator
 default and recommended behaviour remains one-way (single net position per market).
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 By default an account holds **one net position per market** (one-way): buying
 while short reduces, then flips, the same position. **Hedge mode** lets an
@@ -23,7 +23,7 @@ Hedge mode is **opt-in per account** with **no balance threshold** — any accou
 can enable it. It can only be toggled while the account is **flat on every
 market**.
 
-## One-way vs hedge
+## One-way vs hedge {#one-way-vs-hedge}
 
 | | One-way (default) | Hedge |
 |---|---|---|
@@ -38,7 +38,7 @@ The toggle, per-side routing, independent per-leg margin, and dual-leg reporting
 are live; per-leg liquidation selection is in place, with per-leg close emission
 still rolling out (see the status note above).
 
-## Enabling it
+## Enabling it {#enabling-it}
 
 Switching the position mode is a signed action; it is only legal when the
 account is **flat on every market**.
@@ -62,7 +62,7 @@ mode to the value it already has, while flat, is a no-op success.
 See [`set_position_mode`](../api/rest/exchange.md#set_position_mode) in the
 `/exchange` reference for the request/response detail.
 
-## Placing orders in hedge mode
+## Placing orders in hedge mode {#placing-orders-in-hedge-mode}
 
 In hedge mode every order **must carry an explicit `position_side`** (`long` /
 `short`). A one-way account must **not** send `position_side`; a hedge account
@@ -97,7 +97,7 @@ leg can never touch the `long` leg.
 There is **no "flip"** in hedge mode. Closing the long leg never opens a short —
 that is a separate order against the short leg.
 
-## Margin
+## Margin {#margin}
 
 Each leg is margined **independently** — the long leg and the short leg each
 post their own initial and maintenance margin, summed into the account
@@ -116,7 +116,7 @@ different entry prices you intend to manage independently.)
 Each leg keeps its own [margin mode](./margin-modes.md) — you may, for example,
 run the long leg isolated and the short leg cross.
 
-## Liquidation
+## Liquidation {#liquidation}
 
 When an account is flagged for a forced close, both legs are scanned and scored by
 their own maintenance contribution, and the deterministic close ordering — the
@@ -125,7 +125,7 @@ validators — is computed through the standard [tiered liquidation](./tiered-li
 ladder. The actual per-leg close emission against the book is still rolling out;
 when it lands, liquidating one leg will not touch the other.
 
-## Reporting
+## Reporting {#reporting}
 
 When hedge mode is on, the account state and `/info` position reads return **one
 position object per non-zero leg** for a market that has both legs, each labelled
@@ -134,14 +134,14 @@ single *net* position with **no** `position_side` field, exactly as today.
 Market-level open interest stays a single net figure. See
 [`account_state` positions](../api/rest/info.md#account_state).
 
-## See also
+## See also {#see-also}
 
 - [Margin modes](./margin-modes.md) — cross / isolated / strict-iso, applied per leg
 - [Portfolio margin](./portfolio-margin.md) — where future leg-netting credit would live
 - [Tiered liquidation](./tiered-liquidation.md) — per-leg ladders
 - [`/exchange` reference](../api/rest/exchange.md#set_position_mode) — the action wire format
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

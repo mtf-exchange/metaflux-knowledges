@@ -14,7 +14,7 @@ buyback split are network parameters that governance can later tune; total suppl
 is pegged to the population of China and re-pegged annually by validator vote.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 **MTF** is the native token of MetaFlux — an independent proof-of-stake L1 that
 runs a perpetuals DEX core and an EVM sidechain. MTF does five things:
@@ -42,12 +42,12 @@ annual validator vote — minting if the population grew, burning treasury MTF i
 shrank — so supply tracks the population rather than sitting at a fixed cap. The
 fee buyback-and-burn is a **separate** deflationary force on top.
 
-## Token utility
+## Token utility {#token-utility}
 
 Everything in this section is **live**, not proposed. These are the existing
 sinks and sources that give the token its value.
 
-### 1. Gas on the EVM sidechain
+### 1. Gas on the EVM sidechain {#1-gas-on-the-evm-sidechain}
 
 MTF is the gas token of the MetaFlux EVM sidechain. It is an **18-decimal**
 asset at the EVM execution layer — every contract deployment and transaction on
@@ -55,7 +55,7 @@ the sidechain is metered and paid in MTF, exactly as ETH meters the EVM on its
 home chain. The DEX core and the EVM sidechain share the same native asset, so
 demand for on-chain compute is demand for MTF.
 
-### 2. Staking → taker-fee discount
+### 2. Staking → taker-fee discount {#2-staking--taker-fee-discount}
 
 Staking MTF grants a **discount on your taker trading fee**, scaled by a ten-rung
 administrative-grade ladder up to **50%** off taker:
@@ -92,7 +92,7 @@ curve and weight thresholds). The full rate card and stacking rules are on the
 is the direct, mechanical reason an active trader holds and stakes MTF: it pays
 for itself out of reduced trading costs.
 
-### 2b. Staking → MTF revenue-share
+### 2b. Staking → MTF revenue-share {#2b-staking--mtf-revenue-share}
 
 On top of the fee discount, **locked** stakers receive a **revenue-share**. It is
 delivered through the validator channel: **~20% of net fee revenue** goes to
@@ -106,7 +106,7 @@ not a separate fee pool: it is the validators' ~20% fee share, passed through to
 those who staked with them. See
 [Value accrual & flywheel](#value-accrual--flywheel) for the full fee split.
 
-### 3. Staking → consensus security (proof-of-stake)
+### 3. Staking → consensus security (proof-of-stake) {#3-staking--consensus-security-proof-of-stake}
 
 MetaFlux is a proof-of-stake chain. Staked MTF **is** the validator stake.
 Validators self-bond MTF and accept delegations; the active validator set, block
@@ -116,14 +116,14 @@ so the security budget of the chain is denominated in, and backed by, MTF. See
 [Staking](./staking.md) for the validator/delegator model, slashing, and the
 unbonding lifecycle.
 
-### 4. Staking → governance weight
+### 4. Staking → governance weight {#4-staking--governance-weight}
 
 Staked MTF is the **voting weight** in protocol governance. Network parameters —
 fee tiers, emission rate, risk parameters, vault whitelists, market listings — are
 moved by on-chain votes weighted by stake. See [Governance scope](#governance)
 below.
 
-### 5. Fee value accrual → buyback & permanent lock
+### 5. Fee value accrual → buyback & permanent lock {#5-fee-value-accrual--buyback--permanent-lock}
 
 Protocol trading fees are split. After maker rebates and any referrer/builder
 credits are paid **off the top**, the remaining net fee revenue is split **~70%
@@ -141,9 +141,9 @@ real exchange revenue market-buying MTF and then locking the bought tokens away
 forever. The
 deflation rate is a direct function of trading volume. The full step-by-step flow
 and the split are in [Value accrual & flywheel](#value-accrual--flywheel); the
-fee mechanics are on the [Fees](./fees.md#burn-buyback-and-burn) page.
+fee mechanics are on the [Fees](./fees.md#where-fees-go) page.
 
-## Supply & allocation
+## Supply & allocation {#supply--allocation}
 
 :::info
 **Final.** The total supply and the genesis allocation below are finalized. The
@@ -152,7 +152,7 @@ distributed across the three buckets in the table. The total is **re-pegged
 annually by validator vote** (see [Emission & inflation](#emission--inflation)).
 :::
 
-### Total supply
+### Total supply {#total-supply}
 
 **Genesis total supply: 1,404,890,000 MTF — pegged to the population of China**
 (this equals China's 2026 population).
@@ -182,7 +182,7 @@ Notes:
   threshold (10,000,000) is a small fraction of supply, reachable by a serious
   committed desk, which is the intended signal.
 
-### Genesis allocation
+### Genesis allocation {#genesis-allocation}
 
 | Allocation | Share | Tokens | Lockup / vesting | Purpose |
 |------------|------:|-------:|------------------|---------|
@@ -212,7 +212,7 @@ Notes:
   matures (see [Value accrual & flywheel](#value-accrual--flywheel) and
   [MIP-2 Metaliquidity](../mip/mip-2.md)).
 
-### Circulating-supply trajectory
+### Circulating-supply trajectory {#circulating-supply-trajectory}
 
 ```text
 genesis total        : 1,404,890,000 MTF (pegged to China's population)
@@ -238,7 +238,7 @@ supply trends down at steady-state volume. The population re-peg moves the suppl
 while the buyback burn is the fast, volume-driven sink — the two are independent.
 That crossover is the whole point of the model.
 
-## Emission & inflation
+## Emission & inflation {#emission--inflation}
 
 :::info
 **Population-pegged supply, re-pegged annually by validator vote.** Total supply is
@@ -250,7 +250,7 @@ slow, governed adjustment of the supply target, separate from the volume-driven
 buyback-and-burn.
 :::
 
-### The population peg
+### The population peg {#the-population-peg}
 
 Total supply targets the **population of China** and is **re-pegged once a year by
 a validator governance vote**:
@@ -271,7 +271,7 @@ Because China's population moves by only a fraction of a percent per year, the
 re-peg is a **small, slow** annual adjustment to the supply **target** — not a
 recurring inflation lever pulled for yield.
 
-### Staking rewards are non-dilutive
+### Staking rewards are non-dilutive {#staking-rewards-are-non-dilutive}
 
 Staking rewards are paid from two sources, **neither of which is the population
 re-peg**:
@@ -280,7 +280,7 @@ re-peg**:
    treasury/community/ecosystem/validators pool pays a stake-curve-shaped APR in
    the early period.
 2. A **share of protocol fee revenue** is routed to stakers on an ongoing basis
-   (the fee-funded staking yield and the [dividend](#2b-staking--revenue-share-dividend)),
+   (the fee-funded staking yield and the [dividend](#2b-staking--mtf-revenue-share)),
    funded by real exchange volume.
 
 The early-period APR follows a **stake curve** rather than a flat rate: it is
@@ -299,7 +299,7 @@ pool) must be sized to cover the runway until fee revenue takes over. The annual
 population re-peg is **not** a yield source: it adjusts the supply target, it does
 not fund staking.
 
-### Why population-pegged rather than a fixed cap
+### Why population-pegged rather than a fixed cap {#why-population-pegged-rather-than-a-fixed-cap}
 
 The population peg gives MTF a **legible, exogenous supply anchor** — a number
 nobody at the protocol sets by hand — while keeping the deflationary thesis
@@ -316,14 +316,14 @@ adjustment (it can **burn** as well as mint) tied to an external figure, not a
 recurring dilution to fund rewards. Staking yield is funded by the bootstrap budget
 and fee revenue, never by the re-peg.
 
-## Value accrual & flywheel
+## Value accrual & flywheel {#value-accrual--flywheel}
 
 The token's value is wired to exchange activity through a reinforcing loop. The
 core feedback is **volume → fees → split ~70% buyback / ~20% validators (→ stakers)
 / ~10% treasury → the buyback locks MTF out of circulation → scarcity + staker
 yield**, with PoS security as the stabilizing ring around it.
 
-### How fee revenue becomes token value — the flow
+### How fee revenue becomes token value — the flow {#how-fee-revenue-becomes-token-value--the-flow}
 
 The value-accrual path is a clean four-step pipeline:
 
@@ -416,13 +416,13 @@ The flywheel only spins on **real volume**. None of the rings depend on token
 emission or speculative reflexivity to function; they are mechanical consequences
 of people trading on the exchange.
 
-## Staking
+## Staking {#staking}
 
 Staking is **live**. This section summarizes the economics from a tokenomics lens;
 the full operational detail — actions, validator selection, slashing, edge cases —
 is on the dedicated [Staking](./staking.md) page.
 
-### What staking gives you
+### What staking gives you {#what-staking-gives-you}
 
 | Benefit | Source | Notes |
 |---------|--------|-------|
@@ -436,7 +436,7 @@ The **fee discount** and the **MTF revenue-share** both scale with your
 **time-weighted effective weight**, not your raw token amount — the mechanic is
 described next.
 
-### Time-weighted staking (ve-style)
+### Time-weighted staking (ve-style) {#time-weighted-staking-ve-style}
 
 Staking standing is **time-weighted by the lock duration you commit to upfront**.
 Your standing is not your raw staked amount but an **effective weight**:
@@ -453,7 +453,7 @@ Two benefits read off this, but they have **different entry points**:
   flexible stakers earn **0** revenue-share. Within the locked range, longer locks
   earn a larger slice.
 
-#### The multiplier curve
+#### The multiplier curve {#the-multiplier-curve}
 
 | Stake mode | `time_multiplier` (dividend weight) | Fee-discount eligibility | Revenue-share (dividend) |
 |------------|------------------------------------:|--------------------------|--------------------------|
@@ -477,7 +477,7 @@ there is no dividend weight at all. From 1 month (1.0×) the weight climbs to 2.
 at 6 months and caps at 4.0× at 24 months — so both the **higher fee-discount
 tiers** and the **dividend share** scale with how long you lock.
 
-#### How the lock works
+#### How the lock works {#how-the-lock-works}
 
 The mechanic is the standard **vote-escrow (ve)** model — **commit upfront, get
 the weight immediately, cannot unlock early**:
@@ -506,7 +506,7 @@ esGMX-style time-vesting on GMX-class venues). The MetaFlux model applies the ve
 multiplier to the **fee discount and the MTF revenue-share**, and reserves a
 flexible, dividend-free entry lane for market makers.
 
-#### Effective-weight grade thresholds
+#### Effective-weight grade thresholds {#effective-weight-grade-thresholds}
 
 The fee-discount grades (and the dividend allocation, for locked stakers) are read
 off `effective_weight`, on the **same ten-rung ladder** the fee schedule uses — but
@@ -535,7 +535,7 @@ for the single capped grade, a winning rank). So **raw tokens alone are not enou
 for the top grades** — they must be committed to a long enough lock, and the very
 top must also out-rank the field.
 
-#### Worked example — short / flexible does NOT climb; a long lock does
+#### Worked example — short / flexible does NOT climb; a long lock does {#worked-example--short--flexible-does-not-climb-a-long-lock-does}
 
 The hard constraint the model is designed to satisfy:
 
@@ -582,7 +582,7 @@ lock can out-rank them and take a dividend slice. Capital that refuses to lock g
 a fee break but not a cut of the buyback — the core anti-mercenary property of the
 ve design, with a deliberate flexible lane for market makers.
 
-### Validators vs delegators
+### Validators vs delegators {#validators-vs-delegators}
 
 - **Validators** run a consensus node, self-bond above a minimum, propose and vote
   on blocks, and take a commission from the rewards of those who delegate to them.
@@ -591,7 +591,7 @@ ve design, with a deliberate flexible lane for market makers.
   minus commission. They share pro-rata slashing exposure if their validator
   misbehaves, but run no infrastructure.
 
-### Staking timing model
+### Staking timing model {#staking-timing-model}
 
 Three distinct timing concepts govern the staking lifecycle. Keep them separate —
 they are **different things**:
@@ -626,7 +626,7 @@ additionally blocks single-block flash-staking around a fill. Together these kee
 a meaningful share of supply hard-locked and out of float and ensure only
 genuinely time-committed stake reaches the upper tiers and the revenue-share.
 
-### Lockup & unbonding states
+### Lockup & unbonding states {#lockup--unbonding-states}
 
 | State | Earns benefits? | Slashable? |
 |-------|:---------------:|:----------:|
@@ -635,7 +635,7 @@ genuinely time-committed stake reaches the upper tiers and the revenue-share.
 | Unbonding (after lock elapses, exit cooldown) | no | yes (until matured) |
 | Unbonded (claimable) | no | no |
 
-### Where the yield comes from
+### Where the yield comes from {#where-the-yield-comes-from}
 
 Two sources, in order of dominance over the chain's life:
 
@@ -655,13 +655,13 @@ that the protocol bought on the open market, never from the population re-peg.
 Validators are the conduit, so securing the chain and earning the revenue-share are
 the same act.
 
-## Governance
+## Governance {#governance}
 
 Staked MTF is the **governance voting weight**. Governance is the protocol's
 on-chain steering wheel; votes are weighted by stake and enacted by the chain when
 they pass the required threshold.
 
-### Scope of governance
+### Scope of governance {#scope-of-governance}
 
 Governance moves **protocol parameters**, not user funds. In scope:
 
@@ -677,14 +677,14 @@ Governance moves **protocol parameters**, not user funds. In scope:
   protocol-owned liquidity vault.
 - **Treasury** — releases from the protocol treasury allocation.
 
-### How votes pass
+### How votes pass {#how-votes-pass}
 
 Governance actions require a **stake-weighted quorum** to enact; a single large
 holder cannot unilaterally flip a parameter, and validators that are jailed for
 misbehaviour are excluded from the tally. Parameter changes that pass are applied
 deterministically by the chain.
 
-### What governance does NOT control
+### What governance does NOT control {#what-governance-does-not-control}
 
 - It cannot mint or burn MTF arbitrarily. The only supply lever is the **annual
   population re-peg** — a constrained, two-way adjustment of **treasury** MTF to
@@ -697,7 +697,7 @@ deterministically by the chain.
 Governance is a forward-only parameter-steering mechanism, scoped to the economic
 and risk knobs of the protocol.
 
-## See also
+## See also {#see-also}
 
 - [Fees](./fees.md) — the fee split and the buyback-and-burn mechanics
 - [Fee schedule](./fee-schedule.md) — the volume, maker-rebate, and staking-discount rate card
@@ -706,7 +706,7 @@ and risk knobs of the protocol.
 - [Vaults](./vaults.md) — the protocol-operated and user vault families
 - [Glossary](./glossary.md) — protocol-specific terms
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

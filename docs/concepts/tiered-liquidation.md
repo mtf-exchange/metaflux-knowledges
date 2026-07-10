@@ -4,7 +4,7 @@
 **Stable.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier defines what the protocol does as health drops. The [yellow card](#why-a-yellow-card) (T0) is MetaFlux's hysteresis grace period — one block of warning before any position is sold. T4 [ADL](./adl.md) is the last-resort loss mutualisation.
 
@@ -19,7 +19,7 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 
 `account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
 
-## How tiers are computed
+## How tiers are computed {#how-tiers-are-computed}
 
 The bands below are the **literal code constants**, not approximations.
 
@@ -52,7 +52,7 @@ else                                                  → PartialMarket50 { size
 - `size_to_close` for a partial is `maintenance_margin / 2` (integer-truncated). The `deficit` for backstop is `maintenance_margin − account_value` when `account_value ≥ 0`, else `maintenance_margin + |account_value|`.
 - The driver evaluates an **incremental dirty set** each block (event-dirtied accounts + a rolling self-heal slice), not a full scan — proven equivalent to a from-scratch scan by fuzz test. T0 accounts get their resting ALO liquidity force-cancelled after classification.
 
-## How a forced close executes (the price floor)
+## How a forced close executes (the price floor) {#how-a-forced-close-executes-the-price-floor}
 
 A T1/T2 forced close is **never a market sweep**. It executes as an IOC LIMIT
 order bounded off the committed mark:
@@ -87,7 +87,7 @@ builder-deployed markets can configure a health-decayed ramp (close a small
 slice just under the maintenance line, larger slices only as health sinks,
 capped per market) plus the 30 s cooldown between slices.
 
-## The full state machine
+## The full state machine {#the-full-state-machine}
 
 ```mermaid
 stateDiagram-v2
@@ -114,7 +114,7 @@ stateDiagram-v2
 
 `cooldown_ms` defaults to `30 s`. Within a cooldown window, a re-entry to T1 escalates to full close.
 
-## Why a yellow card
+## Why a yellow card {#why-a-yellow-card}
 
 Most public derivatives chains transition straight from "healthy" to "partial close". A volatility spike that knocks health from 1.5 to 0.95 in one tick triggers a forced sale, which depresses the mark, which sweeps more accounts into the same tier. The cascade is the dominant source of liquidation pain in observed events.
 
@@ -126,7 +126,7 @@ T0 is a **one-block hysteresis layer**. You enter the band; the chain freezes yo
 
 At a 100 ms block time the grace window is short but deterministic and large enough for an automated risk process to react.
 
-### Why only ALO orders get cancelled
+### Why only ALO orders get cancelled {#why-only-alo-orders-get-cancelled}
 
 | Order TIF | Cancelled at T0? | Reason |
 |-----------|:----------------:|-------|
@@ -137,7 +137,7 @@ At a 100 ms block time the grace window is short but deterministic and large eno
 
 The intent: free locked capital from passive rest, preserve your active risk decisions.
 
-## T1 partial / full transition
+## T1 partial / full transition {#t1-partial--full-transition}
 
 T1 starts as a 50% partial close. Cooldown logic:
 
@@ -165,7 +165,7 @@ T = 30s+    T1 fire #2 → full close
 
 The cooldown is *not* a no-op zone — T1 keeps firing partials. Cooldown only governs the partial → full upgrade.
 
-### Worked example
+### Worked example {#worked-example}
 
 Account: long 1 BTC at entry 100, USDC isolated bucket = 20.
 
@@ -198,7 +198,7 @@ mark = 82    health = 0.95 again (still in T1, cooldown active)
               account closed cleanly with 3 USDC remaining; insurance untouched
 ```
 
-## T3 backstop — netting at mark
+## T3 backstop — netting at mark {#t3-backstop--netting-at-mark}
 
 Below `health = 0.667` (≈2/3 of maintenance) the chain stops trying the book.
 The position — and any forced-close lots the book could not absorb inside the
@@ -220,7 +220,7 @@ at mark) — they only lose the open position. No fee is charged on either side.
 A netting without a usable mark price, or without any profitable opposite
 side, simply waits — the chain never force-sells into an empty book.
 
-## T4 — the deficit waterfall
+## T4 — the deficit waterfall {#t4--the-deficit-waterfall}
 
 If the account is flat everywhere and its equity is **negative**, that bad
 debt is socialized in a fixed order (ADL **before** the insurance fund — the
@@ -238,7 +238,7 @@ genuine tail events):
 The account's negative balance is then zeroed — the debt lives in the
 waterfall. See [ADL](./adl.md) for the controller math.
 
-## Two-point margin check
+## Two-point margin check {#two-point-margin-check}
 
 Liquidation eligibility is checked at **two points** during each block:
 
@@ -247,7 +247,7 @@ Liquidation eligibility is checked at **two points** during each block:
 
 This prevents "free" intra-block manipulation where a user adds risk between begin-block and the rest of the block.
 
-## Recovery patterns
+## Recovery patterns {#recovery-patterns}
 
 | Scenario | Strategy |
 |----------|----------|
@@ -257,14 +257,14 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 | T1 partial just fired | Re-eval. Position is 50% smaller; consider closing the remainder voluntarily before cooldown's full-close escalation. |
 | Repeated T1 cooldown traps | The position size is wrong for the bucket. Don't refill the bucket without also resizing. |
 
-## How to stay clear
+## How to stay clear {#how-to-stay-clear}
 
 - Watch `health` via [`account_state`](../api/rest/info.md#account_state) queries.
 - Set internal alerts at `health < 1.2` — well above T0.
 - For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when health crosses a threshold.
 - Watch [`userEvents`](../api/ws/subscriptions.md#userevents) on the WS feed for immediate tier transitions (margin / liquidation events ride this channel).
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -276,7 +276,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Portfolio margin](./portfolio-margin.md) — opt-in cross-asset margin reduces baseline maintenance
 - [ADL allocation algorithm](./adl.md) — math behind T4
@@ -285,7 +285,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 - [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) — tier transitions ride this channel
 - [Risk-watcher pattern](../integration/risk-watcher.md) — automated margin top-up
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

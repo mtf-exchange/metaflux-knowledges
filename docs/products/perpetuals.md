@@ -10,7 +10,7 @@ default — funding rates, mark prices, margin modes, and the liquidation ladder
 describe perps unless a page says otherwise.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 A **perpetual future** ("perp") is a leveraged contract that tracks an asset's
 price with **no expiry** — you go long or short, post [margin](../concepts/margin-modes.md)
@@ -25,7 +25,7 @@ sudden close.
 Perps are entirely separate from [spot](./spot.md): a perp position is a leveraged
 exposure backed by collateral, not ownership of the asset.
 
-## How a perp works
+## How a perp works {#how-a-perp-works}
 
 - **Direction & leverage.** Buy to go long, sell to go short. [Leverage](../concepts/margin-modes.md)
   lets a given amount of collateral control a larger position; it amplifies gains
@@ -40,7 +40,7 @@ exposure backed by collateral, not ownership of the asset.
   trigger orders are all computed against the [mark price](../concepts/mark-prices.md),
   not the last trade — so a single stray print cannot distort your position.
 
-## Trading actions
+## Trading actions {#trading-actions}
 
 A perp order targets a perp **`market`** id (distinct from a spot `pair`). The
 order surface is the shared CLOB used across MetaFlux.
@@ -58,7 +58,7 @@ assigned `oid` with a `resting` / `filled` / `error` entry, or `pending` if no
 commit lands in the order-wait window. Orders can be signed by the master account
 or an active [agent wallet](../concepts/agent-wallets.md).
 
-## Margin & risk
+## Margin & risk {#margin--risk}
 
 Perps share the platform's full margin and risk stack:
 
@@ -73,7 +73,7 @@ Perps share the platform's full margin and risk stack:
 - [**ADL**](../concepts/adl.md) — auto-deleveraging as the final backstop when the
   insurance fund is exhausted.
 
-## Fees
+## Fees {#fees}
 
 Perp fills charge a **maker** and a **taker** fee. Your base rate comes from your
 trailing-30-day volume tier; a maker-rebate tier and a staking discount then stack
@@ -94,7 +94,7 @@ governance parameters — query the live card with [`/info fee_schedule`](../api
 **Funding is not a fee** — it is a periodic [long↔short payment](../concepts/funding-rates.md),
 not revenue to the exchange. See [Fees](../concepts/fees.md) for the full mechanics.
 
-## Listing new perp markets
+## Listing new perp markets {#listing-new-perp-markets}
 
 Perp markets are **permissionless** to deploy: any builder can list a new perpetual
 by winning an on-chain gas auction and supplying seed risk parameters (initial
@@ -103,7 +103,7 @@ review committee, no allow-list. See [MIP-3](../mip/mip-3.md) for the deploy flo
 and [MIP-4](../mip/mip-4.md) for the planned liquidity aggregator that carries
 retail flow on top.
 
-## See also
+## See also {#see-also}
 
 - [Contract specifications](../concepts/contract-specifications.md) — per-contract spec (margin, mark, funding, increments, limits) + how to read each field live
 - [Funding rates](../concepts/funding-rates.md) — the hourly long↔short payment

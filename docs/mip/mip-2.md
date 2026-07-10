@@ -11,7 +11,7 @@ vault and share in the PnL of a market-making strategy that quotes on the order
 books. It provides the resting liquidity that takers trade against, so markets are
 not dependent solely on external market makers from day one.
 
-## What's on-chain vs off-chain
+## What's on-chain vs off-chain {#whats-on-chain-vs-off-chain}
 
 A deliberate split keeps the consensus surface small:
 
@@ -23,7 +23,7 @@ A deliberate split keeps the consensus surface small:
   signs orders **on behalf of the vault account** and submits them through the
   normal signed-order path. No strategy logic is baked into consensus.
 
-## For liquidity providers
+## For liquidity providers {#for-liquidity-providers}
 
 - **Deposit** USDC, permissionlessly, and receive vault shares priced at the
   current NAV (`cash + mark-to-market of the vault's open positions`).
@@ -32,18 +32,19 @@ A deliberate split keeps the consensus surface small:
 - Your shares appreciate or depreciate with the strategy's realised and
   unrealised PnL — there is market risk; this is not a yield guarantee.
 
-## Provider whitelist
+## Provider whitelist {#provider-whitelist}
 
 The recognised Metaliquidity provider addresses are a **list**, seeded at genesis
 and mutable by governance. Only a whitelisted address may operate a Metaliquidity
 vault and be authorised to trade its pooled capital; deposits remain open to
 anyone.
 
-## Status & history
+## Status & history {#status--history}
 
 Metaliquidity supplies the native order-book liquidity that a protocol-owned
-provider is meant to bootstrap. The HLP-equivalent protocol vault was originally
-deferred post-launch (to V2) in favour of external market makers; it has been
-pulled forward because native resting liquidity is needed
-earlier than that plan assumed. The on-chain vault is landing now; the off-chain
-strategy and provider whitelist seed in alongside it.
+provider is meant to bootstrap. The equivalent protocol-owned vault on
+established on-chain venues was originally deferred post-launch (to V2) in
+favour of external market makers; it has been pulled forward because native
+resting liquidity is needed earlier than that plan assumed. The on-chain vault
+is landing now; the off-chain strategy and provider whitelist seed in alongside
+it.

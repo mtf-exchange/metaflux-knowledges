@@ -8,13 +8,13 @@ real time. Both the action surface and the scenario engine are shipped and teste
 on a 4-node consensus run.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 PM treats your whole account as one risk number. Hedged or correlated positions net against each other; the protocol charges margin against the worst-case scenario across a calibrated `(price, vol)` shock grid. Typical capital efficiency for a balanced book: **2–5×** classical.
 
 PM is opt-in, equity-gated (default ≥ 100 K USDC), and reversible.
 
-## Classical vs PM — side-by-side
+## Classical vs PM — side-by-side {#classical-vs-pm--side-by-side}
 
 Hedged book example: long 1 BTC at $100, short 25 ETH at $4 (perfectly $-neutral if BTC and ETH are perfectly correlated, which they nearly are).
 
@@ -49,7 +49,7 @@ Worst-case loss: $20 — but only in the decorrelation scenario. Probability-wei
 
 Classical's $10 simply has no view on correlation. PM does.
 
-## How PM works
+## How PM works {#how-pm-works}
 
 > The portfolio-margin engine works in **USD cents** internally (whole-USDC `Decimal` plane × 100). The PM number **replaces** the classical per-asset maintenance sum, it doesn't add to it. There is also a read-side EVM precompile (`portfolio_margin_eval`) for off-chain quoting.
 
@@ -93,7 +93,7 @@ else:
 
 (Skipped when `net_value ≤ 0` — the BOLE negative-equity path catches that account instead.)
 
-## Multi-collateral (cross-collateral haircut)
+## Multi-collateral (cross-collateral haircut) {#multi-collateral-cross-collateral-haircut}
 
 By default, portfolio margin is collateralised in **USDC** only. Governance can
 additionally make selected **non-USDC spot balances** count as portfolio-margin
@@ -136,7 +136,7 @@ the live (governed) eligible set before assuming any non-USDC asset counts towar
 PM.
 :::
 
-## Enrollment
+## Enrollment {#enrollment}
 
 ```json
 { "type": "UserPortfolioMargin", "params": { "enabled": true } }
@@ -152,7 +152,7 @@ Master-only. Symmetric to disable.
 
 Disabling reverts to classical at next block. Disabling while in T0+ is allowed (you can always go back to a more conservative model).
 
-## Strict isolation
+## Strict isolation {#strict-isolation}
 
 Even under PM, mark specific assets as **strictly isolated**. A strict-iso position:
 
@@ -174,7 +174,7 @@ Use cases:
 
 See [margin modes](./margin-modes.md).
 
-## Liquidation under PM
+## Liquidation under PM {#liquidation-under-pm}
 
 PM accounts go through the standard [tiered liquidation](./tiered-liquidation.md) ladder, but `maint_margin` is the PM number, not the classical sum.
 
@@ -186,7 +186,7 @@ T1 partial: close 50% of both legs
 after: long 0.5 + short 12.5 ETH, PM maint = $10, account_value = $13, health = 1.3 → Safe
 ```
 
-## Risk to the operator
+## Risk to the operator {#risk-to-the-operator}
 
 PM is more capital-efficient for users, which is precisely why it's risky for the protocol — a scenario miss-spec can let an account take on more risk than the chain can liquidate cleanly. MetaFlux mitigates with:
 
@@ -196,7 +196,7 @@ PM is more capital-efficient for users, which is precisely why it's risky for th
 
 Scenario set, shock magnitudes, and concentration coefficients are governance parameters (dynamic risk). Subscribe to parameter updates if you operate near the margin limits.
 
-## Worked example — concentration penalty
+## Worked example — concentration penalty {#worked-example--concentration-penalty}
 
 The penalty compares the **largest single-asset absolute notional** against the account's **net value** (`cash + Σ size × mark`), with the code defaults: threshold **50 %**, rate **10 %**.
 
@@ -212,7 +212,7 @@ If the PM scenario sweep computes (say) `$25` worst-case loss, `pm_margin = max(
 
 A more balanced book where no single asset exceeds 50 % of net value pays **no** penalty — `pm_margin` is the scenario worst-case alone. The penalty discourages single-asset concentration within PM; classical margin applies no such penalty.
 
-## Querying
+## Querying {#querying}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -243,7 +243,7 @@ reflects the PM-derived maintenance:
 > today. A future read (a per-scenario PM-details field on `account_state`) will
 > expose the breakdown.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -255,13 +255,13 @@ reflects the PM-derived maintenance:
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Tiered liquidation](./tiered-liquidation.md) — how PM interacts with the ladder
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso
 - [Sub-accounts](./sub-accounts.md) — per-sub PM enrollment
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

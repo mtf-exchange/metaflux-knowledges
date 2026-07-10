@@ -12,7 +12,7 @@ that runs ordinary Solidity contracts and exposes MetaFlux **Core** — the L1 p
 clearinghouse and on-chain CLOB — to those contracts: an EVM execution layer wired
 directly into the L1 it settles against.
 
-## What's different from a vanilla EVM
+## What's different from a vanilla EVM {#whats-different-from-a-vanilla-evm}
 
 - **Unified block, parallel strata** — one block per consensus round (sub-second);
   its transactions are partitioned into parallel conflict-strata, so throughput
@@ -25,7 +25,7 @@ directly into the L1 it settles against.
   with a sequential-equivalent committed state.
 - **EIP-1559 base-fee burn** to a burn-address coinbase.
 
-## Pages
+## Pages {#pages}
 
 | Page | What |
 |------|------|
@@ -34,7 +34,7 @@ directly into the L1 it settles against.
 | [Core ↔ EVM transfers](core-evm-transfers.md) | Moving value between Core and the EVM (and cross-chain) |
 | [Interaction timings](interaction-timings.md) | When a CoreWriter action / a Core→EVM credit actually lands |
 
-## System addresses (at a glance)
+## System addresses (at a glance) {#system-addresses-at-a-glance}
 
 | Address | Role |
 |---------|------|
@@ -42,14 +42,14 @@ directly into the L1 it settles against.
 | `0x0900`–`0x0904` | derivatives read precompiles (margin, NAV, ADL, mark-settle, RFQ) |
 | `0x0906`–`0x0908` | market-data read precompiles (BBO, L2 depth, inventory risk) |
 
-## JSON-RPC
+## JSON-RPC {#json-rpc}
 
 Standard `eth_*` JSON-RPC at `POST /evm` on the gateway; the chain reports its own
 id via `eth_chainId` (see [Networks & chain IDs](../networks.md)). Deployable
 contracts live in the public
 [`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo.
 
-### Transaction submission
+### Transaction submission {#transaction-submission}
 
 Transactions are submitted via the standard Ethereum method `eth_sendRawTransaction`
 with an RLP-encoded signed transaction. The network verifies that the signature

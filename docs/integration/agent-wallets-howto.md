@@ -6,7 +6,7 @@
 
 Concrete code, end-to-end, walking through approval, trading, and rotation. For the conceptual background see [agent wallets](../concepts/agent-wallets.md).
 
-## TL;DR
+## TL;DR {#tldr}
 
 1. Generate an agent keypair locally.
 2. From the master account, submit `ApproveAgent { agent, expires_at_ms }`.
@@ -14,7 +14,7 @@ Concrete code, end-to-end, walking through approval, trading, and rotation. For 
 4. Sign every action with the agent key; submit with `sender = master_addr`.
 5. Before expiry, repeat with a new agent and let the old expire.
 
-## Step 1 — generate an agent key
+## Step 1 — generate an agent key {#step-1--generate-an-agent-key}
 
 ```typescript
 import { randomBytes } from 'crypto';
@@ -40,7 +40,7 @@ agent_addr = to_checksum_address('0x' + sha3.keccak_256(agent_pk).hexdigest()[-4
 print('agent address:', agent_addr)
 ```
 
-## Step 2 — approve from master
+## Step 2 — approve from master {#step-2--approve-from-master}
 
 The master must sign this — it's the **only time** the master signs (per session).
 
@@ -75,7 +75,7 @@ In raw curl, the action body is:
 }
 ```
 
-## Step 3 — wait one block
+## Step 3 — wait one block {#step-3--wait-one-block}
 
 Agent approvals are effective **one block after commit**. Submit your first agent-signed request after the approval block commits.
 
@@ -95,7 +95,7 @@ await waitForApproval(master, master.address, agentAddress);
 
 Alternative: subscribe to `userEvents` and look for `{ kind: "agentApproved" }`.
 
-## Step 4 — trade from the agent
+## Step 4 — trade from the agent {#step-4--trade-from-the-agent}
 
 ```typescript
 // initialise an SDK client with the agent's key, but the master's address
@@ -128,7 +128,7 @@ await fetch('https://api.devnet.mtf.exchange/exchange', {
 });
 ```
 
-## Step 5 — rotation
+## Step 5 — rotation {#step-5--rotation}
 
 Before the old agent expires, stage a new one:
 
@@ -164,7 +164,7 @@ async function rotateAgent(
 
 Schedule rotation daily / weekly via a cron / systemd timer. Multi-host fleets: rotate one host at a time, gated on health checks.
 
-## Multi-host fleet
+## Multi-host fleet {#multi-host-fleet}
 
 Each host has its own agent. They can submit concurrently because they share the master's nonce space and use `Date.now()`:
 
@@ -182,7 +182,7 @@ each host runs:
 
 Nonces collide rarely (sub-millisecond resolution) and the colliding request gets `nonce_too_small`; the bot bumps and retries. For very high throughput per host, use a shared monotonic counter (Redis `INCR`) keyed on the master.
 
-## Detect compromise
+## Detect compromise {#detect-compromise}
 
 | Signal | Likely cause | Action |
 |--------|--------------|--------|
@@ -192,7 +192,7 @@ Nonces collide rarely (sub-millisecond resolution) and the colliding request get
 
 The chain stores every approval, every expiry, every action's recovered signer. Forensics post-incident is mechanical.
 
-## Sub-account agents
+## Sub-account agents {#sub-account-agents}
 
 A sub-account can have its own agent set (separate from master's):
 
@@ -211,7 +211,7 @@ The master signs; `sender = sub_addr`; the chain admits because master holds del
 
 This is the institutional pattern: master in cold storage; one agent per (sub × host) combination; clean revocation surface.
 
-## Sequence — full setup
+## Sequence — full setup {#sequence--full-setup}
 
 ```
 T=0    generate agent keypair on host
@@ -228,7 +228,7 @@ T+29d  scheduled rotation kicks in
 T+29d+1h  old agent expires; bot has fully migrated
 ```
 
-## See also
+## See also {#see-also}
 
 - [Agent wallets](../concepts/agent-wallets.md) — concepts
 - [`POST /exchange approve_agent`](../api/rest/exchange.md#approve_agent)
@@ -237,7 +237,7 @@ T+29d+1h  old agent expires; bot has fully migrated
 - [Sub-accounts](../concepts/sub-accounts.md) — sub-level agent setup
 - [Risk-watcher](./risk-watcher.md) — typical use of a dedicated watcher agent
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

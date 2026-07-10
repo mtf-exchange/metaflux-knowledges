@@ -8,7 +8,7 @@ discount tiers — see the [Fee schedule](./fee-schedule.md). Fee values are net
 parameters and can be updated by governance.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Every fill charges a maker and a taker fee, set by the [Fee schedule](./fee-schedule.md).
 A builder credit can route a share to the order-flow originator, and a referrer
@@ -19,12 +19,12 @@ locks it forever in a keyless protocol address — permanently removing it from
 circulation. Fees are deducted from
 your balance at fill time and shown in [`userFills`](../api/rest/info.md#user_fills).
 
-## How a fee is computed
+## How a fee is computed {#how-a-fee-is-computed}
 
 Fees settle on the whole-USDC plane: notional is the price-times-size product,
 truncated toward zero.
 
-### Per fill
+### Per fill {#per-fill}
 
 ```text
 notional    = |price × size|
@@ -42,7 +42,7 @@ same flow — the protocol never pays out more than it takes in.
 Per-fill fee appears in every [`userFills`](../api/rest/info.md#user_fills) entry as
 `fee` (USDC base units; positive = paid, negative = rebate received).
 
-## Builder credit
+## Builder credit {#builder-credit}
 
 An order-flow originator can claim a share of the taker fee by setting a builder
 address on the order. The credit is paid per fill to that address. Typical uses:
@@ -56,7 +56,7 @@ The builder must be a registered address (see
 builders are silently dropped. The builder credit is additive and taker-only, with
 a per-order cap; it does not change the maker side.
 
-## Referrer credit
+## Referrer credit {#referrer-credit}
 
 When an account has a referrer set, a share of its **taker fee** is routed to the
 referrer **before** the rest is distributed — it comes out of the protocol's take,
@@ -69,7 +69,7 @@ thereafter; setting yourself as your own referrer is rejected.
 A builder credit and a referrer credit can both apply to the same fill — they pay
 out independently.
 
-## Where fees go
+## Where fees go {#where-fees-go}
 
 Collected fees flow through one value-accrual pipeline:
 
@@ -130,7 +130,7 @@ curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"
 Because the staker dividend is delivered through the validator share, stake more
 MTF (or delegate to a validator) to receive a larger slice — see [Staking](./staking.md).
 
-## Spot fees
+## Spot fees {#spot-fees}
 
 The same maker/taker shape applies to spot fills, but spot fees are charged on a
 **separate fee account** from perps, and they are taken **from the leg each side
@@ -146,7 +146,7 @@ See the spot tiers in the [`/info fee_schedule`](../api/rest/info.md#fee_schedul
 response, and [spot trading](../products/spot.md#matching-fills-and-fees) for the
 settlement model.
 
-## Fees on liquidation fills
+## Fees on liquidation fills {#fees-on-liquidation-fills}
 
 Liquidation closes route through the standard taker-fee path described above. A
 discrete liquidation fee — an extra charge split between the insurance pool and
@@ -156,7 +156,7 @@ pay it as part of the loss settled on close, flagged on the liquidation fills in
 [`userFills`](../api/rest/info.md#user_fills). See
 [tiered liquidation](./tiered-liquidation.md) for the close mechanics.
 
-## Querying
+## Querying {#querying}
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
@@ -167,7 +167,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"user_fees","address":"0x<addr>"}'
 ```
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -186,7 +186,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Fee schedule](./fee-schedule.md) — the rate card: volume fee tiers, maker-rebate
   tiers, and staking discount tiers, and how the three combine
@@ -196,7 +196,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — cumulative fee pools (burn / treasury / validator)
 - [Tiered liquidation](./tiered-liquidation.md) — liquidation mechanics
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

@@ -23,7 +23,7 @@ The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**
 
 and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: true`), then live change-driven `{"channel":...,"data":...}` pushes (`is_snapshot: false`). A push lands only when that channel's state actually changed since the last commit; an unchanged channel emits nothing. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
 
-## Channel status at a glance
+## Channel status at a glance {#channel-status-at-a-glance}
 
 | Channel | Status | key | Live source |
 |---------|--------|:-------:|-------------|
@@ -53,9 +53,9 @@ Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unk
 
 ---
 
-## Live channels
+## Live channels {#live-channels}
 
-### `l2_book`
+### Aggregated L2 order book for one market {#l2_book}
 
 Aggregated L2 order book for one market. **Requires `coin`.**
 
@@ -88,7 +88,7 @@ Each push is a **full snapshot of the top 20 levels**, not a partial diff. The f
 
 Frequency: change-driven — a frame is sent only when the book actually changed since the last commit; a commit that leaves this book untouched emits nothing. If the coin maps to no known market, you still get the ack but the snapshot body is the empty book (`"levels": [[], []]`, `"time": 0`) and no pushes follow.
 
-### `bbo`
+### Top-of-book best bid and offer {#bbo}
 
 Top-of-book best bid / offer for one market. A thinner `l2_book`. **Requires `coin`.**
 
@@ -117,7 +117,7 @@ Frequency: change-driven — a frame is sent only when the top-of-book actually 
 
 ---
 
-### `trades`
+### Public trade tape for one market {#trades}
 
 Public trade tape for one market. **Requires `coin`.** Each frame's `data` is an
 **array** of trade records; `px`/`sz` are raw **1e8-plane** integer strings; `side`
@@ -150,7 +150,7 @@ block; each row's `users` is `[taker, maker]` (taker first, the aggressor):
 
 - `tid` may exceed 2⁵³ — parse it as a 64-bit / big integer, not a JS number.
 
-### `active_asset_ctx`
+### Per-market mark, oracle, and funding context {#active_asset_ctx}
 
 Per-market context for one market — mark / oracle price, funding, and open
 interest — pushed when it changes. **Requires `coin`.** The body carries the same
@@ -196,7 +196,7 @@ pushes follow (so a client deserializing a fixed ctx struct never breaks):
 { "channel": "active_asset_ctx", "data": { "coin": "DOGE", "mark_px": "0", "oracle_px": "0", "funding": null, "open_interest": "0" } }
 ```
 
-### `all_mids`
+### Global mid-price map for all markets {#all_mids}
 
 Global mid map — every market's mark price, pushed when the mids change. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info/perpetuals.md#markets) read reports. No `coin` parameter.
 
@@ -208,7 +208,7 @@ Global mid map — every market's mark price, pushed when the mids change. Keyed
 { "channel": "all_mids", "data": { "mids": { "BTC": "66703.35", "ETH": "1856.49", "SOL": "73.95", "MTF": "5" } } }
 ```
 
-### `markets`
+### Global dynamic state for all markets {#markets}
 
 Global per-market **dynamic** state tape — every market's live mark / oracle / mid price, funding premium, open interest, 24h ticker, and halted flag, one row per market. GLOBAL: takes **no `coin` and no `user`** (like [`all_mids`](#all_mids)). The rows share the REST [`markets`](../rest/info/perpetuals.md#markets) dynamic builder, so the WS feed and the REST read never drift.
 
@@ -263,7 +263,7 @@ Spot rows carry only the fields with a spot analogue — `coin`, `kind` (`"spot"
 
 Frequency: change-driven — a delta frame lands only on commits where at least one market's row moved; a commit that changes nothing emits nothing.
 
-### `fills` <a id="fills"></a>
+### Per-account fill stream {#fills}
 
 Per-account fill stream. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Each executed match delivers a record to BOTH parties, each from its own perspective, with the same field set `{coin, side, px, sz, time, oid, cloid, tid, crossed}`:
 
@@ -282,7 +282,7 @@ The initial snapshot is the empty array `[]`; each push is an array holding one 
 { "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] }
 ```
 
-### `user_events` <a id="userevents"></a>
+### Per-account event feed {#userevents}
 
 Per-account event feed. Requires `user` (the 0x address) — NOT a `coin`. Today it tags `fills`; liquidation / funding event kinds will land as sibling keys.
 
@@ -296,7 +296,7 @@ The native channel name is `user_events` (snake_case).
 `user_events` is per-account data but currently has **no authentication** — any connection can subscribe to any address's feed. Do not treat it as a private channel until the auth-at-subscribe gate lands; for authenticated reads/writes use `post` with a signed action.
 :::
 
-### `candles`
+### Rolling OHLCV bars for one market {#candles}
 
 Rolling OHLCV bars for one market at one bar size. **Requires both `coin` and `interval`** — they form the routing key together, so a `1m` and a `5m` subscription on the same market are independent subscriptions, each with its own snapshot and pushes.
 
@@ -330,7 +330,7 @@ The series is **gapless**: an interval with no trades emits a flat bar carrying 
 
 A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing.
 
-### `order_updates`
+### Per-account order lifecycle events {#order_updates}
 
 Per-account order lifecycle. Requires `user` (the 0x address). Each push is an array of order-update records for that account from the just-committed block; the initial snapshot is `[]`.
 
@@ -350,7 +350,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are 1e8-plane decimal strings; `time` is consensus-ms; unknown fields are `null`.
 - **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
 
-### `open_orders`
+### Per-account resting order snapshot {#open_orders}
 
 Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client simply **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
 
@@ -370,7 +370,7 @@ The snapshot is an **array** of records, each in the same fixed shape as an [`or
 - Each element is one resting order: the nested `order` object (`coin`, `side`, `limit_px`, `sz` = remaining size, `orig_sz`, `oid`, `cloid`, `tif`, `reduce_only`), with `filled_sz` / `avg_px` / `reason` all `null` (a standing order, not an event) and `time` the order's insertion timestamp (consensus ms). On this snapshot `orig_sz` is `null` (the placed size is not re-derived for a standing order) and `reduce_only` is `false`; `cloid` is the client id or `null`. `limit_px` is whole-USDC, `sz` is size-plane.
 - Because every frame is a full snapshot, `is_snapshot` is always `true` here — treat each frame as the account's complete current resting set, not an incremental change.
 
-### `notifications`
+### Per-account margin and liquidation notices {#notifications}
 
 Per-account margin / liquidation notices, derived by diffing consecutive committed states. Requires `user`. One array frame per affected commit; initial snapshot `[]`.
 
@@ -391,7 +391,7 @@ Per-account margin / liquidation notices, derived by diffing consecutive committ
 - `kind` is the machine tag; `message` is the human-readable text. `tier` ∈ `yellow_card` / `partial_market_50` / `full_market` / `backstop_takeover` (or `null` on clear).
 - `yellow_card` is the one-block margin-warning grace (the [tiered-liquidation](../../concepts/tiered-liquidation.md) T0 contract); `forced_close` fires when a liquidation actually executes against the account.
 
-### `ledger_updates`
+### Per-account money movement history {#ledger_updates}
 
 Per-account money movement, attributed to its **cause** (read from the committed block payload — a record appears only when the action applied). Requires `user`. The on-subscribe snapshot is an **array** of the account's most-recent ledger records, **newest-first**, bounded to the last **100** (`[]` when the account has no recent records); each subsequent push is an array holding the new record(s) for the just-committed block.
 
@@ -406,7 +406,7 @@ Per-account money movement, attributed to its **cause** (read from the committed
 - `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `deposit` (`amount` may be `null` for an inbound CCTP credit), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver).
 - Amounts are whole-token decimal strings except `withdraw` via MetaBridge, which carries `amount_units` (raw base units). Inbound bridge credit amounts and CoreWriter-delayed actions (which dispatch in a later block) are not yet attributed.
 
-### `active_asset_data`
+### Trading context for one account and market {#active_asset_data}
 
 Per-(user, coin) trading context — leverage, margin mode, and the current
 max-trade-size ceiling for one account on one market. Requires **both** `user`
@@ -430,7 +430,7 @@ re-emits it only when that context changes.
   `available_to_trade` are `[buy, sell]` pairs; fields are identical to the REST
   [`active_asset_data`](../rest/info/perpetuals.md#active_asset_data) read.
 
-### `account_state`
+### Per-account perp clearinghouse state {#account_state}
 
 Per-account **PERP** clearinghouse state — the margin summary, open positions,
 and balances for one account — pushed when it changes. Requires `user` (the 0x
@@ -479,7 +479,7 @@ connection can subscribe to any address. Do not treat it as private until the
 auth-at-subscribe gate lands.
 :::
 
-### `spot_state`
+### Per-account spot clearinghouse state {#spot_state}
 
 Per-account **SPOT** clearinghouse state — the per-token spot balances for one
 account — pushed when they change. Requires `user`. The initial snapshot is the live
@@ -508,7 +508,7 @@ balance set (`[]` for an account with no spot holdings).
 
 Frequency: change-driven — a frame is sent only when the spot balances actually changed since the last commit; an unchanged account emits nothing this commit.
 
-### `user_fundings`
+### Per-account realized funding payments {#user_fundings}
 
 Per-account **realized funding payments** — one record each time funding settles
 against the account on a market. Requires `user` (the 0x address; `address` is
@@ -532,7 +532,7 @@ from the just-committed settlement; the initial snapshot is `[]`.
 - `fundingRate` — the per-asset rate applied at this settlement (decimal string).
 - `time` — settlement timestamp (consensus ms).
 
-### `explorer_block`
+### Latest committed block header {#explorer_block}
 
 Latest committed **block header**, pushed on each new block. No `coin` / `user`
 parameter. Each frame's `data` is an array (the newly-committed header(s));
@@ -557,7 +557,7 @@ parameter. Each frame's `data` is an array (the newly-committed header(s));
 - `time` — block timestamp (consensus ms).
 - `tx_count` — number of transactions in the block.
 
-### `explorer_txs`
+### Transactions in the latest block {#explorer_txs}
 
 Transactions in the latest committed block, pushed on each new block. No
 `coin` / `user` parameter. Each frame's `data` is an array of transaction
@@ -580,7 +580,7 @@ first frame after subscribe.
 
 ---
 
-## `post` — request/response over WS
+## `post` — request/response over WS {#post--requestresponse-over-ws}
 
 Not a subscription channel, but the way to do one-shot reads and signed writes over the same socket. The `request` is the same `{type, payload}` envelope as the REST routes; it is dispatched through the identical handlers (`POST /info`, `POST /exchange`). See [`post` in the WS README](./index.md#post-requestresponse-over-ws) for the full request/response shapes and signing rules.
 
@@ -592,7 +592,7 @@ This is the supported path for authenticated reads and for submitting signed act
 
 ---
 
-## Roadmap — not yet available
+## Roadmap — not yet available {#roadmap--not-yet-available}
 
 The following channels appeared in earlier drafts but are **not implemented** on the node WS surface. They are not recognized channel names; subscribing returns an `unknown channel` error. Listed here so integrators are not misled by older SDK stubs.
 
@@ -607,13 +607,13 @@ Also not implemented today:
 
 ---
 
-## Ordering & delivery
+## Ordering & delivery {#ordering--delivery}
 
 - **Per subscription**, frames arrive in commit order (a frame is emitted only on the commits where the watched channel's state changed). There is no `seq`; ordering is implicit in arrival order on the single socket.
 - **Across subscriptions**, there is no ordering guarantee — interleave is arbitrary. Demux on `channel` + the `coin` inside `data`.
 - Delivery is **at-most-once per change** and **not buffered for resume**: a subscription that lags more than 256 frames behind is dropped with a `lagged` error frame (see [Backpressure & lag](./index.md#backpressure--lag)). Re-subscribe to recover; you get a fresh snapshot.
 
-## See also
+## See also {#see-also}
 
 - [WS README](./index.md) — connection lifecycle, frames, coin parameter, `post`, backpressure
 - [`POST /info`](../rest/info.md) — REST equivalents for one-shot reads (also reachable via `post`)

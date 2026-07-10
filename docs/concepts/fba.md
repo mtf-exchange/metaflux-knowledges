@@ -4,11 +4,11 @@
 **Preview.** Per-market opt-in via [MIP-3](../mip/mip-3.md); not all markets run FBA.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 FBA replaces continuous matching with discrete auction batches every `batch_interval_ms`. Orders queued within a batch are cleared simultaneously at a single uniform clearing price. This neutralises latency-based MEV: there's no benefit to being one microsecond faster.
 
-## Continuous vs batch
+## Continuous vs batch {#continuous-vs-batch}
 
 | Property | Continuous CLOB | FBA |
 |----------|-----------------|-----|
@@ -18,7 +18,7 @@ FBA replaces continuous matching with discrete auction batches every `batch_inte
 | Surplus from latency | Captured by HFT | Returned to participants via uniform price |
 | Public order visibility | Pre-trade (resting book) | Pre-batch (visible queue) |
 
-## Mechanism
+## Mechanism {#mechanism}
 
 ```
 batch t:        accept orders during [t, t + batch_interval_ms)
@@ -37,7 +37,7 @@ Clearing rules:
 
 The fill price is **uniform** across all participants in the batch — no one is filled at a worse price by virtue of arriving later.
 
-## When to use FBA
+## When to use FBA {#when-to-use-fba}
 
 | Asset class | Default | Why |
 |-------------|---------|-----|
@@ -48,13 +48,13 @@ The fill price is **uniform** across all participants in the batch — no one is
 
 Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Markets with FBA on accept both `FbaOrder` (batch-targeted) and [`submit_order`](../api/rest/exchange.md#submit_order) (treated as FBA orders for the next batch). See the [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` is a recognized-but-unmapped stub today.
 
-## Batch interval
+## Batch interval {#batch-interval}
 
 Default: 1 second (10 blocks at 100 ms block time). Governance-set per market in `market_info.fba_batch_interval_ms`. Typical range: 100 ms – 5 s.
 
 Faster intervals reduce the wait but increase computational cost. The 1-second default balances HFT-neutralisation against UX.
 
-## Order shape
+## Order shape {#order-shape}
 
 ```json
 {
@@ -74,7 +74,7 @@ Faster intervals reduce the wait but increase computational cost. The 1-second d
 
 Omit `batch_id` to target the next batch — the server selects the one currently accepting orders.
 
-## Worked example
+## Worked example {#worked-example}
 
 Batch t has the following orders for asset 42:
 
@@ -129,13 +129,13 @@ Max cleared volume is 8 at `p* = 100.05`. So:
 
 All winners fill at 100.05. Bob doesn't get a worse price for being "earlier" — there's no earlier in FBA.
 
-## Fairness in clearing
+## Fairness in clearing {#fairness-in-clearing}
 
 When supply > demand at p*, the larger side is **pro-rata** filled — every seller above gets the same fraction. No FIFO, no price priority among the over-supplied side (everyone's already at or better than p*).
 
 This is the FBA fairness property: at the clearing price, no participant gets a better deal than another.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -148,7 +148,7 @@ This is the FBA fairness property: at the clearing price, no participant gets a 
 
 </details>
 
-## Sequence
+## Sequence {#sequence}
 
 ```
 t=0.0s   batch_id = 9876 opens
@@ -164,7 +164,7 @@ t=1.0s   batch_id 9876 closes; clearing fires
 t=1.0s   batch_id = 9877 opens
 ```
 
-## Querying
+## Querying {#querying}
 
 The live FBA pool + indicative clearing is exposed on the node `/info` read path
 via [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — see that entry for
@@ -201,14 +201,14 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 Prices / sizes are raw **1e8 fixed-point** integer strings (the book / order plane). `next_settle_ms` is **derived** as `last_settle_ms + period_ms`. The `indicative` block is the volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, not yet settled — and is `null` when there is no cross (one-sided or empty window). This is what p\* would be if the batch closed now, useful for traders deciding whether to add to the batch.
 
-## See also
+## See also {#see-also}
 
 - [Order types](./order-types.md)
 - [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` (recognized-but-unmapped stub today)
 - [MIP-3](../mip/mip-3.md) — markets opt into FBA at deploy
 - [`market_info`](../api/rest/info/perpetuals.md#market_info) — check `fba_enabled` per market
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

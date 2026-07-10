@@ -10,7 +10,7 @@ L1. It orders every transaction — orders, cancels, liquidations, transfers,
 EVM calls — into one canonical chain with deterministic, instant finality.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 **MetaFluxBFT** is MetaFlux's Byzantine-fault-tolerant (BFT) Proof-of-Stake
 consensus engine. A stake-weighted set of validators agrees, block by block,
@@ -21,7 +21,7 @@ what lets MetaFlux run a fully on-chain order book and clearinghouse: every
 match, fill, funding payment, and liquidation settles against an order that the
 whole network already agrees on.
 
-## Why an exchange needs this
+## Why an exchange needs this {#why-an-exchange-needs-this}
 
 A trading venue is only fair if everyone sees the same book in the same order.
 MetaFluxBFT provides two properties that matter directly to traders and
@@ -36,7 +36,7 @@ Together these give **front-running-resistant matching** and **immediate
 settlement**: the same canonical sequence that secures the chain is the sequence
 the order book matches against.
 
-## Design lineage
+## Design lineage {#design-lineage}
 
 MetaFluxBFT is a **MetaFlux-native** implementation in the academic lineage of
 the **HotStuff / Jolteon** family of pipelined BFT protocols (the line of
@@ -56,7 +56,7 @@ forking an existing codebase, so the protocol can be tuned to the needs of an
 on-chain exchange (deterministic execution, integrated EVM, stake-derived
 validator set).
 
-## Validators and staking
+## Validators and staking {#validators-and-staking}
 
 The validator set is derived directly from **on-chain stake** — MetaFluxBFT is a
 Proof-of-Stake protocol. Anyone who meets the stake requirements can run a
@@ -82,7 +82,7 @@ sequenceDiagram
     Note over L,V: leadership rotates to the next round
 ```
 
-### Epochs
+### Epochs {#epochs}
 
 The validator set is fixed within an **epoch** and can change only at epoch
 boundaries. Holding the set steady for the duration of an epoch keeps consensus
@@ -90,7 +90,7 @@ deterministic and predictable, while still letting the set evolve over time as
 stake shifts, validators join, or validators leave. When an epoch rolls over,
 the protocol adopts the new stake-derived set for the next epoch.
 
-## Safety and liveness
+## Safety and liveness {#safety-and-liveness}
 
 Two guarantees define what MetaFluxBFT promises, in the classic BFT sense:
 
@@ -112,7 +112,7 @@ protocol moves leadership forward and continues.
 This is the standard separation in partially-synchronous BFT: *safety always*,
 *liveness under synchrony*.
 
-## Finality and deterministic execution
+## Finality and deterministic execution {#finality-and-deterministic-execution}
 
 Finality in MetaFluxBFT is **immediate and absolute**. The moment a quorum
 commits a block, that block — and the exact transaction ordering it carries — is
@@ -143,7 +143,7 @@ flowchart LR
     D --> E[App-hash matches<br/>across all honest nodes]
 ```
 
-## Accountability
+## Accountability {#accountability}
 
 Validators are economically accountable for how they participate. A validator
 that **provably misbehaves** can be **jailed** (removed from active
@@ -154,7 +154,7 @@ stake at risk. Delegators should weigh a validator's operational track record;
 see [Staking](./staking.md) for how slashing and jailing flow through to
 delegated stake.
 
-## How it fits together
+## How it fits together {#how-it-fits-together}
 
 MetaFluxBFT is the foundation the rest of the protocol stands on:
 
@@ -168,7 +168,7 @@ MetaFluxBFT is the foundation the rest of the protocol stands on:
   validator set, and governance-set parameters are themselves committed through
   the chain.
 
-## See also
+## See also {#see-also}
 
 - [Staking](./staking.md) — delegate MTF, back validators, earn rewards, and the
   slashing/jailing rules that secure consensus
@@ -179,7 +179,7 @@ MetaFluxBFT is the foundation the rest of the protocol stands on:
 - [EVM execution model](../evm/execution-model.md) — how the EVM executes on the
   committed block ordering
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

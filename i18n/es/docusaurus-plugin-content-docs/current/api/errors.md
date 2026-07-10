@@ -6,7 +6,7 @@
 
 Una enumeración completa de códigos de estado HTTP, convenciones de cadenas de error, causas raíz y medidas de corrección. Ante cualquier duda sobre cómo manejar una respuesta que no sea `202`, consulte aquí primero.
 
-## Resumen rápido
+## Resumen rápido {#tldr}
 
 - **2xx** — éxito. Los endpoints nativos de MTF utilizan códigos de estado HTTP apropiados para los errores, no indicadores de error en el cuerpo.
 - **400** — error del cliente: solicitud mal formada, forma de firma incorrecta, variante de acción desconocida. No reintente sin corregir el problema.
@@ -17,7 +17,7 @@ Una enumeración completa de códigos de estado HTTP, convenciones de cadenas de
 - **429** — límite de tasa alcanzado. Espere y reintente según `retry_after_ms`.
 - **5xx** — error del servidor. Reintente con retroceso exponencial; los fallos persistentes indican un incidente del lado del operador.
 
-## Estructura del cuerpo
+## Estructura del cuerpo {#body-shape}
 
 Todas las respuestas no-2xx en los endpoints nativos de MTF utilizan:
 
@@ -31,9 +31,9 @@ Todas las respuestas no-2xx en los endpoints nativos de MTF utilizan:
 
 `detail` y `retry_after_ms` están presentes solo cuando aplica. El campo `error` es el identificador estable — mantenga su manejador de errores vinculado a él.
 
-## Catálogo
+## Catálogo {#catalog}
 
-### 400 — solicitud incorrecta
+### 400 — solicitud incorrecta {#400--bad-request}
 
 | `error` | Se produce cuando | Corrección |
 |---------|-------------------|------------|
@@ -50,7 +50,7 @@ Todas las respuestas no-2xx en los endpoints nativos de MTF utilizan:
 | `unknown info type: <X>` | `type` de `/info` no reconocido | Consulte la [referencia de info](./rest/info.md) |
 | `chain_id mismatch` | El campo chainId de un wrapper multi-firma no coincide con la red | Haga coincidir el `chainId` de la red |
 
-### 401 — no autorizado (firma fallida)
+### 401 — no autorizado (firma fallida) {#401--unauthorized-signature-failed}
 
 | `error` | Se produce cuando | Corrección |
 |---------|-------------------|------------|
@@ -62,24 +62,24 @@ Todas las respuestas no-2xx en los endpoints nativos de MTF utilizan:
 | `multisig threshold not met` | La acción interna tiene < `threshold` firmas válidas | Recopile más firmas |
 | `multisig duplicate signer` | La misma dirección firma dos veces en un wrapper multi-firma | Cada firmante debe ser distinto |
 
-### 404 — no encontrado
+### 404 — no encontrado {#404--not-found}
 
 | `error` | Se produce cuando |
 |---------|-------------------|
 | `account not found` | `/info` consultado con una dirección que no tiene estado en cadena |
-| `market not found` | `market_id` / `coin` no está en el registro |
+| `market not found` | El símbolo `coin` no está en el registro |
 | `vault not found` | `vault_id` no existe |
 | `order not found` | `Cancel` sobre un oid que ya fue cancelado / ejecutado / nunca existió |
 
 Para consultas de `/info`, MTF nativo devuelve `404` cuando el recurso consultado es desconocido.
 
-### 405 — método no permitido
+### 405 — método no permitido {#405--method-not-allowed}
 
 | `error` | Se produce cuando |
 |---------|-------------------|
 | (sin cuerpo) | Se usó `GET` en un endpoint `POST` (o viceversa) |
 
-### 422 — entidad no procesable
+### 422 — entidad no procesable {#422--unprocessable-entity}
 
 La solicitud estaba bien formada y la firma era válida, pero la acción en sí es lógicamente inválida.
 
@@ -94,7 +94,7 @@ La solicitud estaba bien formada y la firma era válida, pero la acción en sí 
 | `insufficient balance` | El retiro / transferencia supera el saldo libre | Compruebe `clearinghouseState` primero |
 | `out of bounds: <param>` | Límite de gobernanza violado (p. ej., tasa de financiación en `PerpDeployGasAuctionBid`) | Use un valor dentro del límite publicado |
 
-### 429 — límite de tasa alcanzado
+### 429 — límite de tasa alcanzado {#429--rate-limited}
 
 ```json
 { "error": "rate limit exceeded", "scope": "per_ip"|"per_account", "retry_after_ms": 1200 }
@@ -108,7 +108,7 @@ La solicitud estaba bien formada y la firma era válida, pero la acción en sí 
 
 Consulte [límites de tasa](./rate-limits.md) para presupuestos y manejo de ráfagas.
 
-### 503 — servicio no disponible
+### 503 — servicio no disponible {#503--service-unavailable}
 
 | `error` | Causa | Corrección |
 |---------|-------|------------|
@@ -116,9 +116,9 @@ Consulte [límites de tasa](./rate-limits.md) para presupuestos y manejo de ráf
 | `gateway not ready` | El gateway está iniciándose / fallando las verificaciones de salud | Reintente con retroceso; consulte el [estado](../networks.md#status) |
 | `node downstream unreachable` | El gateway perdió la conexión con el nodo | Problema del operador; retroceda y monitoree el estado |
 
-### Errores en tiempo de confirmación (no HTTP, en el flujo de eventos)
+### Errores en tiempo de confirmación (no HTTP, en el flujo de eventos) {#commit-time-errors-not-http-in-event-stream}
 
-Algunos fallos ocurren después de `202 Accepted` porque solo son detectables en el contexto de ejecución del bloque. Aparecen en el canal WS `orderEvents` / `userEvents` como `{"error":"<reason>", "action_hash":"0x..."}`.
+Algunos fallos ocurren después de `202 Accepted` porque solo son detectables en el contexto de ejecución del bloque. Aparecen en el canal WS `order_updates` / `user_events` como `{"error":"<reason>", "action_hash":"0x..."}`.
 
 | `error` | Causa |
 |---------|-------|
@@ -128,7 +128,7 @@ Algunos fallos ocurren después de `202 Accepted` porque solo son detectables en
 | `evicted_under_cap_pressure` | Admitida pero expulsada del mempool antes de la propuesta de bloque |
 | `liquidation_pre_empted` | La cuenta pasó a T1+ entre la admisión y el despacho |
 
-## Árbol de decisión
+## Árbol de decisión {#decision-tree}
 
 ```mermaid
 flowchart TD
@@ -148,7 +148,7 @@ flowchart TD
     CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted — the failure<br/>is at execution"]
 ```
 
-## Véase también
+## Véase también {#see-also}
 
 - [`POST /exchange`](./rest/exchange.md) — ruta de escritura
 - [`POST /info`](./rest/info.md) — ruta de lectura

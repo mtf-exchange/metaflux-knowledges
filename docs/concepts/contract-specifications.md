@@ -11,7 +11,7 @@ not a static listing. The shapes below are the integration surface an integrator
 actually sees.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Every MetaFlux market is a **linear USDC-margined perpetual**: no expiry, settled
 in USDC, valued against a manipulation-resistant [mark](../concepts/mark-prices.md)
@@ -24,7 +24,7 @@ read. Don't hard-code them; fetch them.
 This page is the reference for **what each spec field means and where it comes
 from**. For the mechanics behind a field, follow the link in its row.
 
-## The spec at a glance
+## The spec at a glance {#the-spec-at-a-glance}
 
 | Spec | Value | Live source field |
 |------|-------|-------------------|
@@ -48,7 +48,7 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info.md#account_state) `pm_enabled` |
 | **FBA eligible** | whether [frequent batch auction](../concepts/fba.md) is enabled | `fba_enabled` |
 
-## Reading a spec from the API
+## Reading a spec from the API {#reading-a-spec-from-the-api}
 
 One read returns the full universe: `markets` responds with `{ "perp": [ … ],
 "spot": { "pairs": […], "tokens": […] } }`. Each `perp[]` element is one
@@ -102,7 +102,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 - **Sizes are whole units** (`step_size`, `min_order`, `open_interest`) — raw lots
   divided by `10^sz_decimals`, not the raw integer size.
 
-## Instrument type & contract unit
+## Instrument type & contract unit {#instrument-type--contract-unit}
 
 Every MetaFlux market is a **linear perpetual future**:
 
@@ -118,7 +118,7 @@ Every MetaFlux market is a **linear perpetual future**:
 Perps are entirely separate from [spot](../products/spot.md) — a perp position is leveraged
 exposure backed by collateral, not ownership of the asset.
 
-## Underlying — the oracle index
+## Underlying — the oracle index {#underlying--the-oracle-index}
 
 The contract's underlying is the MTF **[oracle index](../concepts/oracle-prices.md)**
 (`oracle_px`), a per-block **weighted median of up to 10 external spot venues**
@@ -129,7 +129,7 @@ Bitget / Kraken / KuCoin / Gate / MEXC / MetaFlux-spot 1 each). A weighted media
 good value. Per-symbol weights are governed (long-tail markets cold-start on the
 default table until governance points the index at venues that list them).
 
-## Initial & maintenance margin
+## Initial & maintenance margin {#initial--maintenance-margin}
 
 | | Fraction | Source |
 |---|---|---|
@@ -146,7 +146,7 @@ default table until governance points the index at venues that list them).
   [`update_leverage`](../api/rest/exchange.md#update_leverage) is bounded by the
   per-market cap and a global **100×** hard ceiling.
 
-### Dynamic-risk margin tiers
+### Dynamic-risk margin tiers {#dynamic-risk-margin-tiers}
 
 Per-market risk is **governed on-chain and auto-tunable** (driven by 30-day
 realized volatility), not a static table. A market's dynamic-risk override carries:
@@ -168,7 +168,7 @@ The ladder ships **inline** as `margin_tiers` on the
 [margin modes](../concepts/margin-modes.md) and
 [tiered liquidation](../concepts/tiered-liquidation.md).
 
-## Mark price
+## Mark price {#mark-price}
 
 `mark_px` (`mark_source: "oracle_median"`) is the protocol's authoritative price
 for margin, liquidation, funding, and trigger evaluation — **not** the last trade.
@@ -178,7 +178,7 @@ EMA, internal book mid, external-perp median), then **clamped into the oracle ba
 thin-book wash print can move the mark at most ±band. A lone internal-book mid is
 rejected. Full mechanics: [mark prices](../concepts/mark-prices.md).
 
-## Funding
+## Funding {#funding}
 
 :::info
 **Funding is per-asset DISCRETE — not continuous, and not a fixed global hour.**
@@ -214,7 +214,7 @@ Query the live rate + next boundary per market with
 [`predicted_fundings`](../api/rest/info/perpetuals.md#predicted_fundings); the
 premium-sample history with [`funding_history`](../api/rest/info/perpetuals.md#funding_history).
 
-### Funding impact notional
+### Funding impact notional {#funding-impact-notional}
 
 On markets using the impact-price (Binance-style) funding formula, the premium that
 drives funding is measured from the **impact price** — the volume-weighted price to
@@ -222,7 +222,7 @@ fill a fixed clip of depth, default **$10,000** notional (per-asset overridable)
 not the last trade or top-of-book. You must move genuine depth, not print one lot,
 to move funding.
 
-## Price & size increments
+## Price & size increments {#price--size-increments}
 
 | Field | Meaning | Plane |
 |-------|---------|-------|
@@ -235,7 +235,7 @@ to move funding.
 sub-tick precision. Submit order `limit_px` on the order-book plane and order `size`
 as a multiple of `step_size`, at or above `min_order`.
 
-## Order & position limits
+## Order & position limits {#order--position-limits}
 
 MetaFlux bounds risk by **open interest and the margin gate**, rather than a fixed
 per-order dollar cap:
@@ -250,7 +250,7 @@ per-order dollar cap:
   lists assets currently at/over their cap. `open_interest` on the market record is
   true position OI (positions outstanding), not the book's resting depth.
 
-## Account & margin modes
+## Account & margin modes {#account--margin-modes}
 
 Per-asset margin mode, surfaced via `account_state` and the market `strict_isolated`
 flag (full semantics: [margin modes](../concepts/margin-modes.md)):
@@ -268,7 +268,7 @@ cross open (or an `update_leverage` → cross) on that market is rejected. This 
 **governance** control for new / risky / illiquid listings — distinct from a trader
 choosing Strict-Iso on their own position.
 
-## Portfolio margin
+## Portfolio margin {#portfolio-margin}
 
 Opt-in cross-asset margin (`account_state` `pm_enabled`) that replaces the classical
 per-asset maintenance sum with a single risk number from a **SPAN-style scenario
@@ -288,9 +288,9 @@ non-USDC spot asset count toward an enrolled account's PM value at
 `balance × mark × haircut` (a per-asset haircut weight in `(0, 1]`), folded into the
 grid as a spot leg — letting a portfolio post collateral beyond plain USDC.
 
-## MTF vs Hyperliquid
+## MTF vs HL {#mtf-vs-hyperliquid}
 
-MetaFlux adapts the Hyperliquid perp model; where the contract spec **differs**:
+MetaFlux adapts the HL perp model; where the contract spec **differs**:
 
 | Area | Hyperliquid model | MetaFlux |
 |------|-------------------|----------|
@@ -300,10 +300,10 @@ MetaFlux adapts the Hyperliquid perp model; where the contract spec **differs**:
 | **Risk parameters** | Largely static tiers | **Governed on-chain + dynamic** — `max_leverage`, `maint_margin_ratio`, `funding_rate_cap`, and the notional-banded tier ladder auto-tune from 30-day realized volatility |
 
 These are protocol-level choices, not a wire-compatible shim — MetaFlux is its own
-L1 with an [MTF-native API](../integration/migrating-from-hl.md), not a Hyperliquid
+L1 with an [MTF-native API](../integration/migrating-from-hl.md), not an HL
 deployment.
 
-## See also
+## See also {#see-also}
 
 - [`markets`](../api/rest/info/perpetuals.md#markets) / [`market_info`](../api/rest/info/perpetuals.md#market_info) — the live per-market spec record
 - `margin_tiers` (inline on [`market_info`](../api/rest/info/perpetuals.md#market_info)) · [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) · [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap)

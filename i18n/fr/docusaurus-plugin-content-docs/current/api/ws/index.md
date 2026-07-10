@@ -1,18 +1,18 @@
 # API WebSocket
 
 :::info
-**Statut.** Disponible dès aujourd'hui sur le nœud pour `l2_book`, `bbo` (carnet/meilleure offre), `trades`, `active_asset_ctx` (mark/oracle/financement/intérêt ouvert par marché), `all_mids`, `fills`, `user_events` et `candles` (bougies OHLCV glissantes, par `(coin, interval)`) — toutes publient des données réellement engagées (committed), pilotées par les changements (un canal n'émet une trame que si son état a changé depuis le dernier commit) — plus `post` (requête/réponse via WS) et `ping`/`pong`. Voir [subscriptions](./subscriptions.md) pour les formats par canal.
+**Statut.** Disponible dès aujourd'hui sur le nœud pour `l2_book`, `bbo` (carnet/meilleure offre), `trades`, `active_asset_ctx` (mark/oracle/financement/intérêt ouvert par marché), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, `explorer_txs`, et `candles` (bougies OHLCV glissantes, par `(coin, interval)`) — toutes publient des données réellement engagées (committed), pilotées par les changements (un canal n'émet une trame que si son état a changé depuis le dernier commit) — plus `post` (requête/réponse via WS) et `ping`/`pong`. Voir [subscriptions](./subscriptions.md#channel-status-at-a-glance) pour les formats par canal et la liste de statut à jour.
 :::
 
 :::info
 **Les noms de canaux sont en snake_case (natif MTF).** La surface `/ws` du nœud est native MTF, donc les noms de canaux sur le fil sont en snake_case : `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. La passerelle dessert ce même WS natif sur `api.<net>.mtf.exchange/ws`.
 :::
 
-## En bref
+## En bref {#tldr}
 
 Une seule connexion WS multiplexe les abonnements à de nombreux canaux. Le protocole de trames reflète celui de HL (`{"method":"subscribe","subscription":{"type":...}}`), mais les **noms de canaux sont en snake_case natif MTF** (`l2_book`, `user_events`, …) : vous envoyez un abonnement, le serveur répond par un accusé de réception `subscriptionResponse` suivi d'un instantané initial, puis pousse des trames `{"channel":...,"data":...}` à chaque commit d'état. Les canaux de carnet d'ordres (`l2_book`, `bbo`) sont **par marché** et requièrent un `coin`. Consultez cette page pour le cycle de vie de la connexion ; voir [subscriptions](./subscriptions.md) pour le catalogue des canaux.
 
-## URL
+## URL {#url}
 
 ```
 wss://api.<net>.mtf.exchange/ws
@@ -20,7 +20,7 @@ wss://api.<net>.mtf.exchange/ws
 
 Le WS natif MTF (canaux en snake_case) est desservi par la passerelle sur `/ws`. La porte d'entrée de la passerelle termine le TLS (`wss://`). Si vous opérez votre propre nœud, le même WS natif est servi en clair sur `ws://localhost:8080/ws` — le protocole de trames est identique dans les deux cas.
 
-## Cycle de vie de la connexion
+## Cycle de vie de la connexion {#connection-lifecycle}
 
 ```mermaid
 sequenceDiagram
@@ -40,11 +40,11 @@ sequenceDiagram
     node-->>client: {"channel":"subscriptionResponse","data":{"method":"unsubscribe","subscription":{"type":"l2_book","coin":"BTC"}}}
 ```
 
-## Trames
+## Trames {#frames}
 
 Toutes les trames sont des trames texte JSON. Les trames binaires sont rejetées par une trame d'erreur (la connexion reste ouverte). Les trames entrantes sont identifiées par `method` ; les trames sortantes sont identifiées par `channel`.
 
-### `subscribe`
+### `subscribe` {#subscribe}
 
 ```json
 {
@@ -71,7 +71,7 @@ Le serveur répond par **deux** trames, dans l'ordre :
 
 Un abonnement en double au même `(type, coin)` est **silencieusement ignoré** (pas de second accusé, pas d'erreur) — conformément au comportement de HL.
 
-### `unsubscribe`
+### `unsubscribe` {#unsubscribe}
 
 ```json
 { "method": "unsubscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }
@@ -88,7 +88,7 @@ Accusé de réception (reflète l'accusé de `subscribe` avec `method: "unsubscr
 
 Après l'accusé, plus aucune trame n'arrive pour ce `(type, coin)` jusqu'à un nouvel abonnement. Se désabonner d'un `(type, coin)` auquel vous n'étiez pas abonné est une opération sans effet (vous recevez quand même l'accusé).
 
-### `ping` / `pong`
+### `ping` / `pong` {#ping--pong}
 
 ```json
 { "method": "ping" }
@@ -100,7 +100,7 @@ Après l'accusé, plus aucune trame n'arrive pour ce `(type, coin)` jusqu'à un 
 
 Un simple `{"method":"ping"}` (sans `subscription`) constitue le battement de cœur applicatif ; le serveur répond `{"channel":"pong"}`. Le nœud répond également aux pings WebSocket bas niveau (trames de contrôle RFC 6455 `Ping`) avec un `Pong` automatique — les deux mécanismes de heartbeat fonctionnent.
 
-### Trame d'erreur
+### Trame d'erreur {#error-frame}
 
 Toute trame entrante malformée ou non reconnue produit une trame d'erreur **sans fermer la connexion** :
 
@@ -110,7 +110,7 @@ Toute trame entrante malformée ou non reconnue produit une trame d'erreur **san
 
 Les causes incluent : JSON malformé, `method` absent, `subscription` / `subscription.type` manquant, nom de canal inconnu (`"unknown channel: <name>"`), trame binaire, ou méthode inconnue. Le client peut corriger et réessayer sur le même socket.
 
-### Messages push
+### Messages push {#push-messages}
 
 Les trames de données live partagent une même enveloppe :
 
@@ -123,7 +123,7 @@ Les trames de données live partagent une même enveloppe :
 
 Les mises à jour sont **pilotées par les changements** : après chaque commit, le nœud publie une trame pour un canal souscrit **uniquement si l'état engagé de ce canal a réellement changé** depuis le commit précédent. Un commit qui ne modifie pas un canal surveillé n'émet rien pour lui — vous recevez ainsi moins de trames qu'il n'y a de blocs, sans jamais recevoir de re-push redondant de données inchangées (voir [Push par abonné](#per-subscriber-push)).
 
-### `post` (requête/réponse via WS)
+### `post` (requête/réponse via WS) {#post-requestresponse-over-ws}
 
 Un `post` vous permet d'effectuer un appel requête/réponse unique sur le même socket sans ouvrir une connexion REST. Le corps `request` utilise la même enveloppe `{type, payload}` qu'acceptent les routes REST et est dispatché via les **mêmes handlers exacts** que `POST /info` et `POST /exchange` — vérification de signature des actions incluse.
 
@@ -159,7 +159,7 @@ Réponse (à corréler via `id`) :
 
 Une action bien formée mais échouée (ex. signature invalide) est retournée comme une réponse `action` normale avec `payload.accepted: false` et une chaîne `error`, et non comme une réponse de type `error`.
 
-## Paramètre coin
+## Paramètre coin {#coin-parameter}
 
 Le hub de diffusion est indexé par `(channel, coin)`. Pour les canaux par marché `l2_book` et `bbo`, cela signifie :
 
@@ -173,7 +173,7 @@ Le hub de diffusion est indexé par `(channel, coin)`. Pour les canaux par march
 
 Un abonné indexé par `"BTC"` et un autre indexé par l'identifiant numérique `"0"` (si BTC est l'actif 0) partagent donc le **même** compartiment de routage lors de la publication par commit. Un coin qui n'est ni numérique ni un symbole d'univers connu est conservé tel quel dans son propre compartiment — vous recevez l'accusé et l'instantané vide, mais jamais de trames live (comportement honnête « marché inconnu » plutôt qu'une correspondance fabriquée).
 
-## Push par abonné
+## Push par abonné {#per-subscriber-push}
 
 Les pushs sont **filtrés par abonné, par marché, et pilotés par les changements**. Après chaque bloc engagé, le nœud, pour chaque marché, vérifie `has_receivers(channel, coin)` — une recherche O(1) — et n'agrège le carnet de ce marché que si nécessaire, le diffusant **uniquement s'il a changé** depuis le commit précédent. Conséquences :
 
@@ -182,7 +182,7 @@ Les pushs sont **filtrés par abonné, par marché, et pilotés par les changeme
 - Un marché dont le carnet est inchangé lors d'un commit ne diffuse rien pour ce commit — pas de re-push redondant.
 - Les trames sont livrées à **tous** les abonnés actuels de ce compartiment `(channel, coin)`.
 
-## Contre-pression et retard
+## Contre-pression et retard {#backpressure--lag}
 
 Chaque abonnement est soutenu par un tampon circulaire de diffusion borné (capacité **256** trames). Un consommateur qui accuse plus de 256 trames de retard est **déconnecté** : le serveur envoie une trame d'erreur finale décrivant le retard, puis cesse de transmettre sur cet abonnement.
 
@@ -192,13 +192,13 @@ Chaque abonnement est soutenu par un tampon circulaire de diffusion borné (capa
 
 Sur ce signal, réabonnez-vous (vous recevrez un nouvel instantané). Le nœud **ne saute pas silencieusement en avant** — sur une chaîne de produits dérivés, un trou dans l'état du carnet est pire qu'une déconnexion explicite.
 
-## Authentification
+## Authentification {#authentication}
 
 Les canaux de marché publics (`l2_book`, `bbo`, `trades`, `all_mids`) ne nécessitent **aucune authentification**.
 
 Les canaux par compte (`fills`, `user_events`) sont live et routés par adresse `user` en 0x, mais il n'existe **pas encore de porte d'authentification** — toute connexion peut s'abonner au flux de n'importe quelle adresse (les données sont les mêmes fills publics engagés, indexés par compte). Une enveloppe d'authentification dédiée à l'abonnement (pour qu'une connexion ne voie que son propre compte) est dans la feuille de route. Pour les lectures/écritures authentifiées aujourd'hui, utilisez le canal `post` (lectures info, et actions signées via la même vérification EIP-712 que `POST /exchange`). Voir [subscriptions](./subscriptions.md).
 
-## Multiplexage
+## Multiplexage {#multiplexing}
 
 Une seule connexion peut maintenir de nombreux abonnements ; chacun est démultiplexé par son `(channel, coin)`. Chaque abonnement possède son propre récepteur de diffusion et sa propre tâche de transfert ; la connexion entrelace leurs trames sur l'unique socket. Routez les trames entrantes par `channel` ainsi que le `coin` à l'intérieur de `data`.
 
@@ -208,7 +208,7 @@ l2_book  coin "1" (ETH)
 bbo      coin "0" (BTC)
 ```
 
-## Comportement à la fermeture
+## Comportement à la fermeture {#close-behavior}
 
 - Une trame `close` côté client (ou EOF) démonte la connexion et interrompt toutes les tâches de transfert.
 - Une erreur de lecture est journalisée et entraîne la fermeture.
@@ -216,7 +216,7 @@ bbo      coin "0" (BTC)
 
 Il n'existe pas de table de codes de fermeture personnalisée aujourd'hui ; les codes de fermeture WebSocket standard s'appliquent.
 
-## Stratégie de reconnexion
+## Stratégie de reconnexion {#reconnect-strategy}
 
 1. En cas de déconnexion, reconnectez-vous avec un backoff exponentiel (suggestion : base 200 ms, max 30 s, gigue ±20 %).
 2. Réabonnez-vous à chaque `(type, coin)` depuis le début. La première trame après chaque abonnement est un nouvel instantané — il n'y a pas de jeton de reprise à gérer : jetez l'état local du carnet et reconstruisez-le depuis l'instantané.
@@ -226,7 +226,7 @@ Il n'existe pas de table de codes de fermeture personnalisée aujourd'hui ; les 
 Il n'existe **aucun** mécanisme `seq` / `resume` / `resume_token` aujourd'hui. Tout (ré)abonnement repart d'un nouvel instantané. Les tampons de reprise sont dans la feuille de route, pas encore implémentés.
 :::
 
-## Voir aussi
+## Voir aussi {#see-also}
 
 - [Catalogue des abonnements WS](./subscriptions.md)
 - [`POST /exchange`](../rest/exchange.md) — même enveloppe EIP-712 utilisée par le chemin d'action `post`

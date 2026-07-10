@@ -6,7 +6,7 @@
 
 本文完整列出了 HTTP 状态码、错误字符串规范、根本原因及修复建议。遇到非 `202` 响应时，请先查阅此处。
 
-## 速查
+## 速查 {#tldr}
 
 - **2xx** — 成功。MTF 原生端点对错误使用标准 HTTP 状态码，而非在响应体中标记错误。
 - **400** — 客户端错误：请求格式有误、签名结构不正确、action 类型未知。不要在未修复的情况下重试。
@@ -17,7 +17,7 @@
 - **429** — 触发限频。请按 `retry_after_ms` 退避后重试。
 - **5xx** — 服务端错误。使用指数退避重试；若持续失败，说明运营方出现故障。
 
-## 响应体格式
+## 响应体格式 {#body-shape}
 
 MTF 原生端点的所有非 2xx 响应均使用以下格式：
 
@@ -31,9 +31,9 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 
 `detail` 和 `retry_after_ms` 仅在适用时出现。`error` 字段是稳定标识符——请以它作为错误处理逻辑的键值。
 
-## 错误目录
+## 错误目录 {#catalog}
 
-### 400 — 错误请求
+### 400 — 错误请求 {#400--bad-request}
 
 | `error` | 触发条件 | 修复建议 |
 |---------|----------|----------|
@@ -50,7 +50,7 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 | `unknown info type: <X>` | `/info` 的 `type` 字段不被识别 | 查阅 [info 参考文档](./rest/info.md) |
 | `chain_id mismatch` | 多签包装器中 chainId 字段与网络不匹配 | 与网络的 `chainId` 保持一致 |
 
-### 401 — 未授权（签名验证失败）
+### 401 — 未授权（签名验证失败） {#401--unauthorized-signature-failed}
 
 | `error` | 触发条件 | 修复建议 |
 |---------|----------|----------|
@@ -62,24 +62,24 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 | `multisig threshold not met` | 内层 action 的有效签名数量低于 `threshold` | 收集更多签名 |
 | `multisig duplicate signer` | 同一地址在多签包装中签名两次 | 每位签名者地址必须唯一 |
 
-### 404 — 资源未找到
+### 404 — 资源未找到 {#404--not-found}
 
 | `error` | 触发条件 |
 |---------|----------|
 | `account not found` | `/info` 查询的地址在链上无任何状态 |
-| `market not found` | `market_id` / `coin` 不在注册表中 |
+| `market not found` | `coin` 符号不在注册表中 |
 | `vault not found` | `vault_id` 不存在 |
 | `order not found` | 对一个已撤销 / 已成交 / 从未存在的 oid 执行 `Cancel` |
 
 对于 `/info` 查询，MTF 原生端点在查询的资源未知时返回 `404`。
 
-### 405 — 方法不允许
+### 405 — 方法不允许 {#405--method-not-allowed}
 
 | `error` | 触发条件 |
 |---------|----------|
 | （无响应体） | 对 `POST` 端点使用了 `GET`（或反之） |
 
-### 422 — 请求无法处理
+### 422 — 请求无法处理 {#422--unprocessable-entity}
 
 请求格式正确且签名有效，但 action 本身在逻辑上不合法。
 
@@ -94,7 +94,7 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 | `insufficient balance` | 提款 / 划转金额超过可用余额 | 先查询 `clearinghouseState` |
 | `out of bounds: <param>` | 违反治理边界（例如 `PerpDeployGasAuctionBid` 的资金费率上限） | 使用已公布边界范围内的值 |
 
-### 429 — 请求限频
+### 429 — 请求限频 {#429--rate-limited}
 
 ```json
 { "error": "rate limit exceeded", "scope": "per_ip"|"per_account", "retry_after_ms": 1200 }
@@ -108,7 +108,7 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 
 有关配额和突发流量处理，请参阅[限频说明](./rate-limits.md)。
 
-### 503 — 服务不可用
+### 503 — 服务不可用 {#503--service-unavailable}
 
 | `error` | 原因 | 修复建议 |
 |---------|------|----------|
@@ -116,9 +116,9 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 | `gateway not ready` | 网关正在启动 / 健康检查失败 | 退避重试；查看[状态页](../networks.md#status) |
 | `node downstream unreachable` | 网关丢失与节点的连接 | 运营方问题，退避等待并关注状态页 |
 
-### 提交时错误（非 HTTP，出现在事件流中）
+### 提交时错误（非 HTTP，出现在事件流中） {#commit-time-errors-not-http-in-event-stream}
 
-部分错误发生在返回 `202 Accepted` 之后，因为它们只能在区块执行上下文中被检测到。这些错误以 `{"error":"<reason>", "action_hash":"0x..."}` 的形式出现在 `orderEvents` / `userEvents` WebSocket 频道中。
+部分错误发生在返回 `202 Accepted` 之后，因为它们只能在区块执行上下文中被检测到。这些错误以 `{"error":"<reason>", "action_hash":"0x..."}` 的形式出现在 `order_updates` / `user_events` WebSocket 频道中。
 
 | `error` | 原因 |
 |---------|------|
@@ -128,7 +128,7 @@ MTF 原生端点的所有非 2xx 响应均使用以下格式：
 | `evicted_under_cap_pressure` | 已接受入池，但在区块提案前被逐出内存池 |
 | `liquidation_pre_empted` | 从接受到派发期间账户进入了 T1+ 清算档位 |
 
-## 决策流程图
+## 决策流程图 {#decision-tree}
 
 ```mermaid
 flowchart TD
@@ -148,7 +148,7 @@ flowchart TD
     CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted — the failure<br/>is at execution"]
 ```
 
-## 参见
+## 参见 {#see-also}
 
 - [`POST /exchange`](./rest/exchange.md) — 写入路径
 - [`POST /info`](./rest/info.md) — 读取路径

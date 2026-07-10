@@ -1,7 +1,7 @@
 # Bridge
 
 :::info
-**Status.** MetaBridge USDC custody bridge **live on Base Sepolia** (testnet,
+**Status.** MetaBridge custody bridge **live on Base Sepolia** (testnet,
 `MetaBridgeAlpha` [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)),
 and a Solana custody program live on **devnet** under the same model. Both
 directions are verified end-to-end on Base Sepolia: a real deposit
@@ -12,14 +12,14 @@ partial-success batches, a dual time+block dispute window, hot/cold validator ke
 separation, two-phase validator rotation with a single-hot-validator **cancel**
 veto during the window, and domain- + epoch-bound signatures pinned byte-for-byte
 across the EVM contract, the Solana program, and the L1 (cross-language
-known-answer vectors). Arbitrum rollout + a pre-mainnet audit remain.
+known-answer vectors). A pre-mainnet audit remains before mainnet.
 :::
 
 MetaFlux bridges **all assets — including USDC — through MetaBridge**, a
 MetaFlux-validator-signed custody bridge (HL-Bridge2 equivalent). There is **no
 third-party bridge and no Circle CCTP dependency** on the critical path.
 
-## Why custody, not CCTP
+## Why custody, not CCTP {#why-custody-not-cctp}
 
 CCTP only moves USDC between chains Circle has enrolled as CCTP *domains*. MetaFlux
 is an independent L1; being added as a CCTP domain is a Circle business decision we
@@ -28,14 +28,14 @@ foundation to build on, so MetaFlux runs its own custody bridge under the **same
 validator-set trust assumption as the chain itself** — no external committee,
 guardian network, or gatekeeper.
 
-## Model
+## Model {#model}
 
 A custody **Bridge contract on the source chain** (Base first) holds deposited
 tokens. MetaFlux validators observe deposits and credit the L1; withdrawals are
 released by the contract on a ⅔ stake-weighted validator co-signature set behind a
 dispute window.
 
-### Deposit (source chain → MetaFlux)
+### Deposit (source chain → MetaFlux) {#deposit-source-chain--metaflux}
 
 ```
 Base:
@@ -93,7 +93,7 @@ validator set reaches ⅔ stake-weighted attestation, the L1 credits `mtfDest`
 **exactly once** (idempotent by `message_id`). A given deposit is never
 double-credited, even across a validator-set rotation.
 
-### Withdraw (MetaFlux → source chain)
+### Withdraw (MetaFlux → source chain) {#withdraw-metaflux--source-chain}
 
 ```
 MetaFlux:
@@ -114,7 +114,7 @@ Base (two-phase: request → claim):
      invalidateWithdrawal(id), as an emergency revoke during the window.
 ```
 
-## Security model
+## Security model {#security-model}
 
 - **Authority** — ⅔ stake-weighted MetaFlux validator multisig (secp256k1, the same
   keys that secure consensus; quorum `6700` bps). The validator multisig + the
@@ -138,14 +138,14 @@ Base (two-phase: request → claim):
 - **Custody caveat** — USDC on MetaFlux is a bridged claim backed by the source
   contract's balance, not Circle-canonical on MetaFlux (same as the HL model).
 
-## Deployments
+## Deployments {#deployments}
 
 | Network | Contract | Address |
 |---------|----------|---------|
 | Base **Sepolia** | `MetaBridgeAlpha` | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
 | Arbitrum **Sepolia** | `MetaBridgeAlpha` | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.arbiscan.io/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
 | Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
-| Base / Solana mainnet | — | (pre-audit) |
+| Base / Arbitrum / Solana mainnet | — | (pre-audit) |
 
 Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
 validator set, no admin** (all privileged ops are validator-cosigned), 300 s +
@@ -155,9 +155,9 @@ Contracts + deploy runbook live in the
 repo; the L1-side co-signature / credit logic stays on the node. Pre-audit testnet —
 not for value-bearing use.
 
-## Contract methods
+## Contract methods {#contract-methods}
 
-### Base — `MetaBridgeAlpha` (EVM)
+### Base — `MetaBridgeAlpha` (EVM) {#base--metabridgealpha-evm}
 
 | Method | Authorization | Purpose |
 |--------|---------------|---------|
@@ -177,7 +177,7 @@ not for value-bearing use.
 
 All co-signed calls take `(uint8[] sigV, bytes32[] sigR, bytes32[] sigS)` ordered by ascending signer, low-S, `v ∈ {27,28}`.
 
-### Solana — `metabridge-solana`
+### Solana — `metabridge-solana` {#solana--metabridge-solana}
 
 | Instruction | Authorization | Purpose |
 |-------------|---------------|---------|
@@ -194,16 +194,16 @@ All co-signed calls take `(uint8[] sigV, bytes32[] sigR, bytes32[] sigS)` ordere
 
 Solana uses ONE validator set (no hot/cold split) and has no `setDisputeWindow` / batch entrypoints; the recovery-id is the raw secp256k1 `{0,1}` (vs EVM `{27,28}`). Both chains reject high-S signatures and bind the program/contract id + epoch into every co-signed digest.
 
-## Roadmap
+## Roadmap {#roadmap}
 
 - Real Base deposit-watcher + withdrawal relayer (the deterministic L1 core +
   the Base contract are done; the off-chain observers are wired and use the
   chain's `finalized` block tag to guard against reorgs).
-- Multi-chain rollout: Solana custody program is live on devnet under the same
-  model; Arbitrum is next.
+- Multi-chain rollout: Solana custody program (devnet) and Arbitrum Sepolia are
+  live under the same model, alongside Base Sepolia.
 - Security audit before any value-bearing (mainnet) deployment.
 - Cross-chain composability (calling other-chain contracts from MTF) — V2.
 
-## See also
+## See also {#see-also}
 
 - [Networks](../networks.md) — per-network endpoints + chain IDs

@@ -8,7 +8,7 @@ description: "POST /info 只读端点——查询类型、请求/响应信封及
 **状态：** 信封结构**稳定**。查询类型会持续新增，但信封格式已锁定。
 :::
 
-## 简要说明
+## 简要说明 {#tldr}
 
 单一端点，多类型分发。根据请求体中的 `type` 字段进行路由。只读——不修改任何状态，无需签名。
 
@@ -16,7 +16,7 @@ description: "POST /info 只读端点——查询类型、请求/响应信封及
 **按产品分类。** 永续合约市场的读取查询请参见[永续合约查询](./info/perpetuals.md)；现货、现货保证金及 Earn 的读取查询请参见[现货与保证金查询](./info/spot.md)。本页涵盖信封格式、使用约定，以及账户/治理/金库/验证者查询。
 :::
 
-## URL
+## URL {#url}
 
 ```
 POST  https://api.<net>.mtf.exchange/info
@@ -29,7 +29,7 @@ POST  https://api.<net>.mtf.exchange/info
 网关提供 MTF 原生 `/info` 接口。若自行运行节点，相同的原生 `/info`
 接口直接通过 `http://localhost:8080` 访问。
 
-## 信封格式
+## 信封格式 {#envelope}
 
 请求：
 
@@ -46,9 +46,9 @@ POST  https://api.<net>.mtf.exchange/info
 `type` 未知时返回 `400 Bad Request`，响应体为 `{"error":"unknown info type: <X>"}`。
 资源不存在时（如未知金库 ID）返回 `404 Not Found`，响应体为 `{"error":"<resource> not found"}`。
 
-## 查询类型
+## 查询类型 {#query-types}
 
-### `node_info`
+### 静态节点身份与协议版本 {#node_info}
 
 节点静态身份信息及协议版本。无需传入参数。
 
@@ -87,7 +87,7 @@ POST  https://api.<net>.mtf.exchange/info
 
 这些均为**节点级**字段（节点身份/运行时信息），而非共识状态，因此不同节点之间存在差异属于正常现象。
 
-### `account_state`
+### 账户保证金、持仓与余额 {#account_state}
 
 账户完整快照。
 
@@ -170,7 +170,7 @@ POST  https://api.<net>.mtf.exchange/info
 | `balances.usdc` | 十进制字符串 | **与 `account_value` 相同**（全仓 USDC 抵押品），并非独立的现货 USDC 余额 |
 | `balances.spot` | 对象 | 非 USDC 现货 token 余额，以 **token 名称**为键（如 `"MTF"`）；每个值为 `{total, hold}` 对象（`hold` = 被挂单占用的托管金额；可用余额 = `total − hold`）；无现货余额时为空 |
 
-### `margin_summary`
+### 轻量级仅保证金账户摘要 {#margin_summary}
 
 **仅返回保证金标量**——相当于 `account_state` 去掉 `positions[]` 遍历和现货余额扫描。适合高频清算健康度轮询（风控机器人、自动补充保证金等），当无需持仓/余额明细时为最佳选择。必填参数：`address`（0x hex）。
 
@@ -182,7 +182,7 @@ POST  https://api.<net>.mtf.exchange/info
 `maint_margin`、`init_margin`、`health`、`tier`、`mode`、`pm_enabled`——
 字段语义与 [`account_state`](#account_state) 中同名字段完全一致（由共同的辅助函数计算，两者结果永不相悖）。
 
-### `vault_state`
+### 金库 TVL、份额价格与策略 {#vault_state}
 
 金库完整快照。
 
@@ -209,7 +209,7 @@ POST  https://api.<net>.mtf.exchange/info
 }
 ```
 
-### `staking_state`
+### 账户质押与委托状态 {#staking_state}
 
 ```json
 { "type": "staking_state", "address": "0x<addr>" }
@@ -238,7 +238,7 @@ POST  https://api.<net>.mtf.exchange/info
 }
 ```
 
-### `fee_schedule`
+### 按交易量分级的挂单/吃单手续费 {#fee_schedule}
 
 ```json
 { "type": "fee_schedule" }
@@ -262,22 +262,21 @@ POST  https://api.<net>.mtf.exchange/info
 }
 ```
 
-费率以字符串形式表示，单位为十进制**基点**（`"2.0"` = 2 bps = 0.02%）。`burn_ratio` 为十进制小数（`"0.30"` = 手续费的 30% 被销毁）。详见[手续费说明](../../concepts/fees.md)。
+费率以字符串形式表示，为带一位小数的十进制**基点**（例如 `"2.0"` = 2 bps = 0.02%，`"0.5"` = 0.5 bps = 0.005%），支持精细到亚基点级别的精度。`burn_ratio` 为十进制小数（`"0.30"` = 手续费的 30% 被销毁）。详见[手续费说明](../../concepts/fees.md)。
 
-### `open_orders`
+### 账户在所有永续合约订单簿中的挂单 {#open_orders}
 
 账户在所有永续合约订单簿中的当前挂单。
 
 ```json
-{ "type": "open_orders", "account_id": 42 }
+{ "type": "open_orders", "address": "0x<addr>" }
 ```
 
 | 参数 | 类型 | 必填 |
 |-----|------|----------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 |
-| `address` | hex 地址 | `account_id` / `address` 二选一 |
+| `address` | hex 地址 | 是 |
 
-可使用 `account_id`（u64）或 `address`（0x hex）其中之一标识账户。若请求传入 `account_id`，响应中的 `data.account_id` 会将其回传。
+账户由 `address`（0x hex）标识。缺少 `address` → `400 {"error":"missing field address"}`。
 
 响应：
 
@@ -286,7 +285,6 @@ POST  https://api.<net>.mtf.exchange/info
   "type": "open_orders",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "orders": [
       {
         "oid":          12345,
@@ -305,7 +303,6 @@ POST  https://api.<net>.mtf.exchange/info
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
 | `address` | hex 地址 | 解析后的账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回传 |
 | `orders[*].oid` | uint64 | 服务端订单 ID |
 | `orders[*].market_id` | uint32 | 挂单所在资产/市场 ID |
 | `orders[*].side` | `"bid"` / `"ask"` | 订单方向 |
@@ -314,21 +311,20 @@ POST  https://api.<net>.mtf.exchange/info
 | `orders[*].cloid` | hex 字符串 \| null | 下单时指定的客户端订单 ID（`0x` + 32 位 hex）；未指定时为 `null` |
 | `orders[*].inserted_at_ms` | uint64 | 下单/入账时间戳（共识时间，毫秒） |
 
-### `user_fills`
+### 账户的近期成交历史 {#user_fills}
 
 账户的成交历史，直接从节点已提交状态中读取（每个账户维护一个有界环形缓冲区，折叠进 AppHash——无需外部索引器）。
 
 ```json
-{ "type": "user_fills", "account_id": 42 }
+{ "type": "user_fills", "address": "0x<addr>" }
 ```
 
 | 参数 | 类型 | 必填 | 说明 |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 | 内部账户 ID |
-| `address` | hex 地址 | `account_id` / `address` 二选一 | 账户地址 |
+| `address` | hex 地址 | 是 | 账户地址 |
 | `limit` | uint32 | 否 | 限制返回**最近**记录条数；缺省或为 `0` 时返回完整环形缓冲区内容 |
 
-可使用 `account_id`（u64）或 `address`（0x hex）其中之一标识账户。若请求传入 `account_id`，响应中的 `data.account_id` 会将其回传。
+账户由 `address`（0x hex）标识。缺少 `address` → `400 {"error":"missing field address"}`。
 
 响应：
 
@@ -337,10 +333,9 @@ POST  https://api.<net>.mtf.exchange/info
   "type": "user_fills",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "fills": [
       {
-        "coin":           0,
+        "coin":           "BTC",
         "side":           "B",
         "px":             "67042.50",
         "sz":             "0.125",
@@ -364,8 +359,7 @@ POST  https://api.<net>.mtf.exchange/info
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
 | `address` | hex 地址 | 解析后的账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回传 |
-| `fills[*].coin` | uint32 | 成交所在资产/市场 ID |
+| `fills[*].coin` | string | 成交所在的市场符号 |
 | `fills[*].side` | `"B"` / `"A"` | 本腿方向——`"B"` = 买入/买方，`"A"` = 卖出/卖方 |
 | `fills[*].px` | 十进制字符串 | 成交价格，**USDC 十进制**（人类可读） |
 | `fills[*].sz` | 十进制字符串 | 成交数量，**基础单位**（整数单位） |
@@ -379,7 +373,7 @@ POST  https://api.<net>.mtf.exchange/info
 | `fills[*].block` | uint64 | 成交所在的已提交区块高度（链上定位符） |
 | `fills[*].hash` | hex 字符串 | 原始订单的交易哈希，`0x` 前缀 hex——可用于链上追溯成交记录 |
 
-### `user_fills_by_time`
+### 按时间窗口过滤的成交历史 {#user_fills_by_time}
 
 与 [`user_fills`](#user_fills) 相同，但按每条记录的共识 `time` 限定时间窗口过滤。成交记录结构相同。
 
@@ -389,8 +383,7 @@ POST  https://api.<net>.mtf.exchange/info
 
 | 参数 | 类型 | 是否必填 | 描述 |
 |-----|------|----------|-------------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 | 内部账户 ID |
-| `address` | hex address | `account_id` / `address` 二选一 | 账户地址 |
+| `address` | hex address | 是 | 账户地址 |
 | `start_time` | uint64 | 否 | 时间窗口起始（毫秒，含端点）；按成交 `time` 过滤。缺省则下界开放 |
 | `end_time` | uint64 | 否 | 时间窗口结束（毫秒，含端点）。缺省则上界开放 |
 
@@ -401,7 +394,6 @@ POST  https://api.<net>.mtf.exchange/info
   "type": "user_fills_by_time",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "start_time": 1700000000000,
     "end_time":   1700003600000,
     "fills": [ /* same record shape as user_fills */ ]
@@ -412,12 +404,11 @@ POST  https://api.<net>.mtf.exchange/info
 | 字段 | 类型 | 描述 |
 |-------|------|-------------|
 | `address` | hex address | 解析后的账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回显 |
 | `start_time` | uint64 \| null | 回显的窗口起始时间（若未传则为 `null`） |
 | `end_time` | uint64 \| null | 回显的窗口结束时间（若未传则为 `null`） |
 | `fills` | array | 窗口内的成交记录（每条记录结构与 [`user_fills`](#user_fills) 相同），按时间从旧到新排列 |
 
-### `order_status`
+### 查询单笔订单的生命周期 {#order_status}
 
 通过 `oid`（服务端订单 ID）**或** `cloid`（客户端订单 ID）查询单笔订单的生命周期状态。读取实时订单簿、触发器注册表以及已提交的成交环形缓冲区——均为节点上的已提交状态。
 
@@ -506,7 +497,7 @@ POST  https://api.<net>.mtf.exchange/info
 | `trigger` | object | 当状态为 `"triggered"` 时存在 — `oid`、`market_id`、`side`、`trigger_px` / `size`（定点小数字符串）、`trigger_above`（布尔值：标记价格上穿时触发）、`registered_at_ms`、`fired`（布尔值） |
 | `fill` | object | 当状态为 `"filled"` 时存在 — 匹配的成交记录（参见 [`user_fills`](#user_fills)） |
 
-### `block_info`
+### 最新已提交区块的元数据 {#block_info}
 
 已提交区块的元数据。无必填参数（`height` 被接受但忽略——读取状态仅保留最新已提交上下文）。
 
@@ -537,18 +528,19 @@ POST  https://api.<net>.mtf.exchange/info
 | `timestamp_ms` | uint64 | 区块时间戳（共识毫秒） |
 | `block_hash` | hex string (32 bytes) | 真实的已提交区块哈希（现已接入读取状态——不再是全零占位符） |
 
-### `agents`
+### 账户已授权的代理钱包 {#agents}
 
 账户下已授权的代理钱包 / API 钱包。
 
 ```json
-{ "type": "agents", "account_id": 42 }
+{ "type": "agents", "address": "0x<addr>" }
 ```
 
 | 参数 | 类型 | 是否必填 |
 |-----|------|----------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 |
-| `address` | hex address | `account_id` / `address` 二选一 |
+| `address` | hex address | 是 |
+
+缺少 `address` → `400 {"error":"missing field address"}`。
 
 响应：
 
@@ -557,7 +549,6 @@ POST  https://api.<net>.mtf.exchange/info
   "type": "agents",
   "data": {
     "address":    "0x<master>",
-    "account_id": 42,
     "agents": [
       { "agent": "0x<agent_addr>", "name": "trading-bot", "expires_at_ms": 1700000500000 }
     ]
@@ -568,23 +559,23 @@ POST  https://api.<net>.mtf.exchange/info
 | 字段 | 类型 | 描述 |
 |-------|------|-------------|
 | `address` | hex address | 解析后的主账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回显 |
 | `agents[*].agent` | hex address | 已授权的代理钱包地址 |
 | `agents[*].name` | string \| null | 授权时设置的代理标签；未设置则为 `null` |
 | `agents[*].expires_at_ms` | uint64 \| null | 代理授权到期时间（共识毫秒）；永不过期的授权为 `null` |
 
-### `sub_accounts`
+### 账户的子账户列表 {#sub_accounts}
 
 账户的子账户列表。
 
 ```json
-{ "type": "sub_accounts", "account_id": 42 }
+{ "type": "sub_accounts", "address": "0x<addr>" }
 ```
 
 | 参数 | 类型 | 是否必填 |
 |-----|------|----------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 |
-| `address` | hex address | `account_id` / `address` 二选一 |
+| `address` | hex address | 是 |
+
+缺少 `address` → `400 {"error":"missing field address"}`。
 
 响应：
 
@@ -593,7 +584,6 @@ POST  https://api.<net>.mtf.exchange/info
   "type": "sub_accounts",
   "data": {
     "address":    "0x<parent>",
-    "account_id": 42,
     "sub_accounts": [
       { "index": 0, "address": "0x<sub_addr>" }
     ]
@@ -604,11 +594,10 @@ POST  https://api.<net>.mtf.exchange/info
 | 字段 | 类型 | 描述 |
 |-------|------|-------------|
 | `address` | hex address | 解析后的父账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回显 |
 | `sub_accounts[*].index` | uint32 | 父账户下的子账户索引 |
 | `sub_accounts[*].address` | hex address | 子账户地址 |
 
-### `protocol_metrics`
+### 协议级计数器与累加器 {#protocol_metrics}
 
 协议级别的已提交累加器与计数器。无参数。所有字段均直接读自已提交的 `Exchange` 状态（计数器、手续费池、BOLE 储备金、质押）——不依赖撮合引擎或预言机计算，因此可通过重放精确复现。
 
@@ -696,7 +685,7 @@ POST  https://api.<net>.mtf.exchange/info
 
 状态来源：`locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + 注册表大小。
 
-### `user_fees`
+### 账户手续费等级与交易量 {#user_fees}
 
 每账户手续费 / 交易量等级。必填：`account_id`（u64）**或** `address`（0x 十六进制）。
 
@@ -748,7 +737,7 @@ POST  https://api.<net>.mtf.exchange/info
 
 状态来源：`locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + 已提交的交易量等级阶梯。
 
-### `staking_apr`
+### 实际生效的质押 APR 及其输入参数 {#staking_apr}
 
 年化质押排放率（实际生效值）及其已提交的输入参数。无需传入参数。
 
@@ -799,15 +788,9 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`c_staking.{total_stake, reward_rate_bps, current_epoch, validators}` + 排放曲线。
 
-### `oracle_sources`
+### 单个市场的预言机数据源子集 {#oracle_sources}
 
-每个市场已提交的预言机数据源子集。通过 `asset_id`（u32）**或** `coin`（交易对符号）定位市场。
-
-```json
-{ "type": "oracle_sources", "asset_id": 0 }
-```
-
-或通过名称查询：
+每个市场已提交的预言机数据源子集。通过 `coin`（交易对符号）定位市场。
 
 ```json
 { "type": "oracle_sources", "coin": "BTC" }
@@ -815,10 +798,9 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 | 参数 | 类型 | 是否必填 |
 |-----|------|----------|
-| `asset_id` | uint32 | `asset_id` / `coin` 二选一 |
-| `coin` | symbol | `asset_id` / `coin` 二选一 |
+| `coin` | symbol | 是 |
 
-两者均未传入 → `400`；未知市场 → `404 {"error":"market not found"}`。
+缺少 `coin` → `400 {"error":"missing field coin"}`；未知市场 → `404 {"error":"market not found"}`。
 
 响应：
 
@@ -826,13 +808,12 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 {
   "type": "oracle_sources",
   "data": {
-    "asset_id":          0,
-    "name":              "BTC",
+    "coin":              "BTC",
     "oracle_set":        true,
-    "source_count":      3,
+    "source_count":      10,
     "num_sources":       10,
-    "enabled_sources":   [0, 2, 5],
-    "subset_mask":       37,
+    "enabled_sources":   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    "subset_mask":       1023,
     "weights_committed": false
   }
 }
@@ -840,8 +821,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
-| `asset_id` | uint32 | 回显/解析后的资产 id |
-| `name` | string | 市场交易对符号 |
+| `coin` | string | 回显/解析后的市场符号 |
 | `oracle_set` | bool | 部署者是否已通过 `SetOracle` 显式确认该子集 |
 | `source_count` | uint64 | 已启用的数据源数量（掩码的 popcount） |
 | `num_sources` | uint8 | 数据源插槽总数（`NUM_ORACLE_SOURCES = 10`） |
@@ -855,13 +835,13 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`。
 
-## 治理查询类型
+## 治理查询类型 {#governance-query-types}
 
 链上治理接口：实时投票机制（`gov_state`）、跨类别待定提案视图（含法定人数距离，`gov_proposals`）以及已生效参数的审计记录（`gov_history`）。所有查询均读取已提交的 `Exchange` 状态，使用相同的 `{type, data}` 封装格式。质押法定人数为 ⅔（按质押量加权）；**已监禁**的验证节点从活跃质押分母及所有计票中排除，与链上生效检查逻辑保持一致。
 
-### `gov_state`
+### 实时治理状态与当前参数 {#gov_state}
 
-实时治理全貌——质押法定人数上下文、待处理的 `voteGlobal` 轮次、已开启的 `govPropose` 提案，以及所有受治理参数的当前值。无需传入参数。
+实时治理全貌——质押法定人数上下文、待处理的参数变更投票轮次、已开启的提案，以及所有受治理参数的当前值。无需传入参数。
 
 ```json
 { "type": "gov_state" }
@@ -914,7 +894,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `pending_vote_global[*].votes[*].stake` | decimal string | 该投票者的质押量 |
 | `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | 投票提交时间戳（共识毫秒） |
 | `pending_vote_global[*].leading_stake` | decimal string | 本轮中获得最多质押支持的单一载荷所汇聚的质押量 |
-| `open_proposals[*].proposal_id` | uint64 | govPropose 轮次 id |
+| `open_proposals[*].proposal_id` | uint64 | 提案轮次 id |
 | `open_proposals[*].voters` | uint64 | 已投票数量 |
 | `open_proposals[*].aye_stake` / `nay_stake` | decimal string | 赞成/反对票的质押量 |
 | `params` | object | 所有受治理参数的当前值（每项均为已提交的标量） |
@@ -923,9 +903,9 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 `params` 对象包含投票机制可调整的完整受治理参数集（手续费分配比例、质押参数、MIP-3 限额、风险上限、现货/EVM/跨链桥标志等）；每项均为当前已提交的实时值。
 
-### `gov_proposals`
+### 活跃治理提案与法定人数状态 {#gov_proposals}
 
-**所有**投票类别（不仅限于 `voteGlobal`）中的全部**活跃**治理提案，每项提案附带各载荷的实时质押计票及距 ⅔ 法定人数的差距。这是"当前正在投票的内容及其进展"的跨类别视图。无需传入参数。
+**所有**投票类别（不仅限于直接参数投票）中的全部**活跃**治理提案，每项提案附带各载荷的实时质押计票及距 ⅔ 法定人数的差距。这是"当前正在投票的内容及其进展"的跨类别视图。无需传入参数。
 
 ```json
 { "type": "gov_proposals" }
@@ -983,7 +963,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `proposals[*].payloads[*].payload_hex` | hex string | 某一被投票载荷（无 `0x` 前缀） |
 | `proposals[*].payloads[*].stake` | decimal string | 支持该载荷的活跃质押量 |
 | `proposals[*].payloads[*].meets_quorum` | bool | 该载荷单独是否达到法定人数 |
-| `proposals[*].proposal` | object \| null | 若该轮次通过 `govPropose` 发起，则为类型化的 govPropose 记录；否则为 `null` |
+| `proposals[*].proposal` | object \| null | 若该轮次通过提案开启，则为类型化的提案记录；否则为 `null` |
 | `proposals[*].proposal.kind` | uint | 受治理参数类型 id |
 | `proposals[*].proposal.kind_name` | string \| null | 解码后的类型名称（snake_case），未知时为 `null` |
 | `proposals[*].proposal.value` | decimal string | 提案值 |
@@ -991,7 +971,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `proposals[*].proposal.proposer` | hex address | 发起提案的账户 |
 | `proposals[*].proposal.opened_at_ms` | uint64 | 提案开启时间戳（共识毫秒） |
 
-### `gov_history`
+### 已生效的治理参数变更历史 {#gov_history}
 
 已生效治理操作的审计记录（有界环形缓冲，按时间正序）——每条记录均可证明某参数已通过链上治理发生变更，而非保持创世值。无需传入参数。与 `gov_proposals`（待定侧）形成互补。
 
@@ -1028,17 +1008,17 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `enacted[*].kind` | uint | 受治理参数类型 id |
 | `enacted[*].kind_name` | string \| null | 解码后的类型名称（snake_case），未知时为 `null` |
 | `enacted[*].value` | decimal string | 已生效的值 |
-| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | 来源路径——`govPropose`/`govVote` 与直接 `voteGlobal` 的区分 |
+| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | 来源路径——提案追踪型 vs 直接参数投票 |
 | `enacted[*].enacted_at_ms` | uint64 | 生效时间戳（共识毫秒） |
 | `enacted[*].description` | string | 变更内容的人类可读摘要 |
 
 环形缓冲容量受链上已生效日志上限约束，因此仅保留近期记录，而非全量历史。
 
-## 高级查询类型（RFQ / FBA / 投资组合保证金）
+## 高级查询类型（RFQ / FBA / 投资组合保证金） {#advanced-query-types-rfq--fba--portfolio-margin}
 
 这些接口读取 RFQ、FBA 及投资组合保证金引擎的实时状态，与 `market_info.fba_enabled` / `account_state.pm_enabled` 标志共同呈现完整的引擎状态。使用相同的 `{type, data}` 封装格式及 MTF 原生惯例。**价格精度：** RFQ + FBA 的价格/数量均为原始 **1e8 定点数**整数字符串（即委托簿/订单精度，与 [`open_orders`](#open_orders) / [`l2_book`](./info/perpetuals.md#l2_book) 完全一致），**而非** USDC 整数；投资组合保证金金额为**美分**整数字符串。
 
-### `rfq_open`
+### 未平仓的 RFQ 请求及做市商报价 {#rfq_open}
 
 所有未平仓的 RFQ 请求及其做市商报价。无需传入参数。参见 [RFQ 概念说明](../../concepts/rfq.md)。
 
@@ -1099,20 +1079,19 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `rfqs[*].quotes[*].valid_until_ms` | uint64 | 报价有效期截止时间（共识毫秒） |
 | `rfqs[*].quotes[*].submitted_at_ms` | uint64 | 报价提交时间戳（共识毫秒） |
 
-### `rfq_user`
+### 账户发起或报价的 RFQ {#rfq_user}
 
 某账户参与的询价请求（RFQ）——分为该账户发起的和该账户报价的。参见 [RFQ 概念](../../concepts/rfq.md)。
 
 ```json
-{ "type": "rfq_user", "account_id": 42 }
+{ "type": "rfq_user", "address": "0x<addr>" }
 ```
 
 | 参数 | 类型 | 是否必填 |
 |-----|------|----------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 |
-| `address` | hex address | `account_id` / `address` 二选一 |
+| `address` | hex address | 是 |
 
-可用 `account_id`（u64）或 `address`（0x 十六进制）标识账户；若请求中提供了 `account_id`，则响应中 `data.account_id` 会原样回显。两者均未提供 → `400`；`address` 格式有误 → `400 {"error":"invalid hex"}`。
+账户由 `address`（0x 十六进制）标识。缺少 `address` → `400 {"error":"missing field address"}`；`address` 格式有误 → `400 {"error":"invalid hex"}`。
 
 响应：
 
@@ -1121,7 +1100,6 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
   "type": "rfq_user",
   "data": {
     "address":    "0x<addr>",
-    "account_id": 42,
     "requested": [ /* <rfq>, 每条 RFQ 结构与 rfq_open 相同 */ ],
     "quoted":    [ /* <rfq> */ ]
   }
@@ -1131,25 +1109,24 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
 | `address` | hex address | 解析后的账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回显 |
 | `requested` | array&lt;rfq&gt; | 该账户发起的 RFQ（请求方）；每条 RFQ 结构与 [`rfq_open`](#rfq_open) 相同 |
 | `quoted` | array&lt;rfq&gt; | 该账户参与报价的 RFQ（作为 `maker`）；每条 RFQ 结构相同 |
 
 两个列表均按 `rfq_id` 确定性排序。若账户未参与任何 RFQ，则返回 **200**，两个列表均为空（遵循惯例的零值响应）。
 
-### `fba_batch_state`
+### 实时 FBA 池与指示性清算 {#fba_batch_state}
 
 某市场的实时 FBA 池及指示性清算情况。参见 [FBA 概念](../../concepts/fba.md)。
 
 ```json
-{ "type": "fba_batch_state", "market_id": 3 }
+{ "type": "fba_batch_state", "coin": "BTC" }
 ```
 
 | 参数 | 类型 | 是否必填 |
 |-----|------|----------|
-| `market_id` | uint32 | 是 |
+| `coin` | symbol | 是 |
 
-缺少 `market_id` → `400`。对于未注册的市场，**不会**返回 404：FBA 是按市场选择加入的，若某市场没有池，则返回 **200**，各字段为零值（`enabled:false`、`period_ms:0`、`orders` 为空、`indicative:null`）。
+缺少 `coin` → `400 {"error":"missing field coin"}`。对于未注册的市场，**不会**返回 404：FBA 是按市场选择加入的，若某市场没有池，则返回 **200**，各字段为零值（`enabled:false`、`period_ms:0`、`orders` 为空、`indicative:null`）。
 
 响应：
 
@@ -1157,7 +1134,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 {
   "type": "fba_batch_state",
   "data": {
-    "market_id":      3,
+    "coin":           "BTC",
     "enabled":        true,
     "period_ms":      200,
     "min_lot":        "1",
@@ -1186,7 +1163,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
-| `market_id` | uint32 | 回显的市场 id |
+| `coin` | string | 回显的市场符号 |
 | `enabled` | bool | 该市场是否已启用 FBA |
 | `period_ms` | uint32 | 批次周期 |
 | `min_lot` | u128 string | 最小手数，1e8 定点数 |
@@ -1206,20 +1183,19 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | `indicative.clearing_px` | i128 string | 指示性统一清算价格，1e8 定点数 |
 | `indicative.matched_size` | u128 string | 按 `clearing_px` 可成交的数量，1e8 定点数 |
 
-### `pm_summary`
+### 投资组合保证金注册状态与情景数据 {#pm_summary}
 
 账户的投资组合保证金注册状态及最新计算的情景数据。参见[投资组合保证金](../../concepts/portfolio-margin.md)。
 
 ```json
-{ "type": "pm_summary", "account_id": 42 }
+{ "type": "pm_summary", "address": "0x<addr>" }
 ```
 
 | 参数 | 类型 | 是否必填 |
 |-----|------|----------|
-| `account_id` | uint64 | `account_id` / `address` 二选一 |
-| `address` | hex address | `account_id` / `address` 二选一 |
+| `address` | hex address | 是 |
 
-可用 `account_id`（u64）或 `address`（0x 十六进制）；两者均未提供 → `400`。未注册的账户返回 **200**，`enrolled:false`，各数值字段为零。
+账户由 `address`（0x 十六进制）标识。缺少 `address` → `400 {"error":"missing field address"}`。未注册的账户返回 **200**，`enrolled:false`，各数值字段为零。
 
 响应：
 
@@ -1228,7 +1204,6 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
   "type": "pm_summary",
   "data": {
     "address":                     "0x<addr>",
-    "account_id":                  42,
     "enrolled":                    true,
     "enrolled_at_ms":              1000,
     "last_computed_block":         77,
@@ -1242,7 +1217,6 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
 | `address` | hex address | 解析后的账户地址 |
-| `account_id` | uint64 | 仅当请求使用 `account_id` 时回显 |
 | `enrolled` | bool | 账户是否已加入投资组合保证金 |
 | `enrolled_at_ms` | uint64 | 注册时间戳（共识毫秒）；未注册时为 `0` |
 | `last_computed_block` | uint64 | 最近一次 PM 情景计算时的区块高度 |
@@ -1252,15 +1226,15 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 最坏情景损失有意**省略**：该数据不持久化于已提交状态中，重新计算需重跑情景扫描，而情景扫描并非只读操作。
 
-## 节点快照查询类型
+## 节点快照查询类型 {#node-snapshot-query-types}
 
 以下查询类型暴露节点的已提交状态快照接口。每种类型均读取已提交的 `core_state::Exchange`，使用相同的 `{type, data}` 响应信封及 MTF 原生规范（金额为十进制字符串、地址为 `0x` 十六进制、资产 id 为 `u32`、顺序为 `BTreeMap`）。除集合本身规模较小（市场/金库/验证者）或已建立索引（`liquidatable` 通过 BOLE 索引）的情况外，均采用按地址/资产键值查找，而非 O(N) 全量扫描。现货/现货保证金/Earn 快照读取有专属页面（[现货与保证金查询](./info/spot.md)）；永续合约市场读取见[永续合约查询](./info/perpetuals.md)页面。以下为通用（跨产品）快照读取。
 
-## 通用节点快照查询类型
+## 通用节点快照查询类型 {#general-node-snapshot-query-types}
 
-非特定于单一交易产品的节点快照读取——涵盖交易所状态、前端/挂单辅助、清算、频率限制、金库、验证者、多签及聚合 `web_data2`。
+非特定于单一交易产品的节点快照读取——涵盖交易所状态、前端/挂单辅助、清算、频率限制、金库、验证者及多签。
 
-### `exchange_status`
+### 全局交易所交易状态 {#exchange_status}
 
 全局交易状态。无参数。
 
@@ -1293,7 +1267,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`spot_disabled`、`post_only_until_*`、`scheduled_freeze_height`、`mip3_market_specs` / `mip3_spot_pair_specs`。
 
-### `frontend_open_orders`
+### 含 TIF 与触发详情的挂单 {#frontend_open_orders}
 
 类似 `open_orders`，但每笔订单额外包含 `tif` / `cloid` / `trigger` 详情。必填：`address`（0x 十六进制）。
 
@@ -1333,7 +1307,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：每个订单簿的挂单 + `Exchange.trigger_registry`。
 
-### `vault_summaries`
+### 所有金库的摘要 {#vault_summaries}
 
 所有金库摘要。无参数。
 
@@ -1366,7 +1340,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 > **已标记。** `tvl` 使用高水位线作为 NAV 近似值；完整 NAV 需结合撮合引擎与预言机。
 
-### `user_vault_equities`
+### 用户已存入的金库 {#user_vault_equities}
 
 用户已存入的金库及其份额/权益。必填：`address`（0x 十六进制）。
 
@@ -1395,7 +1369,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`user_vaults[*].follower_shares[addr]`（按金库键值索引）。
 
-### `leading_vaults`
+### 用户担任领导者的金库 {#leading_vaults}
 
 用户担任领导者的金库。必填：`address`（0x 十六进制）。返回与 `vault_summaries` 相同的行结构。
 
@@ -1411,7 +1385,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`Exchange.user_vaults` 中 `leader == addr` 的记录。
 
-### `user_rate_limit`
+### 用户的操作统计与频率限制额度 {#user_rate_limit}
 
 用户的操作统计及频率限制配额。必填：`address`（0x 十六进制）。
 
@@ -1436,7 +1410,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`locus.user_action_registry[addr]`（`UserActionStats`）；账户不存在时返回零值。
 
-### `delegator_summary`
+### 地址的质押摘要 {#delegator_summary}
 
 某地址的质押摘要。必填：`address`（0x 十六进制）。
 
@@ -1465,7 +1439,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`c_staking.{delegations, pending_undelegations, delegator_rewards}`。
 
-### `max_builder_fee`
+### 已批准的构建者费用上限 {#max_builder_fee}
 
 `(address, builder)` 组合已批准的构建者费用上限。必填：`address`（0x 十六进制）+ `builder`（0x 十六进制）。
 
@@ -1489,7 +1463,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`locus.fee_tracker.approved_builders[addr][builder]`（键值索引）。
 
-### `user_to_multi_sig_signers`
+### 地址的多签配置 {#user_to_multi_sig_signers}
 
 查询某地址的多签配置。必填参数：`address`（0x 十六进制）。
 
@@ -1514,7 +1488,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`multi_sig_tracker.configs[addr]`（`MultiSigConfig`）。
 
-### `user_role`
+### 账户的派生角色 {#user_role}
 
 查询账户的派生角色。必填参数：`address`（0x 十六进制）。
 
@@ -1534,7 +1508,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 优先级：`vault`（属于 `user_vaults[*].vault_address`）→ `sub_account`（`sub_account_tracker.sub_to_parent`）→ `agent`（某主账户的已授权代理）→ `user`（拥有用户状态 / 配置 / 现货条目）→ `missing`。
 
-### `validator_l1_votes`
+### 各验证者当前的预言机投票元数据 {#validator_l1_votes}
 
 查询验证者当前的 L1 投票情况。无需参数。
 
@@ -1563,7 +1537,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`validator_l1_vote_tracker.round_to_votes`。投票载荷为不透明的预言机字节（由 Module H 解码）——读取接口仅返回元数据，不返回原始载荷。
 
-### `validator_summaries`
+### 各验证者的质押与状态快照 {#validator_summaries}
 
 每个验证者的快照（HL `validatorSummaries`）。无需参数。按已提交 `BTreeMap` 顺序列出已提交 `c_staking.validators` 中的全部验证者（集合规模有限）。
 
@@ -1611,7 +1585,7 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：`c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`。`name` / `n_recent_blocks` 不在链上追踪，故省略而非伪造。
 
-### `gossip_root_ips`
+### 已配置的 gossip 种子节点端点 {#gossip_root_ips}
 
 已配置的 gossip 根节点/种子节点端点（HL `gossipRootIps`）。无需参数。这是网络拓扑信息，**并非**已提交状态：运行时在启动时将本节点的 `network.peers[].gossip` 端点发布至读取层。单节点部署无对等节点，返回结果为诚实空值。
 
@@ -1631,55 +1605,34 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 
 状态来源：节点配置 `network.peers[].gossip`（启动时发布至 `NodeReadState`；非已提交状态，不计入 AppHash）。
 
-### `web_data2`
+### `web_data2` — 已移除 {#web_data2--removed}
 
-面向前端的"全量"复合快照，按地址查询。必填参数：`address`（0x 十六进制）。数据由其他读取器组合而成，字段结构保持一致不漂移。
+:::warning
+**`web_data2` 已被移除**（REST `/info` 类型和 WS 频道均已移除）。
+现在发起请求会返回 `400 {"error":"unknown info type: web_data2"}`；WS
+订阅会返回 `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`。
 
-```json
-{ "type": "web_data2", "address": "0x<addr>" }
-```
+请改用下列各个独立读取接口来组合出等效视图——它们承载相同的数据，且各自拥有稳定、独立版本管理的结构：
 
-响应：
+| 原 `web_data2` 中的部分 | 请改用 |
+|-------------------------|-------------|
+| `clearinghouse`（保证金 + 持仓） | [`account_state`](#account_state)（REST）/ `account_state` WS 频道 |
+| `spot_balances` | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)（REST）/ `spot_state` WS 频道 |
+| `open_orders` | [`frontend_open_orders`](#frontend_open_orders) |
+| `vault_equities` | [`user_vault_equities`](#user_vault_equities) |
+| `exchange_status` | [`exchange_status`](#exchange_status) |
+:::
 
-```json
-{
-  "type": "web_data2",
-  "data": {
-    "address": "0x<addr>",
-    "clearinghouse": {
-      "account_value": "1000000", "margin_used": "100000",
-      "positions": [ { "asset": 0, "size": "50", "entry_ntl": "2500", "mode": "cross", "lev": 10 } ]
-    },
-    "spot_balances": [ /* <spot_clearinghouse_state.balances> */ ],
-    "open_orders": [ /* <frontend_open_orders.orders> */ ],
-    "vault_equities": [ /* <user_vault_equities.equities> */ ],
-    "exchange_status": { /* <exchange_status.data> */ }
-  }
-}
-```
-
-| 字段 | 类型 | 说明 |
-|-------|------|-------------|
-| `clearinghouse.account_value` | decimal string | 全仓账户权益 |
-| `clearinghouse.margin_used` | decimal string | 各资产已用保证金之和 |
-| `clearinghouse.positions` | object[] | 各资产的持仓信息 |
-| `spot_balances` | object[] | 复用 `spot_clearinghouse_state.balances` |
-| `open_orders` | object[] | 复用 `frontend_open_orders.orders` |
-| `vault_equities` | object[] | 复用 `user_vault_equities.equities` |
-| `exchange_status` | object | 复用 `exchange_status.data` |
-
-状态来源：对上述读取器的复合调用。
-
-## 错误码
+## 错误码 {#errors}
 
 | HTTP | 响应体 | 原因 |
 |------|------|-------|
 | 200 | 正常响应 | 成功（对 `account_state` 等查询**未知地址**时返回 **200** 及清零记录，而非 404） |
 | 400 | `{"error":"missing field \`type\`"}` | 缺少 `type` 鉴别字段 |
 | 400 | `{"error":"unknown info type: <X>"}` | `type` 拼写错误或不受支持 |
-| 400 | `{"error":"missing field: address"}` / `{"error":"missing field market_id"}` | 缺少类型必填参数（字段命名风格因读取器而异） |
+| 400 | `{"error":"missing field: address"}` / `{"error":"missing field coin"}` | 缺少类型必填参数（字段命名风格因读取器而异） |
 | 400 | `{"error":"invalid hex"}` | 地址参数格式有误 |
-| 404 | `{"error":"market not found"}` | 资产 ID / 币种名称未知（仅限 `market_info`） |
+| 404 | `{"error":"market not found"}` | `coin` 符号未知（`market_info` 等） |
 | 404 | `{"error":"vault not found"}` | 金库地址未知（仅限 `vault_state`） |
 | 405 | （无响应体） | 非 POST 请求 |
 | 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | 参见[频率限制](../rate-limits.md) |
@@ -1690,13 +1643,13 @@ effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
 返回 **200** 清零记录，永远不会返回 404。
 :::
 
-## 写后读一致性
+## 写后读一致性 {#read-after-write-consistency}
 
 `/info` 从最新已提交区块读取数据。在时刻 `T` 通过 `POST /exchange` 提交的请求，须等到领导者提交包含该请求的区块后，才能在 `/info` 中可见（默认出块节奏下通常 <200 ms）。
 
 若需要读取自身写入的数据，请订阅 [`userEvents` WS 频道](../ws/subscriptions.md#userevents)；已接收并已提交的事件将按顺序推送，无需轮询。
 
-## 时序图——查询账户并查看自己的订单
+## 时序图——查询账户并查看自己的订单 {#sequence--query-an-account-see-your-own-order}
 
 ```mermaid
 sequenceDiagram
@@ -1715,19 +1668,19 @@ sequenceDiagram
     gateway-->>client: 200 [order present]
 ```
 
-## 参见
+## 参见 {#see-also}
 
 - [`POST /exchange`](./exchange.md) — 写入路径
 - [`POST /faucet`](./faucet.md) — Devnet/测试网测试资金发放（USDC + MTF）
 - [WS 订阅](../ws/subscriptions.md) — 推送等价接口
 
-## 常见问题
+## 常见问题 {#faq}
 
 <details>
 <summary>展开常见问题</summary>
 
-**问：`market_info` 为何同时接受 `asset_id` 和 `coin`？**
-答：`asset_id` 是规范参数；`coin` 是为人工调用者提供的便捷方式。两者均解析到同一条记录。
+**问：应如何定位一个市场——按 id 还是按名称？**
+答：按 `coin` 符号（如 `"BTC"`）。旧版的数字型 `asset_id` / `market_id` 请求参数已被移除；现在只接受 `coin`，且响应中各处均以 coin 符号呈现。（已签名的 `/exchange` 写入路径仍使用数字型 `asset` 字段——该字段已被共识冻结，与这些读取参数无关。）
 
 **问：`user_fills` / `recent_trades` 是否需要外部索引器？**
 答：不需要。两者均从节点上已提交的记录带读取（有界的按账户成交环形缓冲区和按市场交易环形缓冲区，已折叠入 AppHash），因此任何节点均可直接返回真实记录，无需外部索引器。环形缓冲区有大小上限，仅保留近期窗口数据；如需持续实时数据流，请订阅 [WS 频道](../ws/subscriptions.md)。

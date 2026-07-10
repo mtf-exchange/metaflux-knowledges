@@ -17,6 +17,6 @@ MetaFlux follows a numbered improvement-proposal model (analogous to the improve
 
 The deployment proposals split spot from perp the same way established venues do: **MIP-1** is permissionless spot token + market deploy (the `spotDeploy` action family), **MIP-3** is permissionless builder-deployed perp markets (the `perpDeploy` action family). Both ride the same three gas-auction streams. (The current implementation still bundles both action families in one module and labels the spot path "MIP-3"; this is being realigned — behaviour unchanged.) **MIP-2 (Metaliquidity)** is the protocol-owned native-liquidity vault. **MIP-4** is a MetaFlux-operated aggregator carrying retail flow, complementary to the permissionless markets. **MIP-6** (Outcomes) was previously numbered MIP-4 and renumbered when MIP-4 was redefined as the aggregator. **MIP-5 (Earn)** is the lending-pool supply side — depositors earn yield from the interest spot-margin borrowers pay, reusing the MIP-2 NAV/share model.
 
-## V1 scope
+## V1 scope {#v1-scope}
 
 V1 covers MIP-1, MIP-2, and MIP-3. MIP-4 (aggregator) is targeted for V2; MIP-6 (Outcomes) is deferred to V3. MIP-5 (Earn) is planned, following the spot-margin work it builds on.

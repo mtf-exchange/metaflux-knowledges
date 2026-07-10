@@ -15,22 +15,22 @@ Un único protocolo MTF-native, servido por la puerta de entrada del gateway
 > (`/info`, `/exchange`, `/ws`). ¿Ejecutas el nodo tú mismo? Sirve la misma
 > superficie nativa directamente en `http://localhost:8080`.
 
-## REST
+## REST {#rest}
 
 - [`POST /exchange`](./rest/exchange.md) — MTF-native; catálogo completo de acciones
 - [`POST /info`](./rest/info.md) — MTF-native; esquemas por tipo
 
-## WebSocket
+## WebSocket {#websocket}
 
 - [Protocolo WS](./ws/index.md) — ciclo de vida de la conexión, frames, autenticación, reanudación
 - [Suscripciones](./ws/subscriptions.md) — catálogo completo de canales
 
-## Transversales
+## Transversales {#cross-cutting}
 
 - [Errores](./errors.md) — catálogo completo de errores con instrucciones de resolución
 - [Límites de tasa](./rate-limits.md) — presupuestos de peso por IP y QPS por cuenta
 
-## Ver también
+## Ver también {#see-also}
 
 - [Inicio rápido de integración](../integration/quickstart.md) — end-to-end en 5 minutos
 - [Guía de firma](../integration/signing.md) — sobre EIP-712

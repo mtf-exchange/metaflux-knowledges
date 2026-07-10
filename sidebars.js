@@ -14,6 +14,7 @@ const sidebars = {
     },
 
     {type: 'doc', id: 'concepts/consensus', label: 'MetaFluxBFT'},
+    {type: 'doc', id: 'concepts/tokenomics', label: 'Tokenomics'},
 
     {
       type: 'category',
@@ -72,7 +73,6 @@ const sidebars = {
           ],
         },
         'concepts/earn',
-        'concepts/tokenomics',
         'concepts/system-addresses',
         'concepts/glossary',
       ],

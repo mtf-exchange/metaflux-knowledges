@@ -4,7 +4,7 @@
 **Preview.** The gateway enforces the limits below; the bare node accepts unbounded traffic from authenticated mTLS peers (intended for trusted infra only — do not expose `8080` to the open internet in production).
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 - Two budgets: **per-IP weight** (anonymous traffic) and **per-account QPS** (signed traffic).
 - Bursty workloads spend a token bucket; sustained traffic is gated by the refill rate.
@@ -12,7 +12,7 @@
 - `/info` queries are cheap (weight 1); WS subscriptions are even cheaper (1 weight at subscribe, 0 per message). `/exchange` is weight 5 per request.
 - The mempool has an independent per-account cap on outstanding actions.
 
-## Budgets
+## Budgets {#budgets}
 
 | Budget | Limit (default) | Refill | Burst | Exemption |
 |--------|-----------------|--------|-------|-----------|
@@ -60,7 +60,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 }
 ```
 
-## Weight by endpoint
+## Weight by endpoint {#weight-by-endpoint}
 
 | Endpoint | Weight |
 |----------|--------|
@@ -74,7 +74,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 A client making one order per second and polling `account_state` once per second spends `5 + 1 = 6 weight/s = 360 weight/min` — well within budget.
 
-## Per-account QPS
+## Per-account QPS {#per-account-qps}
 
 Once a request is signed, the gateway authenticates the `sender` and counts against the per-account budget instead of (or in addition to) the per-IP budget.
 
@@ -86,7 +86,7 @@ Once a request is signed, the gateway authenticates the `sender` and counts agai
 
 Signed requests effectively double-count against per-IP and per-account; clients hammering from a single IP on behalf of one account will hit whichever budget is tighter.
 
-## Mempool cap
+## Mempool cap {#mempool-cap}
 
 Independent from the rate limits. The state machine refuses to admit > 50 outstanding (not-yet-committed) actions per `sender`. This prevents one account from monopolising mempool space.
 
@@ -98,7 +98,7 @@ If you submit a 51st action while 50 are outstanding:
 
 In practice this is hit only by misbehaving clients — a healthy block time of ~100 ms drains 30 QPS easily. If you hit this, you're rate-limit-correct on per-account but spamming faster than blocks commit.
 
-## Burst behaviour
+## Burst behaviour {#burst-behaviour}
 
 The buckets fill to `burst` and refill at `refill` per second. A burst of `N ≤ burst` requests fits immediately; subsequent requests are throttled to the refill rate.
 
@@ -110,28 +110,28 @@ flowchart LR
 
 A `429` response with `retry_after_ms` tells you exactly when the bucket will hold enough for one more weight-1 request. For batch jobs prefer pacing client-side; for interactive workloads exponential backoff with the hint is fine.
 
-## Strategies
+## Strategies {#strategies}
 
-### Order-flow bot
+### Order-flow bot {#order-flow-bot}
 
 - Pre-emptively rate-limit on the client to ~25 QPS to leave headroom.
 - Use `Order` batching: one request with 10 orders costs 5 weight (same as one order); the per-account QPS counts requests, not legs.
 - Use `BatchModify` instead of N separate `ModifyOrder`s.
 - Keep market-data on the WS feed, not on polling `/info`.
 
-### Market-data consumer
+### Market-data consumer {#market-data-consumer}
 
 - Subscribe to WS channels (`l2_book`, `trades`, `user_events`); do not poll.
 - `subscribe` weight is 1, in-stream messages cost 0.
 - On reconnect you re-subscribe from a fresh snapshot (there are no resume tokens); each subscribe spends weight again on the new connection, so keep connections long-lived. Stay within the **64-subscription** per-connection cap.
 
-### High-frequency liquidator
+### High-frequency liquidator {#high-frequency-liquidator}
 
 - Run from your own self-hosted node (mTLS-authenticated, `localhost:8080`), bypassing the public gateway's limits.
 - Acknowledge this requires running infra peered with a validator.
 - Public gateway access is enough for tens-of-orders-per-second workloads; not enough for HFT.
 
-## Sequence — getting throttled and recovering
+## Sequence — getting throttled and recovering {#sequence--getting-throttled-and-recovering}
 
 ```mermaid
 sequenceDiagram
@@ -153,7 +153,7 @@ sequenceDiagram
     gateway-->>client: 202 Accepted
 ```
 
-## Override channels
+## Override channels {#override-channels}
 
 | Channel | Notes |
 |---------|-------|
@@ -163,13 +163,13 @@ sequenceDiagram
 
 Public defaults assume neither override applies.
 
-## See also
+## See also {#see-also}
 
 - [Errors](./errors.md)
 - [WS subscriptions](./ws/subscriptions.md)
 - [Idempotency](../integration/idempotency.md) — how to retry within rate-limit budget
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

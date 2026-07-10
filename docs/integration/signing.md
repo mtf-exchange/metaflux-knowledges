@@ -17,7 +17,7 @@ is no second scheme to choose between.
 Go to [**typed-data signing**](./typed-data-signing.md) for the full
 specification and copy-pasteable TypeScript / Python examples.
 
-## See also
+## See also {#see-also}
 
 - [Typed-data signing](./typed-data-signing.md) — the signing scheme, end to end
 - [`POST /exchange`](../api/rest/exchange.md) — the endpoint

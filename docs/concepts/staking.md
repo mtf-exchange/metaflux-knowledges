@@ -6,11 +6,11 @@ registration are active and verified end-to-end across consensus on the
 4-node devnet.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Hold MTF, delegate to a validator, earn staking rewards. The ongoing source is protocol fee revenue: fees fund validators — the **20% validator share** of the [fee buyback](./fees.md) — and validators fund stakers, passing that share down minus commission. Early on this is topped up by a finite treasury-funded bootstrap budget (never new issuance). Stake is liquid up to the `lock_period`; unstake takes `7 days` to fully release. Slashing applies to validators who misbehave; delegators face partial slash exposure.
 
-## Actors
+## Actors {#actors}
 
 | Role | Description |
 |------|-------------|
@@ -18,7 +18,7 @@ Hold MTF, delegate to a validator, earn staking rewards. The ongoing source is p
 | **Delegator** | Holds MTF, picks a validator, earns rewards minus the validator's commission. |
 | **Protocol** | Distributes rewards per block, pro-rata to stake: the validator share of fee revenue plus the treasury bootstrap budget. |
 
-## Staking flow
+## Staking flow {#staking-flow}
 
 ```mermaid
 sequenceDiagram
@@ -37,9 +37,9 @@ sequenceDiagram
     Note over P: unbonded MTF → balance
 ```
 
-## Actions
+## Actions {#actions}
 
-### `Delegate`
+### `Delegate` {#delegate}
 
 ```json
 {
@@ -50,7 +50,7 @@ sequenceDiagram
 
 Moves MTF from balance to the validator's delegation pool. Effective at next block. Earns rewards from then on.
 
-### `Undelegate`
+### `Undelegate` {#undelegate}
 
 ```json
 {
@@ -61,7 +61,7 @@ Moves MTF from balance to the validator's delegation pool. Effective at next blo
 
 Removes from active stake; enters unbonding queue. Doesn't earn rewards during unbonding. Matures at `now + lock_period_ms`.
 
-### `Redelegate`
+### `Redelegate` {#redelegate}
 
 ```json
 {
@@ -72,7 +72,7 @@ Removes from active stake; enters unbonding queue. Doesn't earn rewards during u
 
 Move stake between validators **without** entering the unbonding queue. Limited to one redelegation per `(from, to)` pair within a 24 h window (anti-whipsaw).
 
-### `Claim`
+### `Claim` {#claim}
 
 ```json
 {
@@ -85,7 +85,7 @@ Sweep accrued rewards from `pending_rewards` to the delegator's MTF balance. No-
 
 Auto-claim is **not** automatic — claim on a cadence (daily / weekly) or before changing delegation.
 
-### `ClaimUnstaked`
+### `ClaimUnstaked` {#claimunstaked}
 
 ```json
 {
@@ -96,7 +96,7 @@ Auto-claim is **not** automatic — claim on a cadence (daily / weekly) or befor
 
 Sweep matured undelegations (those whose lock period has passed) back to MTF balance. Idempotent.
 
-## Reward sources
+## Reward sources {#reward-sources}
 
 | Source | Cadence | Share |
 |--------|---------|-------|
@@ -109,7 +109,7 @@ Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), bought-bac
 
 Rewards are computed in MTF (bootstrap rewards) and USDC (fee revenue) — claim returns both. `staking_state` shows pending in each currency.
 
-## Lock period
+## Lock period {#lock-period}
 
 Default: **7 days** for unstaking. Tunable by governance per stake-pool.
 
@@ -121,7 +121,7 @@ Default: **7 days** for unstaking. Tunable by governance per stake-pool.
 
 Slash exposure during unbonding is the trap — a validator that gets slashed mid-unbond drags the unbonding delegators down with them, even though they've signalled exit.
 
-## Slashing
+## Slashing {#slashing}
 
 Validators are slashed for:
 
@@ -138,7 +138,7 @@ Mitigations:
 - Diversify across validators (a single validator slash hits only that portion).
 - Avoid validators near `min_self_bond` (more likely to exit ungracefully).
 
-## Validator selection
+## Validator selection {#validator-selection}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
@@ -167,7 +167,7 @@ Pick by:
 - **Jail status** (`is_jailed`): a currently-jailed validator earns nothing until unjailed.
 - **Active** (`is_active`): only `is_active: true` validators are in the live signing set.
 
-## APR estimation
+## APR estimation {#apr-estimation}
 
 The [`staking_apr`](../api/rest/info.md#staking_apr) `/info` query type is **live** —
 it returns the effective bootstrap-reward APR the begin-block reward effect
@@ -215,7 +215,7 @@ Net APR for a delegator:
 net_apr  =  effective_apr  ×  (1 - validator_commission_bps/10_000)
 ```
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -226,7 +226,7 @@ net_apr  =  effective_apr  ×  (1 - validator_commission_bps/10_000)
 
 </details>
 
-## Sequence — full cycle
+## Sequence — full cycle {#sequence--full-cycle}
 
 ```mermaid
 sequenceDiagram
@@ -243,7 +243,7 @@ sequenceDiagram
     Note over U,V: 1000 MTF returned to balance
 ```
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (supported action variants on devnet)
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
@@ -251,7 +251,7 @@ sequenceDiagram
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)
 - [Fees](./fees.md) — fee revenue is one of the staking reward sources
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

@@ -4,7 +4,7 @@
 **Preview.** The `@metaflux/sdk` package ships before mainnet; the API shape below is committed.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 ```bash
 npm install @metaflux/sdk
@@ -24,7 +24,7 @@ await c.exchange.order({
 });
 ```
 
-## Constructor
+## Constructor {#constructor}
 
 ```typescript
 new MetaFluxClient(opts: ClientOpts)
@@ -40,11 +40,11 @@ new MetaFluxClient(opts: ClientOpts)
 | `timeoutMs` | number | optional (default 5000) | HTTP timeout |
 | `nonceFn` | `() => number` | optional (default `Date.now`) | Custom nonce generator |
 
-## Modules
+## Modules {#modules}
 
 The client exposes three modules: `info`, `exchange`, `ws`.
 
-### `info`
+### `info` {#info}
 
 All `POST /info` query types. Methods return typed responses.
 
@@ -63,7 +63,7 @@ c.info.agents();
 c.info.userFees();
 ```
 
-### `exchange`
+### `exchange` {#exchange}
 
 All `POST /exchange` action types.
 
@@ -107,7 +107,7 @@ support leverage or isolated margin in V1 — spot trading uses the
 reserved-balance escrow model via the spot order path instead.
 :::
 
-### `ws`
+### `ws` {#ws}
 
 Returns a `MetaFluxWs` instance that multiplexes subscriptions.
 
@@ -138,7 +138,7 @@ The WS client handles:
 - Auth refresh for private subscriptions (sliding window)
 - Ping/pong keepalive
 
-## Error handling
+## Error handling {#error-handling}
 
 The SDK throws typed errors:
 
@@ -156,7 +156,7 @@ try {
 
 See [error handling](./error-handling.md) for the decision tree.
 
-## Custom signer (HSM / hardware wallet)
+## Custom signer (HSM / hardware wallet) {#custom-signer-hsm--hardware-wallet}
 
 ```typescript
 import { Signer } from '@metaflux/sdk';
@@ -177,7 +177,7 @@ const c = new MetaFluxClient({
 
 The SDK passes already-hashed `signed_hash` to `Signer.sign` — your HSM does not need to know about EIP-712 encoding.
 
-## Configuring an agent-signing client
+## Configuring an agent-signing client {#configuring-an-agent-signing-client}
 
 For the [agent-wallets pattern](./agent-wallets-howto.md):
 
@@ -194,9 +194,9 @@ const agent = new MetaFluxClient({
 //   signature = signed by agentPrivKey
 ```
 
-## Common patterns
+## Common patterns {#common-patterns}
 
-### Place + confirm
+### Place + confirm {#place--confirm}
 
 ```typescript
 const cloid = '0x' + randomBytes(16).toString('hex');
@@ -219,14 +219,14 @@ const filled = new Promise((resolve) => {
 await filled;
 ```
 
-### Cancel-all
+### Cancel-all {#cancel-all}
 
 ```typescript
 const orders = await c.info.openOrders();
 await Promise.all(orders.map(o => c.exchange.cancel({ asset: o.asset, oid: o.oid })));
 ```
 
-### Subscribe and persist
+### Subscribe and persist {#subscribe-and-persist}
 
 ```typescript
 const fills = [];
@@ -235,7 +235,7 @@ c.ws().subscribe('userFills', { user: c.address }, (e) => {
 });
 ```
 
-## Numeric handling
+## Numeric handling {#numeric-handling}
 
 All fixed-point integer and USDC base-unit fields are `string` in both inputs and outputs. The SDK does not coerce to `number` because IEEE-754 silently loses precision past 2^53.
 
@@ -247,7 +247,7 @@ const sizeE8  = BigInt('100000000');       // 1.0 × 10^8
 const notional = priceE8 * sizeE8 / 10n**8n;  // 100.5
 ```
 
-## Logging
+## Logging {#logging}
 
 Pass `logger: console` (or any `{ debug, info, warn, error }` shape) to capture the SDK's internal trace:
 
@@ -257,7 +257,7 @@ const c = new MetaFluxClient({ ..., logger: console });
 
 Log levels: `debug` (everything), `info` (admit + WS connects), `warn` (retries), `error` (terminal failures).
 
-## See also
+## See also {#see-also}
 
 - [Quickstart](./quickstart.md) — 5-minute end-to-end
 - [Signing](./signing.md) — what the SDK does internally
@@ -266,7 +266,7 @@ Log levels: `debug` (everything), `info` (admit + WS connects), `warn` (retries)
 - [WS subscriptions](../api/ws/subscriptions.md) — channel catalog
 - [Rust SDK](./rust-sdk.md)
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

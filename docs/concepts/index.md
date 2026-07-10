@@ -12,27 +12,27 @@ overview of every component inside MetaFlux Core and how they fit together, each
 linking to its deep-dive page below.
 :::
 
-## Read order for integrators
+## Read order for integrators {#read-order-for-integrators}
 
 1. [Agent wallets](./agent-wallets.md) — hot-key delegation, the standard market-maker setup
 2. [Order types](./order-types.md) — TIF, STP, triggers, TWAP, scale
 3. [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso
 4. [Mark prices](./mark-prices.md) — what drives margin, liquidation, triggers
 5. [Tiered liquidation](./tiered-liquidation.md) — T0 yellow card → T4 ADL
-6. [Funding rates](./funding-rates.md) — hourly user-to-user payment
+6. [Funding rates](./funding-rates.md) — per-asset discrete user-to-user payment
 7. [Fees](./fees.md) — maker/taker tiers + burn
 8. [Fee schedule](./fee-schedule.md) — volume, maker-rebate, and staking discount tiers
 9. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
 10. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
 
-## Earn & related products
+## Earn & related products {#earn--related-products}
 
 The tradeable markets now live under [Products](../products/index.md) — see
 [Perpetuals](../products/perpetuals.md), [Spot](../products/spot.md), and
 [Spot margin](../products/spot-margin.md). The lending pool that funds spot-margin
 borrows is a concept:
 
-- [Earn](./earn.md) — **planned**: USDC lending pool that funds spot-margin borrows
+- [Earn](./earn.md) — **devnet preview**: USDC lending pool that funds spot-margin borrows
 - [Spot](../products/spot.md) — **live**: token-for-token CLOB, reserved-balance escrow, no leverage
 - [Spot margin](../products/spot-margin.md) — **devnet preview**: leveraged spot funded by the Earn pool
 
@@ -48,7 +48,7 @@ gharar). See [Spot trading](../products/spot.md). Informational, not religious o
 financial advice.
 :::
 
-## Advanced
+## Advanced {#advanced}
 
 - [ADL](./adl.md) — T4 auto-deleverage math
 - [Multi-sig](./multi-sig.md) — institutional M-of-N
@@ -57,7 +57,7 @@ financial advice.
 - [RFQ](./rfq.md) — request-for-quote for size
 - [FBA](./fba.md) — frequent batch auction matching
 
-## Reference
+## Reference {#reference}
 
 - [System addresses](./system-addresses.md) — the protocol's reserved keyless addresses
 - [Glossary](./glossary.md) — every protocol-specific term defined

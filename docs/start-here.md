@@ -10,7 +10,7 @@ derivatives. By the end you will understand what MetaFlux is, what you can do on
 it today, and the few concepts worth knowing before your first trade.
 :::
 
-## What MetaFlux is
+## What MetaFlux is {#what-metaflux-is}
 
 MetaFlux is an **open, on-chain exchange** — a marketplace where you can trade,
 running entirely on a public network rather than inside one company's private
@@ -26,7 +26,7 @@ happened), **open** (anyone can connect, build on it, or list a market), and
 flip a switch). You connect with a crypto wallet, deposit funds, and trade —
 no account application, no gatekeeper.
 
-## What you can do today
+## What you can do today {#what-you-can-do-today}
 
 - **Trade perpetual futures.** Take a position on whether an asset's price will
   go up or down, with optional leverage, without ever holding the asset itself.
@@ -36,17 +36,17 @@ no account application, no gatekeeper.
 - **Hold two-way (hedge) positions** — keep a long and a short position open in
   the same market at the same time. See [hedge mode](concepts/hedge-mode.md).
 
-And coming soon:
+Also live in devnet preview:
 
 - **Earn yield on idle USDC** through [Earn](concepts/earn.md), a lending pool
   that pays interest.
-- **Leveraged spot trading** (spot margin), arriving alongside Earn. See
+- **Leveraged spot trading** (spot margin), funded by Earn. See
   [spot margin](products/spot-margin.md).
 
 For the full list of trading products and their status — perpetuals, spot, spot
 margin, and the planned options and CDS tracks — see [Products](products/index.md).
 
-## The handful of concepts to know
+## The handful of concepts to know {#the-handful-of-concepts-to-know}
 
 You do not need to be an expert to start, but a few ideas will make everything
 else click. Each links to a fuller explanation.
@@ -96,7 +96,7 @@ watch your position's health against the *mark price*, and avoid
 meet.
 :::
 
-## What makes MetaFlux distinctive
+## What makes MetaFlux distinctive {#what-makes-metaflux-distinctive}
 
 - **Fully on-chain and transparent.** Every order, trade, and liquidation is
   recorded on a public ledger that anyone can verify. There is no hidden matching
@@ -116,7 +116,7 @@ execution layer — so the platform can support strategies and protections that
 simpler venues cannot. You will see this throughout the [concepts](concepts/)
 section.
 
-## How to get started
+## How to get started {#how-to-get-started}
 
 :::info
 **Just want to trade?** Connect a supported wallet and start from the
@@ -134,7 +134,7 @@ network and endpoints.
   [TypeScript](integration/typescript-sdk.md) and
   [Rust](integration/rust-sdk.md) handle signing and the wire format for you.
 
-## Where to next
+## Where to next {#where-to-next}
 
 - Want the big picture first? The [Architecture map](concepts/architecture.md)
   names every component inside MetaFlux Core and links each to its deep dive.

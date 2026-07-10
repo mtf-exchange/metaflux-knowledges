@@ -13,7 +13,7 @@ intent only. It will be filled in with concrete mechanics when the design ships
 behind a MIP. Do not build against it yet — there is no committed wire surface.
 :::
 
-## What a CDS is
+## What a CDS is {#what-a-cds-is}
 
 A **credit default swap (CDS)** is a contract in which a protection **buyer** pays a
 periodic premium to a protection **seller**, and in return the seller compensates the
@@ -21,7 +21,7 @@ buyer if a defined **credit event** occurs on a reference entity or obligation
 (e.g. a default). It is, in effect, insurance against a credit event: the buyer
 transfers default risk to the seller in exchange for an ongoing premium.
 
-## Intended direction on MetaFlux
+## Intended direction on MetaFlux {#intended-direction-on-metaflux}
 
 The goal is an **on-chain protection market** that, like the rest of MetaFlux,
 reuses the platform's primitives where they fit — the [order book](../concepts/order-types.md)
@@ -39,14 +39,14 @@ unconfirmed. The general definition above is standard finance; the MetaFlux-spec
 mechanics are not yet decided.
 :::
 
-## Fees
+## Fees {#fees}
 
 **Not yet defined.** When a CDS market ships, fees will follow the platform
 [fee framework](../concepts/fees.md) — the premium structure and any
 protection-event settlement charges are part of the unfinished spec and will be
 published with it.
 
-## See also
+## See also {#see-also}
 
 - [Perpetuals](./perpetuals.md) — the live leveraged-derivatives market today
 - [Concepts](../concepts/index.md) — the shared mechanics a CDS market would build on

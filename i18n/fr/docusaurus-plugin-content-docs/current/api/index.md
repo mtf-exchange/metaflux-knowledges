@@ -15,22 +15,22 @@ Un seul protocole MTF-native, desservi par la passerelle d'entrée
 > (`/info`, `/exchange`, `/ws`). Vous exécutez le nœud vous-même ? Il expose directement
 > la même surface native sur `http://localhost:8080`.
 
-## REST
+## REST {#rest}
 
 - [`POST /exchange`](./rest/exchange.md) — MTF-native ; catalogue complet des actions
 - [`POST /info`](./rest/info.md) — MTF-native ; schémas par type
 
-## WebSocket
+## WebSocket {#websocket}
 
 - [Protocole WS](./ws/index.md) — cycle de vie de la connexion, trames, authentification, reprise
 - [Abonnements](./ws/subscriptions.md) — catalogue complet des canaux
 
-## Aspects transversaux
+## Aspects transversaux {#cross-cutting}
 
 - [Erreurs](./errors.md) — catalogue complet des erreurs avec mesures correctives
 - [Limites de débit](./rate-limits.md) — quotas de poids par IP et de QPS par compte
 
-## Voir aussi
+## Voir aussi {#see-also}
 
 - [Démarrage rapide d'intégration](../integration/quickstart.md) — bout en bout en 5 minutes
 - [Guide de signature](../integration/signing.md) — enveloppe EIP-712

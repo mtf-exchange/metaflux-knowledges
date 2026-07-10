@@ -4,11 +4,11 @@
 **Preview.** T4 fires only when the insurance pool can't fully cover a T3 shortfall — rare in normal operations but designed to be deterministic when it does.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 When the insurance pool can't absorb a residual liquidation loss, the protocol claws back from profitable counter-parties on the same instrument, pro-rata to their unrealised PnL. MetaFlux's allocation uses an online-learning ranking that aims to minimise **excess haircut** (haircut beyond what the deficit requires).
 
-## When ADL fires
+## When ADL fires {#when-adl-fires}
 
 The [tiered ladder](./tiered-liquidation.md):
 
@@ -26,7 +26,7 @@ if shortfall > 0:
 
 Insurance pool drawdown is itself rate-limited — see [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark).
 
-## How ADL is computed
+## How ADL is computed {#how-adl-is-computed}
 
 > **Further reading:** "Autodeleveraging as Online Learning" (arXiv:2602.15182).
 
@@ -34,7 +34,7 @@ MTF does **not** use a single ranking score. ADL splits into two independent sub
 
 > ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected ("2D OGD — dimension blow-up"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
 
-### 1. Severity — 1-D online gradient descent on θ
+### 1. Severity — 1-D online gradient descent on θ {#1-severity--1-d-online-gradient-descent-on-θ}
 
 Each round picks a scalar `θ_t ∈ [0,1]` = the fraction of this round's deficit to haircut:
 
@@ -62,7 +62,7 @@ exposed as `analytical_bound()`; `check_bound(slack)` asserts empirical regret �
 
 All fractional fields (`θ`, `η`, `path_variation`, …) are `rust_decimal::Decimal`; `sqrt` is an integer-Newton `Decimal` sqrt (no `f64`); every accumulator uses `saturating_*` (a `Decimal::from(u128 > MAX)` would otherwise panic and halt the kernel). State persists in BOLE accumulator **slot 5**.
 
-### 2. Allocation — deterministic capacity pro-rata
+### 2. Allocation — deterministic capacity pro-rata {#2-allocation--deterministic-capacity-pro-rata}
 
 Given budget `B_t`, distribute across the profitable counter-parties `W_t` (each with haircut capacity `u_i` = haircut-able unrealised PnL, `u128`):
 
@@ -86,11 +86,11 @@ This replaces the rejected vector-mirror-descent and ILP allocators (the ILP is 
 
 Pro-rata also gives **0 %** monotonicity violations (vs HL's 11.4 %) and rank stability ≈ 1.0 (vs HL's 0.34).
 
-### Quoting ADL price (read side)
+### Quoting ADL price (read side) {#quoting-adl-price-read-side}
 
 The EVM precompile `0x0902 adl_pro_rata_price` lets a Solidity helper *quote* the VWAP fill an ADL of size N would clear at, walking the queue in side-appropriate priority (long ADL: highest price first; short ADL: lowest first) — **all prices on the 1e8 fixed-point plane** (`price_e8`, `capacity_e8`). It is pro-rata-only; the severity OGD lives in core-state, not the stateless precompile (severity is one decision per round; price quoting is many calls/sec).
 
-## What "haircut" means mechanically
+## What "haircut" means mechanically {#what-haircut-means-mechanically}
 
 Haircut is not a position transfer — the counter-party's position size **shrinks** and their unrealised PnL is converted into a realised loss. The dying account's opposite-side position evaporates by the same amount.
 
@@ -107,7 +107,7 @@ Concretely: suppose account A is long 1 BTC at entry 100 and account B is short 
 
 A keeps the unrealised PnL on its remaining position; A only loses the *closed* portion's PnL.
 
-## Notification
+## Notification {#notification}
 
 ADL events fire on [`userEvents` WS channel](../api/ws/subscriptions.md#userevents):
 
@@ -129,7 +129,7 @@ Plus an account-wide notification:
 
 For automated bots, treat `adl` events as you would a forced fill — your position changed, the protocol gave you the fill price (mark at the haircut block), you'd typically re-evaluate your strategy.
 
-## Predicting ADL exposure
+## Predicting ADL exposure {#predicting-adl-exposure}
 
 For risk monitors, the [`/info`](../api/rest/info.md) account state includes an `adl_rank_estimate` field:
 
@@ -145,7 +145,7 @@ For risk monitors, the [`/info`](../api/rest/info.md) account state includes an 
 
 This is an estimate — actual ranking happens at the moment of ADL trigger against then-current state. For market makers running large books, the headline risk is concentration (one big position dominating the asset's open interest); diversifying across assets reduces ADL exposure.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -157,7 +157,7 @@ This is an estimate — actual ranking happens at the moment of ADL trigger agai
 
 </details>
 
-## Sequence — ADL on a thin tail asset
+## Sequence — ADL on a thin tail asset {#sequence--adl-on-a-thin-tail-asset}
 
 ```
 block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
@@ -178,14 +178,14 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 
 (Allocation is **capacity-pro-rata**, not a score-ranked walk: every winner gives up the same *fraction* of capacity — here 50 % — which is exactly the min-max fairness property pro-rata buys. Compare this to the old "rank by score, drain top tier first" model, which is not what the code does.)
 
-## See also
+## See also {#see-also}
 
 - [Tiered liquidation](./tiered-liquidation.md) — full ladder
 - [Insurance pool](./vaults.md#insurance-pool) — T3 mechanism
 - [Portfolio margin](./portfolio-margin.md) — how PM interacts with ADL
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — receive ADL notifications
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

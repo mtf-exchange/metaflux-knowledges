@@ -169,7 +169,7 @@
 { "channel": "all_mids", "data": { "mids": { "BTC": "66703.35", "ETH": "1856.49", "SOL": "73.95", "MTF": "5" } } }
 ```
 
-### `fills` <a id="fills"></a>
+### `fills` {#fills}
 
 账户级成交流。需要传入 `user`（0x 地址；也接受 `address`）——**不需要** `coin`。每笔撮合成交时，双方各自从自身视角收到一条记录，字段集相同：`{coin, side, px, sz, time, oid, cloid, tid, crossed}`：
 
@@ -188,7 +188,7 @@
 { "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] }
 ```
 
-### `user_events` <a id="userevents"></a>
+### `user_events` {#userevents}
 
 账户级事件流。需要传入 `user`（0x 地址）——**不需要** `coin`。目前包含 `fills` 事件；清算 / 资金费率等事件类型将作为并列字段陆续添加。
 

@@ -24,7 +24,7 @@ generally NOT Sharia-compliant. Muslim users should trade accordingly and consul
 their own scholars. This is informational, not religious or financial advice.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Spot is a **token-for-token central limit order book**: you swap one token for
 another at a price you choose. It is entirely separate from perps — separate
@@ -40,7 +40,7 @@ A spot order is just another [`/exchange`](../api/rest/exchange.md) action —
 field) and can be signed by the master account or an active
 [agent wallet](../concepts/agent-wallets.md).
 
-## What a spot pair is
+## What a spot pair is {#what-a-spot-pair-is}
 
 A spot pair trades a **base** token against a **quote** token (e.g. `B/Q`). The
 order side picks the direction:
@@ -56,7 +56,7 @@ The order field is the **spot pair id** (`pair`), which is distinct from a perp
 own base/quote tokens, size decimals, optional minimum notional, and fee
 overrides.
 
-## Reserved-balance escrow
+## Reserved-balance escrow {#reserved-balance-escrow}
 
 This is the core of how spot stays solvent without leverage. When a `gtc` / `alo`
 order (or the un-crossed residual of one) **rests** on the book, the protocol
@@ -77,7 +77,7 @@ Per-token balances are conserved exactly across every rest, fill, cancel, and
 STP event — spendable plus reserved is invariant per token per account (it is
 fuzz-verified across randomized rest/cross/cancel streams).
 
-## Affordability clamping
+## Affordability clamping {#affordability-clamping}
 
 You can never rest or fill more than you can fund. At admission the order size is
 **clamped** to what your balance covers:
@@ -91,7 +91,7 @@ the affordable portion. Because the clamp runs **before** matching, every
 resulting fill and every escrow reservation is funded; there is no post-match
 fill drop.
 
-## Matching, fills, and fees
+## Matching, fills, and fees {#matching-fills-and-fees}
 
 Spot matching is the same price-time CLOB the rest of MetaFlux uses. A fill swaps
 base for quote at the **maker's resting price**.
@@ -116,7 +116,7 @@ per-pair rate — the perp volume / maker-rebate / staking tiers do **not** appl
 spot. Query the live values in the [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
 response; see [fees](../concepts/fees.md#spot-fees) for the settlement model.
 
-## Time-in-force
+## Time-in-force {#time-in-force}
 
 Spot orders carry the same TIF set as perps, with one spot-specific rule:
 
@@ -137,7 +137,7 @@ needs a book-walk affordability clamp that is still on the roadmap. Send a limit
 the cost is then bounded by `limit_px × size`.
 :::
 
-## Lifecycle — cancel refunds escrow
+## Lifecycle — cancel refunds escrow {#lifecycle--cancel-refunds-escrow}
 
 [`spot_cancel`](../api/rest/exchange.md#spot_cancel) retires one of **your**
 resting orders by `oid` on a pair and refunds the escrow it locked back to your
@@ -151,7 +151,7 @@ spendable balance.
   new orders are disabled, you can always exit a resting order and reclaim its
   escrow.
 
-## Limits and governance
+## Limits and governance {#limits-and-governance}
 
 - **Resting-order cap.** Each account may rest up to **1000** orders per spot
   pair; a new resting order past the cap is rejected (`spot resting-order cap
@@ -163,7 +163,7 @@ spendable balance.
   governance. When disabled, **new** orders are rejected (`spot trading
   disabled`), but cancels still work so resting escrow is never trapped.
 
-## Reading spot state
+## Reading spot state {#reading-spot-state}
 
 Spot balances and open spot orders are queryable via
 [`POST /info`](../api/rest/info.md). A `spot_order` returns a **synchronous**
@@ -172,7 +172,7 @@ per-order status once it commits — the real assigned `oid` with a `resting` or
 order-wait window — the same status union as the perp
 [`submit_order`](../api/rest/exchange.md#submit_order).
 
-## Relationship to spot-margin and Earn
+## Relationship to spot-margin and Earn {#relationship-to-spot-margin-and-earn}
 
 Plain spot is the **baseline**: trade only what you own, no leverage, no
 liquidation. Two planned overlays build on it:
@@ -184,7 +184,7 @@ liquidation. Two planned overlays build on it:
 
 Both are **opt-in overlays**; plain spot is unaffected by them.
 
-## See also
+## See also {#see-also}
 
 - [`spot_order`](../api/rest/exchange.md#spot_order) / [`spot_cancel`](../api/rest/exchange.md#spot_cancel) — the wire actions and field tables
 - [Order types](../concepts/order-types.md) — TIF and STP semantics shared with perps
@@ -192,7 +192,7 @@ Both are **opt-in overlays**; plain spot is unaffected by them.
 - [Spot margin](./spot-margin.md) — the planned leveraged spot track
 - [MIP-1](../mip/mip-1.md) — spot token standard and market deploy
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

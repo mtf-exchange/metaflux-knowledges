@@ -4,11 +4,11 @@
 **Preview.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 RFQ lets a taker request a private quote on a specific size from a set of registered market makers, accept the best, and settle at that price — without exposing the size on the public book first. Useful for sizes that would move the visible book.
 
-## Why RFQ
+## Why RFQ {#why-rfq}
 
 Public CLOB execution leaks intent. A $5M order on a thin asset signals everything before the first fill clears. RFQ flips the model:
 
@@ -18,7 +18,7 @@ Public CLOB execution leaks intent. A $5M order on a thin asset signals everythi
 
 Quotes are visible to the taker only (not on the public book). Other participants see the trade ex-post on the [`trades` WS feed](../api/ws/subscriptions.md#trades) with a `kind: "rfq"` tag.
 
-## Lifecycle
+## Lifecycle {#lifecycle}
 
 ```mermaid
 sequenceDiagram
@@ -35,9 +35,9 @@ sequenceDiagram
     makers-->>taker: WS userEvents { kind: "fill" }
 ```
 
-## Action flow
+## Action flow {#action-flow}
 
-### Taker — request an RFQ
+### Taker — request an RFQ {#taker--request-an-rfq}
 
 `RfqRequest` (action variant; mirrors [`submit_order`](../api/rest/exchange.md#submit_order) shape):
 
@@ -69,7 +69,7 @@ Response:
 
 The RFQ is broadcast to opted-in makers via the [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) (a dedicated `rfq*` event stream is roadmap).
 
-### Maker — submit a quote
+### Maker — submit a quote {#maker--submit-a-quote}
 
 `RfqQuote`:
 
@@ -87,7 +87,7 @@ The RFQ is broadcast to opted-in makers via the [`userEvents` WS channel](../api
 
 A maker can submit multiple quotes (e.g. partial fills at different prices) over the RFQ's lifetime. Each `RfqQuote` is its own action and gets its own `quote_id`.
 
-### Taker — accept
+### Taker — accept {#taker--accept}
 
 `RfqAccept`:
 
@@ -104,7 +104,7 @@ Settlement is atomic in the next block:
 - Other quotes for this `rfq_id` expire.
 - Fee structure: same maker/taker tiers as a public-book fill ([fees](./fees.md)).
 
-### Auto-expire
+### Auto-expire {#auto-expire}
 
 When `ttl_ms` elapses without an accept:
 
@@ -114,7 +114,7 @@ When `ttl_ms` elapses without an accept:
 
 No charge; all submitted quotes are discarded.
 
-## Maker registration
+## Maker registration {#maker-registration}
 
 To be eligible to quote on an asset, a maker registers via `RfqRegister`:
 
@@ -129,7 +129,7 @@ To be eligible to quote on an asset, a maker registers via `RfqRegister`:
 
 Registered makers receive RFQ broadcasts on `rfqEvents`. They are NOT obligated to quote — quoting is opt-in per RFQ.
 
-## Settlement semantics
+## Settlement semantics {#settlement-semantics}
 
 | Property | RFQ fill |
 |----------|----------|
@@ -141,14 +141,14 @@ Registered makers receive RFQ broadcasts on `rfqEvents`. They are NOT obligated 
 | Margin | Same as a regular fill (`init_margin` debited from both sides) |
 | Liquidation | Same — the position becomes a regular position post-settle |
 
-## What RFQ doesn't do
+## What RFQ doesn't do {#what-rfq-doesnt-do}
 
 - **Doesn't bypass margin.** Taker must have margin for the position; failure to admit due to insufficient margin returns a normal `422`.
 - **Doesn't hide ex-post.** The trade is published on the public trade feed after settlement, with the `rfq` tag.
 - **Not Dutch-auction.** Quotes don't decay; makers submit fixed-price quotes; taker picks one.
 - **Not multi-maker fill.** A single RFQ accept matches one maker's quote in full. To split across makers, run multiple RFQs.
 
-## Querying open RFQs
+## Querying open RFQs {#querying-open-rfqs}
 
 The RFQ engine state is exposed on the node `/info` read path via two query
 types — see [`rfq_open`](../api/rest/info.md#rfq_open) and
@@ -177,7 +177,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 An account party to nothing returns a 200 with both lists empty.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -190,7 +190,7 @@ An account party to nothing returns a 200 with both lists empty.
 
 </details>
 
-## Sequence — accepted RFQ
+## Sequence — accepted RFQ {#sequence--accepted-rfq}
 
 ```mermaid
 sequenceDiagram
@@ -208,14 +208,14 @@ sequenceDiagram
     Note over taker,makerC: taker fills long 100 @ 10048 — maker B fills short 100 @ 10048 — quotes from A, C expire — public trade tape: "100 BTC @ 10048 rfq"
 ```
 
-## See also
+## See also {#see-also}
 
 - [Order types](./order-types.md) — public-book alternatives
 - [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `RfqQuote` / `RfqAccept` (currently recognized-but-unmapped stubs)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — RFQ events ride this channel
 - [Fees](./fees.md) — RFQ fills are taxed at the standard tier
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

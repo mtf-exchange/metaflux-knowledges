@@ -4,7 +4,7 @@
 **Stable.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 The **oracle price** is the protocol's per-asset reference price for an underlying, composed once per block as a **weighted median of external spot venues**. It is the external anchor that both the [mark price](./mark-prices.md) (its C1 component) and [funding](./funding-rates.md) (the settlement reference) are built on. The oracle is deliberately *spot-derived and slow to push* — it is not the MetaFlux book price and not the last trade.
 
@@ -15,15 +15,15 @@ Two distinct feed sets feed the protocol, and they are easy to confuse:
 | **Spot oracle** | up to **10 spot venues** | weighted median | `oracle_px`; the mark C1 anchor; funding settlement notional |
 | **External perp mids** | **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC) | median (≥ 2 present) | the mark **C3** component only |
 
-## Why an oracle (and not the book)?
+## Why an oracle (and not the book)? {#why-an-oracle-and-not-the-book}
 
 Margin, liquidation, and funding all need a price that an adversary **cannot** push with a single trade on a thin MetaFlux book. A market-wide weighted median of deep external spot venues is exactly that: to move it you must move spot across many venues at once, which is expensive and self-arbitraging. The internal book *does* feed the mark (via the C2 and C1-basis terms) — but always blended against this external anchor.
 
-## Composition
+## Composition {#composition}
 
 `oracle_px` is the **weighted median** of the present spot venues for the asset.
 
-### Default spot weight table (sum = 15)
+### Default spot weight table (sum = 15) {#default-spot-weight-table-sum--15}
 
 | Venue | Weight | | Venue | Weight |
 |-------|-------:|-|-------|-------:|
@@ -35,13 +35,13 @@ Margin, liquidation, and funding all need a price that an adversary **cannot** p
 
 A **weighted median** (not a weighted mean) is used so a single venue printing a garbage tick cannot drag the result — it only shifts which sample sits at the weighted midpoint.
 
-### Per-symbol governance weights
+### Per-symbol governance weights {#per-symbol-governance-weights}
 
 The default table is a fallback. A governance-only `SetOracleWeights { asset_id, weights }` action (`ActionId 148`) **replaces** (not merges) the table for one asset — necessary because long-tail and permissionless ([MIP-3](../mip/mip-3.md)) markets are often not listed on Binance / Coinbase, so the default weights would resolve to nothing usable. Market deployers **cannot** set their own weights (choosing your oracle sources = choosing your own mark); new markets cold-start on the default table and only governance can override.
 
 The committed per-market source set is queryable — see [`oracle_sources`](#querying) — as a subset mask over the venue list.
 
-## Reliability rules
+## Reliability rules {#reliability-rules}
 
 The aggregator is built to degrade rather than lie. Per tick, in order:
 
@@ -52,16 +52,16 @@ The aggregator is built to degrade rather than lie. Per tick, in order:
 
 A venue whose weight is set to 0 (e.g. delisted for that symbol) is simply never requested.
 
-## Publication
+## Publication {#publication}
 
 The composed `oracle_px` is published **once per block**, derived from the consensus block timestamp (never wall-clock), and signed by the oracle validators in the active set. Because the median, the staleness/outlier filters, and the timestamp are all consensus-derived, every honest validator computes a **byte-identical** oracle snapshot for the block.
 
-## Relationship to mark and funding
+## Relationship to mark and funding {#relationship-to-mark-and-funding}
 
 - **Mark.** The oracle is the mark's **C1 anchor**: `C1 = oracle + EMA(book_mid − oracle)`. With no internal book and no external perps, the mark degrades all the way to the oracle. See [mark prices](./mark-prices.md).
 - **Funding.** Funding is the gap between the **impact price** (depth-weighted book price) and the **oracle**, and it **settles against the oracle**. Crucially, when the oracle for a market is stale or untrusted, funding for that market is *gated off* and decays toward 0 rather than settling against a price nobody trusts. See [funding rates](./funding-rates.md#gating-when-the-oracle-is-untrusted).
 
-## Querying
+## Querying {#querying}
 
 The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`market_info`](../api/rest/info/perpetuals.md#market_info) read, alongside `mark_px`:
 
@@ -92,7 +92,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 The per-venue raw inputs and the exact weights used in a tick live in committed state; they are not (yet) broken out as wire fields beyond the source subset.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -104,13 +104,13 @@ The per-venue raw inputs and the exact weights used in a tick live in committed 
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Mark prices](./mark-prices.md) — the oracle is the mark's C1 anchor
 - [Funding rates](./funding-rates.md) — funding is impact-price vs oracle, settled vs oracle
 - [MIP-3 — permissionless perp deploy](../mip/mip-3.md) — why per-symbol oracle weights exist
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

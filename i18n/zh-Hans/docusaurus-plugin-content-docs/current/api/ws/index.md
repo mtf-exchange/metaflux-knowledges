@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**状态。** 节点目前已上线以下频道：`l2_book`、`bbo`（买卖盘/最优报价）、`trades`、`active_asset_ctx`（每个市场的标记价/预言机价/资金费率/持仓量）、`all_mids`、`fills`、`user_events`，以及 `candles`（滚动 OHLCV K线，按 `(coin, interval)` 维度推送）——所有频道均推送已提交的真实数据，采用变更驱动模式（仅在该频道状态自上次提交以来发生变化时才会推出一帧）——另外还支持 `post`（通过 WS 进行请求/响应）以及 `ping`/`pong`。各频道的数据结构详见[订阅说明](./subscriptions.md)。
+**状态。** 节点目前已上线以下频道：`l2_book`、`bbo`（买卖盘/最优报价）、`trades`、`active_asset_ctx`（每个市场的标记价/预言机价/资金费率/持仓量）、`all_mids`、`markets`、`fills`、`user_events`、`order_updates`、`open_orders`、`notifications`、`ledger_updates`、`active_asset_data`、`user_fundings`、`user_twap_slice_fills`、`user_twap_history`、`account_state`、`spot_state`、`explorer_block`、`explorer_txs`，以及 `candles`（滚动 OHLCV K线，按 `(coin, interval)` 维度推送）——所有频道均推送已提交的真实数据，采用变更驱动模式（仅在该频道状态自上次提交以来发生变化时才会推出一帧）——另外还支持 `post`（通过 WS 进行请求/响应）以及 `ping`/`pong`。各频道的数据结构及最新状态列表详见[订阅说明](./subscriptions.md#channel-status-at-a-glance)。
 :::
 
 :::info

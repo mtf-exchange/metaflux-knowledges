@@ -8,7 +8,7 @@ description: The POST /info read endpoint — query types, envelope, and convent
 **Status.** **stable** shape. Query types are added over time; the envelope is committed.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Single endpoint, multi-type. Dispatches on the request body's `type` field. Read-only — never mutates state, never requires a signature.
 
@@ -16,7 +16,7 @@ Single endpoint, multi-type. Dispatches on the request body's `type` field. Read
 **Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md). This page covers the envelope, conventions, and account/governance/vault/validator reads.
 :::
 
-## URL
+## URL {#url}
 
 ```
 POST  https://api.<net>.mtf.exchange/info
@@ -29,7 +29,7 @@ POST  https://api.<net>.mtf.exchange/info
 The gateway serves the MTF-native `/info`. Running the node yourself, the same
 native `/info` is served directly at `http://localhost:8080`.
 
-## Envelope
+## Envelope {#envelope}
 
 Request:
 
@@ -46,9 +46,9 @@ Response:
 On unknown `type`: `400 Bad Request` with `{"error":"unknown info type: <X>"}`.
 On unknown resource (e.g. unknown vault id): `404 Not Found` with `{"error":"<resource> not found"}`.
 
-## Query types
+## Query types {#query-types}
 
-### `node_info`
+### Static node identity and protocol version {#node_info}
 
 Static node identity + protocol version. No parameters.
 
@@ -87,7 +87,7 @@ Response:
 
 These are **per-node** fields (node identity / runtime), NOT consensus state, so they legitimately differ across nodes.
 
-### `account_state`
+### Per-account margin, positions, and balances {#account_state}
 
 Per-account snapshot.
 
@@ -177,7 +177,7 @@ A positioned account adds entries under `positions`:
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
 | `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); each value is a `{total, hold}` object (`hold` = escrow locked behind resting spot orders; spendable = `total − hold`); empty if none |
 
-### `margin_summary`
+### Lightweight margin-only account summary {#margin_summary}
 
 The **margin scalars only** — `account_state` minus the `positions[]` walk and
 the spot-balance scan. The right call for a frequent liquidation-health poll (a
@@ -194,7 +194,7 @@ identical field semantics to the same-named fields on
 [`account_state`](#account_state) (computed by the shared helper, so the two
 never disagree).
 
-### `vault_state`
+### Per-vault TVL, share price, and strategy {#vault_state}
 
 Per-vault snapshot.
 
@@ -221,7 +221,7 @@ Response:
 }
 ```
 
-### `staking_state`
+### Per-account staking and delegation state {#staking_state}
 
 ```json
 { "type": "staking_state", "address": "0x<addr>" }
@@ -250,7 +250,7 @@ Response:
 }
 ```
 
-### `fee_schedule`
+### Volume-tiered maker and taker fees {#fee_schedule}
 
 ```json
 { "type": "fee_schedule" }
@@ -276,7 +276,7 @@ Response:
 
 Fee rates are decimal **basis points** as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), allowing fine-grained sub-basis-point precision. `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned). See [fees](../../concepts/fees.md).
 
-### `open_orders`
+### Account's resting orders across all perp books {#open_orders}
 
 Account-scoped resting orders across every perp book.
 
@@ -324,7 +324,7 @@ Response:
 | `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none |
 | `orders[*].inserted_at_ms` | uint64 | Placement / insertion timestamp (consensus ms) |
 
-### `user_fills`
+### Recent fill history for an account {#user_fills}
 
 Account-scoped fill history, served directly from committed on-node state (a
 bounded per-account fill ring folded into the AppHash — no external indexer).
@@ -390,7 +390,7 @@ a recent window, not all history. An account with no fills returns
 | `fills[*].block` | uint64 | Committed block height the fill settled in (on-chain locator) |
 | `fills[*].hash` | hex string | Transaction hash of the originating order, `0x`-prefixed hex — lets the fill be traced on-chain |
 
-### `user_fills_by_time`
+### Fill history filtered by time window {#user_fills_by_time}
 
 Like [`user_fills`](#user_fills), but filtered to a time window over each
 record's consensus `time`. Same fill-record shape.
@@ -426,7 +426,7 @@ Response:
 | `end_time` | uint64 \| null | Echoed window end (`null` if omitted) |
 | `fills` | array | In-window fill records (same per-fill shape as [`user_fills`](#user_fills)), oldest-first |
 
-### `order_status`
+### Look up a single order's lifecycle {#order_status}
 
 Single-order lifecycle lookup by `oid` (server order id) **or** `cloid` (client
 order id). Reads the live books, the trigger registry, and the committed fill
@@ -522,7 +522,7 @@ registry and fill ring are keyed by `oid`):
 | `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `registered_at_ms`, `fired` (bool) |
 | `fill` | object | Present on `"filled"` — the matching fill record (see [`user_fills`](#user_fills)) |
 
-### `block_info`
+### Latest committed block metadata {#block_info}
 
 Committed block metadata. No required args (`height` is accepted but ignored —
 the read state keeps only the latest committed context).
@@ -554,7 +554,7 @@ Response:
 | `timestamp_ms` | uint64 | Block timestamp (consensus ms) |
 | `block_hash` | hex string (32 bytes) | Real committed block hash (now plumbed into the read state — no longer the all-zero placeholder) |
 
-### `agents`
+### Approved agent wallets for an account {#agents}
 
 Approved agent / API wallets for an account.
 
@@ -589,7 +589,7 @@ Response:
 | `agents[*].name` | string \| null | Agent label set at approval time; `null` if unset |
 | `agents[*].expires_at_ms` | uint64 \| null | Agent approval expiry (consensus ms); `null` for a never-expiring approval |
 
-### `sub_accounts`
+### List of an account's sub-accounts {#sub_accounts}
 
 Sub-accounts of an account.
 
@@ -623,7 +623,7 @@ Response:
 | `sub_accounts[*].index` | uint32 | Sub-account index under the parent |
 | `sub_accounts[*].address` | hex address | Sub-account address |
 
-### `protocol_metrics`
+### Protocol-wide counters and accumulators {#protocol_metrics}
 
 Protocol-wide committed accumulators / counters. No parameters. Every field is
 read straight off committed `Exchange` state (counters, fee pools, BOLE reserves,
@@ -718,7 +718,7 @@ total exists. Counters are monotonic activity tallies, not money.
 
 State source: `locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + registry sizes.
 
-### `user_fees`
+### Per-account fee tier and volume {#user_fees}
 
 Per-account fee / volume tier. Required: `account_id` (u64) **OR** `address` (0x hex).
 
@@ -778,7 +778,7 @@ bps.
 
 State source: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + the committed volume-tier ladder.
 
-### `staking_apr`
+### Effective staking APR and its inputs {#staking_apr}
 
 Effective annual staking emission rate + its committed inputs. No parameters.
 
@@ -835,7 +835,7 @@ an individual delegator's net APR is `effective_apr × (1 − commission)`.
 
 State source: `c_staking.{total_stake, reward_rate_bps, current_epoch, validators}` + the emission curve.
 
-### `oracle_sources`
+### Per-market oracle source subset {#oracle_sources}
 
 The committed per-market oracle-source subset. Resolves the market by `coin` (symbol).
 
@@ -888,7 +888,7 @@ per-venue weight list rather than fabricating one.
 
 State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
 
-## Governance query types
+## Governance query types {#governance-query-types}
 
 The on-chain governance surface: the live vote machinery (`gov_state`), the
 cross-category pending-proposal view with quorum distance (`gov_proposals`), and
@@ -897,7 +897,7 @@ the enacted-parameter audit trail (`gov_history`). All read committed
 (stake-weighted); **jailed** validators are excluded from the active-stake
 denominator and every tally, matching the on-chain enactment check.
 
-### `gov_state`
+### Live governance state and current parameters {#gov_state}
 
 The live governance surface — stake-quorum context, pending parameter-change
 vote rounds, open proposals, and the CURRENT value of every governed parameter.
@@ -966,7 +966,7 @@ can move (fee distribution split, staking knobs, MIP-3 limits, risk caps, per-as
 funding period / cap, spot / EVM / bridge flags, the set of disabled EVM
 precompiles, …); each is the live committed value.
 
-### `gov_proposals`
+### Active governance proposals and quorum status {#gov_proposals}
 
 Every ACTIVE governance proposal across ALL vote categories (not just
 direct parameter votes), each with its live per-payload stake tally and distance to the ⅔
@@ -1037,7 +1037,7 @@ Response:
 | `proposals[*].proposal.proposer` | hex address | Account that opened the proposal |
 | `proposals[*].proposal.opened_at_ms` | uint64 | Proposal open timestamp (consensus ms) |
 
-### `gov_history`
+### Enacted governance parameter change history {#gov_history}
 
 The enacted-governance audit trail (bounded ring, oldest-first) — each entry
 proves a parameter MOVED by on-chain governance vs its genesis value. No
@@ -1083,7 +1083,7 @@ Response:
 The ring caps at the on-chain enacted-log bound, so this is a recent window, not
 all history.
 
-## Advanced query types (RFQ / FBA / portfolio margin)
+## Advanced query types (RFQ / FBA / portfolio margin) {#advanced-query-types-rfq--fba--portfolio-margin}
 
 These read the live state behind the RFQ, FBA, and portfolio-margin engines — they complement
 the `market_info.fba_enabled` / `account_state.pm_enabled` flags with the engine
@@ -1092,7 +1092,7 @@ plane:** RFQ + FBA prices / sizes are raw **1e8 fixed-point** integer strings (t
 book / order plane, identical to [`open_orders`](#open_orders) / [`l2_book`](./info/perpetuals.md#l2_book)),
 **not** whole-USDC; portfolio-margin magnitudes are **USD cents** integer strings.
 
-### `rfq_open`
+### Open RFQ requests and maker quotes {#rfq_open}
 
 Every open RFQ request plus its maker quotes. No parameters. See the [RFQ concept](../../concepts/rfq.md).
 
@@ -1153,7 +1153,7 @@ Response:
 | `rfqs[*].quotes[*].valid_until_ms` | uint64 | Quote validity deadline (consensus ms) |
 | `rfqs[*].quotes[*].submitted_at_ms` | uint64 | Quote submission timestamp (consensus ms) |
 
-### `rfq_user`
+### RFQs an account requested or quoted {#rfq_user}
 
 RFQs an account is party to — split into those it opened and those it quoted on. See the [RFQ concept](../../concepts/rfq.md).
 
@@ -1191,7 +1191,7 @@ Response:
 Each list iterates deterministically by `rfq_id`. An account party to nothing
 returns a **200** with both lists empty (the established zeroed idiom).
 
-### `fba_batch_state`
+### Live FBA pool and indicative clearing {#fba_batch_state}
 
 Live FBA pool plus the indicative clearing for one market. See the [FBA concept](../../concepts/fba.md).
 
@@ -1263,7 +1263,7 @@ Response:
 | `indicative.clearing_px` | i128 string | Indicative uniform clearing price, 1e8 fixed-point |
 | `indicative.matched_size` | u128 string | Size that would clear at `clearing_px`, 1e8 fixed-point |
 
-### `pm_summary`
+### Portfolio margin enrollment and scenario figures {#pm_summary}
 
 Portfolio-margin enrollment + last-computed scenario figures for an account. See [Portfolio margin](../../concepts/portfolio-margin.md).
 
@@ -1310,17 +1310,17 @@ The worst-case scenario loss is intentionally **omitted**: it is not persisted i
 committed state, and recomputing it would require re-running the scenario sweep,
 which is not a read-only operation.
 
-## Node snapshot query types
+## Node snapshot query types {#node-snapshot-query-types}
 
 The following query types expose the node's committed-state snapshot surface. Each reads committed `core_state::Exchange` and uses the same `{type, data}` envelope and MTF-native conventions (decimal-string money, `0x`-hex addresses, `u32` asset ids, `BTreeMap` order). Keyed lookups (by address / asset), not O(N) scans, except where the set is inherently small (markets / vaults / validators) or already indexed (`liquidatable` via the BOLE index). Spot / spot-margin / Earn snapshot reads have their own page ([spot & margin queries](./info/spot.md)); perpetual market reads are on the [perpetual queries](./info/perpetuals.md) page. The general (cross-cutting) snapshot reads are below.
 
-## General node snapshot query types
+## General node snapshot query types {#general-node-snapshot-query-types}
 
 Node snapshot reads that are not specific to one trading product — exchange status,
 frontend / open-order helpers, liquidation, rate limits, vaults, validators, and
 multi-sig.
 
-### `exchange_status`
+### Global exchange trading status {#exchange_status}
 
 Global trading status. No parameters.
 
@@ -1353,7 +1353,7 @@ Response:
 
 State source: `spot_disabled`, `post_only_until_*`, `scheduled_freeze_height`, `mip3_market_specs` / `mip3_spot_pair_specs`.
 
-### `frontend_open_orders`
+### Open orders with TIF and trigger detail {#frontend_open_orders}
 
 Like `open_orders`, plus each order's `tif` / `cloid` / `trigger` detail. Required: `address` (0x hex).
 
@@ -1393,7 +1393,7 @@ Response:
 
 State source: per-book resting orders + `Exchange.trigger_registry`.
 
-### `vault_summaries`
+### Summary of all vaults {#vault_summaries}
 
 All vaults summary. No parameters.
 
@@ -1426,7 +1426,7 @@ State source: `Exchange.user_vaults`.
 
 > **FLAGGED.** `tvl` uses the high-water mark as the NAV proxy; full NAV needs the match-engine + oracle.
 
-### `user_vault_equities`
+### Vaults a user has deposited into {#user_vault_equities}
 
 Vaults a user has deposited into + share / equity. Required: `address` (0x hex).
 
@@ -1455,7 +1455,7 @@ Response:
 
 State source: `user_vaults[*].follower_shares[addr]` (keyed per vault).
 
-### `leading_vaults`
+### Vaults led by the user {#leading_vaults}
 
 Vaults led by the user. Required: `address` (0x hex). Returns the same row shape as `vault_summaries`.
 
@@ -1471,7 +1471,7 @@ Response:
 
 State source: `Exchange.user_vaults` filtered by `leader == addr`.
 
-### `user_rate_limit`
+### A user's action stats and rate-limit budget {#user_rate_limit}
 
 A user's action stats / rate-limit budget. Required: `address` (0x hex).
 
@@ -1496,7 +1496,7 @@ Response:
 
 State source: `locus.user_action_registry[addr]` (`UserActionStats`); absent account → zeroed.
 
-### `delegator_summary`
+### Staking summary for an address {#delegator_summary}
 
 Staking summary for an address. Required: `address` (0x hex).
 
@@ -1525,7 +1525,7 @@ Response:
 
 State source: `c_staking.{delegations, pending_undelegations, delegator_rewards}`.
 
-### `max_builder_fee`
+### Approved builder fee ceiling {#max_builder_fee}
 
 Approved builder-fee ceiling for `(address, builder)`. Required: `address` (0x hex) + `builder` (0x hex).
 
@@ -1549,7 +1549,7 @@ Response:
 
 State source: `locus.fee_tracker.approved_builders[addr][builder]` (keyed).
 
-### `user_to_multi_sig_signers`
+### Multisig configuration for an address {#user_to_multi_sig_signers}
 
 Multisig config for an address. Required: `address` (0x hex).
 
@@ -1574,7 +1574,7 @@ Response:
 
 State source: `multi_sig_tracker.configs[addr]` (`MultiSigConfig`).
 
-### `user_role`
+### An account's derived role {#user_role}
 
 Derived account role. Required: `address` (0x hex).
 
@@ -1594,7 +1594,7 @@ Response:
 
 Precedence: `vault` (a `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (an approved agent of some master) → `user` (has a user-state / config / spot entry) → `missing`.
 
-### `validator_l1_votes`
+### Current per-validator oracle vote metadata {#validator_l1_votes}
 
 Current validator L1 votes. No parameters.
 
@@ -1623,7 +1623,7 @@ Response:
 
 State source: `validator_l1_vote_tracker.round_to_votes`. The vote payload is opaque oracle bytes (decoded by Module H) — the read surface reports metadata, not the raw payload.
 
-### `validator_summaries`
+### Per-validator stake and status snapshot {#validator_summaries}
 
 Per-validator snapshot (HL `validatorSummaries`). No parameters. Lists every validator in committed `c_staking.validators` (a small, bounded set) in committed `BTreeMap` order.
 
@@ -1671,7 +1671,7 @@ Response:
 
 State source: `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` are not tracked on-chain — omitted rather than fabricated.
 
-### `gossip_root_ips`
+### Configured gossip seed peer endpoints {#gossip_root_ips}
 
 Configured gossip root/seed peer endpoints (HL `gossipRootIps`). No parameters. Network topology, **not** committed state: the runtime publishes this node's `network.peers[].gossip` endpoints to the read layer at startup. A solo node has no peers → honest-empty.
 
@@ -1691,7 +1691,7 @@ Response:
 
 State source: node config `network.peers[].gossip` (published to `NodeReadState` at startup; NOT committed state, NOT folded into AppHash).
 
-### `web_data2` — removed
+### `web_data2` — removed {#web_data2--removed}
 
 :::warning
 **`web_data2` has been REMOVED** (both the REST `/info` type and the WS channel).
@@ -1710,7 +1710,7 @@ data with stable, independently-versioned shapes:
 | `exchange_status` | [`exchange_status`](#exchange_status) |
 :::
 
-## Errors
+## Errors {#errors}
 
 | HTTP | Body | Cause |
 |------|------|-------|
@@ -1730,13 +1730,13 @@ There is **no `account not found`** error: account-keyed readers (`account_state
 record for an address that has never appeared on-chain — they never 404.
 :::
 
-## Read-after-write consistency
+## Read-after-write consistency {#read-after-write-consistency}
 
 `/info` reads from the most recent committed block. A `POST /exchange` admitted at time `T` is not visible in `/info` until the leader commits the block containing it (typically <200 ms at default tick).
 
 For read-your-writes semantics, subscribe to the [`userEvents` WS channel](../ws/subscriptions.md#userevents); admitted-then-committed events arrive in order, removing the need to poll.
 
-## Sequence — query an account, see your own order
+## Sequence — query an account, see your own order {#sequence--query-an-account-see-your-own-order}
 
 ```mermaid
 sequenceDiagram
@@ -1755,13 +1755,13 @@ sequenceDiagram
     gateway-->>client: 200 [order present]
 ```
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange`](./exchange.md) — write path
 - [`POST /faucet`](./faucet.md) — devnet/testnet test-fund grant (USDC + MTF)
 - [WS subscriptions](../ws/subscriptions.md) — push equivalents
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**Статус.** На ноде уже работает: `l2_book`, `bbo` (стакан/лучшие котировки), `trades`, `active_asset_ctx` (метки/оракул/финансирование/OI по каждому рынку), `all_mids`, `fills`, `user_events` и `candles` (скользящие OHLCV-бары по `(coin, interval)`) — все каналы транслируют реальные подтверждённые данные, обновления идут по событиям (кадр по каналу отправляется только при изменении состояния с момента последнего коммита). Также поддерживаются `post` (запрос/ответ через WS) и `ping`/`pong`. Форматы каждого канала описаны в разделе [подписки](./subscriptions.md).
+**Статус.** На ноде уже работает: `l2_book`, `bbo` (стакан/лучшие котировки), `trades`, `active_asset_ctx` (метки/оракул/финансирование/OI по каждому рынку), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, `explorer_txs` и `candles` (скользящие OHLCV-бары по `(coin, interval)`) — все каналы транслируют реальные подтверждённые данные, обновления идут по событиям (кадр по каналу отправляется только при изменении состояния с момента последнего коммита) — а также `post` (запрос/ответ через WS) и `ping`/`pong`. Форматы каждого канала и актуальный список статусов см. в разделе [подписки](./subscriptions.md#channel-status-at-a-glance).
 :::
 
 :::info

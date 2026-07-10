@@ -4,11 +4,11 @@
 **Preview.** The user-visible API is stable; the address-derivation scheme is finalised before mainnet.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 A sub-account is a derived address under a master that has its own positions, margin, and orders, but transfers funds in and out only through the master. Up to 32 subs per master. Use them to isolate strategies, separate trading desks, or A/B portfolios without re-onboarding.
 
-## Mental model
+## Mental model {#mental-model}
 
 ```mermaid
 flowchart TD
@@ -31,7 +31,7 @@ Each sub is a first-class account in the state machine — own balance, own posi
 
 Hard cap: **32 subs** per master (subject to expansion in V2). Hitting the cap returns `{"error":"sub_account_cap"}` on `CreateSubAccount`.
 
-## Transfers
+## Transfers {#transfers}
 
 Only between master and sub:
 
@@ -45,7 +45,7 @@ flowchart LR
 
 External withdrawals (off-chain, to a third address) must come from the **master**. Sub-accounts cannot withdraw directly off-chain.
 
-## Address derivation
+## Address derivation {#address-derivation}
 
 Each sub-account index `n` maps deterministically to an address derived from the master's 20-byte address:
 
@@ -55,7 +55,7 @@ sub_addr_n = first_20_bytes( keccak256( master_addr || uint64_be(n) ) )
 
 Anyone can compute a sub's address without on-chain state. The derivation is consensus-fixed at V1 launch; treat returned addresses as authoritative until then.
 
-## Fund-segregation guarantees
+## Fund-segregation guarantees {#fund-segregation-guarantees}
 
 | Guarantee | Mechanism |
 |-----------|-----------|
@@ -65,7 +65,7 @@ Anyone can compute a sub's address without on-chain state. The derivation is con
 | Master CANNOT involuntarily backstop | A sub's blowup is the sub's, full stop |
 | Master can liquidate **out of** a sub | Withdraw via `SubAccountTransfer` (only if sub stays in Safe tier after the transfer) |
 
-## Creating
+## Creating {#creating}
 
 ```json
 {
@@ -94,7 +94,7 @@ Response:
 
 **Indices are monotonic** — once allocated, they never get reused, even after the sub is emptied and abandoned. Use `explicit_index` carefully.
 
-## Funding
+## Funding {#funding}
 
 ```json
 {
@@ -109,7 +109,7 @@ For spot assets use `SubAccountSpotTransfer` (adds `asset` field).
 
 **Transfer must leave the sub in Safe tier** — a withdrawal that would push the sub into T0+ is rejected with `{"error":"insufficient sub balance"}`. Top up first, then withdraw the excess.
 
-## Trading from a sub
+## Trading from a sub {#trading-from-a-sub}
 
 The sub is a regular account. Sign with the sub's key (or an [approved agent](./agent-wallets.md)) and submit with the sub's address as `sender`.
 
@@ -125,7 +125,7 @@ sequenceDiagram
 
 The SDK exposes each sub as a separate `Client` instance with its own keypair, pointed at its derived address.
 
-## Liquidation isolation
+## Liquidation isolation {#liquidation-isolation}
 
 A sub's [tiered liquidation](./tiered-liquidation.md) is computed against its **own** account value and maintenance margin. A blowup in `sub_0` does not put `sub_1` or the master at risk.
 
@@ -148,7 +148,7 @@ flowchart LR
     acct --> s1c --> l1
 ```
 
-## Per-sub PM enrollment
+## Per-sub PM enrollment {#per-sub-pm-enrollment}
 
 Each sub independently enrolls in [portfolio margin](./portfolio-margin.md) (with its own equity check against `pm_min_equity`).
 
@@ -161,7 +161,7 @@ Each sub independently enrolls in [portfolio margin](./portfolio-margin.md) (wit
 
 A master can keep classical while a sub goes PM; useful when one sub runs a hedged book and others run directional trades.
 
-## Querying
+## Querying {#querying}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -172,7 +172,7 @@ Returns the sub list with indices, derived addresses, labels, and a snapshot of 
 
 Each sub can also be queried as a first-class account via `account_state`, `open_orders`, `user_fills`, etc., by passing its address as `address`.
 
-## Limits
+## Limits {#limits}
 
 | Limit | Default | Notes |
 |-------|---------|-------|
@@ -184,9 +184,9 @@ Each sub can also be queried as a first-class account via `account_state`, `open
 | Sub can have agents | yes | Configured per-sub |
 | Sub can be multi-sig | no | V1 only the master can be multi-sig |
 
-## Use-case patterns
+## Use-case patterns {#use-case-patterns}
 
-### Strategy separation
+### Strategy separation {#strategy-separation}
 
 ```mermaid
 flowchart LR
@@ -201,7 +201,7 @@ flowchart LR
 
 Each strategy has its own agent key, its own liquidation envelope, its own PnL reporting.
 
-### Risk firewalling
+### Risk firewalling {#risk-firewalling}
 
 ```mermaid
 flowchart LR
@@ -212,7 +212,7 @@ flowchart LR
 
 main book gains: full upside; sub_0 blowup is capped to its deposit.
 
-### A/B portfolios
+### A/B portfolios {#ab-portfolios}
 
 ```mermaid
 flowchart LR
@@ -225,7 +225,7 @@ flowchart LR
 
 Quarterly comparison of NAV per sub determines which gets more allocation.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -238,7 +238,7 @@ Quarterly comparison of NAV per sub determines which gets more allocation.
 
 </details>
 
-## Sequence — full setup
+## Sequence — full setup {#sequence--full-setup}
 
 ```mermaid
 sequenceDiagram
@@ -254,14 +254,14 @@ sequenceDiagram
     Note over sub_0: T+5 order admits — fills — sub_0 has a position
 ```
 
-## See also
+## See also {#see-also}
 
 - [Agent wallets](./agent-wallets.md) — per-sub hot keys
 - [Portfolio margin](./portfolio-margin.md) — interaction with cross-asset PM
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso per sub
 - [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — MTF-native query
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

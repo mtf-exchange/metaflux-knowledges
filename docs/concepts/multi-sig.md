@@ -4,11 +4,11 @@
 **Preview.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Convert a regular account into an M-of-N multi-sig: the master key is replaced by a signer set, every state-mutating action must collect `threshold` signatures from `signers`, and the conversion is **irreversible**. Designed for institutional custody, DAO treasuries, and joint-control trading desks.
 
-## Why multi-sig
+## Why multi-sig {#why-multi-sig}
 
 Regular accounts have a single master key. Loss = total loss. Multi-sig spreads custody risk across signers:
 
@@ -17,7 +17,7 @@ Regular accounts have a single master key. Loss = total loss. Multi-sig spreads 
 
 This is the same primitive that backs every Gnosis Safe / institutional self-custody setup, native at the protocol layer rather than via a smart contract.
 
-## Lifecycle
+## Lifecycle {#lifecycle}
 
 ```mermaid
 sequenceDiagram
@@ -29,7 +29,7 @@ sequenceDiagram
     Note over S: verify threshold sigs over inner<br/>dispatch inner as if A signed
 ```
 
-## Conversion
+## Conversion {#conversion}
 
 ```json
 {
@@ -55,7 +55,7 @@ After commit:
 
 **Irreversible**: there is no `RevertFromMultiSig`. The signer set can be **updated** via a multi-sig-wrapped `UpdateMultiSig` (see below), but you cannot go back to single-master.
 
-## Acting as multi-sig
+## Acting as multi-sig {#acting-as-multi-sig}
 
 Wrap every action in `MultiSig`:
 
@@ -91,7 +91,7 @@ If any check fails: `{"error":"multisig threshold not met"}` or `{"error":"multi
 
 If all checks pass: the inner action is dispatched as if `sender` had signed it directly.
 
-### Signing the inner action
+### Signing the inner action {#signing-the-inner-action}
 
 Each signer computes:
 
@@ -106,7 +106,7 @@ flowchart TD
 
 The wrapper bundle is then constructed off-chain (coordinator gathers signatures) and submitted by any signer.
 
-## Updating the signer set
+## Updating the signer set {#updating-the-signer-set}
 
 ```json
 {
@@ -125,7 +125,7 @@ Use to:
 - Add or remove signers
 - Change `threshold` (e.g. moving from 2-of-3 to 3-of-5 as the desk grows)
 
-## Off-chain coordination
+## Off-chain coordination {#off-chain-coordination}
 
 The protocol doesn't bundle the multi-sig flow — signers need an out-of-band way to share the message to sign and to collect signatures. Common patterns:
 
@@ -137,7 +137,7 @@ The protocol doesn't bundle the multi-sig flow — signers need an out-of-band w
 
 Until the SDK lands, integrators implement their own coordinator. The on-chain side is unchanged — only the signatures matter.
 
-## Compatibility with sub-accounts and agents
+## Compatibility with sub-accounts and agents {#compatibility-with-sub-accounts-and-agents}
 
 | Question | Answer |
 |----------|--------|
@@ -145,7 +145,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 | Can a multi-sig account approve agent wallets? | Yes. `ApproveAgent` is multi-sig-wrapped. Once approved, the agent can sign normally **without** further multi-sig collection — the agent's signature alone is enough for the actions it's allowed to perform. This is the typical institutional setup: multi-sig holds withdrawal authority + agent management; an agent runs the daily trading flow. |
 | Can the multi-sig account itself sign as an agent for another account? | Yes — multi-sig accounts can be approved as agents. Other accounts that approve them call `ApproveAgent { agent: <multisig_addr> }`. The multi-sig signer set then signs as needed. |
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -157,7 +157,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 
 </details>
 
-## Querying
+## Querying {#querying}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -179,7 +179,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 `is_multi_sig` is `false` (and `signers` empty) for a plain account. The signer
 set + threshold come straight from the committed `multi_sig_tracker` config.
 
-## Sequence — multi-sig order
+## Sequence — multi-sig order {#sequence--multi-sig-order}
 
 ```mermaid
 sequenceDiagram
@@ -198,14 +198,14 @@ sequenceDiagram
     Note over Chain: T+commit inner Order applied — orderEvents fires;<br/>multi-sig account now has the new resting order
 ```
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)
 - [`/exchange` signed-by semantics](../api/rest/exchange.md#signed-by-semantics) — multi-sig wrapper envelope
 - [Agent wallets](./agent-wallets.md) — combine multi-sig with agent delegation
 - [Sub-accounts](./sub-accounts.md) — multi-sig accounts can have subs
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

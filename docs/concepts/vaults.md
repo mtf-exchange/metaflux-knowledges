@@ -6,11 +6,11 @@ transfer, distribute, modify — is implemented and exercised on devnet.
 End-to-end consensus tests are still being added.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Two vault families: the protocol-operated **MFlux Vault** (the insurance/backstop pool), and **user vaults** (community-deployed strategies you can deposit into). Both share the same share-pricing primitive: deposits mint shares at the current `share_price`; withdrawals burn shares at the current `share_price`.
 
-## MFlux Vault
+## MFlux Vault {#mflux-vault}
 
 The protocol's own pool. It plays three roles:
 
@@ -18,7 +18,7 @@ The protocol's own pool. It plays three roles:
 2. **Market making (planned)**: idle MFlux capital can be deployed into market-making strategies on selected markets.
 3. **Insurance**: holds reserves to socialise small losses without firing T4 ADL.
 
-### Depositing into MFlux Vault
+### Depositing into MFlux Vault {#depositing-into-mflux-vault}
 
 ```json
 {
@@ -32,7 +32,7 @@ The protocol's own pool. It plays three roles:
 
 Mints `amount / share_price × 10^8` shares to the depositor at the next block.
 
-### Withdrawing
+### Withdrawing {#withdrawing}
 
 ```json
 {
@@ -46,13 +46,13 @@ Mints `amount / share_price × 10^8` shares to the depositor at the next block.
 
 Burns `shares` shares; pays out `shares × share_price / 10^8` USDC at the next block.
 
-### Lock-up
+### Lock-up {#lock-up}
 
 MFlux Vault has a default lock-up of `24 h` from deposit to first eligible withdrawal. Per-share lock; withdrawals against shares older than 24 h are unrestricted.
 
 This prevents capital from depositing right before a known T3 event and withdrawing immediately after the loss is socialised (the "free-rider" problem).
 
-### Performance & fees
+### Performance & fees {#performance--fees}
 
 MFlux Vault charges:
 - **Management fee**: 0 bps (no manager — protocol-operated).
@@ -61,11 +61,11 @@ MFlux Vault charges:
 
 Returns net of T3 backstop losses + T1/T2 maker profits. Historical share-price chart is in the live `vault_state` query (see [`/info`](../api/rest/info.md#vault_state)).
 
-## User vaults
+## User vaults {#user-vaults}
 
 Anyone can deploy a vault that pools USDC and runs strategies under a designated manager's signing authority.
 
-### Lifecycle
+### Lifecycle {#lifecycle}
 
 ```mermaid
 sequenceDiagram
@@ -81,7 +81,7 @@ sequenceDiagram
 
 The vault address is a first-class account in the state machine — it has its own positions, balance, and orders. The manager signs trades **on behalf of the vault** (the vault address is the `sender`, the manager's key signs; admission goes through the same agent-approval mechanism as regular agent wallets).
 
-### Deploy
+### Deploy {#deploy}
 
 ```json
 {
@@ -105,7 +105,7 @@ The vault address is a first-class account in the state machine — it has its o
 | `lock_period_ms` | `[0, 30 days]` | Per-deposit lock |
 | `high_water_mark` | bool | If true, performance fee only on new highs |
 
-### Pricing
+### Pricing {#pricing}
 
 ```
 share_price(t) = vault_account_value(t) / total_shares(t) × 10^8
@@ -115,7 +115,7 @@ share_price(t) = vault_account_value(t) / total_shares(t) × 10^8
 
 Pricing updates every commit. Deposits mint at the **post-commit** share price (you don't get the prior block's price); withdrawals burn at the post-commit share price.
 
-### Fees mechanic
+### Fees mechanic {#fees-mechanic}
 
 Performance fee accrues on the manager-designated address at each share-price tick above the prior high-water mark:
 
@@ -136,7 +136,7 @@ mgmt_per_block = management_fee_bps / 1e4 / (blocks_per_year)
 
 Both fees come out of vault NAV before share-price calculation — share price already reflects fee paid.
 
-### Risk
+### Risk {#risk}
 
 User vaults can lose money. If a vault's NAV ≥ liabilities + 1 base unit, withdrawals are honored at the prevailing share price. Below that, the vault is **paused** and withdrawals queue until NAV recovers (potentially by manager unwinding losing positions).
 
@@ -144,7 +144,7 @@ A vault that goes T3 (its own liquidation tier) follows the [tiered liquidation]
 
 The vault address is on-chain forever; even an empty vault sticks around (gas-paid storage isn't reclaimable in V1).
 
-### Querying
+### Querying {#querying}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -172,13 +172,13 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 }
 ```
 
-## Insurance pool
+## Insurance pool {#insurance-pool}
 
 A subset of MFlux Vault is the **insurance pool** — a designated reserve that draws down during T3 backstop events. See [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark).
 
 When the insurance pool runs low, MFlux Vault auto-replenishes it from the broader pool (governance-set ratio, default 10% of MFlux NAV reserved as insurance).
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -191,7 +191,7 @@ When the insurance pool runs low, MFlux Vault auto-replenishes it from the broad
 
 </details>
 
-## Sequence — deposit, manager trades, withdraw
+## Sequence — deposit, manager trades, withdraw {#sequence--deposit-manager-trades-withdraw}
 
 ```mermaid
 sequenceDiagram
@@ -204,14 +204,14 @@ sequenceDiagram
     Note over vault: T+5 user A withdraws all (1000 shares)<br/>payout: 1000 * 1.0085 = 1008.5 USDC<br/>NAV: 2017 - 1008.5 = 1008.5<br/>shares_outstanding: 1000<br/>share_price: still 1.0085
 ```
 
-## See also
+## See also {#see-also}
 
 - [Tiered liquidation](./tiered-liquidation.md) — T3 backstop, insurance pool
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — vault deposit / withdraw / fee events ride this channel
 - [Staking](./staking.md) — separate from vaults
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

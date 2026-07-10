@@ -1,7 +1,7 @@
 # واجهة برمجة تطبيقات WebSocket
 
 :::info
-**الحالة.** تعمل حاليًا على العقدة لقنوات `l2_book` و`bbo` (دفتر الأوامر / أعلى الدفتر) و`trades` و`active_asset_ctx` (علامة السعر / سعر الأوراكل / التمويل / الفائدة المفتوحة لكل سوق) و`all_mids` و`fills` و`user_events` و`candles` (شمعات OHLCV المتجددة لكل `(coin, interval)`) — وجميعها تدفع البيانات المُثبَّتة فعليًا، وتُشغَّل بناءً على التغييرات فحسب (يُصدر القناة إطارًا فقط حين يتغير حالتها منذ آخر إثبات) — بالإضافة إلى `post` (طلب/استجابة عبر WS) و`ping`/`pong`. راجع [الاشتراكات](./subscriptions.md) للاطلاع على أشكال كل قناة.
+**الحالة.** تعمل حاليًا على العقدة لقنوات `l2_book` و`bbo` (دفتر الأوامر / أعلى الدفتر) و`trades` و`active_asset_ctx` (علامة السعر / سعر الأوراكل / التمويل / الفائدة المفتوحة لكل سوق) و`all_mids` و`markets` و`fills` و`user_events` و`order_updates` و`open_orders` و`notifications` و`ledger_updates` و`active_asset_data` و`user_fundings` و`user_twap_slice_fills` و`user_twap_history` و`account_state` و`spot_state` و`explorer_block` و`explorer_txs` و`candles` (شمعات OHLCV المتجددة لكل `(coin, interval)`) — وجميعها تدفع البيانات المُثبَّتة فعليًا، وتُشغَّل بناءً على التغييرات فحسب (يُصدر القناة إطارًا فقط حين يتغير حالتها منذ آخر إثبات) — بالإضافة إلى `post` (طلب/استجابة عبر WS) و`ping`/`pong`. راجع [الاشتراكات](./subscriptions.md#channel-status-at-a-glance) للاطلاع على أشكال كل قناة وقائمة الحالة المحدثة.
 :::
 
 :::info

@@ -6,7 +6,7 @@
 
 A decision tree for production clients. The full catalog of error strings is in [errors](../api/errors.md); this page tells you what to **do** about each class.
 
-## Three failure layers
+## Three failure layers {#three-failure-layers}
 
 ```mermaid
 flowchart TD
@@ -27,7 +27,7 @@ flowchart TD
 
 Each layer has different semantics. Confusing them is the most common production bug.
 
-## Decision tree
+## Decision tree {#decision-tree}
 
 ```mermaid
 flowchart TD
@@ -40,7 +40,7 @@ flowchart TD
     S -->|429| R429["backoff per retry_after_ms"]
 ```
 
-## Layer 1 — admission errors
+## Layer 1 — admission errors {#layer-1--admission-errors}
 
 The request was parsed, but rejected at admission. Status `400`, `401`, `404`, `405`, `422`.
 
@@ -91,7 +91,7 @@ async function handleAdmissionResponse(r: Response) {
 }
 ```
 
-## Layer 2 — commit errors
+## Layer 2 — commit errors {#layer-2--commit-errors}
 
 The action was admitted (`202`) but failed at commit. You learn about it only via the event stream.
 
@@ -119,7 +119,7 @@ ws.subscribe('orderEvents', { user: address }, (event) => {
 });
 ```
 
-## Layer 3 — network errors
+## Layer 3 — network errors {#layer-3--network-errors}
 
 The most ambiguous class. Did the server receive the request? Did the action commit?
 
@@ -131,7 +131,7 @@ The most ambiguous class. Did the server receive the request? Did the action com
 | Connection refused | Server side is unavailable; retry with exponential backoff |
 | DNS failure | Networking / DNS issue; retry with exponential backoff |
 
-### Reconciliation pattern
+### Reconciliation pattern {#reconciliation-pattern}
 
 ```mermaid
 flowchart TD
@@ -152,9 +152,9 @@ The cloid-on-orders pattern (see [idempotency](./idempotency.md)) makes this che
 
 For non-order actions, match on `action_hash` (deterministic from your local msgpack encoding). The `userEvents` WS feed includes `action_hash` on every event.
 
-## Production recipes
+## Production recipes {#production-recipes}
 
-### Order placement with retry
+### Order placement with retry {#order-placement-with-retry}
 
 ```typescript
 async function placeOrderSafely(client: Client, order: Order, maxAttempts = 3) {
@@ -187,7 +187,7 @@ async function placeOrderSafely(client: Client, order: Order, maxAttempts = 3) {
 }
 ```
 
-### Cancel with idempotent safety
+### Cancel with idempotent safety {#cancel-with-idempotent-safety}
 
 ```typescript
 async function cancelSafely(client: Client, asset: number, oid: number) {
@@ -207,7 +207,7 @@ async function cancelSafely(client: Client, asset: number, oid: number) {
 }
 ```
 
-### WS commit reconciliation
+### WS commit reconciliation {#ws-commit-reconciliation}
 
 ```typescript
 const pendingByHash = new Map<string, PendingAction>();
@@ -230,7 +230,7 @@ async function submit(action: Action) {
 }
 ```
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -242,14 +242,14 @@ async function submit(action: Action) {
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Errors](../api/errors.md) — complete catalog
 - [Idempotency](./idempotency.md) — nonce + cloid mechanics
 - [WS subscriptions](../api/ws/subscriptions.md) — commit-time events
 - [Rate limits](../api/rate-limits.md) — pace retries
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

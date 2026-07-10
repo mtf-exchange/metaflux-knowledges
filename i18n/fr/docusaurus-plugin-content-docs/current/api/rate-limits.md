@@ -4,7 +4,7 @@
 **Aperçu.** La passerelle applique les limites ci-dessous ; le nœud nu accepte un trafic illimité de la part des pairs mTLS authentifiés (réservé aux infrastructures de confiance — n'exposez pas `8080` sur l'internet public en production).
 :::
 
-## En bref
+## En bref {#tldr}
 
 - Deux enveloppes : **poids par IP** (trafic anonyme) et **QPS par compte** (trafic signé).
 - Les pics de trafic consomment un seau à jetons ; le trafic soutenu est limité par le taux de recharge.
@@ -12,19 +12,26 @@
 - Les requêtes `/info` sont légères (poids 1) ; les abonnements WS sont encore plus légers (poids 1 à l'abonnement, 0 par message). `/exchange` vaut 5 par requête.
 - Le mempool dispose d'un plafond indépendant sur les actions en attente, par compte.
 
-## Enveloppes
+## Enveloppes {#budgets}
 
-| Enveloppe | Limite (défaut) | Recharge | Pic |
-|-----------|-----------------|----------|-----|
-| Poids par IP | 1200 poids / minute | 20 poids / seconde | 1200 (seau plein) |
-| QPS par compte | 30 req / seconde | 30 / s | 60 |
-| Actions mempool par compte | 50 en attente | se vide à mesure que les actions sont confirmées | — |
-| Abonnements WS par connexion | 256 | — | — |
+| Enveloppe | Limite (défaut) | Recharge | Pic | Exemption |
+|-----------|-----------------|----------|-----|-----------|
+| Poids par IP | 1200 poids / minute | 20 poids / seconde | 1200 (seau plein) | IP sur liste blanche exemptées |
+| Enveloppe `/exchange` par compte | 30 req / seconde | 30 / s | 60 | signataires de l'ensemble metaliquidity exemptés |
+| Actions mempool par compte | 50 en attente | se vide à mesure que les actions sont confirmées | — | — |
+| Abonnements WS par connexion | 64 | — | — | connexions sur liste blanche exemptées |
+
+- **Par IP** couvre le trafic de lecture anonyme (`/info`, abonnement WS) ; les
+  **IP sur liste blanche** (teneurs de marché désignés par l'opérateur / infrastructure)
+  le contournent.
+- L'**enveloppe par compte** s'applique aux écritures signées `/exchange`. Les comptes
+  faisant partie de l'**ensemble opérateur metaliquidity** (les signataires de stratégie
+  de vault sur liste blanche) sont **exemptés** de l'enveloppe par compte.
+- **WS** : au maximum **64 abonnements actifs par connexion** ; un 65e abonnement est
+  rejeté. Les connexions sur liste blanche sont exemptées du plafond.
 
 Toutes les limites sont contrôlées par la gouvernance. Un instantané de l'enveloppe par compte est disponible
-via la lecture native [`user_rate_limit`](./rest/info.md) sur le chemin par défaut de la passerelle
-(la passerelle expose également ces données en tant que `userRateLimit` compatible HL sous
-`/hl`) :
+via la lecture native [`user_rate_limit`](./rest/info.md) :
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -50,25 +57,25 @@ curl -X POST https://api.devnet.mtf.exchange/info \
     "refill":       30
   },
   "mempool_per_account": 50,
-  "ws_subs_per_conn":    256
+  "ws_subs_per_conn":    64
 }
 ```
 
-## Poids par endpoint
+## Poids par endpoint {#weight-by-endpoint}
 
 | Endpoint | Poids |
 |----------|-------|
 | `POST /info` (la plupart des types) | 1 |
-| `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
-| `POST /info` `userFills`, `historicalOrders` (paginé) | 2 |
+| `POST /info` `l2_book`, `markets` | 2 |
+| `POST /info` `user_fills`, `user_fills_by_time` | 2 |
 | `POST /exchange` | 5 |
 | WS `subscribe` | 1 |
 | Message publié WS | 0 |
 | WS `unsubscribe` | 0 |
 
-Un client passant un ordre par seconde et interrogeant `clearinghouseState` une fois par seconde dépense `5 + 1 = 6 poids/s = 360 poids/min` — bien en dessous de l'enveloppe.
+Un client passant un ordre par seconde et interrogeant `account_state` une fois par seconde dépense `5 + 1 = 6 poids/s = 360 poids/min` — bien en dessous de l'enveloppe.
 
-## QPS par compte
+## QPS par compte {#per-account-qps}
 
 Dès qu'une requête est signée, la passerelle authentifie le `sender` et l'impute sur l'enveloppe par compte plutôt que (ou en plus de) l'enveloppe par IP.
 
@@ -80,7 +87,7 @@ Dès qu'une requête est signée, la passerelle authentifie le `sender` et l'imp
 
 Les requêtes signées sont doublement comptabilisées contre le budget par IP et par compte ; les clients qui martèlent depuis une seule IP pour un même compte atteindront l'enveloppe la plus restrictive en premier.
 
-## Plafond du mempool
+## Plafond du mempool {#mempool-cap}
 
 Indépendant des limites de débit. La machine d'état refuse d'admettre plus de 50 actions en attente (non encore confirmées) par `sender`. Cela empêche un compte de monopoliser l'espace du mempool.
 
@@ -92,7 +99,7 @@ Si vous soumettez une 51e action alors que 50 sont en attente :
 
 En pratique, ce cas ne survient qu'avec des clients mal configurés — un temps de bloc sain d'environ 100 ms écoule facilement 30 QPS. Si vous atteignez cette limite, vous êtes dans les normes côté QPS par compte mais vous envoyez plus vite que les blocs ne se confirment.
 
-## Comportement lors des pics
+## Comportement lors des pics {#burst-behaviour}
 
 Les seaux se remplissent jusqu'à `burst` et se rechargent à `refill` par seconde. Un pic de `N ≤ burst` requêtes passe immédiatement ; les requêtes suivantes sont ensuite limitées au taux de recharge.
 
@@ -104,28 +111,28 @@ flowchart LR
 
 Une réponse `429` avec `retry_after_ms` vous indique précisément quand le seau sera suffisamment rechargé pour une requête de poids 1. Pour les traitements par lots, privilégiez le contrôle du débit côté client ; pour les workloads interactifs, un backoff exponentiel guidé par l'indication est suffisant.
 
-## Stratégies
+## Stratégies {#strategies}
 
-### Bot de flux d'ordres
+### Bot de flux d'ordres {#order-flow-bot}
 
 - Limitez le débit côté client à ~25 QPS pour conserver une marge de sécurité.
 - Utilisez le groupement `Order` : une requête contenant 10 ordres coûte 5 poids (autant qu'un seul ordre) ; le QPS par compte compte les requêtes, pas les jambes.
 - Utilisez `BatchModify` plutôt que N `ModifyOrder` distincts.
 - Maintenez les données de marché sur le flux WS, et non en interrogeant `/info`.
 
-### Consommateur de données de marché
+### Consommateur de données de marché {#market-data-consumer}
 
-- Abonnez-vous aux canaux WS (`l2Book`, `trades`, `userEvents`) ; n'interrogez pas par polling.
+- Abonnez-vous aux canaux WS (`l2_book`, `trades`, `user_events`) ; n'interrogez pas par polling.
 - Le poids d'un `subscribe` est 1, les messages en flux coûtent 0.
-- Reconnectez-vous avec `resume_token` plutôt que de vous réabonner à tous les canaux depuis zéro (les abonnements consomment à nouveau du poids sur la nouvelle connexion).
+- À la reconnexion, vous vous réabonnez depuis un instantané neuf (il n'y a pas de jetons de reprise) ; chaque abonnement consomme à nouveau du poids sur la nouvelle connexion, donc gardez vos connexions longue durée. Restez dans la limite des **64 abonnements** par connexion.
 
-### Liquidateur haute fréquence
+### Liquidateur haute fréquence {#high-frequency-liquidator}
 
 - Exécutez depuis votre propre nœud auto-hébergé (authentifié mTLS, `localhost:8080`), en contournant les limites de la passerelle publique.
 - Notez que cela nécessite d'exploiter une infrastructure appairée avec un validateur.
 - L'accès à la passerelle publique suffit pour des workloads de dizaines d'ordres par seconde ; pas pour le trading haute fréquence (HFT).
 
-## Séquence — être throttlé et récupérer
+## Séquence — être limité, puis récupérer {#sequence--getting-throttled-and-recovering}
 
 ```mermaid
 sequenceDiagram
@@ -147,7 +154,7 @@ sequenceDiagram
     gateway-->>client: 202 Accepted
 ```
 
-## Canaux d'exception
+## Canaux d'exception {#override-channels}
 
 | Canal | Remarques |
 |-------|-----------|
@@ -157,13 +164,13 @@ sequenceDiagram
 
 Les paramètres publics par défaut supposent qu'aucune exception ne s'applique.
 
-## Voir aussi
+## Voir aussi {#see-also}
 
 - [Erreurs](./errors.md)
 - [Abonnements WS](./ws/subscriptions.md)
 - [Idempotence](../integration/idempotency.md) — comment réessayer dans l'enveloppe de débit
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Afficher la FAQ</summary>

@@ -6,14 +6,14 @@
 
 How to retry safely without double-spending nonces or duplicating orders.
 
-## TL;DR
+## TL;DR {#tldr}
 
 - Every action has a `nonce`. Reusing one returns `400 nonce_must_increase`.
 - Set a unique `cloid` on every `Order` / `ModifyOrder`; the server rejects duplicate `cloid` on the same account, so retry is safe.
 - For non-order actions, the **state machine** is naturally idempotent (cancel of a non-existent order is harmless; transfer is enforced by balance check).
 - The network error model splits into three classes — admission rejection, commit-time error, network drop — each with a different retry rule.
 
-## Three error classes
+## Three error classes {#three-error-classes}
 
 ```mermaid
 flowchart TD
@@ -29,7 +29,7 @@ flowchart TD
     COMMIT --> ERR["commit error (state machine rejected post-admit)"]
 ```
 
-## Nonce consumption
+## Nonce consumption {#nonce-consumption}
 
 | Outcome | Nonce consumed? | Safe to retry? |
 |---------|:---------------:|:--------------:|
@@ -44,7 +44,7 @@ flowchart TD
 
 The rule: **a request gets a server response → the nonce decision is made**. A network drop is the only ambiguous case.
 
-## Strategy: cloid
+## Strategy: cloid {#strategy-cloid}
 
 For order placement, the client order id is the strongest dedup primitive.
 
@@ -80,7 +80,7 @@ flowchart TD
 
 The same logic applies to `ModifyOrder` — set a new cloid for the modify, dedup the modify.
 
-## Strategy: state-machine idempotence
+## Strategy: state-machine idempotence {#strategy-state-machine-idempotence}
 
 Most non-order actions are idempotent at the state-machine level:
 
@@ -100,11 +100,11 @@ For NOT-idempotent actions, use either:
 - **The nonce as your dedup key**: track which nonces you've submitted, never submit twice with the same nonce. The server enforces this regardless.
 - **An external dedup table**: keep a `{request_id → nonce}` map; if your retry sees an existing nonce for this request_id, you've already submitted.
 
-## Reconcile after network drop
+## Reconcile after network drop {#reconcile-after-network-drop}
 
 When the response is lost (TCP closed, timeout, etc.) you don't know if the action committed. Reconcile:
 
-### For orders
+### For orders {#for-orders}
 
 Query by cloid:
 
@@ -117,7 +117,7 @@ If present → admitted; treat as success.
 If absent → check `userFills` for a fill against that cloid.
 If still absent → admission failed (or was evicted from mempool). Submit again with the same cloid.
 
-### For transfers / withdrawals
+### For transfers / withdrawals {#for-transfers--withdrawals}
 
 Query the account's `userFills` (which includes funding + transfers) or `block_info` around the time of the drop. Match by the action_hash you computed locally — every action has a deterministic hash regardless of admission outcome.
 
@@ -130,7 +130,7 @@ If you can't determine outcome:
 - **For an idempotent action**: retry safely (use a fresh nonce, since the old one may already be consumed).
 - **For a non-idempotent action**: pause; query the account state to see if the side-effect happened; resume only after certainty.
 
-## Sequence — retry with cloid after timeout
+## Sequence — retry with cloid after timeout {#sequence--retry-with-cloid-after-timeout}
 
 ```mermaid
 sequenceDiagram
@@ -147,7 +147,7 @@ sequenceDiagram
 
 The cloid + the server-side checks make the retry safe even when the network is unreliable.
 
-## Nonce-issue troubleshooting
+## Nonce-issue troubleshooting {#nonce-issue-troubleshooting}
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
@@ -155,14 +155,14 @@ The cloid + the server-side checks make the retry safe even when the network is 
 | Two scripts collide on nonce | Sharing the same account | Use a shared nonce service, or one script per account |
 | `nonce_too_small` after a reconnect | Local nonce counter reset to pre-drop value | Persist last-submitted nonce across restarts |
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange`](../api/rest/exchange.md) — full envelope including `nonce`
 - [Errors](../api/errors.md) — every error string + remediation
 - [Error handling](./error-handling.md) — admission vs commit vs network decision tree
 - [Rate limits](../api/rate-limits.md) — pace your retries
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

@@ -12,7 +12,7 @@ actual fields they are signing — `destination`, `amount`, `agentName` — rath
 than an opaque blob. The server reconstructs the typed struct from `action.type`
 + `action.params`, recomputes the digest, and recovers the signer.
 
-## How it works
+## How it works {#how-it-works}
 
 | | Typed data |
 |--|------------|
@@ -24,7 +24,7 @@ Users **see what they sign** in a standard wallet — transfers, withdrawals, ag
 approvals, and account/staking/vault/spot-margin/earn/bridge settings all carry
 named fields.
 
-## Wire shape
+## Wire shape {#wire-shape}
 
 ```json
 {
@@ -54,7 +54,7 @@ recovery runs unconditionally. **Omit it.** If you do send it, the only accepted
 value is `"typed"`.
 :::
 
-## EIP-712 domain
+## EIP-712 domain {#eip-712-domain}
 
 One domain per network, cache it:
 
@@ -81,7 +81,7 @@ Query the node's chain id from [`/info` `node_info`](../api/rest/info.md#node_in
 (`data.chain_id`) and use the matching tag. A `metafluxChain` or `chainId` that
 doesn't match the node recovers a different signer and the request is rejected.
 
-## Encoding rules (atomic EIP-712)
+## Encoding rules (atomic EIP-712) {#encoding-rules-atomic-eip-712}
 
 Standard EIP-712 `hashStruct`:
 
@@ -105,7 +105,7 @@ digest      = keccak256( 0x19 0x01 ‖ domainSeparator ‖ hashStruct )
 Sign the 32-byte `digest` with secp256k1 and serialize the signature as
 `r ‖ s ‖ v` (65 bytes). Both legacy `v ∈ {27, 28}` and `v ∈ {0, 1}` are accepted.
 
-### Decimals are canonical strings — hash then parse
+### Decimals are canonical strings — hash then parse {#decimals-are-canonical-strings--hash-then-parse}
 
 Any amount / quantity field is an EIP-712 **`string`** carrying the canonical
 decimal text (`"1500.5"`, `"750.25"`). The server hashes the **verbatim string**
@@ -123,13 +123,13 @@ This is why typed signing carries decimals as strings rather than scaled
 integers: the wallet prompt shows a human-readable amount, and the hash-then-parse
 rule keeps the signed bytes unambiguous.
 
-## Action type strings
+## Action type strings {#action-type-strings}
 
 For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
 `encodeType` string is given below (the field order is the message field order).
 `action.type` is the `snake_case` tag you put on the POST.
 
-### Transfers
+### Transfers {#transfers}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -137,7 +137,7 @@ For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
 | `usd_class_transfer` | `MetaFluxTransaction:UsdClassTransfer(string metafluxChain,string ntl,bool toPerp,uint64 nonce)` |
 | `withdraw` | `MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uint32 destinationChainId,bool useCctp,uint64 nonce)` |
 
-### Account, staking & vault
+### Account, staking & vault {#account-staking--vault}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -161,7 +161,7 @@ Notes on specific fields:
   delegations**.
 - `create_vault`: `kind` is `0` = User, `1` = Metaliquidity.
 
-### Margin
+### Margin {#margin}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -170,7 +170,7 @@ Notes on specific fields:
 
 `delta` and `amount` are canonical decimal strings (hash-then-parse).
 
-### Staking
+### Staking {#staking}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -179,7 +179,7 @@ Notes on specific fields:
 `amount` is a canonical decimal string. `isUndelegate` = `true` undelegates,
 `false` delegates.
 
-### Vault
+### Vault {#vault}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -189,7 +189,7 @@ Notes on specific fields:
 `vault_transfer.deposit` = `true` deposits, `false` withdraws; `amount` is a
 canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
 
-### Spot margin
+### Spot margin {#spot-margin}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -200,7 +200,7 @@ canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
 `amount` and `borrow` are canonical decimal strings; `size` and `limitPx` are
 integers.
 
-### Earn
+### Earn {#earn}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -209,7 +209,7 @@ integers.
 
 `amount` and `shares` are canonical decimal strings.
 
-### Agent abstraction & bridge
+### Agent abstraction & bridge {#agent-abstraction--bridge}
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -227,7 +227,7 @@ Notes on specific fields:
 - `mb_withdraw`: `amount` is a `uint64` **integer** (not a decimal string);
   `dstAddr` is the destination-chain address string.
 
-### Fields that are *not* in the typed digest
+### Fields that are *not* in the typed digest {#fields-that-are-not-in-the-typed-digest}
 
 Two actions have `params` keys that the typed type string does **not** cover, so
 the server forces them to their default:
@@ -237,7 +237,7 @@ the server forces them to their default:
 - `create_vault` — the `CreateVault` type has **no `parent`**, so `create_vault`
   is **top-level** (no parent). **Omit** `parent`.
 
-## Worked example — `send_asset` (a transfer)
+## Worked example — `send_asset` (a transfer) {#worked-example--send_asset-a-transfer}
 
 A transfer of `"750.25"` of asset `2` from spot DEX `0` to perp DEX `1`, into the
 perp wallet, on **Testnet** (`chainId = 114514`).
@@ -312,7 +312,7 @@ await fetch(`${BASE_URL}/exchange`, {
 });
 ```
 
-## Worked example — `approve_agent` (an account action)
+## Worked example — `approve_agent` (an account action) {#worked-example--approve_agent-an-account-action}
 
 Approve an agent named `"trading-bot"` on **Testnet** (`chainId = 114514`).
 Remember: typed `approve_agent` is no-expiry — there is no `expires_at_ms`.
@@ -376,7 +376,7 @@ await fetch(`${BASE_URL}/exchange`, {
 See [agent wallets](../concepts/agent-wallets.md) for the approval lifecycle (an
 approval becomes effective one block after commit).
 
-## Verifying your encoding
+## Verifying your encoding {#verifying-your-encoding}
 
 Before submitting, recover the signer locally against your own assembled digest
 and confirm it matches the expected address — if it doesn't, the bug is in your
@@ -385,14 +385,14 @@ specification; a cross-implementation known-answer test pins each action's diges
 byte-for-byte, so any compliant `eth_signTypedData_v4` implementation reproduces
 the same result.
 
-## Orders and cancels
+## Orders and cancels {#orders-and-cancels}
 
 Orders and cancels (`submit_order`, `batch_order`, `cancel_order`,
 `batch_cancel`) are submitted through the same `/exchange` envelope and signed the
 same EIP-712 typed-data way. Their action-body shapes are in the
 [`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange`](../api/rest/exchange.md) — the endpoint and full action catalog
 - [Agent wallets](../concepts/agent-wallets.md) — approval lifecycle

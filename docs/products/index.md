@@ -10,7 +10,7 @@ is, its current status, and links to the full mechanics. For the cross-cutting
 machinery they share — order types, margin, liquidation, fees — see
 [Concepts](../concepts/index.md).
 
-## What you can trade
+## What you can trade {#what-you-can-trade}
 
 | Product | What it is | Status |
 |---|---|---|
@@ -38,7 +38,7 @@ leverage and borrowing introduce interest (riba), speculation, and uncertainty
 (maysir, gharar). Informational, not religious or financial advice.
 :::
 
-## See also
+## See also {#see-also}
 
 - [Contract specifications](../concepts/contract-specifications.md) — the per-contract perp spec (margin, mark, funding, increments, limits) read live from the API
 - [Concepts](../concepts/index.md) — the shared mechanics: [order types](../concepts/order-types.md), [margin modes](../concepts/margin-modes.md), [funding rates](../concepts/funding-rates.md), [tiered liquidation](../concepts/tiered-liquidation.md), [fees](../concepts/fees.md)

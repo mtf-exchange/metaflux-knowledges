@@ -11,7 +11,7 @@ flow, and the referrer and builder credits — see [Fees](./fees.md). Tier value
 are network parameters and can be updated by governance.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Your effective perpetual trading rate comes from **three independent tier systems
 that stack**:
@@ -27,7 +27,7 @@ that stack**:
 All three are evaluated continuously and apply together. Referral and builder-code
 credits apply separately, on top.
 
-## 1. Fee tiers (volume)
+## 1. Fee tiers (volume) {#1-fee-tiers-volume}
 
 Your base taker and maker rates are set by your **trailing-30-day total traded
 volume** (taker + maker, summed across all markets and all of your sub-accounts).
@@ -45,7 +45,7 @@ Volume is measured in USDC notional. The window rolls forward continuously — t
 is no monthly snapshot, so a trade that crosses a threshold applies to your next
 fill.
 
-## 2. Maker rebate tiers (maker-volume share)
+## 2. Maker rebate tiers (maker-volume share) {#2-maker-rebate-tiers-maker-volume-share}
 
 On top of your fee-tier maker rate, you can earn an **additional maker rebate** set
 by your **share of total exchange maker volume** over the trailing 30 days. The
@@ -60,7 +60,7 @@ below zero — meaning the exchange pays you to provide liquidity.
 
 This rebate applies to the **maker rate only**. It does not affect your taker rate.
 
-## 3. Staking discount tiers (MTF staked)
+## 3. Staking discount tiers (MTF staked) {#3-staking-discount-tiers-mtf-staked}
 
 Staking MTF earns a **percentage discount on your taker rate**. The discount is
 applied to the taker rate only — it never reduces your maker rate. The ladder is a
@@ -83,7 +83,7 @@ weight** (not raw token count — see [Staking](./staking.md) for the multiplier
 Discounts climb monotonically from **5% to 50%**, thresholds from **100 to
 10,000,000**.
 
-### Two tracks: uncapped grades vs the single capped seat
+### Two tracks: uncapped grades vs the single capped seat {#two-tracks-uncapped-grades-vs-the-single-capped-seat}
 
 The ladder runs on **two tracks**:
 
@@ -102,12 +102,13 @@ The ladder runs on **two tracks**:
   `> 10,000,000` threshold but does not win the seat is held at the **highest
   uncapped grade it qualifies for** (State Councilor / Vice Premier).
 
-See [Staking](./staking.md) for how to stake MTF and how effective weight is
-derived. **Flexible (no-lock) staking carries 0× weight** and therefore only ever
+See [Staking](./staking.md) for how to stake MTF, and
+[Tokenomics](./tokenomics.md#time-weighted-staking-ve-style) for how effective
+weight is derived. **Flexible (no-lock) staking carries 0× weight** and therefore only ever
 reaches the **lowest grade** (Section Chief) and earns **no dividend** — the
 deliberate market-maker lane.
 
-## How the three combine
+## How the three combine {#how-the-three-combine}
 
 The fee tier sets your **base** taker and maker rates from your volume. The other
 two tiers then adjust those bases:
@@ -133,7 +134,7 @@ A negative `effective_maker` is a rebate paid **to** you.
 | Maker rebate (maker share)   | — | subtracted |
 | Staking discount (MTF staked)| multiplied | — |
 
-## Worked examples
+## Worked examples {#worked-examples}
 
 **A State Councilor / Vice Premier staker at the base volume tier.**
 Your effective weight clears `> 5,000,000` (State Councilor / Vice Premier, 40%
@@ -169,7 +170,7 @@ effective_maker = 0.0040% − 0.0020%    = 0.0020%
 
 You pay **0.0200% taker** and **0.0020% maker**.
 
-## On top of the schedule
+## On top of the schedule {#on-top-of-the-schedule}
 
 Referral and builder-code credits apply **separately**, in addition to your
 effective rates above:
@@ -182,7 +183,7 @@ effective rates above:
 See [Fees](./fees.md) for the full mechanics — how credits are split and how
 collected fees fund the MTF buyback that is burned and distributed to stakers.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -207,7 +208,7 @@ collected fees fund the MTF buyback that is burned and distributed to stakers.
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Fees](./fees.md) — fee mechanics, buyback-and-distribute flow, referral and builder credits
 - [Staking](./staking.md) — stake MTF to unlock the taker discount tiers

@@ -6,13 +6,13 @@
 
 Deposit, place an order, cancel, withdraw. By the end of this page your TypeScript / Python / curl session has done a complete round-trip against devnet.
 
-## Prerequisites
+## Prerequisites {#prerequisites}
 
 - An EVM private key (any 32-byte hex; for devnet, generate fresh — don't reuse a mainnet key)
 - USDC on a MetaBridge source chain (Base; Solana and Arbitrum rolling out) — devnet allows the faucet route instead
 - `curl` or any HTTP client
 
-## Endpoints
+## Endpoints {#endpoints}
 
 The gateway is the single public front door, serving the MTF-native surface.
 
@@ -31,7 +31,7 @@ The gateway is the single public front door, serving the MTF-native surface.
 
 See [networks](../networks.md) for the full list including testnet and (post-launch) mainnet.
 
-## Step 1 — Get devnet USDC
+## Step 1 — Get devnet USDC {#step-1--get-devnet-usdc}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/faucet \
@@ -63,7 +63,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 You should see `data.account_value: "3000"`.
 
-## Step 2 — Place a limit order
+## Step 2 — Place a limit order {#step-2--place-a-limit-order}
 
 The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux/sdk` — ships before mainnet; see [TypeScript SDK](./typescript-sdk.md)).
 
@@ -101,7 +101,7 @@ curl -X POST https://api.devnet.mtf.exchange/exchange \
 
 where `order.json` is the signed MTF-native envelope you assembled.
 
-### Spot trading example
+### Spot trading example {#spot-trading-example}
 
 [Spot](../products/spot.md) is a token-for-token CLOB, separate from
 perps — no leverage, no positions. Place a spot order with the native
@@ -129,7 +129,7 @@ entry (the same status union as a perp order). Read your spot balances and open
 spot orders back via [`POST /info`](../api/rest/info.md); cancel with
 [`spot_cancel`](../api/rest/exchange.md#spot_cancel), which refunds the escrow.
 
-## Step 3 — Check the order is on the book
+## Step 3 — Check the order is on the book {#step-3--check-the-order-is-on-the-book}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -148,7 +148,7 @@ ws.subscribe('userEvents', { user: client.address }, (event) => {
 });
 ```
 
-## Step 4 — Cancel
+## Step 4 — Cancel {#step-4--cancel}
 
 ```typescript
 await client.exchange.cancel({ asset: btcId, oid: result.oid });
@@ -160,7 +160,7 @@ curl -X POST https://api.devnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 
-## Step 5 — Withdraw
+## Step 5 — Withdraw {#step-5--withdraw}
 
 ```typescript
 await client.exchange.withdrawUsdc({
@@ -172,7 +172,7 @@ await client.exchange.withdrawUsdc({
 
 This queues a MetaBridge withdrawal. After the MetaFlux validator set co-signs it to a ⅔ stake-weighted quorum and the dispute window elapses (a few minutes), you can `claim` on the destination chain (see [bridge](../bridge/)).
 
-## What just happened
+## What just happened {#what-just-happened}
 
 ```mermaid
 sequenceDiagram
@@ -202,7 +202,7 @@ sequenceDiagram
     gateway-->>client: 202
 ```
 
-## Next steps
+## Next steps {#next-steps}
 
 - [Signing](./signing.md) — what's inside the SDK's signing
 - [Agent wallets in practice](./agent-wallets-howto.md) — production hot-key pattern
@@ -211,7 +211,7 @@ sequenceDiagram
 - [WS subscriptions](../api/ws/subscriptions.md) — push for live data
 - [Migrating from HL](./migrating-from-hl.md) — already have a Hyperliquid bot? this page first
 
-## Troubleshooting
+## Troubleshooting {#troubleshooting}
 
 <details>
 <summary>Show troubleshooting</summary>
@@ -226,7 +226,7 @@ sequenceDiagram
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Networks](../networks.md) — devnet / testnet / mainnet endpoints + chainIds
 - [Signing](./signing.md) — the full envelope spec

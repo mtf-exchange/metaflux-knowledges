@@ -4,7 +4,7 @@
 **Status.** **stable** for the listed action variants. Endpoint shape committed for V1.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Every state-mutating **user** action — place order, cancel, vault deposit, agent
 approval, staking, etc. — is a single EIP-712-signed JSON envelope sent to `POST
@@ -22,7 +22,7 @@ node-local queues gated by validator authority (see the
 Posting a system action's native tag returns `400 unsupported action`.
 :::
 
-## URL
+## URL {#url}
 
 ```
 POST  https://api.<net>.mtf.exchange/exchange
@@ -35,7 +35,7 @@ POST  https://api.<net>.mtf.exchange/exchange
 The gateway serves the MTF-native `/exchange`. Running the node yourself, the same
 native `/exchange` is served directly at `http://localhost:8080`.
 
-## Request envelope
+## Request envelope {#request-envelope}
 
 ```json
 {
@@ -74,7 +74,7 @@ decimal strings) you put in the typed message you signed. A mismatch recovers a
 different signer and the request is rejected `401`. See
 [typed-data signing](../../integration/typed-data-signing.md).
 
-## Signing
+## Signing {#signing}
 
 The signature is a secp256k1 ECDSA recovery over a standard EIP-712 digest. Each
 action is signed as **structured EIP-712 typed data** (`eth_signTypedData_v4`)
@@ -111,7 +111,7 @@ recovery runs unconditionally). **Omit it.** If present, the only accepted value
 is `"typed"`.
 :::
 
-### Chain IDs
+### Chain IDs {#chain-ids}
 
 | Network | `chainId` |
 |---------|-----------|
@@ -126,7 +126,7 @@ recovered address differs from the action's `owner` (or, for sender-authorized
 actions, recovers a phantom address that passes no authorization check). See
 [networks](../../networks.md) for endpoints.
 
-## Numeric conventions
+## Numeric conventions {#numeric-conventions}
 
 | Type | Wire form | Why |
 |------|----------|-----|
@@ -138,7 +138,7 @@ actions, recovers a phantom address that passes no authorization check). See
 
 **Fixed-point fields.** Price and size fields are 8-decimal fixed-point integers; USDC amounts are 6-decimal base units. The value carries the scale, not the field name — e.g. `px = "10050000000"` means `100.50`. Always send as a string; the server parses to `u128`.
 
-## Signed-by semantics
+## Signed-by semantics {#signed-by-semantics}
 
 Most actions can be signed by **either** the master account **or** an active [agent wallet](../../concepts/agent-wallets.md). A subset is **master-only** — agents are explicitly denied withdrawal authority and account-management privileges.
 
@@ -158,7 +158,7 @@ Each action's entry in the [catalog](#action-catalog) lists its signed-by rule e
 
 ---
 
-## Action catalog
+## Action catalog {#action-catalog}
 
 Each variant is a tagged object `{ "type": "<snake_case_tag>", <flat body> }`. The
 body keys are **flat under the action object** (there is no PascalCase `type` and
@@ -178,7 +178,7 @@ numbers (the node decodes them as `u64`, then widens internally). Addresses are
 `0x`-hex (40 chars); `cloid` is `0x` + 32 hex chars (16 bytes).
 :::
 
-### Order placement & lifecycle
+### Order placement & lifecycle {#order-placement--lifecycle}
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
@@ -194,7 +194,7 @@ numbers (the node decodes them as `u64`, then widens internally). Addresses are
 | [`twap_order`](#twap_order) | Schedule a sliced (TWAP) order | sender / agent | by `twap_id` |
 | [`twap_cancel`](#twap_cancel) | Cancel a running TWAP parent | sender / agent | yes |
 
-### Spot trading
+### Spot trading {#spot-trading}
 
 Spot is a token-for-token CLOB (no leverage, no positions) — separate books and
 balances from perps. A resting spot order locks the funds it would owe on fill
@@ -210,10 +210,10 @@ full conceptual model.
 | [`spot_order`](#spot_order) | Place one spot order | sender / agent | by `cloid` |
 | [`spot_cancel`](#spot_cancel) | Cancel a resting spot order by `oid` | sender / agent | yes |
 
-### Spot margin & Earn
+### Spot margin & Earn {#spot-margin--earn}
 
 :::info
-**Available on devnet (preview).** Leveraged spot ([spot margin](../../products/spot-margin.md)) and its lending supply side ([Earn](../../concepts/earn.md)) run end-to-end on **devnet today**: deposit collateral, borrow from the Earn pool, IOC-buy base on leverage, and close to repay. Treat it as a **preview** — forced-liquidation settlement is not yet wired (a forced close does not realize PnL or decrement open interest), and per-pair maintenance ratios are governance parameters still being calibrated. Do not assume production safety at scale.
+**Available on devnet (preview).** Leveraged spot ([spot margin](../../products/spot-margin.md)) and its lending supply side ([Earn](../../concepts/earn.md)) run end-to-end on **devnet today**: deposit collateral, borrow from the Earn pool, IOC-buy base on leverage, and close to repay. Treat it as a **preview** — forced liquidation is live and settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are governance parameters still being calibrated. Do not assume production safety at scale.
 :::
 
 A leveraged spot position is **isolated per `(account, pair)`**: posted quote collateral is a pure loss buffer, the buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All six actions are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) and [`earn_state`](./info/spot.md#earn_state).
@@ -227,7 +227,7 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | sender / agent | no |
 | [`earn_withdraw`](#earn_withdraw) | Redeem pool shares (idle-bounded) | sender / agent | no |
 
-### Margin & risk
+### Margin & risk {#margin--risk}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
@@ -236,7 +236,7 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`top_up_isolated_only_margin`](#top_up_isolated_only_margin) | Strict-iso margin top-up | sender / agent |
 | [`user_portfolio_margin`](#user_portfolio_margin) | Enroll / unenroll PM | sender / agent |
 
-### Account management
+### Account management {#account-management}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
@@ -250,7 +250,7 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Lift account to multi-sig | sender / agent |
 | [`set_position_mode`](#set_position_mode) | Toggle one-way / hedge position mode | sender / agent |
 
-### Staking & abstraction
+### Staking & abstraction {#staking--abstraction}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
@@ -264,13 +264,13 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`agent_set_abstraction`](#agent_set_abstraction) | Agent-scope abstraction config | sender / agent |
 | [`priority_bid`](#priority_bid) | Pay a priority fee for block-front placement | sender / agent |
 
-### Encrypted orders
+### Encrypted orders {#encrypted-orders}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
 | [`submit_encrypted_order`](#submit_encrypted_order) | Threshold-encrypted order ciphertext | sender / agent |
 
-### Vaults
+### Vaults {#vaults}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
@@ -279,7 +279,7 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`vault_modify`](#vault_modify) | Leader-only vault config update | sender / agent |
 | [`vault_withdraw`](#vault_withdraw) | Follower share redemption | sender / agent |
 
-### Bridge withdrawals
+### Bridge withdrawals {#bridge-withdrawals}
 
 External withdrawals leave the chain over [MetaBridge](../../bridge/index.md).
 The action is **sender-authorized**: the recovered signer is the account
@@ -291,7 +291,7 @@ signature would act on the agent's own (separate) account, never the master's.
 | [`core_evm_transfer`](#core_evm_transfer) | Move USDC from the Core ledger to MetaFluxEVM | sender (master) |
 | [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | sender (master) |
 
-### Not on the public `/exchange` path
+### Not on the public `/exchange` path {#not-on-the-public-exchange-path}
 
 These action names appear in earlier drafts, but they are **not bridged on the
 MTF-native `/exchange` handler**. They are
@@ -318,7 +318,7 @@ disposition of each.
 
 ---
 
-## Perpetual order actions
+## Perpetual order actions {#perpetual-order-actions}
 
 Order placement and lifecycle on **perpetual** markets (a perp `market` id). These
 use the shared CLOB; the [spot](#spot-trading-actions) and
@@ -326,7 +326,7 @@ use the shared CLOB; the [spot](#spot-trading-actions) and
 below. Perp leverage and margin controls are under
 [Perpetual margin & risk actions](#perpetual-margin--risk-actions).
 
-### `submit_order`
+### Place a single order {#submit_order}
 
 Place a single order. The order body is carried under `action.order`; `owner` is
 the claimed account (the server requires the recovered signer to equal it or be an
@@ -383,7 +383,7 @@ approved agent). To place many orders under one signature, use
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
 
-#### `position_side` (hedge mode)
+#### `position_side` (hedge mode) {#position_side-hedge-mode}
 
 The optional `position_side` field on the order body selects which leg an order
 applies to when the account is in [hedge mode](../../concepts/hedge-mode.md).
@@ -409,7 +409,7 @@ There is no implicit flip — closing the long leg never opens a short.
 Switch an account into hedge mode (while flat) with
 [`set_position_mode`](#set_position_mode).
 
-#### Trigger orders (`stop_loss` / `take_profit`)
+#### Trigger orders (`stop_loss` / `take_profit`) {#trigger-orders-stop_loss--take_profit}
 
 A single-leg protective trigger (a stop-loss or take-profit) is expressed as a
 `submit_order` whose `order` body carries a `trigger` block. The block's
@@ -461,7 +461,7 @@ Multi-leg entry-plus-protective baskets use [`batch_order`](#batch_order) with
 
 ---
 
-### `batch_order`
+### Place multiple orders in one signature {#batch_order}
 
 N orders carried by ONE signed envelope / one nonce. Each entry is a full
 [`submit_order`](#submit_order) order body (same fields, including per-order
@@ -493,7 +493,7 @@ Returns an array of per-leg statuses (same union as `submit_order`).
 
 ---
 
-### `cancel_order`
+### Cancel a single order by ID {#cancel_order}
 
 Cancel a single order by `oid`. The cancel body is under `action.cancel`; `owner`
 is the claimed account (recovered signer must equal it or be an approved agent).
@@ -521,7 +521,7 @@ For many cancels under one signature, use [`batch_cancel`](#batch_cancel).
 
 ---
 
-### `batch_cancel`
+### Cancel multiple orders in one signature {#batch_cancel}
 
 N cancels carried by one signed envelope. Each entry is a
 [`cancel_order`](#cancel_order) cancel body (an `oid` is required per entry;
@@ -543,7 +543,7 @@ Same per-entry response shape as `cancel_order`.
 
 ---
 
-### `cancel_by_cloid`
+### Cancel an order by client ID {#cancel_by_cloid}
 
 Cancel by client order id. Useful when the caller hasn't seen the server-side
 `oid` yet (race between the `submit_order` response and a cancellation decision).
@@ -569,7 +569,7 @@ Same response shape as `cancel_order`.
 
 ---
 
-### `cancel_all_orders`
+### Cancel all resting orders {#cancel_all_orders}
 
 Cancel all of the sender's resting orders, optionally filtered to one asset.
 
@@ -588,7 +588,7 @@ Returns a count of cancelled orders.
 
 ---
 
-### `modify`
+### Amend a resting order's price or size {#modify}
 
 Amend a resting order's price and/or size in place. At least one of `new_px` /
 `new_size` must be present. The target order is addressed **by `oid`** or **by
@@ -633,7 +633,7 @@ Returns a single modify status.
 
 ---
 
-### `batch_modify`
+### Amend multiple orders in one signature {#batch_modify}
 
 Apply N `modify`s under one signature. Each entry has the same shape as
 `modify.params`.
@@ -671,7 +671,7 @@ an entry with both `new_px` and `new_size` null errors (`nothing to modify`).
 
 ---
 
-### `schedule_cancel`
+### Schedule a future cancel-all trigger {#schedule_cancel}
 
 Arm a future-block cancel-all: at `cancel_at_block`, all the sender's open orders
 are cancelled (a dead-man's switch).
@@ -689,7 +689,7 @@ are cancelled (a dead-man's switch).
 
 ---
 
-### `twap_order`
+### Schedule a sliced TWAP order {#twap_order}
 
 Schedule a sliced (time-weighted) order. The parent is sliced into `slice_count`
 child orders spaced `delay_ms` apart.
@@ -733,7 +733,7 @@ is roadmap).
 
 ---
 
-### `twap_cancel`
+### Cancel a running TWAP order {#twap_cancel}
 
 Cancel a running TWAP parent. Already-filled slices stay filled; future slices stop.
 
@@ -750,12 +750,12 @@ Cancel a running TWAP parent. Already-filled slices stay filled; future slices s
 
 ---
 
-## Spot trading actions
+## Spot trading actions {#spot-trading-actions}
 
 Token-for-token [spot](../../products/spot.md) actions — no leverage, no positions,
 with books and balances entirely separate from perps.
 
-### `spot_order`
+### Place a single spot order {#spot_order}
 
 Place a single order on a **spot** market. Spot trades are a token-for-token
 swap with no leverage and no positions; books and balances are entirely separate
@@ -820,7 +820,7 @@ to the WebSocket trades / candles feeds.
 
 ---
 
-### `spot_cancel`
+### Cancel a resting spot order {#spot_cancel}
 
 Cancel one of **your** resting spot orders by `oid` on a pair, refunding the
 escrow it locked. Sender-authorized; **only the order's owner may cancel it** —
@@ -842,14 +842,14 @@ by the spot halt, so you can always exit a resting order and reclaim escrow.
 
 ---
 
-## Spot margin & Earn actions
+## Spot margin & Earn actions {#spot-margin--earn-actions}
 
 Leveraged [spot margin](../../products/spot-margin.md) and its
 [Earn](../../concepts/earn.md) lending supply side. **Available on devnet
 (preview).** All actions here are sender-authorized and return the
 [`202 Accepted`](#202-accepted--non-order-admission) admission envelope.
 
-### `spot_margin_deposit`
+### Post collateral for spot margin {#spot_margin_deposit}
 
 :::info
 **Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
@@ -875,7 +875,7 @@ Post quote (USDC) collateral into your `(account, pair)` margin account, debited
 
 ---
 
-### `spot_margin_withdraw`
+### Withdraw free spot margin collateral {#spot_margin_withdraw}
 
 :::info
 **Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
@@ -901,10 +901,10 @@ Move free collateral from your `(account, pair)` margin account back to your spe
 
 ---
 
-### `spot_margin_open`
+### Open a leveraged spot position {#spot_margin_open}
 
 :::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats. Leverage works end-to-end on devnet; **forced-liquidation settlement is not yet wired**.
+**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats. Leverage works end-to-end on devnet, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)).
 :::
 
 Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC-buy** `size` base at up to `limit_px`. The buy is funded 100% by the borrow; your posted collateral is the loss buffer (leverage ≈ notional / collateral). The bought base is held **segregated** on the margin account — it is not credited to your spendable balances. Any **unspent borrow is repaid instantly** after the IOC settles, so the outstanding loan equals only what the buy actually spent. A zero-fill IOC is an accepted no-op (full refund, nothing borrowed, account left open). v1 allows **one open position per `(account, pair)`** — no add-on. Sender-authorized; body under `action.params`.
@@ -931,7 +931,7 @@ Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC
 
 ---
 
-### `spot_margin_close`
+### Close a leveraged spot position {#spot_margin_close}
 
 :::info
 **Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
@@ -951,7 +951,7 @@ Close the position: **IOC-sell** the held base at no less than `limit_px`, repay
 | `pair` | uint32 | an active spot pair | Spot pair id the position is on |
 | `limit_px` | uint64 | `> 0` | Floor price for the close sell, in the `1e8` plane |
 
-**Settlement.** Interest accrues `O(1)` off the pool's borrow index since the open. On a close where proceeds + collateral cannot cover the debt, the whole principal still leaves the pool's borrowed book and the **shortfall is socialized to suppliers** (the pool's supplied total is reduced, floored at zero). Forced/liquidation-driven settlement is **not yet wired** in this preview — a close is a voluntary user action.
+**Settlement.** Interest accrues `O(1)` off the pool's borrow index since the open. On a close where proceeds + collateral cannot cover the debt, the whole principal still leaves the pool's borrowed book and the **shortfall is socialized to suppliers** (the pool's supplied total is reduced, floored at zero). This `spot_margin_close` action is always a **voluntary** user-submitted close; a forced liquidation runs automatically through this same settlement path when the account falls through the maintenance floor (see [Liquidation](../../products/spot-margin.md#liquidation)) — it is not something the user submits.
 
 **Gating.** Rejected if there is no margin account, if there is no open position (nothing held), or if the position carries debt but the pair's Earn pool is missing.
 
@@ -959,7 +959,7 @@ Close the position: **IOC-sell** the held base at no less than `limit_px`, repay
 
 ---
 
-### `earn_deposit`
+### Supply quote into the Earn pool {#earn_deposit}
 
 :::info
 **Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
@@ -985,7 +985,7 @@ Supply quote into a lending pool and receive **pool shares** priced off the pool
 
 ---
 
-### `earn_withdraw`
+### Redeem Earn pool shares {#earn_withdraw}
 
 :::info
 **Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
@@ -1011,13 +1011,13 @@ Redeem pool shares back to quote, paid to your spendable balance. The payout is 
 
 ---
 
-## Perpetual margin & risk actions
+## Perpetual margin & risk actions {#perpetual-margin--risk-actions}
 
 Leverage, isolated-margin, and portfolio-margin controls for **perpetual**
 positions. See [margin modes](../../concepts/margin-modes.md) and
 [portfolio margin](../../concepts/portfolio-margin.md) for the models.
 
-### `update_leverage`
+### Set leverage and margin mode {#update_leverage}
 
 Set per-asset leverage and, optionally, flip the asset to isolated mode.
 
@@ -1038,7 +1038,7 @@ There is no separate margin-mode action: isolation is the `is_isolated` flag her
 
 ---
 
-### `update_isolated_margin`
+### Adjust isolated margin by a delta {#update_isolated_margin}
 
 Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
 
@@ -1056,7 +1056,7 @@ Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
 
 ---
 
-### `top_up_isolated_only_margin`
+### Add margin to a strict-isolated position {#top_up_isolated_only_margin}
 
 Add margin to a strict-isolated position. Top-up direction only (positive amount).
 
@@ -1074,7 +1074,7 @@ Add margin to a strict-isolated position. Top-up direction only (positive amount
 
 ---
 
-### `user_portfolio_margin`
+### Enroll or unenroll portfolio margin {#user_portfolio_margin}
 
 Enroll or unenroll the account in portfolio margin.
 
@@ -1093,13 +1093,13 @@ Requires account equity ≥ `pm_min_equity` (governance parameter). See [portfol
 
 ---
 
-## Account, staking, vaults & bridge actions
+## Account, staking, vaults & bridge actions {#account-staking-vaults--bridge-actions}
 
 Cross-cutting actions that are not specific to one trading product — agent wallets,
 display name, referrer, multi-sig, sub-accounts, position mode, staking and
 abstraction, encrypted orders, vaults / Metaliquidity, and bridge withdrawals.
 
-### `approve_agent`
+### Approve an agent wallet {#approve_agent}
 
 Approve an agent wallet to sign on the account's behalf. See [agent wallets](../../concepts/agent-wallets.md) for the lifecycle.
 
@@ -1138,7 +1138,7 @@ Becomes effective **one block after commit**. Submitting an agent-signed action 
 
 ---
 
-### `set_display_name`
+### Set the account display name {#set_display_name}
 
 Set the account's human-readable handle.
 
@@ -1155,7 +1155,7 @@ Set the account's human-readable handle.
 
 ---
 
-### `set_referrer`
+### Bind the account to a referrer {#set_referrer}
 
 Bind the account to a referrer **address** (not a code).
 
@@ -1174,7 +1174,7 @@ Settable **once** per account; subsequent attempts return `{"error":"referrer al
 
 ---
 
-### `approve_builder_fee`
+### Approve a builder fee ceiling {#approve_builder_fee}
 
 Approve a builder address up to a fee ceiling (bps). `0` revokes; the core handler caps at 8 bps.
 
@@ -1195,7 +1195,7 @@ Approve a builder address up to a fee ceiling (bps). `0` revokes; the core handl
 
 ---
 
-### `convert_to_multi_sig_user`
+### Convert the account to multi-sig {#convert_to_multi_sig_user}
 
 Convert the account to a multi-sig roster. **Irreversible**.
 
@@ -1234,7 +1234,7 @@ See [multi-sig](../../concepts/multi-sig.md).
 
 ---
 
-### `create_sub_account`
+### Create a sub-account {#create_sub_account}
 
 Open a sub-account owned by the sender (the recovered signer becomes the sole
 master). The sub-account gets a derived on-chain address that carries its own
@@ -1266,7 +1266,7 @@ outcome**, not the HTTP body — track the commit via the returned `action_hash`
 
 ---
 
-### `sub_account_transfer`
+### Transfer collateral between master and sub-account {#sub_account_transfer}
 
 Move perp cross-margin USDC collateral between the master account and one of its
 sub-accounts. **Sender-authorized** — no `owner` field; the signer is the master.
@@ -1299,7 +1299,7 @@ found` (unknown/unowned `sub_index`), `insufficient cross collateral`.
 
 ---
 
-### `sub_account_spot_transfer`
+### Transfer spot tokens between master and sub-account {#sub_account_spot_transfer}
 
 Move a **spot token** balance between the master account and one of its
 sub-accounts. **Sender-authorized** — no `owner` field.
@@ -1334,7 +1334,7 @@ found`, `insufficient spot balance`.
 
 ---
 
-### `set_position_mode`
+### Toggle one-way vs hedge position mode {#set_position_mode}
 
 Toggle the sender's account between one-way (single net position per market) and
 [hedge mode](../../concepts/hedge-mode.md) (a separate long leg and short leg per
@@ -1372,7 +1372,7 @@ liquidation and dual-leg position reporting are still rolling out; see
 
 ---
 
-### `c_deposit`
+### Move MTF into free staking balance {#c_deposit}
 
 Move whole-MTF from the sender's **spot MTF balance** into their **free staking
 balance** (the undelegated pool that [`token_delegate`](#token_delegate) draws
@@ -1400,7 +1400,7 @@ balance`, MTF spot asset not configured on this chain.
 
 ---
 
-### `c_withdraw`
+### Move MTF out of staking balance {#c_withdraw}
 
 The exact reverse of [`c_deposit`](#c_deposit): move whole-MTF from the sender's
 **free staking balance** back to their **spot MTF balance**. No unbonding window
@@ -1427,7 +1427,7 @@ balance`, MTF spot asset not configured on this chain.
 
 ---
 
-### `token_delegate`
+### Delegate or undelegate stake {#token_delegate}
 
 Delegate or undelegate stake to a validator. The delegate side draws from the
 **free staking balance** (funded by [`c_deposit`](#c_deposit)); undelegation
@@ -1452,7 +1452,7 @@ enters a slashable unbonding window before the stake returns to that balance.
 
 ---
 
-### `claim_rewards`
+### Claim staking rewards {#claim_rewards}
 
 Claim staking rewards, optionally scoped to one validator.
 
@@ -1469,7 +1469,7 @@ Claim staking rewards, optionally scoped to one validator.
 
 ---
 
-### `link_staking_user`
+### Alias a staking target address {#link_staking_user}
 
 Alias a staking target address to the sender.
 
@@ -1486,7 +1486,7 @@ Alias a staking target address to the sender.
 
 ---
 
-### `user_dex_abstraction`
+### Toggle DEX-abstraction for the account {#user_dex_abstraction}
 
 Toggle the global DEX-abstraction flag for the sender.
 
@@ -1503,7 +1503,7 @@ Toggle the global DEX-abstraction flag for the sender.
 
 ---
 
-### `user_set_abstraction`
+### Set self-scoped abstraction config {#user_set_abstraction}
 
 Self-scope abstraction config. `kind` is an opaque dispatch tag; `value` is the setting.
 
@@ -1521,7 +1521,7 @@ Self-scope abstraction config. `kind` is an opaque dispatch tag; `value` is the 
 
 ---
 
-### `agent_set_abstraction`
+### Set another user's abstraction config {#agent_set_abstraction}
 
 Agent-scope abstraction config: an agent signs to update another user's config.
 The core handler enforces the agent-approval check against `user` at dispatch.
@@ -1545,7 +1545,7 @@ The core handler enforces the agent-approval check against `user` at dispatch.
 
 ---
 
-### `priority_bid`
+### Pay for priority block placement {#priority_bid}
 
 Pay a priority fee (bps) to push the sender's flow toward the front of the next block.
 
@@ -1563,7 +1563,7 @@ Pay a priority fee (bps) to push the sender's flow toward the front of the next 
 
 ---
 
-### `submit_encrypted_order`
+### Submit a threshold-encrypted order {#submit_encrypted_order}
 
 **Status: available on devnet (preview).** The action is accepted and the
 pending-pool mechanics below apply, but the threshold-encrypted order pipeline
@@ -1601,7 +1601,7 @@ pending pool errors at commit.
 
 ---
 
-### `create_vault`
+### Create a vault {#create_vault}
 
 Leader creates a vault.
 
@@ -1628,7 +1628,7 @@ Returns the new `vault_id` and derived `vault_address`.
 
 ---
 
-### `vault_transfer`
+### Transfer funds between leader and vault {#vault_transfer}
 
 Leader seed transfer between the leader's main account and the vault sub-account.
 
@@ -1647,7 +1647,7 @@ Leader seed transfer between the leader's main account and the vault sub-account
 
 ---
 
-### `vault_modify`
+### Update vault configuration {#vault_modify}
 
 Leader-only vault config update. Each `new_*` field is optional (`null` =
 unchanged).
@@ -1675,7 +1675,7 @@ unchanged).
 
 ---
 
-### `vault_withdraw`
+### Redeem vault shares {#vault_withdraw}
 
 Follower share redemption.
 
@@ -1695,7 +1695,7 @@ Returns USD-cents paid out and shares burnt.
 
 ---
 
-### `core_evm_transfer`
+### Transfer USDC from Core to EVM {#core_evm_transfer}
 
 Move USDC from the **Core clearing ledger** to the **MetaFluxEVM** side: debits
 the sender's USDC cross-collateral on Core and mints the scale-converted
@@ -1774,7 +1774,7 @@ for core->evm transfer`.
 
 ---
 
-### `mb_withdraw`
+### Withdraw USDC to an external chain {#mb_withdraw}
 
 External withdrawal over [MetaBridge](../../bridge/index.md): debits the
 sender's USDC cross-collateral and queues an **Outbound** bridge message for
@@ -1847,9 +1847,7 @@ collateral for withdrawal`.
 
 ---
 
-<a id="non-bridged-actions"></a>
-
-### Non-bridged actions
+### Non-bridged actions {#non-bridged-actions}
 
 The following draft action names are **not** wired on the MTF-native `/exchange`
 handler. Posting them returns `400 unsupported action` (recognized-but-unmapped
@@ -1875,7 +1873,7 @@ here only to redirect integrators to the supported path.
 
 ---
 
-## Response
+## Response {#response}
 
 The response shape depends on the action class:
 
@@ -1885,7 +1883,7 @@ The response shape depends on the action class:
 - **Any admission-time rejection** → the rejection envelope (`accepted:false`),
   with the documented HTTP status.
 
-### `200 OK` — order path (synchronous oid)
+### `200 OK` — order path (synchronous oid) {#200-ok--order-path-synchronous-oid}
 
 `submit_order` blocks up to the node's order-wait window (default ~5 s; devnet
 commits in ~250 ms) so the response carries the real `oid` + resting/filled
@@ -1908,7 +1906,7 @@ A `pending` entry means the action was admitted and may still commit later —
 track it via the [WS feed](../ws/subscriptions.md) or by polling `/info` with the
 returned `action_hash`.
 
-### `202 Accepted` — non-order admission
+### `202 Accepted` — non-order admission {#202-accepted--non-order-admission}
 
 Every non-order action (cancel, margin, vault, staking, governance, …) returns
 the admission envelope:
@@ -1924,7 +1922,7 @@ the admission envelope:
 
 `mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier (`0x` + keccak256 of the exact signed `action` JSON bytes) you can match against commit events.
 
-### Rejection envelope
+### Rejection envelope {#rejection-envelope}
 
 Every admission-time rejection (4xx) carries the same flat body — `accepted:false`,
 the `error` reason, and the `mempool_depth` at the time:
@@ -1933,7 +1931,7 @@ the `error` reason, and the `mempool_depth` at the time:
 { "accepted": false, "error": "signature: expected 130 hex chars, got 4", "mempool_depth": 0 }
 ```
 
-### `400 Bad Request` — malformed
+### `400 Bad Request` — malformed {#400-bad-request--malformed}
 
 | `error` value | Cause | Remediation |
 |---------------|-------|-------------|
@@ -1946,7 +1944,7 @@ the `error` reason, and the `mempool_depth` at the time:
 | `action carries no owner` | An owner-less action that is not sender-authorized | Use a supported action |
 | `duplicate cloid` | `submit_order` reused a client order id on the same account | Use a fresh `cloid` |
 
-### `401 Unauthorized` — signature / authorization failed
+### `401 Unauthorized` — signature / authorization failed {#401-unauthorized--signature--authorization-failed}
 
 | `error` value | Cause |
 |---------------|-------|
@@ -1962,7 +1960,7 @@ per-account sliding window), not at admission — a reused nonce is admitted at 
 HTTP edge and dropped at commit, so there is no synchronous `nonce` rejection here.
 :::
 
-### `429 Too Many Requests` — rate-limited
+### `429 Too Many Requests` — rate-limited {#429-too-many-requests--rate-limited}
 
 ```json
 { "error": "rate limit exceeded", "retry_after_ms": 1200 }
@@ -1970,7 +1968,7 @@ HTTP edge and dropped at commit, so there is no synchronous `nonce` rejection he
 
 See [rate limits](../rate-limits.md).
 
-### `503 Service Unavailable` — mempool full
+### `503 Service Unavailable` — mempool full {#503-service-unavailable--mempool-full}
 
 ```json
 { "error": "mempool at capacity", "retry_after_ms": 200 }
@@ -1980,7 +1978,7 @@ Back off and retry. Sustained 503 indicates network congestion; bidirectional WS
 
 ---
 
-## Admission ≠ commit
+## Admission ≠ commit {#admission--commit}
 
 `202` means accepted to the mempool. It does **not** mean:
 
@@ -1999,7 +1997,7 @@ flowchart LR
 
 Track commit status via the [WS feed](../ws/subscriptions.md) (`orderEvents` / `userEvents`) or poll `/info` for `openOrders` / `userFills`. The `action_hash` returned at admission appears unchanged in commit events.
 
-## Sequence diagram — place an order and see it on the book
+## Sequence diagram — place an order and see it on the book {#sequence-diagram--place-an-order-and-see-it-on-the-book}
 
 ```mermaid
 sequenceDiagram
@@ -2019,7 +2017,7 @@ sequenceDiagram
     gateway-->>client: WS orderEvents {resting, oid:...}
 ```
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -2033,7 +2031,7 @@ sequenceDiagram
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [`POST /info`](./info.md) — read path (MTF-native)
 - [Agent wallets](../../concepts/agent-wallets.md)
@@ -2044,7 +2042,7 @@ sequenceDiagram
 - [Errors](../errors.md)
 - [Rate limits](../rate-limits.md)
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

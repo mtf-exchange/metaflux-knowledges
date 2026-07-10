@@ -15,7 +15,7 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 **Building on-chain?** See [MIP-3 permissionless market deploy](./mip/mip-3.md).
 :::
 
-## Explore
+## Explore {#explore}
 
 <div class="mtf-cardgrid">
 
@@ -29,7 +29,7 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 
 </div>
 
-## Quick links
+## Quick links {#quick-links}
 
 - [Quickstart](./integration/quickstart.md) — 5-minute deposit → trade → withdraw
 - [Migrating from HL](./integration/migrating-from-hl.md) — switch a Hyperliquid bot to the MTF-native API
@@ -40,14 +40,14 @@ Welcome. Start here if you are **integrating with** or **building on** MetaFlux.
 
 The left sidebar is the exhaustive index; the cards above are the fast way in.
 
-## Conventions
+## Conventions {#conventions}
 
 - Endpoints documented here are the **stable, public** wire surface.
 - Request / response examples use real shapes — copy-paste safe.
 - Price and size fields are fixed-point integers (8-decimal scale); USDC amounts are 6-decimal base units. Both are transmitted as JSON strings to avoid IEEE-754 precision loss.
 - All times in `_ts` / `_ms` fields are unix milliseconds (consensus-derived).
 
-## Status legend
+## Status legend {#status-legend}
 
 Each doc carries a "Status" tag at the top:
 

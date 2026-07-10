@@ -8,11 +8,11 @@ A risk-watcher is an automated process that monitors your account's health and i
 
 Production trading bots that hold positions overnight should run one. The protocol's T0 yellow card buys you one block (~100ms); a risk-watcher uses that block productively.
 
-## TL;DR
+## TL;DR {#tldr}
 
 Subscribe to `marginEvents`, react to tier transitions, top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before `maint_margin` becomes binding.
 
-## Architecture
+## Architecture {#architecture}
 
 ```mermaid
 flowchart TD
@@ -26,13 +26,13 @@ flowchart TD
 
 The watcher is a separate logical process even when co-located — its decisions are independent of the trading strategy's decisions. A common failure mode is conflating "should I close this position?" with "should I take this trade?"; risk-watchers answer only the first.
 
-## Inputs
+## Inputs {#inputs}
 
 - `marginEvents` WS push: live `account_value`, `maint_margin`, `health`, `tier`.
 - `mark` WS push (per held asset): for forward-looking estimation.
 - `fundingTicks` WS push: to anticipate hourly funding charges.
 
-## Reaction rules
+## Reaction rules {#reaction-rules}
 
 | Trigger | Action | Rationale |
 |---------|--------|-----------|
@@ -44,7 +44,7 @@ The watcher is a separate logical process even when co-located — its decisions
 
 Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (health 1.3 floor). Conservative books: looser (health 1.8 floor).
 
-## Implementation sketch (TypeScript)
+## Implementation sketch (TypeScript) {#implementation-sketch-typescript}
 
 ```typescript
 import { MetaFluxClient } from '@metaflux/sdk';
@@ -111,13 +111,13 @@ async function emergencyUnwind(c: MetaFluxClient) {
 }
 ```
 
-## Key choices
+## Key choices {#key-choices}
 
 - **Separate agent for watcher.** Trader's agent does trading; watcher's agent does margin management. Compromise of trading host doesn't enable margin manipulation.
 - **Watcher's authority.** Agents can submit `UpdateIsolatedMargin` and place / cancel orders. Agents CANNOT withdraw, so the watcher can't move funds off the account — only between sub-buckets. This is desired.
 - **Watcher's nonce space.** Watcher and trader share the master's nonce space (per [agent wallets](../concepts/agent-wallets.md)). Use `Date.now()` on both — collision risk is sub-millisecond.
 
-## Pre-deposit math
+## Pre-deposit math {#pre-deposit-math}
 
 To bring health from H₀ to target H₁:
 
@@ -130,7 +130,7 @@ needed = (1.5 - 1.0) × 10 = 5 USDC.
 
 Cap your watcher's per-block deposit to avoid spending too much on a transient regime. Aggressive default: 1× position notional reserved for top-ups; once exhausted, escalate to operator.
 
-## Sequence — pre-emptive top-up
+## Sequence — pre-emptive top-up {#sequence--pre-emptive-top-up}
 
 ```mermaid
 sequenceDiagram
@@ -147,20 +147,20 @@ sequenceDiagram
     Exchange-->>Watcher: T = 5.3s  marginEvents push: tier=Safe — reaction loop continues
 ```
 
-## Failure modes
+## Failure modes {#failure-modes}
 
 - **Watcher and trader race.** Trader submits a new position; watcher reacts to the in-flight position. Resolve: only react after commit (margin events fire on commit, so this is already the case).
 - **Watcher's own agent expired.** Mid-stress, watcher can't act. Mitigation: tight rotation cadence, monitoring of agent expiry, never < 24h to expiry.
 - **Mempool full during stress.** Watcher's deposit gets 503'd. Backoff with exponential jitter; submit at most every 100ms.
 - **Deposit succeeds but oracle stays bad.** The deposit raises account_value; if maint also rose (mark moved against you), health may not improve enough. Loop: re-evaluate after commit; deposit again or unwind.
 
-## When NOT to deploy a risk-watcher
+## When NOT to deploy a risk-watcher {#when-not-to-deploy-a-risk-watcher}
 
 - Very short-lived positions (open and close within a single block) — health doesn't matter.
 - Pure spot trading with no margin — no liquidation ladder applies.
 - Fully isolated single-position bots where you've explicitly accepted the bucket loss limit — automating top-ups defeats the firewalling.
 
-## See also
+## See also {#see-also}
 
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — the ladder you're defending against
 - [`userEvents` WS](../api/ws/subscriptions.md#userevents) — margin / tier transitions ride this channel

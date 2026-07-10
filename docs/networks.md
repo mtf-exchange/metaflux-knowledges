@@ -4,7 +4,7 @@
 **Status.** **devnet stable**. Testnet (`chainId 114514`) and mainnet (`chainId 8964`) chainIds are assigned; their endpoints are published pre-launch.
 :::
 
-## Summary
+## Summary {#summary}
 
 | Network | Status | `chainId` | Stable wire? |
 |---------|--------|-----------|:------------:|
@@ -12,7 +12,7 @@
 | Testnet | preview before mainnet | `114514` | yes |
 | Mainnet | not launched | `8964` | yes |
 
-## Devnet
+## Devnet {#devnet}
 
 The integration sandbox. Free USDC via the faucet; ephemeral state (occasional resets).
 
@@ -42,7 +42,7 @@ EVM RPC at `http://localhost:8545`. Those are the self-hosted ports, not public 
 
 USDC bridging: via the **MetaBridge custody bridge** ([bridge](./bridge/)), not Circle CCTP. Testnet deposits use the Base Sepolia `MetaBridgeAlpha` deployment + Circle's Base Sepolia test USDC.
 
-### Faucet
+### Faucet {#faucet}
 
 `POST /faucet` on the gateway front door credits an address with test funds.
 Devnet/testnet only — the route is **never mounted on mainnet** (`chainId 8964`).
@@ -62,11 +62,11 @@ curl -X POST https://api.devnet.mtf.exchange/faucet \
 - Rate-limited 1 request / minute / IP (`429` when exceeded).
 - `400` invalid address · `429` already funded / IP-throttled · `503` backlog full — body `{"error":"…"}`.
 
-### State resets
+### State resets {#state-resets}
 
 Devnet may be reset for protocol upgrades. Cadence: on demand during pre-mainnet development; weekly notice when possible. Watch [status](https://status.mtf.exchange/devnet) for reset announcements.
 
-## Testnet (planned)
+## Testnet (planned) {#testnet-planned}
 
 Pre-mainnet rehearsal network with stability guarantees.
 
@@ -86,7 +86,7 @@ Testnet differences from mainnet:
 
 Testnet's wire shape is identical to mainnet's. Clients tested against testnet should require **only the `chainId` and base URL change** to flip to mainnet.
 
-## Mainnet (planned)
+## Mainnet (planned) {#mainnet-planned}
 
 Production network. Real USDC, real value, real validators.
 
@@ -104,7 +104,7 @@ Mainnet differences from devnet/testnet:
 - Real economic value.
 - Rate limits and fees per [rate limits](./api/rate-limits.md) and [fees](./concepts/fees.md).
 
-## Bridge corridors
+## Bridge corridors {#bridge-corridors}
 
 USDC (and other assets) bridge via the **MetaBridge custody bridge** — validator
 ⅔ stake-weighted co-signing, no Circle CCTP dependency. Source chains:
@@ -117,7 +117,7 @@ USDC (and other assets) bridge via the **MetaBridge custody bridge** — validat
 
 See [bridge](./bridge/) for the deposit / withdraw flow + the deployment table.
 
-## Status
+## Status {#status}
 
 Operational status, incident history, and planned maintenance:
 
@@ -132,7 +132,7 @@ The status page exposes:
 - Latest committed block height
 - Active validator set size
 
-## Compatibility windows
+## Compatibility windows {#compatibility-windows}
 
 | Network | Wire-shape commitment |
 |---------|-----------------------|
@@ -140,7 +140,7 @@ The status page exposes:
 | Testnet | Stable; breaking changes require 30-day deprecation notice |
 | Mainnet | Stable; breaking changes per [versioning policy](./versioning.md) |
 
-## See also
+## See also {#see-also}
 
 - [Bridge](./bridge/) — MetaBridge custody bridge details
 - [Versioning](./versioning.md) — wire-shape change policy

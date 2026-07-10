@@ -7,7 +7,7 @@ spot-margin borrowers. Specification and rollout follow the spot-margin work it
 builds on.
 :::
 
-## What Earn is
+## What Earn is {#what-earn-is}
 
 Earn is the **supply side of MetaFlux's spot lending market**. A depositor lends
 an asset (e.g. USDC) into a per-asset pool and receives **shares** priced off the
@@ -27,7 +27,7 @@ supplied). Supply APY tracks it:
 supply_APY ≈ borrow_APR × utilisation × (1 − reserve_factor)
 ```
 
-## Two sides of one market
+## Two sides of one market {#two-sides-of-one-market}
 
 Earn (supply) and spot margin (demand) are the two sides of a single lending
 market: the interest borrowers pay **is** the yield lenders earn.
@@ -38,12 +38,12 @@ market: the interest borrowers pay **is** the yield lenders earn.
 - Adds what a vault does not have: a utilisation→APR interest-rate curve and
   continuous (per-block) interest accrual.
 
-## Status
+## Status {#status}
 
 Planned. Depends on spot trading and spot margin landing first; not yet part of
 the V1 finished feature set.
 
-## Governing reference
+## Governing reference {#governing-reference}
 
 - See the [MIP registry](./index.md) for the authoritative index and status of
   every MIP.

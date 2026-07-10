@@ -13,7 +13,7 @@ ships behind a MIP. Do not build against it yet — there is no committed wire
 surface.
 :::
 
-## What an option is
+## What an option is {#what-an-option-is}
 
 An **option** is a contract that gives the holder the right — but not the
 obligation — to buy (a **call**) or sell (a **put**) an underlying asset at a fixed
@@ -22,7 +22,7 @@ the seller (writer) collects the premium and takes on the obligation. Options le
 traders express directional, volatility, and hedging views with a defined,
 premium-bounded downside for buyers.
 
-## Intended direction on MetaFlux
+## Intended direction on MetaFlux {#intended-direction-on-metaflux}
 
 The goal is a **fully on-chain options market** that reuses the platform's existing
 infrastructure where it makes sense — the [order book](../concepts/order-types.md)
@@ -38,14 +38,14 @@ unconfirmed. The general definition above is standard finance; the MetaFlux-spec
 mechanics are not yet decided.
 :::
 
-## Fees
+## Fees {#fees}
 
 **Not yet defined.** When options ship, trading fees will follow the platform
 [fee framework](../concepts/fees.md) — the exact maker/taker rates and any
 premium- or settlement-based charges are part of the unfinished spec and will be
 published with it.
 
-## See also
+## See also {#see-also}
 
 - [Perpetuals](./perpetuals.md) — the live leveraged-derivatives market today
 - [Concepts](../concepts/index.md) — the shared mechanics options will build on

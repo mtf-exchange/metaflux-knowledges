@@ -6,15 +6,15 @@
 
 What the protocol guarantees, what it doesn't, and where you carry the risk.
 
-## TL;DR
+## TL;DR {#tldr}
 
 - The protocol guarantees: deterministic state-machine semantics, signature-bound authorisation, on-chain auditability of every action.
 - The protocol does NOT guarantee: oracle correctness beyond the published composition, your private-key storage, or absence of governance risk.
 - Bug bounties run on third-party platforms; coordinated disclosure expected.
 
-## Trust surface
+## Trust surface {#trust-surface}
 
-### What the protocol owns
+### What the protocol owns {#what-the-protocol-owns}
 
 | Layer | Protocol guarantee |
 |-------|--------------------|
@@ -27,7 +27,7 @@ What the protocol guarantees, what it doesn't, and where you carry the risk.
 
 A node not following these rules is not a valid validator; consensus rejects it.
 
-### What the user owns
+### What the user owns {#what-the-user-owns}
 
 | Layer | User responsibility |
 |-------|--------------------|
@@ -36,7 +36,7 @@ A node not following these rules is not a valid validator; consensus rejects it.
 | Risk management | Position sizing relative to bucket / equity |
 | Bridge counterparty risk | Choice of source-chain wallet & bridge route |
 
-### Where trust is shared
+### Where trust is shared {#where-trust-is-shared}
 
 | Layer | Trust assumption |
 |-------|------------------|
@@ -46,9 +46,9 @@ A node not following these rules is not a valid validator; consensus rejects it.
 
 The principle: trust is minimised, not eliminated. Where shared trust is unavoidable (oracles, attestation services), the trust surface is documented and bounded.
 
-## Threat model
+## Threat model {#threat-model}
 
-### Out of scope for the protocol
+### Out of scope for the protocol {#out-of-scope-for-the-protocol}
 
 - A user signs an order they regret.
 - A user's hot key is stolen and the thief signs trades (this is why agents have no withdrawal authority).
@@ -59,7 +59,7 @@ The principle: trust is minimised, not eliminated. Where shared trust is unavoid
 
 These are not security issues. They are operational risk users carry.
 
-### In scope (report these)
+### In scope (report these) {#in-scope-report-these}
 
 - Signature forgery / acceptance of invalid signatures.
 - Non-deterministic state-machine execution (two validators disagree on committed state).
@@ -71,7 +71,7 @@ These are not security issues. They are operational risk users carry.
 - DoS that prevents valid actions from being admitted at documented rate limits.
 - Documented invariants that don't hold (e.g. nonce monotonicity bypass).
 
-## Disclosure policy
+## Disclosure policy {#disclosure-policy}
 
 For security vulnerabilities:
 
@@ -86,7 +86,7 @@ For security vulnerabilities:
 
 A bug-bounty program with tiered rewards runs on a third-party platform; details published pre-launch.
 
-## On-chain auditability
+## On-chain auditability {#on-chain-auditability}
 
 Every action is permanently on-chain. Forensic tooling can reconstruct:
 
@@ -97,7 +97,7 @@ Every action is permanently on-chain. Forensic tooling can reconstruct:
 
 Explorers expose these; indexers ship the data in queryable form.
 
-## Deterministic execution
+## Deterministic execution {#deterministic-execution}
 
 The state machine is a pure function:
 
@@ -109,7 +109,7 @@ Validators that disagree on `state_{t+1}` are non-conformant. Sources of non-det
 
 If your bot computes a future state value (e.g. expected PM margin after an order), it can compute it identically to what the chain would compute, given the same inputs. The wire spec captures everything you need.
 
-## Operational security recommendations
+## Operational security recommendations {#operational-security-recommendations}
 
 For institutional / production users:
 
@@ -126,7 +126,7 @@ For institutional / production users:
 | Audit your action_hash → commit reconciliation | Catch silent drops |
 | Test breaking-change migrations against testnet 60 days ahead | Avoid mainnet-day surprises |
 
-## Verifying release binaries
+## Verifying release binaries {#verifying-release-binaries}
 
 Node release binaries are published with a detached GPG signature (`.asc`) produced by an offline release **root** key. Before running a downloaded `mtf-node`, verify it against that key:
 
@@ -144,7 +144,7 @@ The signing key fingerprint is `5AF6597573B2E475B0C646BAD8E6D0B3D187F583`; confi
 The node supervisor pins this same root key and refuses to stage or activate any binary whose `.asc` does not verify against it, so the network only ever upgrades to signed builds.
 :::
 
-## What if the chain goes wrong
+## What if the chain goes wrong {#what-if-the-chain-goes-wrong}
 
 Consensus halts (e.g. partition that prevents quorum) are operationally rare but possible. During a halt:
 
@@ -157,14 +157,14 @@ Upon resume, the chain replays from the last committed block. No state is lost. 
 
 If a node sees consensus halt, switch to another node / gateway (the validator set is distributed). The protocol's design assumes ≥ 2/3 of validators are honest and online; transient halts < that threshold's outage are expected.
 
-## See also
+## See also {#see-also}
 
 - [Bridge](./bridge/) — MetaBridge custody trust surface
 - [Versioning](./versioning.md) — change policy
 - [Networks](./networks.md) — operational endpoints
 - [Multi-sig](./concepts/multi-sig.md) — institutional custody
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

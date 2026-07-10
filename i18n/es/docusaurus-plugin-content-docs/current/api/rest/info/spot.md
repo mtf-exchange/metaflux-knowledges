@@ -6,9 +6,9 @@ description: "Consultas de lectura POST /info para mercados spot, margen spot ap
 
 Consultas de lectura para mercados [spot](../../../products/spot.md), [margen spot](../../../products/spot-margin.md) apalancado, y el pool [Earn](../../../concepts/earn.md). Mismo endpoint `POST /info` y estructura que la [página base](../info.md).
 
-## Tipos de consulta para spot, margen spot y Earn
+## Tipos de consulta para spot, margen spot y Earn {#spot-spot-margin--earn-query-types}
 
-### `spot_meta`
+### Universo de pares spot y registro de tokens {#spot_meta}
 
 Universo de pares spot más registro por token. Sin parámetros.
 
@@ -61,7 +61,7 @@ Respuesta:
 
 Fuente de estado: `Exchange.mip3_spot_pair_specs` (pares) + `Exchange.mip3_spot_token_specs` (tokens).
 
-### `spot_clearinghouse_state`
+### Saldos de tokens spot por cuenta {#spot_clearinghouse_state}
 
 Saldos de tokens spot por cuenta. Requerido: `address` (hex con prefijo 0x).
 
@@ -90,7 +90,7 @@ Respuesta:
 
 El conjunto de tokens es la unión de los saldos y las claves de custodia (`reserved`) de la cuenta — un token que está completamente bloqueado con cero disponible igualmente aparece. Se obtiene mediante un escaneo por rango por cuenta (no es un recorrido de tabla completo). Fuente de estado: `locus.spot_clearinghouse.{balances, reserved}` (ambos indexados por `(owner, asset)`).
 
-### `spot_margin_state`
+### Todas las posiciones de margen spot de una cuenta {#spot_margin_state}
 
 :::info
 **Disponible en Devnet (vista previa).** Superficie de lectura para [margen spot](../../../products/spot-margin.md) apalancado; consulte la página de conceptos para conocer las advertencias de la vista previa.
@@ -136,7 +136,7 @@ Respuesta:
 
 Las posiciones se listan en orden de id de par. Una cuenta sin posiciones devuelve un array `accounts` vacío.
 
-### `earn_state`
+### Pools de préstamos Earn y participación de la cuenta {#earn_state}
 
 :::info
 **Disponible en Devnet (vista previa).** Superficie de lectura para los pools de préstamos [Earn](../../../concepts/earn.md); consulte la página de conceptos para conocer las advertencias de la vista previa.
@@ -191,7 +191,7 @@ Respuesta:
 
 Los pools se listan en orden de id de activo. Si se omite `user`, los campos `user_shares` / `user_value` no aparecen.
 
-### `spot_deploy_state`
+### Estado de la subasta de gas para el despliegue de pares spot {#spot_deploy_state}
 
 Estado de la subasta de gas para el despliegue de pares spot según MIP-1. Sin parámetros.
 
@@ -223,7 +223,7 @@ Respuesta:
 Fuente de estado: `Exchange.spot_pair_deploy_gas_auction`.
 
 
-## Véase también
+## Véase también {#see-also}
 
 - [`POST /info`](../info.md) — el endpoint base de lectura (estructura, convenciones, consultas de cuenta e infraestructura)
 - [Consultas de perpetuos](./perpetuals.md) — lecturas del mercado de contratos perpetuos

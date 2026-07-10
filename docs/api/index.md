@@ -15,22 +15,22 @@ One MTF-native protocol, served by the gateway front door
 > (`/info`, `/exchange`, `/ws`). Running the node yourself? It serves the same
 > native surface directly at `http://localhost:8080`.
 
-## REST
+## REST {#rest}
 
 - [`POST /exchange`](./rest/exchange.md) — MTF-native; full action catalog
 - [`POST /info`](./rest/info.md) — MTF-native; per-type schemas
 
-## WebSocket
+## WebSocket {#websocket}
 
 - [WS protocol](./ws/index.md) — connection lifecycle, frames, auth, resume
 - [Subscriptions](./ws/subscriptions.md) — full channel catalog
 
-## Cross-cutting
+## Cross-cutting {#cross-cutting}
 
 - [Errors](./errors.md) — complete error catalog with remediation
 - [Rate limits](./rate-limits.md) — per-IP weight + per-account QPS budgets
 
-## See also
+## See also {#see-also}
 
 - [Integration quickstart](../integration/quickstart.md) — 5-minute end-to-end
 - [Signing walkthrough](../integration/signing.md) — EIP-712 envelope

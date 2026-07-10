@@ -238,6 +238,15 @@ a { color: var(--ifm-color-primary); font-weight: 500; }
   letter-spacing: -0.025em;
   margin-bottom: 1rem;
 }
+/* API reference titles (`POST /exchange` — submit a signed action, etc.) carry a
+   long sentence plus an inline code token — at the full marketing display size they
+   dominate the page and wrap awkwardly. Detect them by the inline `code` (only these
+   reference titles have one) and give them a reference-scale rather than hero-scale size. */
+.markdown h1:first-child:has(code) {
+  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
 .markdown h2 {
   font-size: var(--mtf-text-h2);
   line-height: 1.05;

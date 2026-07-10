@@ -4,19 +4,19 @@
 **Stable.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 The **mark price** is the protocol's authoritative price per asset for margin, liquidation, funding, and trigger evaluation. It's a median of three components — the oracle anchor (plus a basis EMA), the internal quote mid, and the external perp median — recomputed continuously. It is NOT the last trade price.
 
-## Why mark ≠ last trade
+## Why mark ≠ last trade {#why-mark--last-trade}
 
 Using last-trade for margin is exploitable: a small adversarial trade at a manipulated price can push other users into liquidation. Mark is a smoothed, multi-source composition that's hard to push.
 
-## Composition
+## Composition {#composition}
 
 > The implemented mark is the **3-component median** below (`mark_source: "MedianOfOraclesAndMid"`), not a flat `median(mid, oracle, ema_mid)`.
 
-### How it's computed
+### How it's computed {#how-its-computed}
 
 ```
 mark = median( present components of {C1, C2, C3} )
@@ -42,7 +42,7 @@ The outer median is robust to a single outlier. **Absent components simply drop 
 
 > ⚠️ **Correction vs. prior text.** The earlier doc modelled C2 as `median(bid, ask, last_trade)` and C3 as a 7-venue weighted median. The real shapes are: C2 = a **two-sided quote mid** (best bid/ask only, last trade excluded), C3 = the **median of 5 external perp venues** (≥ 2 required), and C1 = the oracle plus a fixed-decay (`0.9548`) EMA of the perp basis. Absent components drop out of the median (no `unwrap_or(C1)` substitution), and a lone C2 yields no update.
 
-### Two price planes (read this before reading any number)
+### Two price planes (read this before reading any number) {#two-price-planes-read-this-before-reading-any-number}
 
 MTF carries prices on **two distinct numeric planes** — the #1 source of scale confusion:
 
@@ -53,7 +53,7 @@ MTF carries prices on **two distinct numeric planes** — the #1 source of scale
 
 The mark computer and the oracle aggregation operate entirely in the **`Decimal` whole-USDC plane**. The result is converted to the **1e8 `FixedPrice` plane** when written to the book / `last_mark_px`. The human `market_info` / `markets` read, however, reports `mark_px` and `oracle_px` already scaled back into the **whole-USDC plane** (e.g. `"67042.335"`, not raw 1e8) — only the order/book *submission* fields (`l2_book` level px, order `limit_px`, `tick_size`) stay 1e8. PnL/funding *settlement* runs on a third minor convention — USDC `1e6` (`accumulated_funding_e6` in `mark_settle`). Always check which plane a formula is in before comparing magnitudes.
 
-## The oracle (C1 anchor)
+## The oracle (C1 anchor) {#the-oracle-c1-anchor}
 
 `oracle` — the C1 anchor — is the **weighted median** of up to 10 external spot venues (Binance 3, OKX 2, Bybit 2, Coinbase 2, Bitget / Kraken / KuCoin / Gate / MEXC / MetaFlux-spot 1 each; sum 15), published once per block and signed by the oracle validators. Per-symbol weights are governance-settable (`SetOracleWeights`, `ActionId 148`); a feed stale > 60 s or > 5 % off the cross-venue median is dropped; if < 50 % of weight is present the slot holds its last good value.
 
@@ -61,7 +61,7 @@ The mark's **C3 component is a separate feed set** — perp mids from the **5 pe
 
 The [`market_info`](../api/rest/info/perpetuals.md#market_info) read surfaces `mark_source` (the descriptor `"MedianOfOraclesAndMid"`) and the composed `mark_px` / `oracle_px`; the individual C1/C2/C3 components and the weighted source list are not broken out as wire fields.
 
-## Mark vs oracle — why they diverge
+## Mark vs oracle — why they diverge {#mark-vs-oracle--why-they-diverge}
 
 It is **normal and expected** for the mark to sit far from the oracle. The oracle tracks **spot**; the mark tracks where the **perp** trades — and a perp can carry a persistent **basis** (premium or discount) to spot:
 
@@ -70,7 +70,7 @@ It is **normal and expected** for the mark to sit far from the oracle. The oracl
 
 So when a perp trades at, say, a 30 % discount to its spot index, `mark ≈ perp` and `oracle ≈ spot` legitimately diverge by ~30 %. That gap is exactly what **[funding](./funding-rates.md)** is there to close — and note that if the oracle itself is unreliable, funding is *gated off and decays to 0* even while the mark/oracle gap is wide (so a large gap with ~0 funding means the oracle for that market is being distrusted, not that funding is broken). See [funding gating](./funding-rates.md#gating-when-the-oracle-is-untrusted).
 
-## Sanity bands
+## Sanity bands {#sanity-bands}
 
 > **Implementation status:** the 3-component median (absent components dropping out, lone-C2 rejected) is implemented today. The per-block clamp described in this section (a `clamp(candidate, prior ± max_step)` ramp on top of the median) is a **design specification, not yet a discrete clamp in the mark computer** — the structural median is currently the primary manipulation defence. The closest live guard copies the oracle into a stale book's `last_mark_px` rather than ramping. Treat the numbers below as the intended band design; verify against the live values before relying on exact clamp numbers.
 
@@ -95,7 +95,7 @@ At 0.05% per 100 ms, a 5% move takes ≈10 seconds. Genuine fast moves catch up 
 
 If the candidate exceeds the band repeatedly for `band_violation_blocks` (default 50 = ~5 s), the protocol assumes a real regime shift and widens the band by 2× for one window. This prevents permanent freeze during true market dislocations.
 
-## What uses mark
+## What uses mark {#what-uses-mark}
 
 | Consumer | Why mark? |
 |----------|-----------|
@@ -111,7 +111,7 @@ Consumers that use **last trade** instead of mark:
 - Maker / taker fees (computed against fill price, not mark)
 - Realised PnL (computed at exit fill price)
 
-## Querying
+## Querying {#querying}
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -144,7 +144,7 @@ Frozen means all sources failed and the protocol is holding prior mark.
 
 A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available) (not yet streaming); poll [`market_info`](../api/rest/info/perpetuals.md#market_info) for `mark_px` meanwhile.
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -160,7 +160,7 @@ A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#
 
 </details>
 
-## Sequence — mark band engages on a spike
+## Sequence — mark band engages on a spike {#sequence--mark-band-engages-on-a-spike}
 
 The 3-component median already neutralises a single-source spike before any band:
 
@@ -181,14 +181,14 @@ block T+1:  adversary persists at 110.0; oracle/perps drift up slowly
 
 The defence is structural: to move the median an adversary must move at least **two** of the three components, and C1 (oracle) + C3 (5-venue external perp median) are exactly the hard-to-move ones. The optional per-block sanity band below is an additional clamp on top.
 
-## See also
+## See also {#see-also}
 
 - [Funding rates](./funding-rates.md) — funding uses mark vs oracle
 - [Tiered liquidation](./tiered-liquidation.md) — tier eval against mark
 - [`mark` WS channel (roadmap)](../api/ws/subscriptions.md#roadmap--not-yet-available)
 - [Oracle prices](./oracle-prices.md) — full source list, weights, reliability rules
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

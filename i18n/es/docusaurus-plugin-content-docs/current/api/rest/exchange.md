@@ -4,7 +4,7 @@
 **Estado.** **estable** para las variantes de acción listadas. La forma del endpoint está comprometida para V1.
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Toda acción **de usuario** que muta estado — colocar orden, cancelar, depósito en vault, aprobación de agente, staking, etc. — es un único sobre JSON firmado con EIP-712 enviado a `POST /exchange`. La variante de acción se selecciona mediante el campo `type`. Una **orden** devuelve `200 OK` con el `oid` asignado de forma síncrona (el manejador espera la confirmación); cualquier **otra** acción devuelve `202 Accepted` al ser admitida, y la confirmación de commit llega a través del [feed WS](../ws/subscriptions.md) o mediante sondeo.
 
@@ -12,7 +12,7 @@ Toda acción **de usuario** que muta estado — colocar orden, cancelar, depósi
 **Solo acciones de usuario.** `/exchange` es la ruta de escritura pública para **usuarios**. Las escrituras privilegiadas / de sistema — envío de precios de oráculo, créditos de faucet, `SystemUserModify`, `SystemSpotSend`, votos de validador — **nunca** pasan por `/exchange`. Se inyectan mediante colas locales del nodo controladas por autoridad de validador (véase la [tabla de acciones no puenteadas](#non-bridged-actions) y el [faucet](./faucet.md#why-this-is-not-on-exchange)). Enviar la etiqueta nativa de una acción de sistema devuelve `400 unsupported action`.
 :::
 
-## URL
+## URL {#url}
 
 ```
 POST  https://api.<net>.mtf.exchange/exchange
@@ -24,7 +24,7 @@ POST  https://api.<net>.mtf.exchange/exchange
 
 El gateway sirve la `/exchange` nativa MTF. Si ejecutas el nodo tú mismo, el mismo `/exchange` nativo se sirve directamente en `http://localhost:8080`.
 
-## Sobre de solicitud
+## Sobre de solicitud {#request-envelope}
 
 ```json
 {
@@ -51,7 +51,7 @@ El gateway sirve la `/exchange` nativa MTF. Si ejecutas el nodo tú mismo, el mi
 
 El servidor reconstruye el struct tipado EIP-712 a partir de `action.type` + `action.params` y recupera el firmante sobre **esos valores de campo** — por lo que el `action.params` que envíes debe llevar los **mismos valores** (y las mismas cadenas decimales canónicas) que pusiste en el mensaje tipado que firmaste. Una discrepancia recupera un firmante diferente y la solicitud es rechazada con `401`. Véase [firma de typed-data](../../integration/typed-data-signing.md).
 
-## Firma
+## Firma {#signing}
 
 La firma es una recuperación ECDSA secp256k1 sobre un resumen EIP-712 estándar. Cada acción se firma como **typed data EIP-712 estructurado** (`eth_signTypedData_v4`) con un tipo primario por acción `MetaFluxTransaction:<Action>`, de modo que un monedero muestra cada campo por nombre. El servidor reconstruye el struct tipado a partir de `action.type` + `action.params`, recalcula el resumen y recupera el firmante:
 
@@ -78,7 +78,7 @@ Las cadenas de tipo por acción, las reglas atómicas de `encodeData` y ejemplos
 **`sig_scheme` es vestigial.** Las versiones anteriores incluían un selector `sig_scheme` en el sobre; ya no es necesario y el servidor lo ignora (la recuperación por typed-data se ejecuta incondicionalmente). **Omítelo.** Si está presente, el único valor aceptado es `"typed"`.
 :::
 
-### IDs de cadena
+### IDs de cadena {#chain-ids}
 
 | Red | `chainId` |
 |---------|-----------|
@@ -88,7 +88,7 @@ Las cadenas de tipo por acción, las reglas atómicas de `encodeData` y ejemplos
 
 El `chainId` del dominio de firma **debe coincidir con el `chain_id` de consenso del nodo** — consúltalo mediante [`/info` `node_info`](./info.md#node_info) (`data.chain_id`) y usa ese valor exacto. Firmar con un `chainId` incorrecto devuelve `401` porque la dirección recuperada difiere del `owner` de la acción (o, en acciones autorizadas por el remitente, recupera una dirección fantasma que no supera ninguna verificación de autorización). Véase [redes](../../networks.md) para los endpoints.
 
-## Convenciones numéricas
+## Convenciones numéricas {#numeric-conventions}
 
 | Tipo | Forma wire | Por qué |
 |------|----------|-----|
@@ -100,7 +100,7 @@ El `chainId` del dominio de firma **debe coincidir con el `chain_id` de consenso
 
 **Campos de punto fijo.** Los campos de precio y tamaño son enteros de punto fijo con 8 decimales; los importes en USDC son unidades base con 6 decimales. El valor lleva la escala, no el nombre del campo — por ejemplo, `px = "10050000000"` significa `100.50`. Envíalo siempre como cadena; el servidor lo parsea a `u128`.
 
-## Semántica del firmante
+## Semántica del firmante {#signed-by-semantics}
 
 La mayoría de las acciones pueden ser firmadas por **la cuenta maestra o** por un [agente](../../concepts/agent-wallets.md) activo. Un subconjunto es **exclusivo del maestro** — a los agentes se les niega explícitamente la autoridad de retiro y los privilegios de gestión de cuenta.
 
@@ -120,7 +120,7 @@ La entrada de cada acción en el [catálogo](#action-catalog) indica explícitam
 
 ---
 
-## Catálogo de acciones
+## Catálogo de acciones {#action-catalog}
 
 Cada variante es un objeto etiquetado `{ "type": "<snake_case_tag>", <cuerpo plano> }`. Las claves del cuerpo están **en el plano bajo el objeto de acción** (no hay `type` en PascalCase ni un envoltorio `params` universal) — p. ej., `submit_order` lleva un objeto `order`, `cancel_order` lleva un objeto `cancel`, y las acciones autorizadas por el remitente llevan un objeto `params`. Haz clic para ver la tabla de campos detallada. Las tablas de resumen a continuación agrupan todas las acciones por categoría; las **definiciones completas a nivel de campo que siguen están divididas por tipo de operación** — [Acciones de orden perpetuo](#perpetual-order-actions), [Acciones de trading spot](#spot-trading-actions), [Acciones de margen spot y Earn](#spot-margin--earn-actions), [Acciones de margen y riesgo en perpetuos](#perpetual-margin--risk-actions) y [Cuenta, staking, vaults y bridge](#account-staking-vaults--bridge-actions).
 
@@ -128,7 +128,7 @@ Cada variante es un objeto etiquetado `{ "type": "<snake_case_tag>", <cuerpo pla
 **`px` / `size` son `u64` de punto fijo sin signo en el wire nativo**, enviados como números JSON (el nodo los decodifica como `u64`, luego los amplía internamente). Las direcciones son hex con `0x` (40 caracteres); `cloid` es `0x` + 32 caracteres hex (16 bytes).
 :::
 
-### Colocación y ciclo de vida de órdenes
+### Colocación y ciclo de vida de órdenes {#order-placement--lifecycle}
 
 | `type` | Propósito | Firmante | Idempotente |
 |--------|---------|-----------|-----------|
@@ -144,7 +144,7 @@ Cada variante es un objeto etiquetado `{ "type": "<snake_case_tag>", <cuerpo pla
 | [`twap_order`](#twap_order) | Programar una orden fraccionada (TWAP) | remitente / agente | por `twap_id` |
 | [`twap_cancel`](#twap_cancel) | Cancelar un TWAP padre en curso | remitente / agente | sí |
 
-### Trading spot
+### Trading spot {#spot-trading}
 
 Spot es un CLOB de token contra token (sin apalancamiento, sin posiciones) — libros y saldos separados de los perpetuos. Una orden spot en reposo bloquea los fondos que debería en caso de ejecución en un **saldo reservado**: una `bid` reserva la **cotización** (su nocional al precio límite), una `ask` reserva la **base** que ofrece. El tamaño de la orden queda **limitado al momento de admisión** a lo que tu saldo financia, y las comisiones se toman del tramo que recibe cada parte. Ambas acciones son **autorizadas por el remitente** (el firmante es el trader; no hay `owner`). Véase [trading spot](../../products/spot.md) para el modelo conceptual completo.
 
@@ -153,7 +153,7 @@ Spot es un CLOB de token contra token (sin apalancamiento, sin posiciones) — l
 | [`spot_order`](#spot_order) | Colocar una orden spot | remitente / agente | por `cloid` |
 | [`spot_cancel`](#spot_cancel) | Cancelar una orden spot en reposo por `oid` | remitente / agente | sí |
 
-### Margen spot y Earn
+### Margen spot y Earn {#spot-margin--earn}
 
 :::info
 **Disponible en devnet (vista previa).** El spot con apalancamiento ([margen spot](../../products/spot-margin.md)) y su lado de oferta de préstamos ([Earn](../../concepts/earn.md)) funcionan de extremo a extremo en **devnet hoy**: deposita colateral, toma prestado del pool Earn, compra la base al contado con apalancamiento (IOC) y cierra para reembolsar. Trátalo como una **vista previa** — la liquidación forzada no está conectada todavía (un cierre forzado no realiza PnL ni decrementa el interés abierto), y las ratios de mantenimiento por par son parámetros de gobernanza que aún están siendo calibrados. No asumas seguridad en producción a escala.
@@ -170,7 +170,7 @@ Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: 
 | [`earn_deposit`](#earn_deposit) | Suministrar cotización al pool de préstamos a cambio de participaciones | remitente / agente | no |
 | [`earn_withdraw`](#earn_withdraw) | Canjear participaciones del pool (acotado por liquidez ociosa) | remitente / agente | no |
 
-### Margen y riesgo
+### Margen y riesgo {#margin--risk}
 
 | `type` | Propósito | Firmante |
 |--------|---------|-----------|
@@ -179,7 +179,7 @@ Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: 
 | [`top_up_isolated_only_margin`](#top_up_isolated_only_margin) | Recarga de margen en modo aislado estricto | remitente / agente |
 | [`user_portfolio_margin`](#user_portfolio_margin) | Inscribir / dar de baja en PM | remitente / agente |
 
-### Gestión de cuenta
+### Gestión de cuenta {#account-management}
 
 | `type` | Propósito | Firmante |
 |--------|---------|-----------|
@@ -193,7 +193,7 @@ Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: 
 | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Elevar la cuenta a multi-firma | remitente / agente |
 | [`set_position_mode`](#set_position_mode) | Alternar modo de posición unidireccional / cobertura | remitente / agente |
 
-### Staking y abstracción
+### Staking y abstracción {#staking--abstraction}
 
 | `type` | Propósito | Firmante |
 |--------|---------|-----------|
@@ -207,13 +207,13 @@ Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: 
 | [`agent_set_abstraction`](#agent_set_abstraction) | Configuración de abstracción de alcance de agente | remitente / agente |
 | [`priority_bid`](#priority_bid) | Pagar una comisión de prioridad para colocación al frente del bloque | remitente / agente |
 
-### Órdenes cifradas
+### Órdenes cifradas {#encrypted-orders}
 
 | `type` | Propósito | Firmante |
 |--------|---------|-----------|
 | [`submit_encrypted_order`](#submit_encrypted_order) | Texto cifrado de orden con cifrado de umbral | remitente / agente |
 
-### Vaults y Metaliquidity
+### Vaults {#vaults}
 
 | `type` | Propósito | Firmante |
 |--------|---------|-----------|
@@ -222,7 +222,7 @@ Una posición de spot con apalancamiento está **aislada por `(cuenta, par)`**: 
 | [`vault_modify`](#vault_modify) | Actualización de configuración del vault exclusiva del líder | remitente / agente |
 | [`vault_withdraw`](#vault_withdraw) | Redención de participaciones del seguidor | remitente / agente |
 
-### Retiros mediante bridge
+### Retiros mediante bridge {#bridge-withdrawals}
 
 Los retiros externos salen de la cadena a través de [MetaBridge](../../bridge/index.md). La acción está **autorizada por el remitente**: el firmante recuperado es la cuenta debitada, por lo que la autoridad de retiro es efectivamente **exclusiva del maestro** — una firma de agente actuaría sobre la propia cuenta del agente (separada), nunca sobre la del maestro.
 
@@ -231,7 +231,7 @@ Los retiros externos salen de la cadena a través de [MetaBridge](../../bridge/i
 | [`core_evm_transfer`](#core_evm_transfer) | Mover USDC del libro mayor Core a MetaFluxEVM | remitente (maestro) |
 | [`mb_withdraw`](#mb_withdraw) | Retirar USDC con colateral cruzado a una cadena externa | remitente (maestro) |
 
-### No disponibles en la ruta pública `/exchange`
+### No disponibles en la ruta pública `/exchange` {#not-on-the-public-exchange-path}
 
 Estos nombres de acción aparecen en borradores anteriores, pero **no están puenteados en el manejador nativo MTF de `/exchange`**. Son escrituras privilegiadas / de sistema que nunca deben transitar por la ruta pública de usuario, o stubs de esquema reconocidos pero sin mapeo. Publicarlos devuelve `400 unsupported action`. Véase [la tabla a continuación](#non-bridged-actions) para la disposición de cada uno.
 
@@ -247,17 +247,17 @@ Estos nombres de acción aparecen en borradores anteriores, pero **no están pue
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Stub reconocido pero sin mapeo → `unsupported action` |
 | `FbaOrder` | `fba_submit` | Stub reconocido pero sin mapeo → `unsupported action` |
 | (distribución de vault) | `vault_distribute` | Manejador parcial/stub; no puenteado en `/exchange` |
-| (ciclo de vida PM) | `pm_enroll` / `pm_unenroll` / `pm_rebalance` | Stub reconocido pero sin mapeo → `unsupported action` |
+| (ciclo de vida PM) | `pm_enroll` / `pm_unenroll` | Se mapean a [`user_portfolio_margin`](#user_portfolio_margin) (inscribir / dar de baja). `pm_rebalance` ha sido **eliminada** — rechazada como acción desconocida |
 | (entre cadenas) | `cross_chain_send` | Stub reconocido pero sin mapeo → `unsupported action` |
 | (envío cifrado alt) | `encrypted_order_submit` | Stub; usa [`submit_encrypted_order`](#submit_encrypted_order) en su lugar |
 
 ---
 
-## Acciones de orden perpetuo
+## Acciones de orden perpetuo {#perpetual-order-actions}
 
 Colocación de órdenes y ciclo de vida en mercados de **contratos perpetuos** (id de `market` de un perpetuo). Utilizan el CLOB compartido; las acciones de trading [spot](#spot-trading-actions) y de [margen spot](#spot-margin--earn-actions) están en secciones separadas a continuación. Los controles de apalancamiento y margen en perpetuos están en [Acciones de margen y riesgo en perpetuos](#perpetual-margin--risk-actions).
 
-### `submit_order`
+### Colocar una única orden {#submit_order}
 
 Colocar una única orden. El cuerpo de la orden se incluye en `action.order`; `owner` es la cuenta declarada (el servidor exige que el firmante recuperado sea igual a ella o sea un agente aprobado). Para colocar muchas órdenes bajo una sola firma, usa [`batch_order`](#batch_order).
 
@@ -310,7 +310,7 @@ Colocar una única orden. El cuerpo de la orden se incluye en `action.order`; `o
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitido, sin commit en la ventana de espera
 ```
 
-#### `position_side` (modo cobertura)
+#### `position_side` (modo cobertura) {#position_side-hedge-mode}
 
 El campo opcional `position_side` en el cuerpo de la orden selecciona a qué pata se aplica una orden cuando la cuenta está en [modo cobertura](../../concepts/hedge-mode.md).
 
@@ -328,7 +328,7 @@ La pata se elige explícitamente — **nunca se infiere** a partir de `side` —
 
 Cambia una cuenta al modo cobertura (estando plano) con [`set_position_mode`](#set_position_mode).
 
-#### Órdenes trigger (`stop_loss` / `take_profit`)
+#### Órdenes trigger (`stop_loss` / `take_profit`) {#trigger-orders-stop_loss--take_profit}
 
 Un trigger protector de una sola pata (stop-loss o take-profit) se expresa como un `submit_order` cuyo cuerpo `order` lleva un bloque `trigger`. La **presencia** del bloque — no el `kind` — es lo que lo enruta: la orden queda **aparcada** en el registro canónico de triggers en lugar de ir al libro, y se dispara más tarde como un **IOC reduce-only** cuando el precio mark cruza `trigger_px`.
 
@@ -367,7 +367,7 @@ La admisión devuelve la misma unión de estado por orden que un `submit_order` 
 
 ---
 
-### `batch_order`
+### Colocar varias órdenes en una sola firma {#batch_order}
 
 N órdenes agrupadas en UN solo sobre firmado / un solo nonce. Cada entrada es un cuerpo de orden
 [`submit_order`](#submit_order) completo (mismos campos, incluyendo
@@ -399,7 +399,7 @@ Devuelve un array de estados por tramo (misma unión que `submit_order`).
 
 ---
 
-### `cancel_order`
+### Cancelar una única orden por ID {#cancel_order}
 
 Cancela una sola orden por `oid`. El cuerpo de cancelación va en `action.cancel`; `owner`
 es la cuenta declarada (el firmante recuperado debe coincidir con ella o ser un agente autorizado).
@@ -427,7 +427,7 @@ Para múltiples cancelaciones bajo una sola firma, use [`batch_cancel`](#batch_c
 
 ---
 
-### `batch_cancel`
+### Cancelar varias órdenes en una sola firma {#batch_cancel}
 
 N cancelaciones agrupadas en un solo sobre firmado. Cada entrada es un cuerpo de cancelación
 [`cancel_order`](#cancel_order) (se requiere un `oid` por entrada;
@@ -449,7 +449,7 @@ Misma estructura de respuesta por entrada que `cancel_order`.
 
 ---
 
-### `cancel_by_cloid`
+### Cancelar una orden por ID de cliente {#cancel_by_cloid}
 
 Cancela por id de orden del cliente. Útil cuando el emisor aún no ha recibido el
 `oid` del lado del servidor (carrera entre la respuesta de `submit_order` y una decisión de cancelación).
@@ -475,7 +475,7 @@ Misma estructura de respuesta que `cancel_order`.
 
 ---
 
-### `cancel_all_orders`
+### Cancelar todas las órdenes pendientes {#cancel_all_orders}
 
 Cancela todas las órdenes pendientes del remitente, opcionalmente filtradas a un solo activo.
 
@@ -494,7 +494,7 @@ Devuelve el conteo de órdenes canceladas.
 
 ---
 
-### `modify`
+### Modificar el precio o tamaño de una orden pendiente {#modify}
 
 Modifica el precio y/o el tamaño de una orden pendiente en su lugar. Al menos uno de `new_px` /
 `new_size` debe estar presente. La orden objetivo se identifica **por `oid`** o **por
@@ -539,7 +539,7 @@ Devuelve un estado de modificación individual.
 
 ---
 
-### `batch_modify`
+### Modificar varias órdenes en una sola firma {#batch_modify}
 
 Aplica N modificaciones (`modify`) bajo una sola firma. Cada entrada tiene la misma estructura que
 `modify.params`.
@@ -577,7 +577,7 @@ una entrada con `new_px` y `new_size` ambos nulos genera error (`nothing to modi
 
 ---
 
-### `schedule_cancel`
+### Programar una cancelación total futura {#schedule_cancel}
 
 Programa una cancelación total en un bloque futuro: en `cancel_at_block`, todas las órdenes abiertas
 del remitente son canceladas (un interruptor de hombre muerto).
@@ -595,7 +595,7 @@ del remitente son canceladas (un interruptor de hombre muerto).
 
 ---
 
-### `twap_order`
+### Programar una orden TWAP fraccionada {#twap_order}
 
 Programa una orden segmentada (ponderada en el tiempo). La orden principal se divide en `slice_count`
 órdenes hijas separadas `delay_ms` entre sí.
@@ -638,7 +638,7 @@ iguales a cero generan error en la confirmación. Los eventos de segmento se emi
 
 ---
 
-### `twap_cancel`
+### Cancelar una orden TWAP en ejecución {#twap_cancel}
 
 Cancela una orden TWAP principal en ejecución. Los segmentos ya ejecutados permanecen ejecutados; los futuros se detienen.
 
@@ -655,12 +655,12 @@ Cancela una orden TWAP principal en ejecución. Los segmentos ya ejecutados perm
 
 ---
 
-## Acciones de trading spot
+## Acciones de trading spot {#spot-trading-actions}
 
 Acciones [spot](../../products/spot.md) de token por token — sin apalancamiento, sin posiciones,
 con libros y saldos completamente separados de los contratos perpetuos.
 
-### `spot_order`
+### Colocar una única orden spot {#spot_order}
 
 Coloca una sola orden en un mercado **spot**. Las operaciones spot son un intercambio de token por token
 sin apalancamiento y sin posiciones; los libros y saldos son completamente independientes
@@ -725,7 +725,7 @@ a los feeds WebSocket de operaciones / velas.
 
 ---
 
-### `spot_cancel`
+### Cancelar una orden spot pendiente {#spot_cancel}
 
 Cancela una de **sus** órdenes spot pendientes por `oid` en un par, reembolsando el
 depósito en garantía que bloqueó. Autorizada por el remitente; **solo el propietario de la orden puede cancelarla** —
@@ -747,14 +747,14 @@ por la pausa del spot, por lo que siempre puede salir de una orden pendiente y r
 
 ---
 
-## Acciones de margen spot y Earn
+## Acciones de margen spot y Earn {#spot-margin--earn-actions}
 
 [Margen spot](../../products/spot-margin.md) apalancado y el lado de
 suministro de préstamos de [Earn](../../concepts/earn.md). **Disponible en Devnet
 (vista previa).** Todas las acciones aquí están autorizadas por el remitente y devuelven
 el sobre de admisión [`202 Accepted`](#202-accepted--non-order-admission).
 
-### `spot_margin_deposit`
+### Aportar garantía para margen spot {#spot_margin_deposit}
 
 :::info
 **Disponible en Devnet (vista previa).** Consulta el resumen de [Margen spot y Earn](#spot-margin--earn) para conocer las advertencias de esta vista previa.
@@ -780,7 +780,7 @@ Deposita garantía en forma de activo de cotización (USDC) en tu cuenta de marg
 
 ---
 
-### `spot_margin_withdraw`
+### Retirar garantía libre de margen spot {#spot_margin_withdraw}
 
 :::info
 **Disponible en Devnet (vista previa).** Consulta el resumen de [Margen spot y Earn](#spot-margin--earn) para conocer las advertencias de esta vista previa.
@@ -806,7 +806,7 @@ Mueve la garantía libre de tu cuenta de margen `(cuenta, par)` de vuelta a tu s
 
 ---
 
-### `spot_margin_open`
+### Abrir una posición spot apalancada {#spot_margin_open}
 
 :::info
 **Disponible en Devnet (vista previa).** Consulta el resumen de [Margen spot y Earn](#spot-margin--earn) para conocer las advertencias de esta vista previa. El apalancamiento funciona de extremo a extremo en Devnet; **la liquidación forzosa aún no está implementada**.
@@ -836,7 +836,7 @@ Abre una posición larga apalancada: toma prestado `borrow` en cotización del p
 
 ---
 
-### `spot_margin_close`
+### Cerrar una posición spot apalancada {#spot_margin_close}
 
 :::info
 **Disponible en Devnet (vista previa).** Consulta el resumen de [Margen spot y Earn](#spot-margin--earn) para conocer las advertencias de esta vista previa.
@@ -864,7 +864,7 @@ Cierra la posición: **vende IOC** la base mantenida a no menos de `limit_px`, r
 
 ---
 
-### `earn_deposit`
+### Suministrar cotización al pool Earn {#earn_deposit}
 
 :::info
 **Disponible en Devnet (vista previa).** Consulta el resumen de [Margen spot y Earn](#spot-margin--earn) para conocer las advertencias de esta vista previa.
@@ -890,7 +890,7 @@ Suministra cotización a un pool de préstamos y recibe **participaciones del po
 
 ---
 
-### `earn_withdraw`
+### Canjear participaciones del pool Earn {#earn_withdraw}
 
 :::info
 **Disponible en Devnet (vista previa).** Consulta el resumen de [Margen spot y Earn](#spot-margin--earn) para conocer las advertencias de esta vista previa.
@@ -916,13 +916,13 @@ Canjea participaciones del pool a cotización, pagada a tu saldo disponible. El 
 
 ---
 
-## Acciones de margen perpetuo y gestión de riesgo
+## Acciones de margen perpetuo y gestión de riesgo {#perpetual-margin--risk-actions}
 
 Controles de apalancamiento, margen aislado y margen de cartera para posiciones
 **perpetuas**. Consulta [modos de margen](../../concepts/margin-modes.md) y
 [margen de cartera](../../concepts/portfolio-margin.md) para conocer los modelos.
 
-### `update_leverage`
+### Establecer apalancamiento y modo de margen {#update_leverage}
 
 Establece el apalancamiento por activo y, opcionalmente, cambia el activo al modo aislado.
 
@@ -943,7 +943,7 @@ No existe una acción separada para el modo de margen: el aislamiento se gestion
 
 ---
 
-### `update_isolated_margin`
+### Ajustar el margen aislado mediante un delta {#update_isolated_margin}
 
 Aplica un delta de margen con signo a una posición aislada (`+` añade, `−` retira).
 
@@ -961,7 +961,7 @@ Aplica un delta de margen con signo a una posición aislada (`+` añade, `−` r
 
 ---
 
-### `top_up_isolated_only_margin`
+### Añadir margen a una posición estrictamente aislada {#top_up_isolated_only_margin}
 
 Añade margen a una posición de margen estrictamente aislado. Solo en dirección de recarga (importe positivo).
 
@@ -979,7 +979,7 @@ Añade margen a una posición de margen estrictamente aislado. Solo en direcció
 
 ---
 
-### `user_portfolio_margin`
+### Inscribir o dar de baja el margen de cartera {#user_portfolio_margin}
 
 Inscribe o cancela la inscripción de la cuenta en margen de cartera.
 
@@ -998,13 +998,13 @@ Requiere que el patrimonio de la cuenta sea ≥ `pm_min_equity` (parámetro de g
 
 ---
 
-## Acciones de cuenta, staking, vaults y puente
+## Acciones de cuenta, staking, vaults y puente {#account-staking-vaults--bridge-actions}
 
 Acciones transversales no específicas de un producto de trading — carteras de agentes,
 nombre para mostrar, referido, multi-firma, subcuentas, modo de posición, staking y
 abstracción, órdenes cifradas, vaults / Metaliquidity, y retiros por puente.
 
-### `approve_agent`
+### Aprobar una cartera de agente {#approve_agent}
 
 Aprueba una cartera de agente para firmar en nombre de la cuenta. Consulta [carteras de agente](../../concepts/agent-wallets.md) para el ciclo de vida.
 
@@ -1043,7 +1043,7 @@ Tiene efecto **un bloque después del commit**. Enviar una acción firmada por e
 
 ---
 
-### `set_display_name`
+### Establecer el nombre para mostrar de la cuenta {#set_display_name}
 
 Establece el identificador legible por personas de la cuenta.
 
@@ -1060,7 +1060,7 @@ Establece el identificador legible por personas de la cuenta.
 
 ---
 
-### `set_referrer`
+### Vincular la cuenta a un referido {#set_referrer}
 
 Vincula la cuenta a una **dirección** de referido (no un código).
 
@@ -1079,7 +1079,7 @@ Configurable **una sola vez** por cuenta; los intentos posteriores devuelven `{"
 
 ---
 
-### `approve_builder_fee`
+### Aprobar un límite de comisión de builder {#approve_builder_fee}
 
 Aprueba una dirección de builder hasta un límite de comisión (bps). `0` revoca; el manejador base limita a 8 bps.
 
@@ -1100,7 +1100,7 @@ Aprueba una dirección de builder hasta un límite de comisión (bps). `0` revoc
 
 ---
 
-### `convert_to_multi_sig_user`
+### Convertir la cuenta a multi-firma {#convert_to_multi_sig_user}
 
 Convierte la cuenta a un registro multi-firma. **Irreversible**.
 
@@ -1139,7 +1139,7 @@ Consulta [multi-firma](../../concepts/multi-sig.md).
 
 ---
 
-### `create_sub_account`
+### Crear una subcuenta {#create_sub_account}
 
 Abre una subcuenta cuyo propietario es el remitente (el firmante recuperado se convierte en el único
 maestro). La subcuenta recibe una dirección derivada en cadena que mantiene sus propios
@@ -1171,7 +1171,7 @@ de confirmación**, no en el cuerpo HTTP — haga seguimiento de la confirmació
 
 ---
 
-### `sub_account_transfer`
+### Transferir colateral entre la cuenta maestra y la subcuenta {#sub_account_transfer}
 
 Mueve colateral USDC de margen cruzado de perpetuos entre la cuenta maestra y una de sus
 subcuentas. **Autorizado por el remitente** — sin campo `owner`; el firmante es el maestro.
@@ -1204,7 +1204,7 @@ found` (`sub_index` desconocido o no perteneciente al remitente), `insufficient 
 
 ---
 
-### `sub_account_spot_transfer`
+### Transferir tokens spot entre la cuenta maestra y la subcuenta {#sub_account_spot_transfer}
 
 Mueve un saldo de **token spot** entre la cuenta maestra y una de sus
 subcuentas. **Autorizado por el remitente** — sin campo `owner`.
@@ -1239,7 +1239,7 @@ found`, `insufficient spot balance`.
 
 ---
 
-### `set_position_mode`
+### Alternar entre modo unidireccional y modo cobertura {#set_position_mode}
 
 Alterna la cuenta del remitente entre el modo unidireccional (una única posición neta por mercado) y el
 [modo cobertura](../../concepts/hedge-mode.md) (una posición larga y una corta separadas por
@@ -1276,7 +1276,7 @@ liquidación por posición y el reporte dual de posiciones todavía se están de
 
 ---
 
-### `c_deposit`
+### Mover MTF al saldo libre de staking {#c_deposit}
 
 Mueve MTF entero del **saldo spot de MTF** del remitente a su **saldo libre de staking**
 (el fondo no delegado del que se nutre [`token_delegate`](#token_delegate)). Movimiento de valor puro
@@ -1304,7 +1304,7 @@ balance`, activo spot de MTF no configurado en esta cadena.
 
 ---
 
-### `c_withdraw`
+### Retirar MTF del saldo de staking {#c_withdraw}
 
 El reverso exacto de [`c_deposit`](#c_deposit): mueve MTF entero del
 **saldo libre de staking** del remitente de vuelta a su **saldo spot de MTF**. No se aplica ningún período de desbloqueo
@@ -1331,7 +1331,7 @@ balance`, activo spot de MTF no configurado en esta cadena.
 
 ---
 
-### `token_delegate`
+### Delegar o retirar la delegación de stake {#token_delegate}
 
 Delega o retira la delegación de stake a un validador. El lado de la delegación se nutre del
 **saldo libre de staking** (financiado por [`c_deposit`](#c_deposit)); la retirada de delegación
@@ -1356,7 +1356,7 @@ entra en un período de desvinculación sujeto a penalización antes de que el s
 
 ---
 
-### `claim_rewards`
+### Reclamar recompensas de staking {#claim_rewards}
 
 Reclama las recompensas de staking, opcionalmente limitado a un validador.
 
@@ -1373,7 +1373,7 @@ Reclama las recompensas de staking, opcionalmente limitado a un validador.
 
 ---
 
-### `link_staking_user`
+### Asignar un alias a una dirección objetivo de staking {#link_staking_user}
 
 Crea un alias de una dirección objetivo de staking al remitente.
 
@@ -1390,7 +1390,7 @@ Crea un alias de una dirección objetivo de staking al remitente.
 
 ---
 
-### `user_dex_abstraction`
+### Activar o desactivar la abstracción DEX de la cuenta {#user_dex_abstraction}
 
 Activa o desactiva el indicador global de abstracción DEX para el remitente.
 
@@ -1407,7 +1407,7 @@ Activa o desactiva el indicador global de abstracción DEX para el remitente.
 
 ---
 
-### `user_set_abstraction`
+### Configurar la abstracción de alcance propio {#user_set_abstraction}
 
 Configuración de abstracción de alcance propio. `kind` es una etiqueta de despacho opaca; `value` es el ajuste.
 
@@ -1425,7 +1425,7 @@ Configuración de abstracción de alcance propio. `kind` es una etiqueta de desp
 
 ---
 
-### `agent_set_abstraction`
+### Configurar la abstracción de otro usuario {#agent_set_abstraction}
 
 Configuración de abstracción de alcance de agente: un agente firma para actualizar la configuración de otro usuario.
 El manejador central verifica la aprobación del agente contra `user` en el despacho.
@@ -1449,7 +1449,7 @@ El manejador central verifica la aprobación del agente contra `user` en el desp
 
 ---
 
-### `priority_bid`
+### Pagar por colocación prioritaria en el bloque {#priority_bid}
 
 Paga una tarifa de prioridad (bps) para impulsar el flujo del remitente hacia el frente del próximo bloque.
 
@@ -1467,7 +1467,7 @@ Paga una tarifa de prioridad (bps) para impulsar el flujo del remitente hacia el
 
 ---
 
-### `submit_encrypted_order`
+### Enviar una orden cifrada por umbral {#submit_encrypted_order}
 
 **Estado: disponible en devnet (vista previa).** La acción es aceptada y se aplica la
 mecánica del pool pendiente que se describe a continuación, pero el pipeline de órdenes cifradas con umbral
@@ -1505,7 +1505,7 @@ pendiente lleno generan error al confirmar.
 
 ---
 
-### `create_vault`
+### Crear un vault {#create_vault}
 
 El líder crea una bóveda.
 
@@ -1532,7 +1532,7 @@ Devuelve el nuevo `vault_id` y la `vault_address` derivada.
 
 ---
 
-### `vault_transfer`
+### Transferir fondos entre el líder y el vault {#vault_transfer}
 
 Transferencia de fondos semilla del líder entre la cuenta principal del líder y la subcuenta del vault.
 
@@ -1551,7 +1551,7 @@ Transferencia de fondos semilla del líder entre la cuenta principal del líder 
 
 ---
 
-### `vault_modify`
+### Actualizar la configuración del vault {#vault_modify}
 
 Actualización de configuración del vault exclusiva para el líder. Cada campo `new_*` es opcional (`null` =
 sin cambios).
@@ -1579,7 +1579,7 @@ sin cambios).
 
 ---
 
-### `vault_withdraw`
+### Canjear participaciones del vault {#vault_withdraw}
 
 Redención de participaciones por parte de los seguidores.
 
@@ -1599,7 +1599,7 @@ Devuelve los centavos de USD pagados y las participaciones quemadas.
 
 ---
 
-### `core_evm_transfer`
+### Transferir USDC de Core a EVM {#core_evm_transfer}
 
 Mueve USDC del **ledger de compensación Core** al lado **MetaFluxEVM**: debita el colateral cruzado de USDC del remitente en Core y acuña el USDC EVM de 6 decimales con conversión de escala en `destination` en el siguiente bloque EVM. El equivalente MTF de una transferencia de activos Core → EVM. **Autorizado por el remitente** — sin campo `owner`; el firmante recuperado es la cuenta debitada. Una firma de agente actúa, por tanto, sobre la **propia cuenta del agente**, nunca sobre la del maestro, por lo que esto es efectivamente exclusivo del maestro (coherente con la [tabla de firmantes](#signed-by-semantics)).
 
@@ -1651,7 +1651,7 @@ for core->evm transfer`.
 
 ---
 
-### `mb_withdraw`
+### Retirar USDC a una cadena externa {#mb_withdraw}
 
 Retiro externo a través de [MetaBridge](../../bridge/index.md): debita el colateral cruzado de USDC del remitente y encola un mensaje de puente **Outbound** para la cofirma de validadores (⅔ del stake activo), tras lo cual los fondos se liberan en `dst_addr` en la cadena de destino. **Autorizado por el remitente** — sin campo `owner`; el firmante recuperado es la cuenta debitada. Una firma de agente actúa, por tanto, sobre la **propia cuenta del agente**, nunca sobre la del maestro, por lo que la autoridad de retiro es efectivamente exclusiva del maestro (coherente con la [tabla de firmantes](#signed-by-semantics)).
 
@@ -1699,9 +1699,7 @@ collateral for withdrawal`.
 
 ---
 
-<a id="non-bridged-actions"></a>
-
-### Acciones no transferidas por puente
+### Acciones no transferidas por puente {#non-bridged-actions}
 
 Los siguientes nombres de acción en borrador **no** están conectados al manejador `/exchange` nativo de MTF. Publicarlos devuelve `400 unsupported action` (stubs reconocidos pero no mapeados) o `400 action: unknown type` (sin etiqueta nativa en absoluto). Se documentan aquí únicamente para redirigir a los integradores al camino compatible.
 
@@ -1718,13 +1716,13 @@ Los siguientes nombres de acción en borrador **no** están conectados al maneja
 | `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Stub reconocido pero no mapeado → `unsupported action` | — |
 | `FbaOrder` | `fba_submit` | Stub reconocido pero no mapeado → `unsupported action` | — |
 | (distribución de vault) | `vault_distribute` | Manejador parcial/stub; no transferido por puente en `/exchange` | — |
-| (ciclo de vida PM) | `pm_enroll` / `pm_unenroll` / `pm_rebalance` | Stub reconocido pero no mapeado → `unsupported action` | [`user_portfolio_margin`](#user_portfolio_margin) para inscripción/baja |
+| (ciclo de vida PM) | `pm_enroll` / `pm_unenroll` | Se mapean a la acción canónica de inscripción/baja; `pm_rebalance` **eliminada** → rechazada como acción desconocida | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (entre cadenas) | `cross_chain_send` | Stub reconocido pero no mapeado → `unsupported action` | — |
 | (envío encriptado alternativo) | `encrypted_order_submit` | Stub | [`submit_encrypted_order`](#submit_encrypted_order) |
 
 ---
 
-## Respuesta
+## Respuesta {#response}
 
 La forma de la respuesta depende de la clase de acción:
 
@@ -1734,7 +1732,7 @@ La forma de la respuesta depende de la clase de acción:
 - **Cualquier rechazo en el momento de admisión** → el envoltorio de rechazo (`accepted:false`),
   con el estado HTTP documentado.
 
-### `200 OK` — ruta de orden (oid síncrono)
+### `200 OK` — ruta de orden (oid síncrono) {#200-ok--order-path-synchronous-oid}
 
 `submit_order` bloquea hasta la ventana de espera de orden del nodo (por defecto ~5 s; Devnet
 confirma en ~250 ms), por lo que la respuesta incluye el `oid` real + estado en libro/ejecutado.
@@ -1757,7 +1755,7 @@ Una entrada `pending` significa que la acción fue admitida y puede confirmarse 
 rastréala a través del [feed WS](../ws/subscriptions.md) o consultando `/info` con el
 `action_hash` devuelto.
 
-### `202 Accepted` — admisión de acciones que no son órdenes
+### `202 Accepted` — admisión de acciones que no son órdenes {#202-accepted--non-order-admission}
 
 Cada acción que no es una orden (cancelación, margen, vault, staking, gobernanza, …) devuelve
 el envoltorio de admisión:
@@ -1773,7 +1771,7 @@ el envoltorio de admisión:
 
 `mempool_depth` es informativo en el momento de la admisión. `action_hash` es el identificador determinístico (`0x` + keccak256 de los bytes exactos del JSON de `action` firmado) que puedes cotejar con los eventos de confirmación.
 
-### Envoltorio de rechazo
+### Envoltorio de rechazo {#rejection-envelope}
 
 Cada rechazo en el momento de admisión (4xx) incluye el mismo cuerpo plano — `accepted:false`,
 el motivo del `error` y el `mempool_depth` en ese momento:
@@ -1782,7 +1780,7 @@ el motivo del `error` y el `mempool_depth` en ese momento:
 { "accepted": false, "error": "signature: expected 130 hex chars, got 4", "mempool_depth": 0 }
 ```
 
-### `400 Bad Request` — solicitud mal formada
+### `400 Bad Request` — solicitud mal formada {#400-bad-request--malformed}
 
 | Valor de `error` | Causa | Solución |
 |---------------|-------|-------------|
@@ -1795,7 +1793,7 @@ el motivo del `error` y el `mempool_depth` en ese momento:
 | `action carries no owner` | Una acción sin propietario que no está autorizada por el remitente | Usa una acción compatible |
 | `duplicate cloid` | `submit_order` reutilizó un ID de orden de cliente en la misma cuenta | Usa un `cloid` nuevo |
 
-### `401 Unauthorized` — firma / autorización fallida
+### `401 Unauthorized` — firma / autorización fallida {#401-unauthorized--signature--authorization-failed}
 
 | Valor de `error` | Causa |
 |---------------|-------|
@@ -1809,7 +1807,7 @@ como un tipo de acción desconocido devuelve el error `401 recover:`, no un `400
 La protección contra repetición (unicidad de nonce) se aplica en el **estado confirmado** (una ventana deslizante de 64 posiciones por cuenta), no en la admisión — un nonce reutilizado es admitido en el borde HTTP y descartado al confirmar, por lo que no hay rechazo síncrono de `nonce` aquí.
 :::
 
-### `429 Too Many Requests` — límite de tasa alcanzado
+### `429 Too Many Requests` — límite de tasa alcanzado {#429-too-many-requests--rate-limited}
 
 ```json
 { "error": "rate limit exceeded", "retry_after_ms": 1200 }
@@ -1817,7 +1815,7 @@ La protección contra repetición (unicidad de nonce) se aplica en el **estado c
 
 Consulte [límites de tasa](../rate-limits.md).
 
-### `503 Service Unavailable` — mempool lleno
+### `503 Service Unavailable` — mempool lleno {#503-service-unavailable--mempool-full}
 
 ```json
 { "error": "mempool at capacity", "retry_after_ms": 200 }
@@ -1827,7 +1825,7 @@ Aplique retroceso exponencial y reintente. Un 503 sostenido indica congestión d
 
 ---
 
-## Admisión ≠ confirmación
+## Admisión ≠ confirmación {#admission--commit}
 
 `202` significa aceptado en el mempool. Esto **no** implica:
 
@@ -1846,7 +1844,7 @@ flowchart LR
 
 Siga el estado de confirmación mediante el [feed WS](../ws/subscriptions.md) (`orderEvents` / `userEvents`) o consulte `/info` para `openOrders` / `userFills`. El `action_hash` devuelto en la admisión aparece sin cambios en los eventos de confirmación.
 
-## Diagrama de secuencia — colocar una orden y verla en el libro
+## Diagrama de secuencia — colocar una orden y verla en el libro {#sequence-diagram--place-an-order-and-see-it-on-the-book}
 
 ```mermaid
 sequenceDiagram
@@ -1866,7 +1864,7 @@ sequenceDiagram
     gateway-->>client: WS orderEvents {resting, oid:...}
 ```
 
-## Casos límite
+## Casos límite {#edge-cases}
 
 <details>
 <summary>Mostrar casos límite</summary>
@@ -1880,7 +1878,7 @@ sequenceDiagram
 
 </details>
 
-## Véase también
+## Véase también {#see-also}
 
 - [`POST /info`](./info.md) — ruta de lectura (nativo MTF)
 - [Billeteras de agente](../../concepts/agent-wallets.md)
@@ -1891,7 +1889,7 @@ sequenceDiagram
 - [Errores](../errors.md)
 - [Límites de tasa](../rate-limits.md)
 
-## Preguntas frecuentes
+## Preguntas frecuentes {#faq}
 
 <details>
 <summary>Mostrar preguntas frecuentes</summary>

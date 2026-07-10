@@ -4,11 +4,11 @@
 **Stable.**
 :::
 
-## TL;DR
+## TL;DR {#tldr}
 
 Three modes per-asset: **Cross**, **Isolated**, **Strict-Iso**. Cross pools collateral across all your positions; Isolated walls off margin per asset; Strict-Iso additionally excludes that asset from any [portfolio-margin](./portfolio-margin.md) netting.
 
-## Comparison
+## Comparison {#comparison}
 
 | Mode | Collateral source | Loss can drain | PM eligible | Liquidation isolation |
 |------|-------------------|----------------|-------------|----------------------|
@@ -18,11 +18,11 @@ Three modes per-asset: **Cross**, **Isolated**, **Strict-Iso**. Cross pools coll
 
 In Cross, profitable positions can carry less-healthy ones — your free balance is fungible across the account. In Isolated, blowing up one asset is contained to that asset's bucket.
 
-## How margin is computed
+## How margin is computed {#how-margin-is-computed}
 
 > All amounts are on the **whole-USDC `Decimal` plane** (notional, collateral, margin), not the 1e8 book plane — see [mark prices: two price planes](./mark-prices.md#two-price-planes-read-this-before-reading-any-number).
 
-### Initial margin (pre-trade gate)
+### Initial margin (pre-trade gate) {#initial-margin-pre-trade-gate}
 
 An order opening new exposure must post initial margin:
 
@@ -38,7 +38,7 @@ So `init_margin = notional / max_leverage` — the classic `1 / max_leverage` ra
 
 `held_initial_margin` sums `ceil(|entry_notional| / effective_lev(asset))` over every **cross** open position (isolated positions are excluded — their collateral is the separately-posted bucket).
 
-### Maintenance margin & health
+### Maintenance margin & health {#maintenance-margin--health}
 
 ```
 health = account_value / maint_margin
@@ -53,7 +53,7 @@ Maintenance sits below the initial requirement (`notional / max_leverage`), so a
 
 > The arithmetic uses `Decimal` / `i128` throughout (no floats); the tier decision even right-shifts both operands by a common amount before the `Decimal` division when an account value would exceed `Decimal::MAX`, preserving the health ratio so the tier decision is unaffected.
 
-## Cross — the default
+## Cross — the default {#cross--the-default}
 
 ```mermaid
 flowchart LR
@@ -66,7 +66,7 @@ flowchart LR
 
 Implication: a 10% adverse move on BTC reduces account-wide health, even if your ETH position is fine. You can prop up the BTC position by closing the ETH winner.
 
-## Isolated
+## Isolated {#isolated}
 
 :::warning
 **Implementation gap.** The conceptual model below is the **target behaviour**.
@@ -100,7 +100,7 @@ You can deposit/withdraw to the bucket while the position is open:
 
 `isolated_amount` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected.
 
-## Strict-Iso
+## Strict-Iso {#strict-iso}
 
 Same wall as Isolated, plus an explicit opt-out from PM scenario inclusion. Even if your master is portfolio-margin-enrolled, a Strict-Iso position:
 
@@ -113,7 +113,7 @@ Use Strict-Iso for:
 - Speculation budget you want firewalled from your hedged core book
 - Listings (MIP-3) where the maintenance ratio is conservative until liquidity builds
 
-## Governance-imposed strict isolation (market-level)
+## Governance-imposed strict isolation (market-level) {#governance-imposed-strict-isolation-market-level}
 
 The Strict-Iso mode above is a choice *you* make per asset. MetaFlux also lets
 **governance** impose strict isolation at the **market level** — a per-market risk
@@ -143,7 +143,7 @@ Unlike the `onlyIsolated` deploy-time flag (fixed once when a
 be turned **on or off on a live market** by a later vote as its risk profile
 changes.
 
-## When to use each
+## When to use each {#when-to-use-each}
 
 | Goal | Mode |
 |------|------|
@@ -155,9 +155,9 @@ changes.
 
 For multi-strategy isolation, [sub-accounts](./sub-accounts.md) are usually a better fit than Isolated — sub-accounts isolate the entire account, including agent keys and order space, not just margin.
 
-## Transitions
+## Transitions {#transitions}
 
-Switching modes uses the [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) action (the `is_isolated` flag — there is no separate margin-mode action) and is allowed only when:
+Switching modes uses the [`update_leverage`](../api/rest/exchange.md#update_leverage) action (the `is_isolated` flag — there is no separate margin-mode action) and is allowed only when:
 
 | From → To | Allowed when |
 |-----------|--------------|
@@ -169,7 +169,7 @@ Switching modes uses the [`update_isolated_margin`](../api/rest/exchange.md#upda
 
 Switching mode mid-position is **not** a flat-and-reopen — the position stays, only the margin accounting changes.
 
-## Liquidation behaviour
+## Liquidation behaviour {#liquidation-behaviour}
 
 The [tiered liquidation](./tiered-liquidation.md) ladder applies independently per scope:
 
@@ -192,7 +192,7 @@ flowchart TD
     SS --> L4["ladder #4 (SOL-only, classical)"]
 ```
 
-## Sequence — flip cross → isolated
+## Sequence — flip cross → isolated {#sequence--flip-cross--isolated}
 
 ```mermaid
 sequenceDiagram
@@ -205,7 +205,7 @@ sequenceDiagram
     node-->>client: cross free_balance = 4000<br/>BTC bucket = 1000<br/>margin_mode[BTC] = Isolated
 ```
 
-## Edge cases
+## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
@@ -217,14 +217,14 @@ sequenceDiagram
 
 </details>
 
-## See also
+## See also {#see-also}
 
 - [Portfolio margin](./portfolio-margin.md) — PM-vs-classical math
 - [Tiered liquidation](./tiered-liquidation.md) — per-scope ladders
 - [Sub-accounts](./sub-accounts.md) — full account-level isolation
-- [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) — margin mode is the `is_isolated` flag here; there is no separate margin-mode action
+- [`update_leverage`](../api/rest/exchange.md#update_leverage) — margin mode is the `is_isolated` flag here; there is no separate margin-mode action
 
-## FAQ
+## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>

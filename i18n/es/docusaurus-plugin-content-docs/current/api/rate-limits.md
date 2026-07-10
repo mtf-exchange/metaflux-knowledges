@@ -4,7 +4,7 @@
 **Vista previa.** El gateway aplica los límites que se indican a continuación; el nodo base acepta tráfico ilimitado de peers mTLS autenticados (destinado exclusivamente a infraestructura de confianza — no exponga `8080` a internet abierto en producción).
 :::
 
-## Resumen rápido
+## Resumen rápido {#tldr}
 
 - Dos presupuestos: **peso por IP** (tráfico anónimo) y **QPS por cuenta** (tráfico firmado).
 - Las cargas de trabajo con ráfagas consumen un token bucket; el tráfico sostenido queda regulado por la tasa de recarga.
@@ -12,14 +12,22 @@
 - Las consultas a `/info` son económicas (peso 1); las suscripciones WS son aún más baratas (1 de peso al suscribirse, 0 por mensaje). `/exchange` tiene peso 5 por solicitud.
 - El mempool tiene un límite independiente de acciones pendientes por cuenta.
 
-## Presupuestos
+## Presupuestos {#budgets}
 
-| Presupuesto | Límite (por defecto) | Recarga | Ráfaga |
-|-------------|----------------------|---------|--------|
-| Peso por IP | 1200 peso / minuto | 20 peso / segundo | 1200 (bucket completo) |
-| QPS por cuenta | 30 req / segundo | 30 / s | 60 |
-| Acciones en mempool por cuenta | 50 pendientes | se vacía conforme se confirman las acciones | — |
-| Suscripciones WS por conexión | 256 | — | — |
+| Presupuesto | Límite (por defecto) | Recarga | Ráfaga | Exención |
+|-------------|----------------------|---------|--------|----------|
+| Peso por IP | 1200 peso / minuto | 20 peso / segundo | 1200 (bucket completo) | IPs en lista blanca exentas |
+| Bucket `/exchange` por cuenta | 30 req / segundo | 30 / s | 60 | firmantes del conjunto de metaliquidez exentos |
+| Acciones en mempool por cuenta | 50 pendientes | se vacía conforme se confirman las acciones | — | — |
+| Suscripciones WS por conexión | 64 | — | — | conexiones en lista blanca exentas |
+
+- **Por IP** cubre el tráfico de lectura anónimo (`/info`, suscripción WS); las
+  **IPs en lista blanca** (creadores de mercado / infraestructura designados por el operador) lo omiten.
+- El **bucket por cuenta** se aplica a las escrituras firmadas de `/exchange`. Las cuentas en el
+  **conjunto de operadores de metaliquidez** (los firmantes de estrategias de vault en lista blanca) están
+  **exentas** del bucket por cuenta.
+- **WS**: como máximo **64 suscripciones activas por conexión**; una 65.ª suscripción es
+  rechazada. Las conexiones en lista blanca están exentas del límite.
 
 Todos los límites están controlados por gobernanza. Una instantánea del presupuesto por cuenta está disponible
 mediante la lectura nativa [`user_rate_limit`](./rest/info.md):
@@ -48,25 +56,25 @@ curl -X POST https://api.devnet.mtf.exchange/info \
     "refill":       30
   },
   "mempool_per_account": 50,
-  "ws_subs_per_conn":    256
+  "ws_subs_per_conn":    64
 }
 ```
 
-## Peso por endpoint
+## Peso por endpoint {#weight-by-endpoint}
 
 | Endpoint | Peso |
 |----------|------|
 | `POST /info` (la mayoría de tipos) | 1 |
-| `POST /info` `l2Book`, `metaAndAssetCtxs` | 2 |
-| `POST /info` `userFills`, `historicalOrders` (paginado) | 2 |
+| `POST /info` `l2_book`, `markets` | 2 |
+| `POST /info` `user_fills`, `user_fills_by_time` | 2 |
 | `POST /exchange` | 5 |
 | WS `subscribe` | 1 |
 | Mensaje publicado WS | 0 |
 | WS `unsubscribe` | 0 |
 
-Un cliente que realiza una orden por segundo y consulta `clearinghouseState` una vez por segundo consume `5 + 1 = 6 peso/s = 360 peso/min` — muy por debajo del presupuesto.
+Un cliente que realiza una orden por segundo y consulta `account_state` una vez por segundo consume `5 + 1 = 6 peso/s = 360 peso/min` — muy por debajo del presupuesto.
 
-## QPS por cuenta
+## QPS por cuenta {#per-account-qps}
 
 Una vez que una solicitud está firmada, el gateway autentica al `sender` y lo cuenta contra el presupuesto por cuenta en lugar de (o además de) el presupuesto por IP.
 
@@ -78,7 +86,7 @@ Una vez que una solicitud está firmada, el gateway autentica al `sender` y lo c
 
 Las solicitudes firmadas se contabilizan dos veces: contra por-IP y por-cuenta; los clientes que envían tráfico intenso desde una única IP en nombre de una cuenta alcanzarán el presupuesto que sea más restrictivo.
 
-## Límite del mempool
+## Límite del mempool {#mempool-cap}
 
 Independiente de los límites de tasa. La máquina de estados rechaza admitir más de 50 acciones pendientes (no confirmadas aún) por `sender`. Esto evita que una cuenta monopolice el espacio del mempool.
 
@@ -90,7 +98,7 @@ Si envía una 51.ª acción mientras hay 50 pendientes:
 
 En la práctica, esto solo lo encuentran clientes con comportamiento incorrecto — un tiempo de bloque saludable de ~100 ms vacía 30 QPS con facilidad. Si llega a este límite, es correcto en cuanto a tasa por cuenta, pero está enviando más rápido de lo que los bloques confirman.
 
-## Comportamiento de ráfaga
+## Comportamiento de ráfaga {#burst-behaviour}
 
 Los buckets se llenan hasta `burst` y se recargan a `refill` por segundo. Una ráfaga de `N ≤ burst` solicitudes se atiende de inmediato; las solicitudes posteriores quedan limitadas a la tasa de recarga.
 
@@ -102,28 +110,28 @@ flowchart LR
 
 Una respuesta `429` con `retry_after_ms` le indica exactamente cuándo el bucket tendrá suficiente para una solicitud más de peso 1. Para trabajos por lotes, es preferible regular el ritmo en el cliente; para cargas interactivas, el retroceso exponencial con la pista es adecuado.
 
-## Estrategias
+## Estrategias {#strategies}
 
-### Bot de flujo de órdenes
+### Bot de flujo de órdenes {#order-flow-bot}
 
 - Aplique un límite de tasa preventivo en el cliente de ~25 QPS para mantener margen de seguridad.
 - Use el agrupamiento de `Order`: una solicitud con 10 órdenes cuesta 5 de peso (igual que una sola orden); el QPS por cuenta cuenta solicitudes, no legs.
 - Use `BatchModify` en lugar de N llamadas separadas a `ModifyOrder`.
 - Mantenga los datos de mercado en el feed WS, no mediante polling a `/info`.
 
-### Consumidor de datos de mercado
+### Consumidor de datos de mercado {#market-data-consumer}
 
-- Suscríbase a los canales WS (`l2Book`, `trades`, `userEvents`); no haga polling.
+- Suscríbase a los canales WS (`l2_book`, `trades`, `user_events`); no haga polling.
 - El peso de `subscribe` es 1; los mensajes en flujo cuestan 0.
-- Reconéctese con `resume_token` en lugar de volver a suscribirse a todos los canales desde cero (las suscripciones consumen peso de nuevo en la nueva conexión).
+- Al reconectar, se vuelve a suscribir desde una instantánea nueva (no hay tokens de reanudación); cada suscripción vuelve a consumir peso en la nueva conexión, así que mantenga las conexiones activas el mayor tiempo posible. Manténgase dentro del límite de **64 suscripciones** por conexión.
 
-### Liquidador de alta frecuencia
+### Liquidador de alta frecuencia {#high-frequency-liquidator}
 
 - Ejecute desde su propio nodo alojado (autenticado con mTLS, `localhost:8080`), evitando los límites del gateway público.
 - Tenga en cuenta que esto requiere ejecutar infraestructura con un validador.
 - El acceso al gateway público es suficiente para cargas de trabajo de decenas de órdenes por segundo; no para HFT.
 
-## Secuencia — ser limitado y recuperarse
+## Secuencia — ser limitado y recuperarse {#sequence--getting-throttled-and-recovering}
 
 ```mermaid
 sequenceDiagram
@@ -145,7 +153,7 @@ sequenceDiagram
     gateway-->>client: 202 Accepted
 ```
 
-## Canales de exención
+## Canales de exención {#override-channels}
 
 | Canal | Notas |
 |-------|-------|
@@ -155,13 +163,13 @@ sequenceDiagram
 
 Los valores predeterminados públicos asumen que ninguna exención aplica.
 
-## Véase también
+## Véase también {#see-also}
 
 - [Errores](./errors.md)
 - [Suscripciones WS](./ws/subscriptions.md)
 - [Idempotencia](../integration/idempotency.md) — cómo reintentar dentro del presupuesto de límite de tasa
 
-## Preguntas frecuentes
+## Preguntas frecuentes {#faq}
 
 <details>
 <summary>Mostrar preguntas frecuentes</summary>

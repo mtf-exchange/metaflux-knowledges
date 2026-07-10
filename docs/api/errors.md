@@ -6,7 +6,7 @@
 
 A complete enumeration of HTTP status codes, error-string conventions, root causes, and remediation. When in doubt about how to handle a non-`202`, look here first.
 
-## TL;DR
+## TL;DR {#tldr}
 
 - **2xx** — success. MTF-native endpoints use proper HTTP status codes for errors, not in-body error flags.
 - **400** — client-side bug: malformed request, bad signature shape, unknown action variant. Do not retry without fixing.
@@ -17,7 +17,7 @@ A complete enumeration of HTTP status codes, error-string conventions, root caus
 - **429** — rate limited. Back off and retry per `retry_after_ms`.
 - **5xx** — server-side. Retry with exponential backoff; persistent failures indicate operator-side incident.
 
-## Body shape
+## Body shape {#body-shape}
 
 All non-2xx responses on MTF-native endpoints use:
 
@@ -31,9 +31,9 @@ All non-2xx responses on MTF-native endpoints use:
 
 `detail` and `retry_after_ms` are present only when applicable. The `error` field is the stable identifier — keep your error handler keyed off it.
 
-## Catalog
+## Catalog {#catalog}
 
-### 400 — bad request
+### 400 — bad request {#400--bad-request}
 
 | `error` | Triggered when | Remediation |
 |---------|----------------|-------------|
@@ -50,7 +50,7 @@ All non-2xx responses on MTF-native endpoints use:
 | `unknown info type: <X>` | `/info` `type` not recognised | Check the [info reference](./rest/info.md) |
 | `chain_id mismatch` | The chainId field of a multi-sig wrapper doesn't match the network | Match the network's `chainId` |
 
-### 401 — unauthorized (signature failed)
+### 401 — unauthorized (signature failed) {#401--unauthorized-signature-failed}
 
 | `error` | Triggered when | Remediation |
 |---------|----------------|-------------|
@@ -62,7 +62,7 @@ All non-2xx responses on MTF-native endpoints use:
 | `multisig threshold not met` | Inner action has < `threshold` valid signatures | Collect more signatures |
 | `multisig duplicate signer` | Same address signs twice in a multi-sig wrap | Each signer must be distinct |
 
-### 404 — not found
+### 404 — not found {#404--not-found}
 
 | `error` | Triggered when |
 |---------|----------------|
@@ -73,13 +73,13 @@ All non-2xx responses on MTF-native endpoints use:
 
 For `/info` queries, MTF-native returns `404` when the queried resource is unknown.
 
-### 405 — method not allowed
+### 405 — method not allowed {#405--method-not-allowed}
 
 | `error` | Triggered when |
 |---------|----------------|
 | (no body) | Used `GET` on a `POST` endpoint (or vice versa) |
 
-### 422 — unprocessable entity
+### 422 — unprocessable entity {#422--unprocessable-entity}
 
 Request was well-formed and the signature was valid, but the action itself is logically invalid.
 
@@ -94,7 +94,7 @@ Request was well-formed and the signature was valid, but the action itself is lo
 | `insufficient balance` | Withdrawal / transfer exceeds free balance | Check `clearinghouseState` first |
 | `out of bounds: <param>` | Governance bound violated (e.g. funding cap on `PerpDeployGasAuctionBid`) | Use a value within the published bound |
 
-### 429 — rate limited
+### 429 — rate limited {#429--rate-limited}
 
 ```json
 { "error": "rate limit exceeded", "scope": "per_ip"|"per_account", "retry_after_ms": 1200 }
@@ -108,7 +108,7 @@ Request was well-formed and the signature was valid, but the action itself is lo
 
 See [rate limits](./rate-limits.md) for budgets and burst handling.
 
-### 503 — service unavailable
+### 503 — service unavailable {#503--service-unavailable}
 
 | `error` | Cause | Remediation |
 |---------|-------|-------------|
@@ -116,9 +116,9 @@ See [rate limits](./rate-limits.md) for budgets and burst handling.
 | `gateway not ready` | Gateway is starting up / failing health checks | Retry with backoff; check [status](../networks.md#status) |
 | `node downstream unreachable` | Gateway lost the node connection | Operator-side; backoff and watch status |
 
-### Commit-time errors (not HTTP, in event stream)
+### Commit-time errors (not HTTP, in event stream) {#commit-time-errors-not-http-in-event-stream}
 
-Some failures happen after `202 Accepted` because they're only knowable in the block-execution context. These appear on the `orderEvents` / `userEvents` WS channel as `{"error":"<reason>", "action_hash":"0x..."}`.
+Some failures happen after `202 Accepted` because they're only knowable in the block-execution context. These appear on the `order_updates` / `user_events` WS channel as `{"error":"<reason>", "action_hash":"0x..."}`.
 
 | `error` | Cause |
 |---------|-------|
@@ -128,7 +128,7 @@ Some failures happen after `202 Accepted` because they're only knowable in the b
 | `evicted_under_cap_pressure` | Admitted but evicted from mempool before block proposal |
 | `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch |
 
-## Decision tree
+## Decision tree {#decision-tree}
 
 ```mermaid
 flowchart TD
@@ -148,7 +148,7 @@ flowchart TD
     CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted — the failure<br/>is at execution"]
 ```
 
-## See also
+## See also {#see-also}
 
 - [`POST /exchange`](./rest/exchange.md) — write path
 - [`POST /info`](./rest/info.md) — read path

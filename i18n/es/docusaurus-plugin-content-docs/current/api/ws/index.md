@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**Estado.** Activo en el nodo para `l2_book`, `bbo` (libro/mejor precio), `trades`, `active_asset_ctx` (mark/oracle/financiación/interés abierto por mercado), `all_mids`, `fills`, `user_events` y `candles` (barras OHLCV en tiempo real, por `(coin, interval)`) — todos emiten datos confirmados en tiempo real, orientados a cambios (un canal emite un frame solo cuando su estado cambió desde el último commit) — además de `post` (solicitud/respuesta sobre WS) y `ping`/`pong`. Consulte [suscripciones](./subscriptions.md) para ver las estructuras por canal.
+**Estado.** Activo en el nodo para `l2_book`, `bbo` (libro/mejor precio), `trades`, `active_asset_ctx` (mark/oracle/financiación/interés abierto por mercado), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, `explorer_txs` y `candles` (barras OHLCV en tiempo real, por `(coin, interval)`) — todos emiten datos confirmados en tiempo real, orientados a cambios (un canal emite un frame solo cuando su estado cambió desde el último commit) — además de `post` (solicitud/respuesta sobre WS) y `ping`/`pong`. Consulte [suscripciones](./subscriptions.md#channel-status-at-a-glance) para ver las estructuras por canal y la lista de estado actualizada.
 :::
 
 :::info

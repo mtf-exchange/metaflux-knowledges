@@ -6,7 +6,7 @@
 
 Any builder can deploy a new perpetual market on MetaFlux by paying through an on-chain gas auction. There is no protocol-team gate, no review committee, no allow-list. The auction price plus a minimum deposit are the only barriers. (Permissionless **spot** market deploy is the sibling proposal, [MIP-1](./mip-1.md).)
 
-## Why this exists
+## Why this exists {#why-this-exists}
 
 A core protocol capability. Centralised exchanges curate listings; MetaFlux makes the listing process itself part of the protocol. Builders who want a market for some niche asset don't need permission — they need to win an auction and supply seed parameters.
 
@@ -16,7 +16,7 @@ This is MetaFlux's adaptation of the permissionless-market-deploy design pioneer
 - Auction parameters (decay, refund window, slot interval) governance-configurable
 - Initial maintenance ratio, max leverage, funding cap — submitted with the deploy bid, bounded by governance-set ranges
 
-## Deploy flow
+## Deploy flow {#deploy-flow}
 
 ```mermaid
 flowchart TD
@@ -44,7 +44,7 @@ Winning a deploy slot goes through the gas auction: a builder calls **`submitGas
 
 Auctions resolve at block boundaries — highest bidder per slot wins, paid amount is burned (not paid to anyone), spec parameters become the deployed market's parameters.
 
-## Bid escrow & refund
+## Bid escrow & refund {#bid-escrow--refund}
 
 Bids are held in escrow while the auction runs. On loss, the bid is returned to the builder's account minus a small auction fee. On win, the winning amount is burned at slot close (not paid to anyone).
 
@@ -54,7 +54,7 @@ Active bids are visible via:
 POST /info { "type": "mip3_active_bids" }
 ```
 
-## Parameter bounds
+## Parameter bounds {#parameter-bounds}
 
 Governance sets the bounds within which bid spec parameters must fall:
 
@@ -65,7 +65,7 @@ Governance sets the bounds within which bid spec parameters must fall:
 
 Bids with out-of-bounds parameters are rejected at submission.
 
-## Auction parameters
+## Auction parameters {#auction-parameters}
 
 Per stream (perp / spot / token-register), the auction has:
 
@@ -75,17 +75,17 @@ Per stream (perp / spot / token-register), the auction has:
 
 All three are governance-mutable (MIP-3 builder-governance globals).
 
-## After deploy
+## After deploy {#after-deploy}
 
 The new market lives in the canonical asset registry from the next block. Liquidity is the builder's problem; the protocol provides no seed orders.
 
 Builders typically bootstrap depth by combining an MIP-3 deploy with a liquidity source on the same market — [MIP-2 Metaliquidity](./mip-2.md), an external market maker drawn in by builder-fee rebates, or a user-created vault.
 
-## MIP-4
+## MIP-4 {#mip-4}
 
 See [MIP-4 — perps liquidity aggregator / internalizer](mip-4.md) for the MetaFlux-operated aggregator that complements permissionless deploy.
 
-## See also
+## See also {#see-also}
 
 - [MIP-1 — spot token standard + market deployment](./mip-1.md) — the spot sibling of permissionless deploy
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — applies to MIP-3 deployed markets just like protocol-listed ones
