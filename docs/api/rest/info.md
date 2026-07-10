@@ -301,7 +301,7 @@ Response:
     "orders": [
       {
         "oid":          12345,
-        "market_id":    0,
+        "coin":         "BTC",
         "side":         "bid",
         "px":        "99000",
         "size":      "700",
@@ -316,8 +316,8 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
-| `orders[*].oid` | uint64 | Server order id |
-| `orders[*].market_id` | uint32 | Asset / market id the order rests on |
+| `orders[*].oid` | uint64 | Server order id (the real resting id; cancellable per-`oid`) |
+| `orders[*].coin` | string | Market symbol the order rests on (e.g. `"BTC"`) |
 | `orders[*].side` | `"bid"` / `"ask"` | Order side |
 | `orders[*].px` | i128 string | Resting price, fixed-point decimal string |
 | `orders[*].size` | u128 string | Remaining size, fixed-point decimal string |
