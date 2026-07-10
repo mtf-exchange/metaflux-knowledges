@@ -319,8 +319,8 @@ Response:
 | `orders[*].oid` | uint64 | Server order id (the real resting id; cancellable per-`oid`) |
 | `orders[*].coin` | string | Market symbol the order rests on (e.g. `"BTC"`) |
 | `orders[*].side` | `"bid"` / `"ask"` | Order side |
-| `orders[*].px` | i128 string | Resting price, fixed-point decimal string |
-| `orders[*].size` | u128 string | Remaining size, fixed-point decimal string |
+| `orders[*].px` | Decimal string | Resting price, human-decimal (tick-snapped) |
+| `orders[*].size` | Decimal string | Remaining size, whole units |
 | `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none |
 | `orders[*].inserted_at_ms` | uint64 | Placement / insertion timestamp (consensus ms) |
 
@@ -888,6 +888,263 @@ per-venue weight list rather than fabricating one.
 
 State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
 
+## Account history query types {#account-history-query-types}
+
+Per-account history reads — funding payments, ledger updates, past orders, TWAP
+slice fills, and staking events. Same `{type, data}` envelope and MTF-native
+conventions as the reads above (decimal-string money, `0x`-hex addresses, coin
+**symbols**). Every type here requires `address` (0x hex; missing or malformed →
+`400`); an **unknown address is never an error** — it answers **200** with the
+empty shape (the established zeroed idiom).
+
+Four of the six types ship the locked wire contract with an **honest-empty**
+array today (marked **Status: empty (history retention pending)** below): their
+backing events currently stream on the live
+[WS channels](../ws/subscriptions.md) only and are not yet retained for REST.
+The retention backfill fills them **without a wire change** — the
+request/response envelopes below are final, and the documented record shapes are
+the locked forms the arrays will carry.
+
+### Realized funding-payment history {#user_funding}
+
+**Status: empty (history retention pending).** The envelope is live; `fundings`
+is `[]` until funding payments are retained for REST. For live per-account
+funding payments today, subscribe to the
+[`user_fundings` WS channel](../ws/subscriptions.md#user_fundings).
+
+```json
+{ "type": "user_funding", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `address` | hex address | yes | Account address |
+| `start_time` | uint64 | no | Window start (ms); echoed back (`null` when omitted) |
+| `end_time` | uint64 | no | Window end (ms); echoed back (`null` when omitted) |
+
+Response:
+
+```json
+{
+  "type": "user_funding",
+  "data": {
+    "address":    "0x<addr>",
+    "start_time": 1700000000000,
+    "end_time":   1700003600000,
+    "fundings":   []
+  }
+}
+```
+
+Future record shape (locked):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `fundings[*].coin` | string | Market symbol the payment settled on |
+| `fundings[*].payment` | Decimal string | Funding payment, whole-USDC (signed) |
+| `fundings[*].szi` | Decimal string | Signed position size at settlement (whole units) |
+| `fundings[*].funding_rate` | Decimal string | Funding rate applied (signed) |
+| `fundings[*].time` | uint64 | Settlement timestamp (consensus ms) |
+
+State source: the transient `user_fundings` WS sink (streamed, not yet retained for REST).
+
+### Balance ledger update history {#user_ledger_updates}
+
+**Status: empty (history retention pending).** `updates` is `[]` until ledger
+events (deposits / withdrawals / transfers / system credits) are retained for
+REST. For live per-account ledger deltas today, subscribe to the
+[`ledger_updates` WS channel](../ws/subscriptions.md#ledger_updates).
+
+```json
+{ "type": "user_ledger_updates", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `address` | hex address | yes | Account address |
+| `start_time` / `end_time` | uint64 | no | Window (ms); echoed back (`null` when omitted) |
+
+Response:
+
+```json
+{
+  "type": "user_ledger_updates",
+  "data": {
+    "address":    "0x<addr>",
+    "start_time": 1700000000000,
+    "end_time":   1700003600000,
+    "updates":    []
+  }
+}
+```
+
+Future record shape (locked): the
+[`ledger_updates` WS record](../ws/subscriptions.md#ledger_updates) verbatim —
+`{kind, amount | amount_units, time}` plus the kind-specific fields
+(`destination`, `token`, `asset`, `to_perp`, `via`).
+
+State source: the transient `ledger_updates` WS sink (streamed, not yet retained for REST).
+
+### Past executed orders {#historical_orders}
+
+An account's past (executed) orders, folded from the same committed per-account
+fill ring [`user_fills`](#user_fills) reads — one record per order (`oid`),
+newest first, with `filled_sz` the exact sum of that order's fills.
+
+```json
+{ "type": "historical_orders", "address": "0x<addr>" }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `address` | hex address | yes | Account address |
+| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ all (bounded by the ring) |
+
+Response:
+
+```json
+{
+  "type": "historical_orders",
+  "data": {
+    "address": "0x<addr>",
+    "orders": [
+      {
+        "oid":       12345,
+        "coin":      "BTC",
+        "side":      "B",
+        "px":        "67042.5",
+        "filled_sz": "1.2",
+        "time":      1700000000555,
+        "block":     562,
+        "hash":      "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c",
+        "status":    "filled"
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `orders[*].oid` | uint64 | Order id (the fold key) |
+| `orders[*].coin` | string | Market **symbol** the order executed on |
+| `orders[*].side` | `"B"` / `"A"` | Side token — `"B"` = buy/bid, `"A"` = sell/ask (same token as [`user_fills`](#user_fills)) |
+| `orders[*].px` | Decimal string | Price of the order's most-recent fill, **decimal USDC** |
+| `orders[*].filled_sz` | Decimal string | Total executed size — the exact sum of every fill of this `oid` (whole units) |
+| `orders[*].time` | uint64 | Timestamp of the most-recent fill (consensus ms) |
+| `orders[*].block` | uint64 | Committed block of the most-recent fill |
+| `orders[*].hash` | hex string | Transaction hash of the originating order; `""` when none was recorded |
+| `orders[*].status` | `"filled"` | The only status emitted today — see below |
+
+Records are newest-first. The source ring is bounded, so this is a recent
+window, not all history.
+
+:::info
+**`status` is `"filled"` only, today.** The committed ring holds **executed**
+legs only, so cancel / reject / expire records are not yet emitted — a
+partially-filled-then-cancelled order still renders as `"filled"` (with
+`filled_sz` = the executed portion). Live resting orders and parked triggers are
+deliberately **not** re-emitted here (they are derivable) — read them from
+[`open_orders`](#open_orders) / [`order_status`](#order_status).
+:::
+
+State source: the committed per-account fill ring (`Exchange.account_fills[addr]`, the same ring behind [`user_fills`](#user_fills)), folded by `oid`.
+
+### TWAP slice-fill history {#user_twap_slice_fills}
+
+**Status: empty (history retention pending).** `fills` is `[]` until TWAP slice
+fills are retained for REST. For live slice fills today, subscribe to the
+`user_twap_slice_fills` [WS channel](../ws/subscriptions.md); the account's
+**active** TWAP parents are on [`user_twaps`](#user_twaps).
+
+```json
+{ "type": "user_twap_slice_fills", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{ "type": "user_twap_slice_fills", "data": { "address": "0x<addr>", "fills": [] } }
+```
+
+Future record shape (locked): `{twap_id, fill}` — `twap_id` (uint64) the parent
+TWAP id, `fill` a full [`user_fills`](#user_fills) record for the slice.
+
+State source: the transient TWAP slice-fill WS sink (streamed, not yet retained for REST).
+
+### Staking delegation event history {#delegator_history}
+
+**Status: empty (history retention pending).** `history` is `[]` — no
+delegation event log is retained yet, and entries are deliberately **not**
+synthesized from the current delegation set (event timestamps are not kept;
+CURRENT state is already served by [`staking_state`](#staking_state) /
+[`delegator_summary`](#delegator_summary)).
+
+```json
+{ "type": "delegator_history", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
+```
+
+Response:
+
+```json
+{
+  "type": "delegator_history",
+  "data": {
+    "address":    "0x<addr>",
+    "start_time": 1700000000000,
+    "end_time":   1700003600000,
+    "history":    []
+  }
+}
+```
+
+Future record shape (locked):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `history[*].time` | uint64 | Event timestamp (consensus ms) |
+| `history[*].kind` | enum | `"delegate"` \| `"undelegate"` \| `"deposit"` \| `"withdraw"` \| `"claim"` |
+| `history[*].validator` | hex address | Present on validator-scoped kinds; absent otherwise |
+| `history[*].amount` | Decimal string | Event amount (whole-MTF) |
+| `history[*].hash` | hex string | Acting transaction hash |
+
+### Per-validator staking reward accruals {#delegator_rewards}
+
+The delegator's live per-validator reward accruals, plus the total a claim-all
+would pay right now. Required: `address` (0x hex).
+
+```json
+{ "type": "delegator_rewards", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "delegator_rewards",
+  "data": {
+    "address":           "0x<addr>",
+    "claimable_rewards": "9",
+    "rewards": [
+      { "validator": "0x<val_a>", "unclaimed": "3", "last_claim_time": 1700000000000 },
+      { "validator": "0x<val_b>", "unclaimed": "4", "last_claim_time": 1700000500000 }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `claimable_rewards` | Decimal string | What a claim-all ([`claim_rewards`](./exchange.md#claim_rewards) without `validator`) pays the delegator now: Σ per-row `unclaimed` **plus** the account's legacy reward roll-up bucket (drained on claim). Delegator side only — the separate validator-commission credit a claim also routes is not delegator-claimable and is excluded |
+| `rewards[*].validator` | hex address | Validator the delegation accrues under |
+| `rewards[*].unclaimed` | Decimal string | Live unclaimed reward accrued on this delegation (whole-MTF) |
+| `rewards[*].last_claim_time` | uint64 | Last claim timestamp on this delegation (consensus ms); `0` if never claimed |
+
+Rows list in ascending validator-address order. An account with no staking state
+returns `claimable_rewards: "0"` and an empty `rewards` array.
+
+State source: `c_staking.delegations` (live per-row accrual) + `c_staking.delegator_rewards` (the legacy roll-up bucket).
+
 ## Governance query types {#governance-query-types}
 
 The on-chain governance surface: the live vote machinery (`gov_state`), the
@@ -1088,9 +1345,10 @@ all history.
 These read the live state behind the RFQ, FBA, and portfolio-margin engines — they complement
 the `market_info.fba_enabled` / `account_state.pm_enabled` flags with the engine
 state itself. Same `{type, data}` envelope and MTF-native conventions. **Price
-plane:** RFQ + FBA prices / sizes are raw **1e8 fixed-point** integer strings (the
-book / order plane, identical to [`open_orders`](#open_orders) / [`l2_book`](./info/perpetuals.md#l2_book)),
-**not** whole-USDC; portfolio-margin magnitudes are **USD cents** integer strings.
+plane:** RFQ + FBA prices / sizes are raw **1e8 fixed-point** integer strings
+(the book / order **submission** plane — the same 1e8 plane `/exchange` orders
+are priced in), **not** whole-USDC; portfolio-margin magnitudes are **USD
+cents** integer strings.
 
 ### Open RFQ requests and maker quotes {#rfq_open}
 
@@ -1393,6 +1651,61 @@ Response:
 
 State source: per-book resting orders + `Exchange.trigger_registry`.
 
+### Active TWAP parents for an account {#user_twaps}
+
+The account's **active** TWAP parent orders — the live slice schedulers, with
+total vs executed size. Completed / cancelled TWAPs leave this set (it is the
+live set, not history — slice-fill history is
+[`user_twap_slice_fills`](#user_twap_slice_fills)). Required: `address` (0x hex).
+
+```json
+{ "type": "user_twaps", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "user_twaps",
+  "data": {
+    "address": "0x<addr>",
+    "twaps": [
+      {
+        "twap_id":         1,
+        "coin":            "BTC",
+        "side":            "B",
+        "sz":              "1.5",
+        "executed_sz":     "0.6",
+        "slices_total":    10,
+        "slices_done":     4,
+        "delay_ms":        3000,
+        "last_fire_ts_ms": 42000,
+        "reduce_only":     false
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `twaps[*].twap_id` | uint64 | Parent TWAP id (pass to [`twap_cancel`](./exchange.md#twap_cancel)) |
+| `twaps[*].coin` | string | Market symbol |
+| `twaps[*].side` | `"B"` / `"A"` | Side token — the same `"B"`/`"A"` form as [`user_fills`](#user_fills) |
+| `twaps[*].sz` | Decimal string | Parent total size (whole units) |
+| `twaps[*].executed_sz` | Decimal string | Size already filled by fired slices (whole units) |
+| `twaps[*].slices_total` | uint32 | Slice count the parent was scheduled with |
+| `twaps[*].slices_done` | uint32 | Slices fired so far |
+| `twaps[*].delay_ms` | uint64 | Inter-slice delay (ms) |
+| `twaps[*].last_fire_ts_ms` | uint64 | Last slice fire timestamp (consensus ms) |
+| `twaps[*].reduce_only` | bool | Parent is reduce-only |
+
+Rows list in ascending `twap_id` order. There is **no `duration` field** — it is
+derivable (`slices_total × delay_ms`); the wire carries the minimal independent
+set.
+
+State source: the perp DEX TWAP tracker, filtered by owner.
+
 ### Summary of all vaults {#vault_summaries}
 
 All vaults summary. No parameters.
@@ -1549,6 +1862,42 @@ Response:
 
 State source: `locus.fee_tracker.approved_builders[addr][builder]` (keyed).
 
+### All approved builder-fee grants {#approved_builders}
+
+Every builder-fee grant an account has approved — the **enumerated** counterpart
+to the keyed-single [`max_builder_fee`](#max_builder_fee) lookup (same committed
+value, field-identical `max_fee_bps`; the two reads are complementary, not
+derivable from each other). Required: `address` (0x hex).
+
+```json
+{ "type": "approved_builders", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "approved_builders",
+  "data": {
+    "address": "0x<addr>",
+    "builders": [
+      { "builder": "0x<builder_a>", "max_fee_bps": 25 },
+      { "builder": "0x<builder_b>", "max_fee_bps": 50 }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `builders[*].builder` | hex address | Approved builder address |
+| `builders[*].max_fee_bps` | uint32 | Approved bps ceiling — an **integer**, the same committed value [`max_builder_fee`](#max_builder_fee) reports |
+
+Builders list in ascending address order; an account with no approvals returns
+an empty array.
+
+State source: `locus.fee_tracker.approved_builders[addr]` (the account's full grant map).
+
 ### Multisig configuration for an address {#user_to_multi_sig_signers}
 
 Multisig config for an address. Required: `address` (0x hex).
@@ -1593,6 +1942,42 @@ Response:
 | `role` | `"missing" \| "user" \| "agent" \| "vault" \| "sub_account"` | Derived role |
 
 Precedence: `vault` (a `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (an approved agent of some master) → `user` (has a user-state / config / spot entry) → `missing`.
+
+### An account's abstraction entries {#abstraction_state}
+
+The account's user-scoped and agent-scoped abstraction config entries — the
+values written by
+[`user_set_abstraction`](./exchange.md#user_set_abstraction) /
+[`agent_set_abstraction`](./exchange.md#agent_set_abstraction). Required:
+`address` (0x hex) — the **user** address in both cases (the `agent` list is
+what agents set **for** that user, not the agents' own state).
+
+```json
+{ "type": "abstraction_state", "address": "0x<addr>" }
+```
+
+Response:
+
+```json
+{
+  "type": "abstraction_state",
+  "data": {
+    "address": "0x<addr>",
+    "user":  [ { "kind": 3, "value": "1.5" }, { "kind": 7, "value": "2" } ],
+    "agent": [ { "kind": 1, "value": "9" } ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user` / `agent` | array | One entry per set `kind` — user-scoped vs agent-scoped writes |
+| `*.kind` | uint8 | Sub-type tag (the dispatch key the set actions carry) |
+| `*.value` | Decimal string | Stored setting value (interpretation is per-`kind`) |
+
+Both arrays are honest-empty when nothing has been set.
+
+State source: the committed abstraction entries keyed by the user address (user- and agent-scoped).
 
 ### Current per-validator oracle vote metadata {#validator_l1_votes}
 

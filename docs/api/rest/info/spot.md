@@ -66,6 +66,117 @@ token's standalone book is live (only USDC is, on devnet).
 
 State source: `Exchange.mip3_spot_pair_specs` (pairs) + `Exchange.mip3_spot_token_specs` (tokens).
 
+### Single-token detail with tradable pairs and fees {#token_info}
+
+One spot token's identity / EVM-binding block, plus every tradable pair it
+fronts (where it is the **base**) with each pair's live market context and
+resolved fee rates. Resolve by `token` — the token **symbol** (`"MTF"`) or its
+numeric asset id sent as a string (`"104"`). Optionally pass `address` to also
+get that account's **effective** (post-staking-discount / post-maker-rebate)
+rates per pair.
+
+```json
+{ "type": "token_info", "token": "MTF" }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `token` | string | yes | Spot-token symbol, or its numeric asset id as a string |
+| `address` | hex address | no | Adds per-pair effective fee fields for this account (and echoes `address` top-level) |
+
+Missing `token` → `400 {"error":"missing field: token"}`; unknown token →
+`404 {"error":"spot token not found"}`.
+
+Response:
+
+```json
+{
+  "type": "token_info",
+  "data": {
+    "token": {
+      "id":             104,
+      "name":           "MTF",
+      "sz_decimals":    2,
+      "wei_decimals":   8,
+      "token_id":       "0xabababababababababababababababababababababababababababababababab",
+      "system_address": "0x5555555555555555555555555555555555555555",
+      "is_canonical":   true,
+      "total_supply":   "1000000",
+      "evm_contract":   { "address": "0x6666666666666666666666666666666666666666", "evm_extra_wei_decimals": -3 }
+    },
+    "pairs": [
+      {
+        "pair_id":            113,
+        "name":               "MTF/USDC",
+        "base":               104,
+        "quote":              100,
+        "active":             true,
+        "deployer":           "0x7777777777777777777777777777777777777777",
+        "registered_at_ms":   1700000000000,
+        "min_notional":       "10",
+        "tick_size":          "0.0001",
+        "lot_size":           "1",
+        "mark_px":            "2.05",
+        "mid_px":             "2.06",
+        "day_ntl_vlm":        "15230.5",
+        "prev_day_px":        "1.98",
+        "circulating_supply": "1000000",
+        "fee": { "taker_bps": "3.0", "maker_bps": "1.0", "source": "pair_override" }
+      }
+    ]
+  }
+}
+```
+
+The `token` identity / binding block renders **identically** to the same token's
+row in [`spot_meta`](#spot_meta) `tokens` — the two reads never drift.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `token.id` | uint32 | Spot token asset id |
+| `token.name` | string | Token symbol |
+| `token.sz_decimals` | uint8 | Display / size precision |
+| `token.wei_decimals` | uint8 | Native (ERC-20-style) token decimals |
+| `token.token_id` | hex string (32 bytes) | MTF-native canonical token id, `0x`-hex; all-zero for a token registered without one |
+| `token.system_address` | hex address | The token's Core-side system anchor address |
+| `token.is_canonical` | bool | Canonical (protocol-registered) token flag |
+| `token.total_supply` | Decimal string | Committed Core-side total supply (whole units) |
+| `token.evm_contract` | object \| null | The token's EVM (ERC-20) binding — `null` when unbound, never a fabricated object |
+| `token.evm_contract.address` | hex address | Bound ERC-20 contract address on MetaFluxEVM |
+| `token.evm_contract.evm_extra_wei_decimals` | int (signed) | The EVM contract's decimals minus the Core token's `wei_decimals` |
+| `pairs[*].pair_id` | uint32 | Spot pair id (`SpotPairSpec.pair_id`) |
+| `pairs[*].name` | string | `BASE/QUOTE` display name |
+| `pairs[*].base` / `quote` | uint32 | Base / quote token asset ids |
+| `pairs[*].active` | bool | Pair active for trading |
+| `pairs[*].deployer` | hex address | Account that registered the pair (pair-level provenance) |
+| `pairs[*].registered_at_ms` | uint64 | Pair registration timestamp (consensus ms) |
+| `pairs[*].min_notional` | Decimal string | Minimum order notional, whole-USDC |
+| `pairs[*].tick_size` | Decimal string | Price tick, human-decimal |
+| `pairs[*].lot_size` | u128 string | Size lot, raw base lots |
+| `pairs[*].mark_px` | Decimal string \| null | Last-trade mark; `null` before the first trade |
+| `pairs[*].mid_px` | Decimal string \| null | Book mid (falls back to the mark when one-sided); `null` when neither exists |
+| `pairs[*].day_ntl_vlm` | Decimal string | 24h notional volume |
+| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; `null` if unknown |
+| `pairs[*].circulating_supply` | Decimal string | Base token committed total supply |
+| `pairs[*].fee.taker_bps` / `maker_bps` | bps string | The pair's resolved base rates, decimal bps (`"3.0"` = 3 bps) — the same rates the settlement path charges |
+| `pairs[*].fee.source` | `"pair_override"` \| `"volume_tier"` | Where the resolved rate came from — a per-pair deployer override, or the shared volume-tier ladder (the default) |
+
+With `address`, each pair's `fee` object additionally carries the account's
+effective rates, and the resolved `address` is echoed top-level:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pairs[*].fee.effective_taker_bps` | bps string | Taker rate after the account's staking discount |
+| `pairs[*].fee.effective_maker_bps` | bps string | Maker rate after the account's maker rebate |
+| `pairs[*].fee.staking_discount_permille` | uint | Staking taker-fee discount applied (per-mille) |
+| `pairs[*].fee.maker_rebate_bps` | bps string | Maker rebate applied |
+| `address` | hex address | Echoed **only** when the request carried it |
+
+Pairs list the markets where this token is the base, in pair-id order; a token
+fronting no tradable pair returns an empty `pairs` array.
+
+State source: `Exchange.mip3_spot_token_specs` (identity / binding) + `Exchange.mip3_spot_pair_specs` (pairs) + the spot clearinghouse supply and per-pair market context.
+
 ### Per-account spot token balances {#spot_clearinghouse_state}
 
 Per-account spot token balances. Required: `address` (0x hex).

@@ -169,7 +169,8 @@ below group every action by category; the **full field-level definitions that
 follow are split by trading type** — [Perpetual order actions](#perpetual-order-actions),
 [Spot trading actions](#spot-trading-actions),
 [Spot margin & Earn actions](#spot-margin--earn-actions),
-[Perpetual margin & risk actions](#perpetual-margin--risk-actions), and
+[Perpetual margin & risk actions](#perpetual-margin--risk-actions),
+[RFQ, FBA & utility actions](#rfq-fba--utility-actions), and
 [Account, staking, vaults & bridge actions](#account-staking-vaults--bridge-actions).
 
 :::warning
@@ -235,6 +236,21 @@ A leveraged spot position is **isolated per `(account, pair)`**: posted quote co
 | [`update_isolated_margin`](#update_isolated_margin) | Signed isolated-margin delta | sender / agent |
 | [`top_up_isolated_only_margin`](#top_up_isolated_only_margin) | Strict-iso margin top-up | sender / agent |
 | [`user_portfolio_margin`](#user_portfolio_margin) | Enroll / unenroll PM | sender / agent |
+
+### RFQ, FBA & utility {#rfq-fba--utility}
+
+Request-for-quote ([RFQ](../../concepts/rfq.md)) block trading, the
+frequent-batch-auction ([FBA](../../concepts/fba.md)) entry, and the deliberate
+no-op. See [the field-level sections](#rfq-fba--utility-actions) for the wire
+planes and the digest-bound `owner` rule.
+
+| `type` | Purpose | Signed-by |
+|--------|---------|-----------|
+| [`rfq_request`](#rfq_request) | Open an RFQ session (taker) | sender / agent (`owner` digest-bound) |
+| [`rfq_quote`](#rfq_quote) | Quote onto an open RFQ (maker) | sender / agent (`owner` digest-bound) |
+| [`rfq_accept`](#rfq_accept) | Accept a quote and settle (taker) | sender / agent (`owner` digest-bound) |
+| [`fba_submit`](#fba_submit) | Submit into a batch-auction window | sender / agent |
+| [`noop`](#noop) | Deliberate no-op (nonce burn / keepalive) | sender |
 
 ### Account management {#account-management}
 
@@ -309,12 +325,9 @@ disposition of each.
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |
 | `BorrowLend` | — | Not bridged |
-| `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` |
-| `FbaOrder` | `fba_submit` | Recognized-but-unmapped stub → `unsupported action` |
 | (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to [`user_portfolio_margin`](#user_portfolio_margin) (enroll / unenroll). `pm_rebalance` has been **removed** — rejected as an unknown action |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` |
-| (encrypted submit alt) | `encrypted_order_submit` | Stub; use [`submit_encrypted_order`](#submit_encrypted_order) instead |
 
 ---
 
@@ -1093,6 +1106,217 @@ Requires account equity ≥ `pm_min_equity` (governance parameter). See [portfol
 
 ---
 
+## RFQ, FBA & utility actions {#rfq-fba--utility-actions}
+
+[RFQ](../../concepts/rfq.md) block trading, the
+[FBA](../../concepts/fba.md) frequent-batch-auction entry, and the deliberate
+no-op. All five return the
+[`202 Accepted`](#202-accepted--non-order-admission) admission envelope; the
+committed outcome is observable via the [`rfq_open`](./info.md#rfq_open) /
+[`rfq_user`](./info.md#rfq_user) /
+[`fba_batch_state`](./info.md#fba_batch_state) reads and the
+[WS feed](../ws/subscriptions.md).
+
+**Wire planes.** The RFQ / FBA numeric fields (`size`, `price`, `max_size`,
+`limit_px`) are unsigned fixed-point `u64` JSON **numbers** on the wire — the
+same 1e8 price plane / raw-lot size plane as [`submit_order`](#submit_order),
+widened to `u128` / `i128` internally. They are **not** decimal strings: the
+strings-on-the-wire policy covers the whole-USDC decimal plane, not the
+fixed-point book plane. `side` here uses the core `"Bid"` / `"Ask"` tokens
+(capitalized — unlike the perp order body's lowercase `"bid"` / `"ask"`).
+
+**Acting as a vault / master (`owner`).** Each RFQ action takes an optional
+`owner` (0x hex): an approved [agent](../../concepts/agent-wallets.md) may act
+**as** the master / vault it is approved for. Unlike the order actions, the RFQ
+`owner` **is bound into the EIP-712 digest** (a distinct type string with
+`address owner` right after `metafluxChain`): the signer cryptographically
+commits **which** account requests / quotes / accepts, because an RFQ session is
+gated to its requester. A signer that is not an approved agent of `owner` is
+rejected `401`. Omitting `owner` keeps the plain sender-authorized digest.
+`fba_submit`'s `owner` follows the **order** convention instead — resolved at
+admission, **not** digest-bound.
+
+### Open an RFQ session {#rfq_request}
+
+Taker opens a request-for-quote session: `size` on `market`, optionally bounded
+by `limit_px`, open for maker quotes until `expiry_ms`.
+
+```json
+{
+  "type": "rfq_request",
+  "params": {
+    "market":    0,
+    "side":      "Bid",
+    "size":      100000000,
+    "limit_px":  10050000000,
+    "expiry_ms": 1735689605000,
+    "stp_group": 42
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: open the RFQ **as** this master / vault (approved agents only). **Digest-bound** — see above |
+| `market` | uint32 | a perp market | Asset/market id |
+| `side` | enum | `"Bid"` / `"Ask"` | Side the requester wants to take |
+| `size` | uint64 | `> 0` | Requested size, fixed-point size plane (widened to `u128`) |
+| `limit_px` | uint64 \| null | — | Optional taker limit price, 1e8 plane; `null` / omitted = none |
+| `expiry_ms` | uint64 | — | Session expiry timestamp (consensus ms) |
+| `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
+
+Typed-data primary type (`owner` absent / present):
+
+```
+MetaFluxTransaction:RfqRequest(string metafluxChain,uint32 market,uint8 side,uint64 size,bool hasLimitPx,uint64 limitPx,uint64 expiryMs,bool hasStpGroup,uint64 stpGroup,uint64 nonce)
+MetaFluxTransaction:RfqRequest(string metafluxChain,address owner,uint32 market,uint8 side,uint64 size,bool hasLimitPx,uint64 limitPx,uint64 expiryMs,bool hasStpGroup,uint64 stpGroup,uint64 nonce)
+```
+
+In the digest, `side` encodes as a `uint8` (`0` = bid, `1` = ask) and each
+optional flattens to a presence `bool` + value (`0` when absent).
+
+The assigned `rfq_id` is a committed effect — read it back from
+[`rfq_user`](./info.md#rfq_user) or the WS feed. The session is
+**requester-gated**: only the account that opened it can
+[`rfq_accept`](#rfq_accept) on it.
+
+---
+
+### Quote onto an open RFQ {#rfq_quote}
+
+Maker posts a quote onto an open RFQ session: a `price` and the maximum size the
+maker will fill, valid until `valid_until_ms`.
+
+```json
+{
+  "type": "rfq_quote",
+  "params": {
+    "rfq_id":         9,
+    "price":          2500000000,
+    "max_size":       100000000,
+    "valid_until_ms": 1735689604000,
+    "stp_group":      7
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: quote **as** this master / vault (approved agents only). **Digest-bound** — see above |
+| `rfq_id` | uint64 | an open session | The RFQ session id ([`rfq_open`](./info.md#rfq_open) / the WS feed) |
+| `price` | uint64 | `> 0` | Quote price, 1e8 plane (widened to `i128`) |
+| `max_size` | uint64 | `> 0` | Maximum size the maker will fill, fixed-point size plane (widened to `u128`) |
+| `valid_until_ms` | uint64 | — | Quote validity deadline (consensus ms) |
+| `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
+
+Typed-data primary type (`owner` absent / present):
+
+```
+MetaFluxTransaction:RfqQuote(string metafluxChain,uint64 rfqId,uint64 price,uint64 maxSize,uint64 validUntilMs,bool hasStpGroup,uint64 stpGroup,uint64 nonce)
+MetaFluxTransaction:RfqQuote(string metafluxChain,address owner,uint64 rfqId,uint64 price,uint64 maxSize,uint64 validUntilMs,bool hasStpGroup,uint64 stpGroup,uint64 nonce)
+```
+
+The optional `stp_group` flattens to a presence `bool` + value in the digest.
+The quote is recorded under the acting account as its maker — the digest-bound
+`owner` when quoting as a vault, else the signer — and the taker sees it on the
+session (`quotes[*]` in [`rfq_open`](./info.md#rfq_open) /
+[`rfq_user`](./info.md#rfq_user)).
+
+---
+
+### Accept an RFQ quote {#rfq_accept}
+
+Taker accepts one specific quote (`quote_idx`) on their session for a fill of
+`size`, settling off-book at the quoted price. The remaining quotes expire with
+the session.
+
+```json
+{
+  "type": "rfq_accept",
+  "params": { "rfq_id": 9, "quote_idx": 0, "size": 100000000 }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: accept **as** this master / vault (approved agents only). **Digest-bound**. Both legs must carry `owner` for an operator to open **and** accept as the vault |
+| `rfq_id` | uint64 | own open session | The RFQ session id |
+| `quote_idx` | uint32 | a quote on the session | Index of the accepted quote |
+| `size` | uint64 | `> 0` | Fill size, fixed-point size plane (widened to `u128`) |
+
+Typed-data primary type (`owner` absent / present):
+
+```
+MetaFluxTransaction:RfqAccept(string metafluxChain,uint64 rfqId,uint32 quoteIdx,uint64 size,uint64 nonce)
+MetaFluxTransaction:RfqAccept(string metafluxChain,address owner,uint64 rfqId,uint32 quoteIdx,uint64 size,uint64 nonce)
+```
+
+**Requester-gated.** The accept is only honored for the account that opened the
+session — this binding is why the RFQ `owner` is part of the signed digest.
+
+---
+
+### Submit into a frequent-batch auction {#fba_submit}
+
+Submit an order into the market's live [FBA](../../concepts/fba.md) window; it
+clears at the batch's uniform price on the next settle boundary.
+
+```json
+{
+  "type": "fba_submit",
+  "params": {
+    "market": 0,
+    "side":   "Bid",
+    "size":   100000000,
+    "price":  10050000000
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: submit **as** this master / vault (approved agents only). **Not** digest-bound — resolved at admission, mirroring the order actions |
+| `market` | uint32 | an FBA-enabled market | Asset/market id (see [`market_info.fba_enabled`](./info/perpetuals.md#market_info)) |
+| `side` | enum | `"Bid"` / `"Ask"` | Order side |
+| `size` | uint64 | `> 0` | Order size, fixed-point size plane (widened to `u128`) |
+| `price` | uint64 | `> 0` | Order price, 1e8 plane (widened to `i128`) |
+| `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
+
+Typed-data primary type:
+
+```
+MetaFluxTransaction:FbaSubmit(string metafluxChain,uint32 market,uint8 side,uint64 size,uint64 price,bool hasStpGroup,uint64 stpGroup,uint64 nonce)
+```
+
+Observe the pooled order and the indicative uniform clearing via
+[`fba_batch_state`](./info.md#fba_batch_state).
+
+---
+
+### Deliberate no-op {#noop}
+
+A deliberate no-op: the handler touches **no state** — the action's only effect
+is burning the envelope `nonce`. Use it as a keepalive or for nonce-gap
+management (committing a `noop` at nonce `N` invalidates any other in-flight
+action signed with nonce `N`, since replay protection enforces per-account nonce
+uniqueness at commit). Sender-authorized; the action carries **no params**.
+
+```json
+{ "type": "noop" }
+```
+
+Typed-data primary type — the chain tag and the envelope nonce are the only
+signed fields:
+
+```
+MetaFluxTransaction:Noop(string metafluxChain,uint64 nonce)
+```
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission).
+
+---
+
 ## Account, staking, vaults & bridge actions {#account-staking-vaults--bridge-actions}
 
 Cross-cutting actions that are not specific to one trading product — agent wallets,
@@ -1599,6 +1823,12 @@ pending-pool depth after the push is carried in the **commit outcome**, not the
 HTTP body. An empty or over-sized ciphertext, a zero `threshold`, or a full
 pending pool errors at commit.
 
+:::info
+**The old `encrypted_order_submit` alias is retired.** `/exchange` rejects it
+`400` with an error pointing at the canonical spelling — submit as
+`submit_encrypted_order` (same fields, same signed digest).
+:::
+
 ---
 
 ### Create a vault {#create_vault}
@@ -1864,12 +2094,10 @@ here only to redirect integrators to the supported path.
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
 | `WithdrawUsdc` | — | Draft name; not a native tag | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
 | `BorrowLend` | — | Not bridged | — |
-| `RfqQuote` / `RfqAccept` | `rfq_request` / `rfq_accept` | Recognized-but-unmapped stub → `unsupported action` | — |
-| `FbaOrder` | `fba_submit` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` | — |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to the canonical enroll/unenroll action; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` | — |
-| (encrypted submit alt) | `encrypted_order_submit` | Stub | [`submit_encrypted_order`](#submit_encrypted_order) |
+| (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
 
 ---
 

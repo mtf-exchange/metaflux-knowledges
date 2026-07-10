@@ -46,6 +46,7 @@ Response:
     "mark_px":            "61550.2",
     "oracle_px":          "61501.7",
     "mid_px":             "61669.4",
+    "impact_pxs":         ["61663.1", "61675.7"],
     "premium":            "0.00209225",
     "tick_size":          "0.1",
     "step_size":          "0.00001",
@@ -93,9 +94,10 @@ be dropped without a wire-version bump.
 (`"61550.2"`, `"0.1"`, `"0.00001"`), the same unit as account positions' mark.
 `mark_px` is the on-book mark, falling back to the oracle px when the book has no
 mark yet; `oracle_px` is the latest committed index price; either is `"0"` when
-unset. The **order/book submission plane is a separate 1e8 fixed-point plane** —
-`l2_book` level `px` and order `limit_px` are raw 1e8 magnitudes, NOT human
-decimals; MTF keeps those two scale planes distinct.
+unset. The **order submission plane is a separate 1e8 fixed-point plane** — an
+`/exchange` order `limit_px` is a raw 1e8 magnitude, NOT a human decimal; MTF
+keeps those two scale planes distinct. Read surfaces (including
+[`l2_book`](#l2_book) level prices) report human-decimal strings.
 :::
 
 :::info
@@ -124,11 +126,12 @@ axes.
 :::
 
 `market_info` returns the **full** record — the union of the **dynamic** fields
-served by [`markets`](#markets) (`mark_px`, `oracle_px`, `mid_px`, `premium`,
-`funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`)
-and the **static** fields served by [`markets_meta`](#markets_meta) (`sz_decimals`,
-`tick_size`, `step_size`, `min_order`, `max_leverage`, the margin ratios,
-`margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `mark_source`,
+served by [`markets`](#markets) (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
+`premium`, `funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`,
+`change_24h`, `halted`) and the **static** fields served by
+[`markets_meta`](#markets_meta) (`sz_decimals`, `tick_size`, `step_size`,
+`min_order`, `max_leverage`, the margin ratios, `margin_tiers`,
+`strict_isolated`, `disable_open` / `disable_close`, `oi_cap`, `mark_source`,
 `fba_enabled`, `asset_id`). See those two reads for per-field semantics.
 
 ### Get live state for all markets {#markets}
@@ -172,6 +175,7 @@ Response (truncated to one entry per list):
         "mark_px":         "61521.1",
         "oracle_px":       "61529.3",
         "mid_px":          "61669.4",
+        "impact_pxs":      ["61663.1", "61675.7"],
         "premium":         "0.0018587",
         "funding": {
           "rate_per_hr":     "20",
@@ -222,8 +226,9 @@ these same dynamic rows (a full snapshot on subscribe, then changed-row deltas).
 | `perp[*].mark_px` | Decimal string | On-book mark, **human-decimal plane**, tick-snapped (oracle fallback; `"0"` if unset) |
 | `perp[*].oracle_px` | Decimal string | Index price, human-decimal plane, tick-snapped (`"0"` if unset) |
 | `perp[*].mid_px` | Decimal string | Order-book mid `(best_bid + best_ask) / 2`, human-decimal, tick-snapped; **omitted** when one-sided / empty |
+| `perp[*].impact_pxs` | [Decimal string, Decimal string] | Depth-aware impact prices `[bid, ask]` — the book-walk prices for the funding impact notional (the same walk the funding premium samples), human-decimal, tick-snapped; **omitted** entirely when either side of the book cannot fill the impact notional |
 | `perp[*].premium` | Decimal string \| null | Latest committed funding premium sample (signed), an **8-decimal** string (truncated toward zero); `null` when none |
-| `perp[*].funding.rate_per_hr` | bps string | Latest hourly funding-rate sample (pre-cap), decimal bps |
+| `perp[*].funding.rate_per_hr` | bps string | The hourly funding rate that would be **charged** — the derived rate clamped to the per-asset cap (the same clamp settlement applies), decimal bps |
 | `perp[*].funding.cap_per_hr` | bps string | Per-hour funding-rate cap, decimal bps |
 | `perp[*].funding.interval_ms` | uint64 | Per-asset funding cadence (1h = `3600000`) |
 | `perp[*].funding.next_payment_ts` | uint64 | Next aligned funding-settlement boundary (epoch-ms); `0` until the first sample |
@@ -237,10 +242,10 @@ these same dynamic rows (a full snapshot on subscribe, then changed-row deltas).
 
 The **static** per-market fields (`sz_decimals`, `tick_size`, `step_size`,
 `min_order`, `max_leverage`, `maint_margin_ratio`, `init_margin_ratio`,
-`margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `mark_source`,
-`fba_enabled`, `asset_id`) are **not** on this read — fetch them from
-[`markets_meta`](#markets_meta). For the spot pair / token field semantics see
-[`spot_meta`](./spot.md#spot_meta).
+`margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `oi_cap`,
+`mark_source`, `fba_enabled`, `asset_id`) are **not** on this read — fetch them
+from [`markets_meta`](#markets_meta). For the spot pair / token field semantics
+see [`spot_meta`](./spot.md#spot_meta).
 
 ### Get static metadata for all markets {#markets_meta}
 
@@ -303,9 +308,9 @@ Response (perp truncated to one entry; the `spot` section is identical to
 
 Each `perp` row is the **static** half of the [`market_info`](#market_info)
 bundle, joined to its dynamic [`markets`](#markets) row on `(coin, kind)`. None of
-the per-commit dynamic fields (`mark_px`, `oracle_px`, `mid_px`, `premium`,
-`funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`)
-appear here.
+the per-commit dynamic fields (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
+`premium`, `funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`,
+`halted`) appear here.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -321,7 +326,8 @@ appear here.
 | `perp[*].margin_tiers` | array | Notional-banded leverage ladder (see [`market_info`](#market_info)); each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
 | `perp[*].disable_open` / `disable_close` | bool | Open / close disabled for this market |
-| `perp[*].mark_source` | string | Mark-price descriptor (e.g. `"oracle_median"`) |
+| `perp[*].oi_cap` | Decimal string | Governance open-interest cap, in the market's size units; **OMITTED** entirely when the market is uncapped (never a fabricated `"0"`) |
+| `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].asset_id` | uint32 | **DEPRECATED** indexer-shim field — do not build against it |
 | `spot.pairs` / `spot.tokens` | array | Spot pair / token registry, identical to [`markets`](#markets) (see [`spot_meta`](./spot.md#spot_meta)) |
@@ -330,17 +336,37 @@ For the spot pair / token field semantics see [`spot_meta`](./spot.md#spot_meta)
 
 ### Get aggregated order book levels {#l2_book}
 
-Market-scoped aggregated bid/ask levels.
+Market-scoped aggregated bid/ask levels — full tick-precise depth by default,
+optionally grouped to a coarser significant-figure price grid.
 
 ```json
 { "type": "l2_book", "coin": "BTC" }
 ```
 
-| Arg | Type | Required |
-|-----|------|----------|
-| `coin` | symbol | yes |
+Grouped to a coarser grid:
+
+```json
+{ "type": "l2_book", "coin": "BTC", "n_sig_figs": 5, "mantissa": 5 }
+```
+
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `coin` | symbol | yes | Market symbol |
+| `n_sig_figs` | uint | no | Group levels to this many significant figures — an integer `2`–`5`. Absent ⇒ the full-depth, tick-precise book |
+| `mantissa` | uint | no | Sub-step for `n_sig_figs: 5` **only** — one of `1`, `2`, `5` (the grid step is `mantissa ×` the 5-sig-fig step). Invalid with any other `n_sig_figs` |
 
 Missing `coin` → `400 {"error":"missing field coin"}`.
+
+:::info
+**Grouping is a GATEWAY-side aggregation.** The node always serves the full-depth
+book; the gateway applies `n_sig_figs` / `mantissa` to the response. Grouped
+levels round **away from the spread** — bid prices round **down** (floor), ask
+prices round **up** (ceil) onto the grid — so a grouped level never displays a
+better price than its orders actually rest at, and the sizes of collapsed levels
+are **summed** (per-side total size is conserved). A request without grouping
+args is forwarded verbatim and returns the live book untouched. Querying a bare
+node directly, the grouping args are ignored — full depth either way.
+:::
 
 Response:
 
@@ -362,9 +388,9 @@ market returns empty `bids` / `asks` arrays.
 | Field | Type | Description |
 |-------|------|-------------|
 | `coin` | string | Echoed market symbol |
-| `bids[*].px` / `asks[*].px` | i128 string | Level price, fixed-point decimal string (order/book 1e8 plane) |
-| `bids[*].size` / `asks[*].size` | u128 string | Summed size at the level |
-| `bids[*].n_orders` / `asks[*].n_orders` | uint64 | Resting orders at the level |
+| `bids[*].px` / `asks[*].px` | Decimal string | Level price, **human-decimal** (tick-snapped; the grouped grid price when grouping args are sent) |
+| `bids[*].size` / `asks[*].size` | Decimal string | Summed size at the level (whole units) |
+| `bids[*].n_orders` / `asks[*].n_orders` | uint64 | Resting orders aggregated into the level |
 
 ### Get recent public trades {#recent_trades}
 
@@ -651,6 +677,55 @@ Response:
 | `bids[*].amount` | decimal string | Bid amount |
 | `bids[*].submitted_at_ms` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
+
+### Get perp-deploy and per-market limits {#perp_dex_limits}
+
+The governance-set permissionless-deploy (MIP-3) and per-market limit
+configuration. No parameters. The unit planes are load-bearing and deliberately
+explicit in the field names.
+
+```json
+{ "type": "perp_dex_limits" }
+```
+
+Response:
+
+```json
+{
+  "type": "perp_dex_limits",
+  "data": {
+    "mip3_enabled":            true,
+    "min_deploy_stake_base":   "100000000000",
+    "min_deploy_stake_mtf":    "500000",
+    "gas_auction_min_bid":     "100",
+    "auction_duration_blocks": 1000,
+    "deployer_fee_cap_bps":    300,
+    "dutch_start_multiplier":  "2",
+    "per_market_limits": {
+      "max_oi":            "1000000000000",
+      "max_leverage":      50,
+      "max_taker_fee_bps": "10.0",
+      "max_oi_per_second": "10000000000"
+    }
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mip3_enabled` | bool | Permissionless (MIP-3) perp deploy enabled |
+| `min_deploy_stake_base` | u128 string | Deployer **self-stake floor**, MTF base units |
+| `min_deploy_stake_mtf` | Decimal string | Permissionless-deploy **staking bond**, whole-MTF. An independent governance knob from `min_deploy_stake_base` — two thresholds, not one value on two planes |
+| `gas_auction_min_bid` | Decimal string | Deploy gas-auction minimum bid, whole-USDC |
+| `auction_duration_blocks` | uint64 | Gas-auction window length, in blocks |
+| `deployer_fee_cap_bps` | uint | Ceiling on the per-market deployer fee share (bps) |
+| `dutch_start_multiplier` | Decimal string | Dutch-auction start-price multiplier over the minimum bid |
+| `per_market_limits.max_oi` | u128 string | Per-market open-interest cap, size base units |
+| `per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |
+| `per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](../info.md#fee_schedule)) |
+| `per_market_limits.max_oi_per_second` | u128 string | Per-market open-interest growth-rate cap, size base units per second |
+
+State source: `Exchange.mip3_config` (+ its `per_market_limits`).
 
 ### List accounts flagged for liquidation {#liquidatable}
 
