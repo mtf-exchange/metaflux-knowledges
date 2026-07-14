@@ -121,7 +121,9 @@ Response (a faucet-funded account, no positions):
     "balances": {
       "usdc": "3000",
       "spot": { "MTF": { "total": "10", "hold": "0" } }
-    }
+    },
+    "height": 562,
+    "time":   1700000000555
   }
 }
 ```
@@ -176,6 +178,17 @@ A positioned account adds entries under `positions`:
 | `positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
 | `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
 | `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); each value is a `{total, hold}` object (`hold` = escrow locked behind resting spot orders; spendable = `total − hold`); empty if none |
+| `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
+| `time` | uint64 | Consensus block time in **milliseconds**. A **bare integer**. Advances on every commit, from the same consensus clock as `height` |
+
+`height` / `time` are an **as-of stamp**: they tell you which committed block the
+snapshot was rendered against, and they advance on every commit regardless of
+whether any monetary field moved. This lets a client tell a **fresh-but-quiet**
+account (constant `account_value`, but `height`/`time` still climbing) apart from
+a **stalled** read path (`height`/`time` frozen — the node or your connection has
+stopped advancing). The same stamp appears on the WS
+[`account_state`](../ws/subscriptions.md#account_state) channel with identical
+values, so a client can cross-check or de-duplicate REST and WS against it.
 
 ### Lightweight margin-only account summary {#margin_summary}
 
@@ -388,7 +401,7 @@ a recent window, not all history. An account with no fills returns
 | `fills[*].dir` | string | Direction label, e.g. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Signed leg size BEFORE the fill, **base units** (whole-unit, signed) |
 | `fills[*].block` | uint64 | Committed block height the fill settled in (on-chain locator) |
-| `fills[*].hash` | hex string | Transaction hash of the originating order, `0x`-prefixed hex — lets the fill be traced on-chain |
+| `fills[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets the fill be traced on-chain. **Empty string (`""`) when there is no signed taker action behind the fill** — a system / begin-block print, or the resting **maker leg** of a match (the maker's original submit hash is not carried on the fill). Taker legs of a user-signed order carry the hash |
 
 ### Fill history filtered by time window {#user_fills_by_time}
 

@@ -445,7 +445,7 @@ a recent window, not all history. An unknown / never-traded market returns
 | `trades[*].time` | uint64 | Trade timestamp (consensus ms) |
 | `trades[*].tid` | uint64 | Deterministic trade id (shared by both legs of the print); may exceed 2⁵³ — parse as a 64-bit / big integer, not a JS number |
 | `trades[*].block` | uint64 | Committed block height the trade settled in (on-chain locator) |
-| `trades[*].hash` | hex string | Transaction hash of the originating order, `0x`-prefixed hex — lets a print be traced on-chain |
+| `trades[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets a print be traced on-chain. **Empty string (`""`) when there is no signed taker action** behind the print (a system / begin-block print, or a maker leg whose submit hash is not carried) |
 
 ### Get trades in a time window {#trades_by_time}
 

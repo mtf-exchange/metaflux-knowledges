@@ -192,7 +192,9 @@ Response:
   "type": "spot_clearinghouse_state",
   "data": {
     "address": "0x<addr>",
-    "balances": [ { "asset": 104, "name": "MTF", "total": "10", "hold": "0" } ]
+    "balances": [ { "asset": 104, "name": "MTF", "total": "10", "hold": "0" } ],
+    "height": 562,
+    "time":   1700000000555
   }
 }
 ```
@@ -203,6 +205,14 @@ Response:
 | `balances[*].name` | string | Token / pair name, else `asset:<id>` |
 | `balances[*].total` | decimal string | Full balance, truncated toward zero |
 | `balances[*].hold` | decimal string | Locked behind resting spot orders (escrow); spendable = `total − hold` |
+| `height` | uint64 | Committed block height this snapshot reflects — a **bare integer**, not a Decimal string. Advances on **every** commit, even when the balances are unchanged |
+| `time` | uint64 | Consensus block time in **milliseconds** — a **bare integer**, same consensus clock as `height` |
+
+`height` / `time` are an **as-of stamp** (identical semantics to the perp
+[`account_state`](../info.md#account_state) read, and matching the WS
+[`spot_state`](../../ws/subscriptions.md#spot_state) channel): they advance every
+commit even when no balance moved, letting a client distinguish a fresh-but-quiet
+account from a stalled read path.
 
 Token set is the union of the account's balance and escrow (`reserved`) keys —
 a token that is entirely held with zero spendable still appears. Range-scanned

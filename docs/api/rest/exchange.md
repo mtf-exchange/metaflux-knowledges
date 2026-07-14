@@ -2144,11 +2144,11 @@ the admission envelope:
   "accepted":      true,
   "mempool_depth": 3,
   "nonce":         1735689600001,
-  "action_hash":   "0x<keccak256_of_action_json>"
+  "action_hash":   "0x<action_hash>"
 }
 ```
 
-`mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier (`0x` + keccak256 of the exact signed `action` JSON bytes) you can match against commit events.
+`mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier you can match against commit events. It is `0x` + `keccak256` of the exact signed `action` bytes concatenated with the sender address (20 bytes) and the nonce (8 bytes, big-endian). Because the sender and nonce are bound into the hash, two submissions with byte-identical `action` params produce **different** `action_hash` values, so a resubmit never collides with an earlier one.
 
 ### Rejection envelope {#rejection-envelope}
 

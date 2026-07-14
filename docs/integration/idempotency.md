@@ -119,10 +119,11 @@ If still absent → admission failed (or was evicted from mempool). Submit again
 
 ### For transfers / withdrawals {#for-transfers--withdrawals}
 
-Query the account's `userFills` (which includes funding + transfers) or `block_info` around the time of the drop. Match by the action_hash you computed locally — every action has a deterministic hash regardless of admission outcome.
+Query the account's `userFills` (which includes funding + transfers) or `block_info` around the time of the drop. Match by the action_hash you computed locally — every action has a deterministic hash (bound to the sender + nonce) regardless of admission outcome.
 
 ```typescript
-const actionHash = keccak256(msgpack(action));
+// action_hash = keccak256(action bytes ‖ sender(20) ‖ nonce(8, big-endian))
+const actionHash = keccak256(concat(msgpack(action), senderAddr, nonceBE8(action.nonce)));
 // search for events with this action_hash in WS history or info queries
 ```
 

@@ -135,7 +135,7 @@ The most ambiguous class. Did the server receive the request? Did the action com
 
 ```mermaid
 flowchart TD
-    E["upon network error:<br/>compute action_hash = keccak256(msgpack(action))"]
+    E["upon network error:<br/>compute action_hash = keccak256(msgpack(action) ‖ sender ‖ nonce_be8)"]
     E --> L{"for attempt in 1..10:<br/>query /info openOrders or relevant info"}
     L --> H{"action_hash visible in committed state?"}
     H -->|yes| D1["admitted + committed &rarr — done"]
@@ -150,7 +150,7 @@ flowchart TD
 
 The cloid-on-orders pattern (see [idempotency](./idempotency.md)) makes this cheap: query open orders, see if your cloid is there.
 
-For non-order actions, match on `action_hash` (deterministic from your local msgpack encoding). The `userEvents` WS feed includes `action_hash` on every event.
+For non-order actions, match on `action_hash` — deterministic from your local msgpack encoding bound to the sender and nonce: `keccak256(msgpack(action) ‖ sender_20 ‖ nonce_be8)` (the sender + 8-byte big-endian nonce are concatenated after the action bytes, so a resubmit with the same params but a new nonce yields a different hash). The `userEvents` WS feed includes `action_hash` on every event.
 
 ## Production recipes {#production-recipes}
 
@@ -223,7 +223,8 @@ ws.subscribe('userEvents', { user: address }, (event) => {
 });
 
 async function submit(action: Action) {
-  const hash = keccak256(msgpack(action));
+  // action_hash binds the action bytes to the sender + 8-byte big-endian nonce
+  const hash = keccak256(concat(msgpack(action), senderAddr, nonceBE8(action.nonce)));
   const p = new Promise((resolve, reject) => pendingByHash.set(hash, { resolve, reject }));
   await client.exchange.submit(action);
   return Promise.race([p, timeout(5000)]);

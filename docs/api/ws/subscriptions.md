@@ -1,7 +1,7 @@
 # WS subscription channels
 
 :::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit. Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit (the exception: `account_state` and `spot_state` additionally re-send an unchanged snapshot as a ~1s liveness heartbeat). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
 
 :::warning
 **`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
@@ -44,8 +44,8 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, on change |
 | `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), on change |
 | `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`; `state.twapId` is the parent id to pass to `twap_cancel`, alongside coin/side/sz/executedSz/minutes/reduceOnly: activated / finished / terminated), on change |
-| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change |
-| `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — on change |
+| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change + ~1s heartbeat |
+| `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — on change + ~1s heartbeat |
 | `explorer_block` | **live** | none | latest committed block header, on each new block |
 | `explorer_txs` | **live** | none | transactions in the latest committed block, on each new block |
 
@@ -455,7 +455,9 @@ with no funds), not an empty array.
       { "asset": 0, "size": "600", "entry": "62000", "upnl": "441",
         "isolated": false, "lev": 7, "side": "long" }
     ],
-    "balances": { "usdc": "10000", "spot": { "MTF": { "total": "12.5", "hold": "0" } } }
+    "balances": { "usdc": "10000", "spot": { "MTF": { "total": "12.5", "hold": "0" } } },
+    "height": 562,
+    "time": 1700000000555
   }
 }
 ```
@@ -470,8 +472,20 @@ with no funds), not an empty array.
   hedge mode).
 - `balances` — `{usdc, spot}`: `usdc` is the quote collateral (whole-USDC); `spot`
   maps token → `{total, hold}`.
+- `height` / `time` — the **as-of stamp**: `height` is the committed block height
+  the frame was rendered against and `time` the consensus block time in ms. Both
+  are **bare integers** (not Decimal strings) and advance on **every** commit,
+  even when nothing else in the record moved. Identical values to the REST
+  [`account_state`](../rest/info.md#account_state) read. They are **excluded from
+  the change-gate** below (the stamp advancing never by itself triggers a push),
+  so a client can use them to tell a fresh-but-quiet account from a stalled feed.
 
-Frequency: change-driven — a frame is sent only when the account's state actually changed since the last commit; an unchanged account emits nothing this commit.
+Frequency: change-driven, **plus a liveness heartbeat** — a frame is sent when the
+account's state changes since the last commit, and additionally the current full
+snapshot (unchanged body, only a fresh `height`/`time` stamp) is re-sent about
+once per second (every 4 commits at the ~250 ms Core cadence) even when nothing
+changed. The heartbeat lets a client confirm the feed is live and distinguish a
+quiet account from a stalled connection.
 
 :::warning
 `account_state` is per-account data but currently has **no authentication** — any
@@ -497,7 +511,9 @@ balance set (`[]` for an account with no spot holdings).
     "balances": [
       { "asset": 1, "name": "USDC", "total": "2500", "hold": "100" },
       { "asset": 2, "name": "MTF", "total": "12.5", "hold": "0" }
-    ]
+    ],
+    "height": 562,
+    "time": 1700000000555
   }
 }
 ```
@@ -505,8 +521,19 @@ balance set (`[]` for an account with no spot holdings).
 - `balances[]` — one entry per held spot token: `asset` (numeric id), `name`
   (token symbol), `total` (whole-token decimal string), `hold` (amount reserved
   by resting spot orders). Identical to the REST spot-balances read.
+- `height` / `time` — the **as-of stamp**: `height` is the committed block height
+  the frame was rendered against and `time` the consensus block time in ms, both
+  **bare integers** that advance on **every** commit even when the balances are
+  unchanged. Identical values to the REST
+  [`spot_clearinghouse_state`](../rest/info/spot.md#spot_clearinghouse_state) read
+  and excluded from the change-gate, so a client can tell a quiet account from a
+  stalled feed.
 
-Frequency: change-driven — a frame is sent only when the spot balances actually changed since the last commit; an unchanged account emits nothing this commit.
+Frequency: change-driven, **plus a liveness heartbeat** — a frame is sent when the
+spot balances change since the last commit, and additionally the current full
+snapshot (unchanged body, only a fresh `height`/`time` stamp) is re-sent about
+once per second (every 4 commits at the ~250 ms Core cadence) even when nothing
+changed, so a client can confirm the feed is live.
 
 ### Per-account realized funding payments {#user_fundings}
 

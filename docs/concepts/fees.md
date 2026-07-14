@@ -21,8 +21,11 @@ your balance at fill time and shown in [`userFills`](../api/rest/info.md#user_fi
 
 ## How a fee is computed {#how-a-fee-is-computed}
 
-Fees settle on the whole-USDC plane: notional is the price-times-size product,
-truncated toward zero.
+Fees are charged at **micro-USDC** (1e-6 USDC) granularity, truncated toward zero:
+the fee is the price-times-size notional times the rate, rounded **down** to the
+nearest 1e-6 USDC. A small fill therefore pays its true fractional fee (a `$20`
+fill pays a real `$0.02` taker fee instead of rounding to `$0`), not a value
+rounded to a whole cent or dollar.
 
 ### Per fill {#per-fill}
 
@@ -212,8 +215,10 @@ open market and locks it out of circulation, while the validator and treasury
 shares stay in the fill currency.
 
 **Q: Is there a min-fee floor?**
-A: No floor. A tiny fill computes a sub-cent fee (rounded down on display, charged
-at full precision internally).
+A: No floor. A tiny fill computes a sub-cent fee, and the wire carries that
+fractional amount directly: the `fee` field on a fill is a decimal-USDC string
+truncated toward zero at 1e-6 (micro-USDC) granularity — there is no separate
+display-vs-internal precision, the charged value is what you see.
 
 **Q: Do TWAP slices each pay taker?**
 A: Yes — each slice is an IOC at the protocol's discretion. Total TWAP fee = sum of
