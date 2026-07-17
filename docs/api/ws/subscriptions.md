@@ -91,6 +91,20 @@ Each push is a **full snapshot of the top 20 levels**, not a partial diff. The f
 
 Frequency: change-driven — a frame is sent only when the book actually changed since the last commit; a commit that leaves this book untouched emits nothing. If the coin maps to no known market, you still get the ack but the snapshot body is the empty book (`"levels": [[], []]`, `"time": 0`) and no pushes follow.
 
+**Optional depth / precision aggregation.** The `l2_book` subscription accepts the same aggregation params as the [REST `l2_book`](../rest/info/perpetuals.md#l2_book) read, applied to every frame (snapshot and pushes):
+
+```json
+{ "method": "subscribe", "subscription": { "type": "l2_book", "coin": "BTC", "n_sig_figs": 5, "mantissa": 5, "n_levels": 5 } }
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `n_sig_figs` | uint | no | Group price levels to this many significant figures — an integer `2`–`5`. Absent ⇒ full-depth, tick-precise book |
+| `mantissa` | uint | no | Sub-step for `n_sig_figs: 5` **only** — one of `1`, `2`, `5`. Invalid with any other `n_sig_figs` |
+| `n_levels` | uint | no | Per-side depth cap — keep only the best `n_levels` levels per side (applied **after** grouping). Absent ⇒ up to the 20-level default |
+
+Grouping is deterministic and away from the spread (bids round down, asks round up, so a grouped book is never tighter than the raw one); sizes of merged levels are **summed** (per-side total size is conserved). A connection holds one `l2_book` view per coin: re-subscribing to a coin with different aggregation params **replaces** the prior view (open a second connection if you want two groupings of one coin side by side). The subscription ack echoes the params you set. Invalid params return an `error` frame (the connection stays open).
+
 ### Top-of-book best bid and offer {#bbo}
 
 Top-of-book best bid / offer for one market. A thinner `l2_book`. **Requires `coin`.**
