@@ -289,9 +289,11 @@ Response:
 
 Fee rates are decimal **basis points** as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), allowing fine-grained sub-basis-point precision. `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned). See [fees](../../concepts/fees.md).
 
-### Account's resting orders across all perp books {#open_orders}
+### Account's resting orders across all books {#open_orders}
 
-Account-scoped resting orders across every perp book.
+Account-scoped resting orders across every perp **and spot** book. A spot
+entry labels `coin` with the pair name (e.g. `"BTC/USDC"`) and renders
+`px` / `size` in the pair's own planes (pair tick, base-token size decimals).
 
 ```json
 { "type": "open_orders", "address": "0x<addr>" }

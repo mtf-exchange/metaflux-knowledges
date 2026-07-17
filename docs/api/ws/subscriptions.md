@@ -57,7 +57,10 @@ Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unk
 
 ### Aggregated L2 order book for one market {#l2_book}
 
-Aggregated L2 order book for one market. **Requires `coin`.**
+Aggregated L2 order book for one market — perp or spot. **Requires `coin`** (a
+perp symbol like `"BTC"`, or a spot pair name like `"BTC/USDC"`; a spot pair
+streams its spot book depth in the pair's own tick / size planes, with `time: 0`
+— the spot book carries no last-trade timestamp).
 
 ```json
 { "method": "subscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }

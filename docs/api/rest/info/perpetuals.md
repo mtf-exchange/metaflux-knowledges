@@ -237,15 +237,15 @@ these same dynamic rows (a full snapshot on subscribe, then changed-row deltas).
 | `perp[*].prev_day_px` | Decimal string \| null | Price 24h ago; `null` if unknown |
 | `perp[*].change_24h` | Decimal string \| null | 24h price change (fraction, signed); `null` when no prior px |
 | `perp[*].halted` | bool | Market halted |
-| `spot.pairs` | array | Spot pair registry (same rows as [`spot_meta`](./spot.md#spot_meta) `pairs`, plus live `mark_px` / `mid_px` / `day_ntl_vlm`) |
-| `spot.tokens` | array | Spot token registry (same rows as [`spot_meta`](./spot.md#spot_meta) `tokens`) |
+| `spot.pairs` | array | Spot pair registry (same rows as [the spot registry](./spot.md#spot_meta) `pairs`, plus live `mark_px` / `mid_px` / `day_ntl_vlm`) |
+| `spot.tokens` | array | Spot token registry (same rows as [the spot registry](./spot.md#spot_meta) `tokens`) |
 
 The **static** per-market fields (`sz_decimals`, `tick_size`, `step_size`,
 `min_order`, `max_leverage`, `maint_margin_ratio`, `init_margin_ratio`,
 `margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `oi_cap`,
 `mark_source`, `fba_enabled`, `asset_id`) are **not** on this read — fetch them
 from [`markets_meta`](#markets_meta). For the spot pair / token field semantics
-see [`spot_meta`](./spot.md#spot_meta).
+see [the spot registry](./spot.md#spot_meta).
 
 ### Get static metadata for all markets {#markets_meta}
 
@@ -330,9 +330,9 @@ the per-commit dynamic fields (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].asset_id` | uint32 | **DEPRECATED** indexer-shim field — do not build against it |
-| `spot.pairs` / `spot.tokens` | array | Spot pair / token registry, identical to [`markets`](#markets) (see [`spot_meta`](./spot.md#spot_meta)) |
+| `spot.pairs` / `spot.tokens` | array | Spot pair / token registry, identical to [`markets`](#markets) (see [the spot registry](./spot.md#spot_meta)) |
 
-For the spot pair / token field semantics see [`spot_meta`](./spot.md#spot_meta).
+For the spot pair / token field semantics see [the spot registry](./spot.md#spot_meta).
 
 ### Get aggregated order book levels {#l2_book}
 
@@ -351,9 +351,10 @@ Grouped to a coarser grid:
 
 | Arg | Type | Required | Description |
 |-----|------|----------|-------------|
-| `coin` | symbol | yes | Market symbol |
+| `coin` | symbol | yes | Market symbol — a perp symbol (`"BTC"`) or a spot pair name (`"BTC/USDC"`); a spot pair renders its spot order-book depth in the pair's own tick / size planes |
 | `n_sig_figs` | uint | no | Group levels to this many significant figures — an integer `2`–`5`. Absent ⇒ the full-depth, tick-precise book |
 | `mantissa` | uint | no | Sub-step for `n_sig_figs: 5` **only** — one of `1`, `2`, `5` (the grid step is `mantissa ×` the 5-sig-fig step). Invalid with any other `n_sig_figs` |
+| `n_levels` | uint | no | Per-side depth cap — keep only the best `n_levels` aggregated levels per side (applied **after** grouping, so a capped grouped book covers more raw depth). Absent ⇒ no cap |
 
 Missing `coin` → `400 {"error":"missing field coin"}`.
 
@@ -363,9 +364,11 @@ book; the gateway applies `n_sig_figs` / `mantissa` to the response. Grouped
 levels round **away from the spread** — bid prices round **down** (floor), ask
 prices round **up** (ceil) onto the grid — so a grouped level never displays a
 better price than its orders actually rest at, and the sizes of collapsed levels
-are **summed** (per-side total size is conserved). A request without grouping
-args is forwarded verbatim and returns the live book untouched. Querying a bare
-node directly, the grouping args are ignored — full depth either way.
+are **summed** (per-side total size is conserved). The `n_levels` depth cap is
+likewise gateway-applied, counted over the AGGREGATED levels. A request without
+grouping / depth args is forwarded verbatim and returns the live book untouched.
+Querying a bare node directly, the grouping / depth args are ignored — full
+depth either way.
 :::
 
 Response:

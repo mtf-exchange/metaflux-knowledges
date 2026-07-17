@@ -10,61 +10,82 @@ Read queries for [spot](../../../products/spot.md) markets, leveraged [spot marg
 
 ### Spot pair universe and token registry {#spot_meta}
 
-Spot pair universe + per-token registry. No parameters.
+:::warning API change
+The standalone `spot_meta` query type has been **removed** — it was a
+byte-identical alias of the `spot` section that
+[`markets_meta`](./perpetuals.md#markets_meta) (and dynamic
+[`markets`](./perpetuals.md#markets)) already return. Query `markets_meta` with
+`kind: "spot"` instead; a `spot_meta` request now returns
+`400 {"error":"unknown info type: spot_meta"}`.
+:::
 
 ```json
-{ "type": "spot_meta" }
+{ "type": "markets_meta", "kind": "spot" }
 ```
 
-Response:
+Response (the `spot` section):
 
 ```json
 {
-  "type": "spot_meta",
+  "type": "markets_meta",
   "data": {
-    "pairs": [
-      { "id": 100, "name": "USDC", "base": 100, "quote": 100, "taker_fee_bps": 0, "min_notional": "0", "active": true },
-      { "id": 101, "name": "BTC",  "base": 101, "quote": 101, "taker_fee_bps": 0, "min_notional": "0", "active": false },
-      { "id": 104, "name": "MTF",  "base": 104, "quote": 104, "taker_fee_bps": 0, "min_notional": "0", "active": false },
-      { "id": 110, "name": "BTC/USDC", "base": 101, "quote": 100, "taker_fee_bps": 5, "min_notional": "100", "active": true },
-      { "id": 113, "name": "MTF/USDC", "base": 104, "quote": 100, "taker_fee_bps": 5, "min_notional": "100", "active": true }
-    ],
-    "tokens": [
-      { "id": 100, "name": "USDC", "sz_decimals": 2, "wei_decimals": 6 },
-      { "id": 101, "name": "BTC",  "sz_decimals": 5, "wei_decimals": 8 },
-      { "id": 102, "name": "ETH",  "sz_decimals": 4, "wei_decimals": 18 },
-      { "id": 103, "name": "SOL",  "sz_decimals": 2, "wei_decimals": 9 },
-      { "id": 104, "name": "MTF",  "sz_decimals": 2, "wei_decimals": 8 }
-    ]
+    "spot": {
+      "pairs": [
+        {
+          "id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
+          "taker_fee_bps": "5", "min_notional": "100", "active": true,
+          "mark_px": "61650", "mid_px": "61651.5", "day_ntl_vlm": "15230.5",
+          "prev_day_px": "61200", "circulating_supply": "21000000"
+        }
+      ],
+      "tokens": [
+        {
+          "id": 101, "name": "BTC", "sz_decimals": 5, "wei_decimals": 8,
+          "token_id": "0xab…", "system_address": "0x55…",
+          "evm_contract": { "address": "0x66…", "evm_extra_wei_decimals": -3 },
+          "is_canonical": true, "total_supply": "21000000"
+        }
+      ]
+    }
   }
 }
 ```
 
 :::info
 **`pairs` carries two kinds of entry.** The per-token "self pairs" (`id` =
-token id, `base == quote`, e.g. `100`/USDC, `101`/BTC, …, `104`/MTF) are the
-token registry projected as pairs; the **real tradable pairs** have ids `110+`
-(`BTC/USDC`=110, `ETH/USDC`=111, `SOL/USDC`=112, `MTF/USDC`=113) with distinct
-`base`/`quote` and `active:true`. A self-pair's `active` reflects whether that
-token's standalone book is live (only USDC is, on devnet).
+token id, `base == quote`) are the token registry projected as pairs; the
+**real tradable pairs** have distinct `base`/`quote` (e.g. `"BTC/USDC"`).
+Real pairs carry the live market-context fields (`mark_px`, `mid_px`,
+`day_ntl_vlm`, `prev_day_px`, `circulating_supply`).
 :::
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `pairs[*].id` | uint32 | Pair id (`SpotPairSpec.pair_id`); `110+` = real `BASE/USDC` pairs |
+| `pairs[*].id` | uint32 | Pair id (`SpotPairSpec.pair_id`) |
 | `pairs[*].name` | string | Pair name (e.g. `"BTC/USDC"`) |
 | `pairs[*].base` / `quote` | uint32 | Base / quote asset id (equal for self-pairs) |
-| `pairs[*].taker_fee_bps` | uint16 | Taker fee (bps); `0` if unset |
-| `pairs[*].min_notional` | decimal string | Min notional (USDC cents); `"0"` if unset |
+| `pairs[*].taker_fee_bps` | bps string | Taker fee (whole bps); `"0"` if unset |
+| `pairs[*].min_notional` | decimal string | Min notional (whole USDC); `"0"` if unset |
 | `pairs[*].active` | bool | Whether the pair is active for trading |
-| `tokens[*].id` | uint32 | Spot token asset id (`100`=USDC, `101`=BTC, `102`=ETH, `103`=SOL, `104`=MTF) |
+| `pairs[*].mark_px` | decimal string \| null | Last-trade price (whole USDC); `null` before the first trade |
+| `pairs[*].mid_px` | decimal string \| null | Book mid, falls back to `mark_px`; `null` when neither exists |
+| `pairs[*].day_ntl_vlm` | decimal string | 24h notional volume |
+| `pairs[*].prev_day_px` | decimal string \| null | Price ~24h ago; `null` if unknown |
+| `pairs[*].circulating_supply` | decimal string | Base token committed supply (whole units) |
+| `tokens[*].id` | uint32 | Spot token asset id |
 | `tokens[*].name` | string | Token name (e.g. `"USDC"`, `"MTF"`) |
 | `tokens[*].sz_decimals` | uint8 | Display / size precision |
-| `tokens[*].wei_decimals` | uint8 | Native (ERC-20-style) token decimals (USDC=6, BTC=8, ETH=18, SOL=9, MTF=8) |
+| `tokens[*].wei_decimals` | uint8 | Native (ERC-20-style) token decimals |
+| `tokens[*].token_id` | hex string (32 bytes) | Canonical token id, `0x`-hex |
+| `tokens[*].system_address` | hex address | Core-side anchor address |
+| `tokens[*].evm_contract` | object \| null | EVM binding `{address, evm_extra_wei_decimals}`; `null` when unbound |
+| `tokens[*].is_canonical` | bool | Canonical (genesis / governance-listed) token |
+| `tokens[*].total_supply` | decimal string | Committed token issuance (whole units); `"0"` when none |
 
 `tokens` and `pairs` are in committed `BTreeMap` order (by asset / pair id).
 
-State source: `Exchange.mip3_spot_pair_specs` (pairs) + `Exchange.mip3_spot_token_specs` (tokens).
+State source: `Exchange.spot_pair_specs` (pairs) + `Exchange.spot_token_specs`
+(tokens) + `spot_clearinghouse.total_supply` (supply).
 
 ### Single-token detail with tradable pairs and fees {#token_info}
 
