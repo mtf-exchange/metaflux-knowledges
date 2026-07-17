@@ -150,7 +150,7 @@ Response (correlate on `id`):
 ```
 
 - `request.type` is `"info"` or `"action"`.
-- For `"action"`, `payload` must be a full signed-exchange envelope (`signature` / `nonce` / `action`), identical to [`POST /exchange`](../rest/exchange.md). The action is signed over the **compact `serde_json` serialization of the `action` object** — the deterministic canonical form the SDK pins.
+- For `"action"`, `payload` must be a full signed-exchange envelope (`signature` / `nonce` / `action`, plus the optional [`expires_after`](../rest/exchange.md#optional-action-expiry-expiresafter)), identical to [`POST /exchange`](../rest/exchange.md). The action is signed over the **compact `serde_json` serialization of the `action` object** — the deterministic canonical form the SDK pins.
 - Errors are returned as a normal `post` frame with `response.type: "error"` and a string `payload` (never a connection close):
 
 ```json

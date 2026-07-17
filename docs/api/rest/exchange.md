@@ -53,6 +53,7 @@ native `/exchange` is served directly at `http://localhost:8080`.
 | `signature` | hex string, 65 bytes (130 hex chars; `0x` optional) | yes | secp256k1 ECDSA over the EIP-712 [typed-data digest](#signing) of the action's structured fields + `nonce`. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
 | `nonce` | uint64 | yes | Strictly-monotonic per actor. Conventionally `Date.now()`. Bound into the signed digest. See [idempotency](../../integration/idempotency.md). |
 | `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. |
+| `expires_after` | uint64 (ms) | no | **Optional** action expiry, in consensus milliseconds. Omit it or send `0` for the default (never expires) — that produces the exact same signed digest as before this field existed. A non-zero value is **signed into** the digest and the action is rejected once consensus time passes it. See [Optional action expiry](#optional-action-expiry-expiresafter). |
 
 :::info
 **No top-level `sender`.** The envelope carries no `sender` field. The account
@@ -125,6 +126,28 @@ that exact value. Signing against the wrong `chainId` returns `401` because the
 recovered address differs from the action's `owner` (or, for sender-authorized
 actions, recovers a phantom address that passes no authorization check). See
 [networks](../../networks.md) for endpoints.
+
+### Optional action expiry (`expiresAfter`) {#optional-action-expiry-expiresafter}
+
+Any action may carry an optional expiry so it cannot be replayed or relayed late.
+Send an `expires_after` (uint64 milliseconds) next to `action` / `nonce` /
+`signature`, and set the **same** value in the signed typed message:
+
+- **`0` or absent — the default.** The digest is **byte-for-byte identical** to
+  the pre-existing one, so nothing changes for actions that don't opt in. Leave
+  the field off entirely, or send `0`.
+- **Non-zero.** The value is folded into the EIP-712 type string and appended as
+  the final signed field (see
+  [typed-data signing → action expiry](../../integration/typed-data-signing.md#action-expiry-expiresafter)),
+  so the expiry is **signed and tamper-evident** — a relay can neither strip nor
+  alter it. The action is rejected at submission if the expiry is already in the
+  past, and dropped at execution if consensus time passes it before it commits.
+
+:::info
+**Availability.** Non-zero `expires_after` is accepted **from the scheduled
+network upgrade** onward. Until then send `0` / omit it (the only accepted value)
+— a non-zero expiry submitted before the upgrade is rejected.
+:::
 
 ## Numeric conventions {#numeric-conventions}
 
@@ -309,18 +332,19 @@ signature would act on the agent's own (separate) account, never the master's.
 
 ### Not on the public `/exchange` path {#not-on-the-public-exchange-path}
 
-These action names appear in earlier drafts, but they are **not bridged on the
-MTF-native `/exchange` handler**. They are
-either privileged / system writes that must never transit the public user path,
-or recognized-but-unmapped schema stubs. Posting them returns
-`400 unsupported action`. See [the table below](#non-bridged-actions) for the
-disposition of each.
+These are draft / legacy action names from earlier docs. Most are **not bridged
+on the MTF-native `/exchange` handler** — they are either privileged / system
+writes that must never transit the public user path, or recognized-but-unmapped
+schema stubs, and posting them returns `400 unsupported action`. The one
+exception below is `MultiSig`, which **is** bridged (its native tag is
+`multi_sig`). See [the table below](#non-bridged-actions) for the disposition of
+each.
 
 | Draft name | Native tag (if recognized) | Why not bridged |
 |-----------|----------------------------|-----------------|
 | `ScaleOrder` | — | No native action; ladder client-side into `batch_order` |
 | `UpdateMarginMode` | — | No native action; isolation is the `is_isolated` flag on `update_leverage` |
-| `MultiSig` | — | Multi-sig collect-and-execute wrapper not bridged (preview / not executing — the account is *registered* via `convert_to_multi_sig_user`) |
+| `MultiSig` | `multi_sig` | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts (post it as a normal `multi_sig` `/exchange` envelope). See [multi-sig](../../concepts/multi-sig.md#acting-as-multi-sig). (A non-wrapped action from a multi-sig account is still rejected.) |
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |

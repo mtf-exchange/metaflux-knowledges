@@ -237,6 +237,66 @@ the server forces them to their default:
 - `create_vault` — the `CreateVault` type has **no `parent`**, so `create_vault`
   is **top-level** (no parent). **Omit** `parent`.
 
+## Action expiry (`expiresAfter`) {#action-expiry-expiresafter}
+
+Every action type optionally carries a top-level **`expiresAfter`** (uint64
+milliseconds): an expiry time, signed into the digest, after which the action is
+no longer valid. It is a defence against late replay — a signature that leaks or
+is held back by a relay stops working once its expiry passes. See
+[`POST /exchange` → optional action expiry](../api/rest/exchange.md#optional-action-expiry-expiresafter)
+for the wire behaviour and rejection rules.
+
+The fold is **uniform across every action type** and follows one rule:
+
+- **`expiresAfter == 0` (or absent) — the default.** The digest is **byte-for-byte
+  identical** to the action's normal digest. Nothing about signing changes unless
+  you opt in.
+- **`expiresAfter != 0`.** Two changes, both deterministic:
+  1. The type string's trailing `…,uint64 nonce)` becomes
+     `…,uint64 nonce,uint64 expiresAfter)`.
+  2. One extra 32-byte word — `expiresAfter` as a big-endian `uint64`, left-padded
+     — is appended to `encodeData` **after** the `nonce` word.
+
+So for `withdraw`:
+
+```
+// expiresAfter == 0 (or omitted): unchanged
+MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uint32 destinationChainId,bool useCctp,uint64 nonce)
+
+// expiresAfter != 0: folded
+MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uint32 destinationChainId,bool useCctp,uint64 nonce,uint64 expiresAfter)
+```
+
+### `eth_signTypedData_v4` field placement {#expiresafter-field-placement}
+
+When `expiresAfter` is non-zero, add it as the **last** field of the action's type
+array and set it in the message (as a decimal string, like any `uint64`):
+
+```js
+types['MetaFluxTransaction:Withdraw'].push({ name: 'expiresAfter', type: 'uint64' });
+message.expiresAfter = '1735693200000';   // only when non-zero
+```
+
+When it is `0` / absent, do **not** add the field or the message key — that
+reproduces the legacy typed data exactly.
+
+### Worked delta — `withdraw` with and without expiry {#worked-delta--withdraw-expiry}
+
+A `withdraw` of `"100.5"` of asset `0` to chain id `8453` on **Testnet**
+(`chainId = 114514`), `useCctp = false`, `nonce = 1735689600000`. The two digests
+below are pinned by the cross-implementation known-answer test — a compliant
+`eth_signTypedData_v4` assembly reproduces them exactly:
+
+| `expiresAfter` | Signed EIP-712 digest (32 bytes) |
+|----------------|----------------------------------|
+| `0` / omitted  | `0x425495f369661cdff0c274cd16ee5ad91294892a924b9a84033f09183b087c0e` |
+| `1735693200000` | `0x9ad23a96bb83b8bdd427fe9023b4855e8689be66da73da745f9af0acb59f5833` |
+
+The first row is **identical** to the digest you get from the plain (no-expiry)
+`withdraw` — proof that opting out costs nothing. The second row differs only
+because the folded type string and the appended `expiresAfter` word changed the
+struct hash.
+
 ## Worked example — `send_asset` (a transfer) {#worked-example--send_asset-a-transfer}
 
 A transfer of `"750.25"` of asset `2` from spot DEX `0` to perp DEX `1`, into the

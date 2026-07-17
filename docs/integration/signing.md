@@ -20,6 +20,7 @@ specification and copy-pasteable TypeScript / Python examples.
 ## See also {#see-also}
 
 - [Typed-data signing](./typed-data-signing.md) — the signing scheme, end to end
+  (including the optional [action `expiresAfter`](./typed-data-signing.md#action-expiry-expiresafter) expiry)
 - [`POST /exchange`](../api/rest/exchange.md) — the endpoint
 - [Agent wallets](../concepts/agent-wallets.md) — multi-signer setup
 - [Idempotency](./idempotency.md) — nonce strategy + retry

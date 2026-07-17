@@ -401,7 +401,7 @@ a recent window, not all history. An account with no fills returns
 | `fills[*].dir` | string | Direction label, e.g. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Signed leg size BEFORE the fill, **base units** (whole-unit, signed) |
 | `fills[*].block` | uint64 | Committed block height the fill settled in (on-chain locator) |
-| `fills[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets the fill be traced on-chain. **Empty string (`""`) when there is no signed taker action behind the fill** — a system / begin-block print, or the resting **maker leg** of a match (the maker's original submit hash is not carried on the fill). Taker legs of a user-signed order carry the hash |
+| `fills[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets the fill be traced on-chain. A taker leg carries its order's hash; from the scheduled network upgrade a **maker leg carries the hash of the maker's own resting order** (its original `submit_order`), so both legs of a match are traceable to the action that placed them. **Empty string (`""`)** when there is no signed user order behind the leg — a system / begin-block / liquidation print — and, for maker legs, on fills recorded before the network upgrade |
 
 ### Fill history filtered by time window {#user_fills_by_time}
 

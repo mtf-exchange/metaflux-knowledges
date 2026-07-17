@@ -156,9 +156,21 @@ The cloid + the server-side checks make the retry safe even when the network is 
 | Two scripts collide on nonce | Sharing the same account | Use a shared nonce service, or one script per account |
 | `nonce_too_small` after a reconnect | Local nonce counter reset to pre-drop value | Persist last-submitted nonce across restarts |
 
+## Complement: action expiry {#complement-action-expiry}
+
+The nonce window stops an action from committing **twice**; it does not stop a
+still-unused signature from committing **late**. The optional
+[action `expiresAfter`](./typed-data-signing.md#action-expiry-expiresafter) closes
+that gap — sign an expiry into the action and it is rejected once consensus time
+passes it, so a leaked or relay-held signature cannot land after its window. The
+two are complementary: `nonce` guards against duplication, `expiresAfter` guards
+against staleness. It is optional and defaults to off (`0` / absent), which keeps
+the digest byte-for-byte unchanged.
+
 ## See also {#see-also}
 
 - [`POST /exchange`](../api/rest/exchange.md) — full envelope including `nonce`
+  and the optional [`expires_after`](../api/rest/exchange.md#optional-action-expiry-expiresafter)
 - [Errors](../api/errors.md) — every error string + remediation
 - [Error handling](./error-handling.md) — admission vs commit vs network decision tree
 - [Rate limits](../api/rate-limits.md) — pace your retries
