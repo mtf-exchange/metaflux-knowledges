@@ -76,7 +76,16 @@ Response:
     "disable_close": false,
     "halted":        false,
     "strict_isolated": false,
-    "asset_id":      0
+    "asset_id":      0,
+    "token": {
+      "id":                 101,
+      "wei_decimals":       8,
+      "token_id":           "0x0000000000000000000000000000000000000000000000000000000000000065",
+      "system_address":     "0x2000000000000000000000000000000000000065",
+      "evm_contract":       null,
+      "is_canonical":       true,
+      "circulating_supply": "0"
+    }
   }
 }
 ```
@@ -125,6 +134,26 @@ decimals, which are set by the price tick (`tick_size`). The two are independent
 axes.
 :::
 
+:::info
+**`token` — the perp's underlying spot-token identity + issuance (optional).**
+When the token registry hosts a token whose name matches the perp's symbol, the
+record carries a `token` object so a consumer needs no name-join into the spot
+registry. It mirrors the corresponding `markets_meta` spot-token row field-for-field:
+
+- `id` — the token's registry id (`u32`).
+- `wei_decimals` — the token's native wei precision (`u8`).
+- `token_id` — the 32-byte token id, `0x`-hex.
+- `system_address` — the token's system address, `0x`-hex.
+- `evm_contract` — `{ address, evm_extra_wei_decimals }` when the token has a bound
+  EVM contract, else `null`.
+- `is_canonical` — whether this is the canonical token for the symbol (`bool`).
+- `circulating_supply` — committed issuance, a decimal string (`"0"` when none).
+
+The whole object is **omitted** for a perp with no registered underlying token
+(never fabricated). The identical block is emitted on each
+[`markets_meta`](#markets_meta) perp row.
+:::
+
 `market_info` returns the **full** record — the union of the **dynamic** fields
 served by [`markets`](#markets) (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
 `premium`, `funding`, `open_interest`, `day_ntl_vlm`, `prev_day_px`,
@@ -132,7 +161,7 @@ served by [`markets`](#markets) (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
 [`markets_meta`](#markets_meta) (`sz_decimals`, `tick_size`, `step_size`,
 `min_order`, `max_leverage`, the margin ratios, `margin_tiers`,
 `strict_isolated`, `disable_open` / `disable_close`, `oi_cap`, `mark_source`,
-`fba_enabled`, `asset_id`). See those two reads for per-field semantics.
+`fba_enabled`, `asset_id`, the optional `token` block). See those two reads for per-field semantics.
 
 ### Get live state for all markets {#markets}
 
