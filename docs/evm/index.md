@@ -57,3 +57,41 @@ recovers to the declared sender address — this is a deterministic security che
 prevents unsigned or malformed transactions from entering the chain. Standard EVM
 clients and wallets that correctly sign transactions see no change; the verification
 is automatic and transparent.
+
+### WebSocket subscriptions {#websocket-subscriptions}
+
+Realtime push is available over a WebSocket on the **same** `/evm` endpoint —
+`ws://…/evm` (or `wss://` behind TLS). Standard EVM tooling (ethers, viem, wagmi)
+that dials a WebSocket transport gets both regular request/reply (`eth_call`,
+`eth_getLogs`, `eth_sendRawTransaction`, …) and `eth_subscribe` push notifications
+on the one connection.
+
+Subscribe with `eth_subscribe`, unsubscribe with `eth_unsubscribe`; the server
+pushes each update as a standard `eth_subscription` notification:
+
+```json
+{"jsonrpc":"2.0","method":"eth_subscription","params":{"subscription":"0x…","result":{ … }}}
+```
+
+Three channels are supported:
+
+| Channel | Emits |
+|---------|-------|
+| `newHeads` | the block header of each newly **committed** EVM block |
+| `logs` (with an `{address, topics}` filter) | each matching log in each newly committed block — identical matching to `eth_getLogs` |
+| `newPendingTransactions` | see the note below |
+
+Subscriptions are **forward-only** — they stream blocks committed *after* you
+subscribe, with no historical backfill (use `eth_getLogs` / `eth_getBlockByNumber`
+for history). Because MetaFlux has single-slot BFT finality a committed block never
+reorgs, so streamed logs are never `removed` and `newHeads` never rewinds.
+
+> **`newPendingTransactions` = newly *committed* transactions, not a mempool feed.**
+> MetaFlux exposes no public pending mempool, so this channel emits the hashes of
+> transactions the instant they **commit** in a new block — the same timing as
+> `newHeads`, not the pre-confirmation timing a geth mempool feed gives. If you call
+> `watchPendingTransactions()` (viem) / `eth_subscribe(["newPendingTransactions"])`
+> expecting pre-confirmation hashes, note that on MetaFlux they arrive at commit.
+
+`eth_subscribe` / `eth_unsubscribe` are **WebSocket-only**; calling them over
+`POST /evm` returns a JSON-RPC error directing you to a WebSocket connection.
