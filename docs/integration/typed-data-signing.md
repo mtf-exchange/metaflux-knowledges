@@ -257,6 +257,29 @@ Notes on specific fields:
 - `pxLow` / `pxHigh` / `totalSize` are `uint64` integers on the wire (widened
   internally).
 
+### Chase {#chase}
+
+A [chase order](../api/rest/exchange.md#chase_order) binds one self-repricing
+leg: you sign the intent, the node re-prices the resting leg to track the touch.
+Like the scale ladder it has an owner-less primary type and a `_WITH_OWNER` twin
+(`owner` right after `metafluxChain`).
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `chase_order` | `MetaFluxTransaction:ChaseOrder(string metafluxChain,uint32 market,string side,uint64 size,string cloid,string stpMode,string positionSide,uint32 intervalBlocks,uint64 ttlMs,uint32 maxReprices,uint64 nonce)` |
+| `chase_order` (with owner) | `MetaFluxTransaction:ChaseOrder(string metafluxChain,address owner,uint32 market,string side,uint64 size,string cloid,string stpMode,string positionSide,uint32 intervalBlocks,uint64 ttlMs,uint32 maxReprices,uint64 nonce)` |
+| `cancel_chase` | `MetaFluxTransaction:CancelChase(string metafluxChain,uint32 market,uint64 chaseOid,uint64 nonce)` |
+| `cancel_chase` (with owner) | `MetaFluxTransaction:CancelChase(string metafluxChain,address owner,uint32 market,uint64 chaseOid,uint64 nonce)` |
+
+Notes on specific fields:
+
+- `side` / `stpMode` / `positionSide` / `cloid` are EIP-712 **`string`s** signed
+  verbatim in their `snake_case` wire form; each is `""` when omitted. `cloid` is
+  hashed as the verbatim `0x`-hex STRING, not the raw 16 bytes.
+- `size` / `intervalBlocks` / `ttlMs` / `maxReprices` are integer words.
+- `cancel_chase.chaseOid` is the registry cancel handle from the `chase_order`
+  ack (`statuses[0].chase.chase_oid`), **not** the resting leg oid.
+
 ### Fields that are *not* in the typed digest {#fields-that-are-not-in-the-typed-digest}
 
 Two actions have `params` keys that the typed type string does **not** cover, so

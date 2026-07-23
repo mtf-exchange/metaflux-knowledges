@@ -95,6 +95,8 @@ c.exchange.modify_order(ModifyOrderParams { .. }).await?;
 c.exchange.batch_modify(BatchModifyParams { .. }).await?;
 c.exchange.scale_order(ScaleOrderParams { .. }).await?;   // N-rung ladder, one signature; returns per-rung results
 c.exchange.cancel_scale(CancelScaleParams { .. }).await?; // cancel a whole ladder by its shared cloid
+c.exchange.chase_order(ChaseParams { .. }).await?;        // self-repricing chase leg, one signature
+c.exchange.cancel_chase(CancelChaseParams { .. }).await?; // cancel a chase by its handle (chase_oid)
 c.exchange.twap_order(TwapOrderParams { .. }).await?;
 c.exchange.twap_cancel(TwapCancelParams { .. }).await?;
 c.exchange.trigger(TriggerParams { .. }).await?;

@@ -6,7 +6,7 @@
 
 ## TL;DR {#tldr}
 
-MetaFlux supports a full ladder of order primitives — limit, IOC, ALO, FOK, market, stop-loss, take-profit, trigger limits, TWAP, scale, and reduce-only — plus self-trade-prevention (STP) modes that gate matching against your own orders. Every variant is a `POST /exchange { type: "Order", ... }` shape; specialised flows like TWAP and Scale use their own action variants.
+MetaFlux supports a full ladder of order primitives — limit, IOC, ALO, FOK, market, stop-loss, take-profit, trigger limits, TWAP, scale, chase, and reduce-only — plus self-trade-prevention (STP) modes that gate matching against your own orders. Every variant is a `POST /exchange { type: "Order", ... }` shape; specialised flows like TWAP and Scale use their own action variants.
 
 ## Time-in-force {#time-in-force}
 
@@ -181,6 +181,58 @@ handle. Use a fresh handle per ladder — the SDKs tag ladder handles with a `0x
 prefix. See [`POST /exchange` → scale_order](../api/rest/exchange.md#scale_order)
 for the full field table and admission rules.
 
+## Chase orders {#chase-orders}
+
+:::info
+**Preview.** Chase orders ship in the SDKs with a frozen wire contract, but are
+**not enabled on every network** yet — confirm availability on your target network
+before you depend on them.
+:::
+
+A **chase order** is a single resting **post-only** leg that the node automatically
+re-prices to stay one tick inside the top of the book. You sign one compact request
+— the market, side, size, a reprice cadence, a time-to-live, and a reprice budget —
+and the node keeps the leg pegged to the best price with **no client round-trip**.
+Because the leg is post-only and always rests strictly inside the spread, a chase
+never takes liquidity and never pays a taker fee.
+
+```json
+{
+  "type": "chase_order",
+  "params": {
+    "market": 7, "side": "bid",
+    "size": 100000000,
+    "cloid": "0x5c000000000000000000000000000002",
+    "stp_mode": "cancel_oldest",
+    "interval_blocks": 4,
+    "ttl_ms": 3600000,
+    "max_reprices": 500
+  }
+}
+```
+
+The node pegs the leg one tick inside the touch — a buy chase one tick above the
+best bid, a sell chase one tick below the best ask — and re-prices it at most once
+per `interval_blocks` committed blocks. Each reprice cancels the old leg and places
+a new leg at the fresh price under the **same re-stamped `cloid`**, so correlate the
+leg across reprices by `cloid`, not by its `oid`.
+
+The chase ends when `ttl_ms` elapses, when `max_reprices` is reached, or when the
+leg fills or is cancelled by another path. A partial fill keeps the chase running on
+the remaining size. A reprice that would cross the book, a book too thin to peg
+against, or a halted market **pauses** the leg at its current price and retries
+later.
+
+**Cancel a chase** with [`cancel_chase`](../api/rest/exchange.md#cancel_chase),
+passing the `chase_oid` handle returned when you placed it (the handle is stable;
+the leg `oid` is not). There is **no chase-specific WS channel** — the placement and
+every reprice ride the account
+[`order_updates`](../api/ws/subscriptions.md#order_updates) and
+[`open_orders`](../api/ws/subscriptions.md#open_orders) feeds as an ordinary cancel
+plus a new resting order. See
+[`POST /exchange` → chase_order](../api/rest/exchange.md#chase_order) for the full
+field table and admission rules.
+
 ## TWAP {#twap}
 
 `TwapOrder` schedules slices over `duration_ms`.
@@ -269,6 +321,17 @@ await client.scaleOrder({
   totalSize: '500000000',
   dist: 'flat',
   cloid: '0x5c000000000000000000000000000001'
+});
+
+// chase buy — one leg the node reprices to track the top of book
+await client.placeChase({
+  market: 0, side: 'bid',
+  size: '100000000',
+  stp_mode: 'cancel_oldest',
+  interval_blocks: 4,
+  ttl_ms: 3_600_000,
+  max_reprices: 500,
+  cloid: '0x5c000000000000000000000000000002'
 });
 ```
 

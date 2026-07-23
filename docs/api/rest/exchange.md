@@ -219,6 +219,8 @@ numbers (the node decodes them as `u64`, then widens internally). Addresses are
 | [`twap_cancel`](#twap_cancel) | Cancel a running TWAP parent | sender / agent | yes |
 | [`scale_order`](#scale_order) | Place an N-rung ladder / one signature | owner / agent | by `cloid` |
 | [`cancel_scale`](#cancel_scale) | Cancel a whole ladder by its shared `cloid` | owner / agent | yes |
+| [`chase_order`](#chase_order) | Place a self-repricing chase leg / one signature | owner / agent | by `cloid` |
+| [`cancel_chase`](#cancel_chase) | Cancel a chase by its handle | owner / agent | yes |
 
 ### Spot trading {#spot-trading}
 
@@ -979,6 +981,144 @@ by a signer who is not the owner is rejected.
 only the resting book. A parked [TP/SL trigger leg](#trigger-orders-stop_loss--take_profit)
 that carries the same `cloid` is **not** swept, and can later fire into the group
 after the ladder is gone. Keep trigger legs on their own `cloid`.
+
+---
+
+### Place a chase order {#chase_order}
+
+:::info
+**Preview — confirm before you depend on it.** The chase order type ships in the
+SDKs and its wire contract is frozen. It is **not enabled on every network** yet.
+Confirm it is active on your target network first. A submit to a network where it
+is not enabled is rejected with `chase_order feature not active`.
+:::
+
+Place one **chase order** — a single resting post-only leg that the node
+automatically re-prices to stay one tick inside the top of the book. You sign one
+compact request; the node places the leg and re-prices it every eligible block, so
+the quote tracks the best price with **no client round-trip**. The leg is
+**post-only** — it always rests and never takes liquidity, so it never pays a
+taker fee. The body is carried under `action.params`; `owner` is optional (an
+approved agent / operator routes for the named account).
+
+```json
+{
+  "type": "chase_order",
+  "params": {
+    "market":          7,
+    "side":            "bid",
+    "size":            100000000,
+    "cloid":           "0x5c000000000000000000000000000002",
+    "stp_mode":        "cancel_oldest",
+    "interval_blocks": 4,
+    "ttl_ms":          3600000,
+    "max_reprices":    500
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`). Perp markets only in v1 |
+| `side` | enum | `"bid"` / `"ask"` | `bid` = buy chase, `ask` = sell chase |
+| `size` | uint64 | `> 0`, on-lot | Leg size in raw lots (`10^sz_decimals` per whole unit). A partial fill shrinks the leg; the next reprice re-places the remainder |
+| `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client handle. It is **re-stamped on every reprice** — correlate the leg across reprices by `cloid` |
+| `stp_mode` | enum | `"cancel_oldest"` / `"cancel_newest"` / `"cancel_both"` / `"reject"` | Self-trade prevention, re-applied on every leg. All four values are accepted. The leg always rests strictly inside the spread, so self-trade prevention rarely fires |
+| `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only.** Omit on a one-way account; send it on a hedge account |
+| `interval_blocks` | uint32 | `2 … 28800` | Reprice debounce: reprice at most once per this many committed blocks (roughly 0.5 s to 2 h at the current block cadence) |
+| `ttl_ms` | uint64 | `60000 … 604800000` | Time-to-live in consensus milliseconds (1 min .. 7 days). When it elapses the leg is cancelled and the chase ends |
+| `max_reprices` | uint32 | `1 … 100000` | Maximum reprices. When reached the leg is cancelled and the chase ends |
+| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for (self or an approved agent). Wire-only — dropped on lowering |
+
+**How the leg tracks the book.** The node pegs the leg one tick inside the touch:
+a buy chase rests one tick above the best bid, a sell chase one tick below the best
+ask, always kept strictly inside the spread so it can never cross. The peg ignores
+your own resting orders on both sides, so a two-sided pair of your own chases both
+track the real market and never cancel each other. Each eligible block the node
+cancels the old leg and places a new leg at the fresh target — under the same
+re-stamped `cloid` — so a client watching the account sees an ordinary cancel
+followed by a new resting order.
+
+**Reprice cadence.** A reprice happens at most once per `interval_blocks` committed
+blocks. A reprice that would cross the book, a book too thin to peg against, or a
+market that is halted or has trading disabled **pauses** the leg at its current
+price — the old leg keeps resting and the node retries on a later block. No reprice
+ever takes liquidity.
+
+**Termination.** The chase ends and its leg is cancelled when `ttl_ms` elapses or
+`max_reprices` is reached. If the leg fills completely, or is cancelled by any
+other path, the chase ends and is **not** re-placed. A partial fill keeps the chase
+running on the remaining size.
+
+**Admission** (the chase is rejected, nothing rests, if any check fails):
+
+- `interval_blocks` in `2 … 28800`, else `chase interval_blocks must be in 2..=28800`.
+- `ttl_ms` in `60000 … 604800000`, else `chase ttl_ms must be in 60000..=604800000`.
+- `max_reprices` in `1 … 100000`, else `chase max_reprices must be in 1..=100000`.
+- The market carries a positive tick / lot grid, else `chase market has no tick/lot grid` or `chase market tick_size must be positive`.
+- `size > 0` and on the lot grid.
+- Position mode matches (one-way omits `position_side`; hedge sends it).
+- Under the caps: at most **5** active chases per account (`chase_cap`) and a global active-chase cap (`chase global cap reached`).
+- The book is deep enough to peg against (`chase book too thin`) and the initial target does not cross the book (`chase target would cross the book`).
+- The initial leg rests (`chase leg did not rest`).
+
+**Response.** A `chase_order` is an order-type action, so it returns the per-order
+`statuses` array. The success entry is a single-key `chase` object:
+
+```json
+{ "statuses": [ { "chase": { "chase_oid": 12345, "leg_oid": 12346, "leg_px": "6800000000", "cloid": "0x5c000000000000000000000000000002" } } ] }
+```
+
+- `chase_oid` (uint64) — the stable **cancel handle**. Pass it to [`cancel_chase`](#cancel_chase). It is **not** the leg's `oid`.
+- `leg_oid` (uint64) — the initial resting leg id. It is re-stamped on every reprice, so do not treat it as stable — correlate the leg by `cloid` instead.
+- `leg_px` — the leg's placed price, a fixed-point integer string on the `1e8` plane.
+- `cloid` — echoed only when the chase carried one.
+
+A rejected chase returns `{ "accepted": false, "error": "<reason>", "mempool_depth": N }`.
+
+**Watching the chase.** There is **no chase-specific WS channel**. The initial
+placement and every reprice surface on the existing per-account
+[`order_updates`](../ws/subscriptions.md#order_updates) stream and
+[`open_orders`](../ws/subscriptions.md#open_orders) snapshots as an ordinary cancel
+plus a new resting order; leg fills surface on
+[`fills`](../ws/subscriptions.md#fills) and
+[`user_events`](../ws/subscriptions.md#userevents). Correlate reprices by `cloid`
+(each reprice carries a new `leg_oid` under the same `cloid`); keep the `chase_oid`
+from this response for [`cancel_chase`](#cancel_chase).
+
+---
+
+### Cancel a chase order {#cancel_chase}
+
+:::info
+**Preview — confirm before you depend on it.** See [`chase_order`](#chase_order).
+:::
+
+Cancel one chase by its **handle** — the `chase_oid` returned by
+[`chase_order`](#chase_order). This cancels the chase's current resting leg and
+stops further reprices. The body is carried under `action.params`; `owner` is
+optional (agent / operator routing).
+
+```json
+{
+  "type": "cancel_chase",
+  "params": {
+    "market":    7,
+    "chase_oid": 12345
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `market` | uint32 | `[0, market_count)` | The perpetual market the chase runs on. Must match the chase's market |
+| `chase_oid` | uint64 | a live chase handle | The **handle** from the `chase_order` response (the cancel key) — **not** the leg's `oid` |
+| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for. Wire-only — dropped on lowering |
+
+**Semantics.** Only the account that owns the chase may cancel it. An unknown
+handle, a wrong-owner handle, or a wrong-market handle all return
+`order not found`. If the leg already filled or was cancelled out of band, the
+handle still retires cleanly.
 
 ---
 
