@@ -243,7 +243,7 @@ per account (not a full-table walk). State source:
 ### Every spot-margin position for an account {#spot_margin_state}
 
 :::info
-**Available on devnet (preview).** Read surface for leveraged [spot margin](../../../products/spot-margin.md); see the concept page for the preview caveats.
+**Cross-collateralized from the scheduled network upgrade on testnet `114514`.** Read surface for leveraged [spot margin](../../../products/spot-margin.md); the position's margin is held against your one unified USDC account, not a per-pair bucket. See the concept page for the model.
 :::
 
 Every spot-margin position held by one account. Required: `user` (0x hex).
@@ -262,7 +262,7 @@ Response:
     "accounts": [
       {
         "pair": 200,
-        "collateral": "5",
+        "collateral": "0",
         "borrowed": "20",
         "borrow_index_snapshot": "1",
         "base_held": "9.99",
@@ -277,7 +277,7 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `accounts[*].pair` | uint32 | Spot pair id the position is on |
-| `accounts[*].collateral` | decimal string | Posted quote collateral (loss buffer) |
+| `accounts[*].collateral` | decimal string | **Vestigial.** Spot margin is now cross-collateralized against your unified USDC account, so there is no per-pair collateral bucket. Reads `"0"`; kept only for wire-shape compatibility |
 | `accounts[*].borrowed` | decimal string | Outstanding loan **principal** (at the snapshot index) |
 | `accounts[*].borrow_index_snapshot` | decimal string | Pool borrow index captured at open (debt-accrual basis) |
 | `accounts[*].base_held` | decimal string | Segregated base bought on leverage (not in spendable balances) |

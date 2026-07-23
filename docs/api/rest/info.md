@@ -501,6 +501,8 @@ The `data.status` discriminates the branch:
       "side":             "ask",
       "trigger_px":       "66000",
       "trigger_above":    false,
+      "is_market":        false,
+      "limit_px":         "65000",
       "size":             "700",
       "registered_at_ms": 1700000000000,
       "fired":            false
@@ -534,7 +536,7 @@ registry and fill ring are keyed by `oid`):
 |-------|------|-------------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | Resolved lifecycle state |
 | `order` | object | Present on `"resting"` — `oid`, `market_id`, `side` (`"bid"`/`"ask"`), `px` / `size` (fixed-point decimal strings), `inserted_at_ms`, `cloid` (hex \| null) |
-| `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `registered_at_ms`, `fired` (bool) |
+| `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (fixed-point decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at_ms`, `fired` (bool) |
 | `fill` | object | Present on `"filled"` — the matching fill record (see [`user_fills`](#user_fills)) |
 
 ### Latest committed block metadata {#block_info}
@@ -1645,7 +1647,7 @@ Response:
       {
         "oid": 7, "market_id": 0, "side": "bid", "px": "50000", "size": "20000",
         "tif": "gtc", "cloid": "0x000…cafe",
-        "trigger": { "trigger_px": "49000", "trigger_above": false },
+        "trigger": { "trigger_px": "49000", "trigger_above": false, "is_market": false, "limit_px": "48000" },
         "inserted_at_ms": 1700000000000
       }
     ]
@@ -1661,7 +1663,7 @@ Response:
 | `orders[*].px` / `size` | decimal string | Resting price / remaining size |
 | `orders[*].tif` | `"alo" \| "ioc" \| "gtc"` | Time-in-force |
 | `orders[*].cloid` | hex string \| null | Client order id, `null` if none |
-| `orders[*].trigger` | object \| null | `{trigger_px, trigger_above}` if a trigger is registered for the oid, else `null` |
+| `orders[*].trigger` | object \| null | `{trigger_px, trigger_above, is_market, limit_px}` if a trigger is registered for the oid, else `null`. `is_market` (bool) discriminates a market trigger from a limit trigger; `limit_px` is the limit trigger's resting price (fixed-point decimal string), `null` for a market trigger |
 | `orders[*].inserted_at_ms` | uint64 | Insertion timestamp (consensus ms) |
 
 State source: per-book resting orders + `Exchange.trigger_registry`.

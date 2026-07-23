@@ -66,6 +66,23 @@ flowchart LR
 
 Implication: a 10% adverse move on BTC reduces account-wide health, even if your ETH position is fine. You can prop up the BTC position by closing the ETH winner.
 
+### Spot margin joins the cross account {#spot-margin-cross}
+
+From the scheduled network upgrade on testnet `114514`, a
+[spot-margin](../products/spot-margin.md) position is **cross-margined against the
+same unified USDC account**. Its initial-margin requirement is subtracted from
+`free_collateral` (like a perpetual open), and its unrealised PnL and maintenance
+requirement enter the account-level health decision. Two consequences follow:
+
+- An open spot-margin position **reduces your perpetual margin headroom**.
+- A perpetual loss **reduces the collateral that backs a spot-margin position**,
+  and a spot-margin loss can draw on the same account collateral your perpetual
+  positions use.
+
+There is no per-pair spot-margin collateral bucket and no separate deposit — the
+one unified USDC account is the collateral. See
+[spot margin](../products/spot-margin.md).
+
 ## Isolated {#isolated}
 
 :::warning

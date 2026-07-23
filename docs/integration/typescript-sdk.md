@@ -73,7 +73,8 @@ c.exchange.cancel(p: CancelParams): Promise<CancelResult>;
 c.exchange.cancelByCloid(p: CancelByCloidParams): Promise<CancelResult>;
 c.exchange.modifyOrder(p: ModifyOrderParams): Promise<OrderResult>;
 c.exchange.batchModify(p: BatchModifyParams): Promise<OrderResult[]>;
-c.exchange.scaleOrder(p: ScaleOrderParams): Promise<OrderResult[]>;
+c.exchange.scaleOrder(p: ScaleOrderParams): Promise<OrderResult[]>;   // N-rung ladder, one signature; per-rung results
+c.exchange.cancelScale(p: CancelScaleParams): Promise<CancelResult>;  // cancel a whole ladder by its shared cloid
 c.exchange.twapOrder(p: TwapOrderParams): Promise<TwapResult>;
 c.exchange.twapCancel(p: { twapId: string }): Promise<void>;
 c.exchange.trigger(p: TriggerParams): Promise<OrderResult>;

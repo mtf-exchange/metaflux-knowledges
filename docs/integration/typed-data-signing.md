@@ -227,6 +227,36 @@ Notes on specific fields:
 - `mb_withdraw`: `amount` is a `uint64` **integer** (not a decimal string);
   `dstAddr` is the destination-chain address string.
 
+### Scale ladder {#scale-ladder}
+
+The [scale ladder](../api/rest/exchange.md#scale_order) actions bind the **compact
+request** — you sign the range and the distribution, not the expanded rungs. Each
+has an owner-less primary type and a `_WITH_OWNER` twin; the twin is used **only**
+when the wire carries an `owner` (an agent / operator acting for another account),
+with `owner` inserted right after `metafluxChain`, mirroring `batch_order`.
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `scale_order` | `MetaFluxTransaction:ScaleOrder(string metafluxChain,uint32 market,string side,uint32 n,uint64 pxLow,uint64 pxHigh,uint64 totalSize,string dist,bytes32 weights,string tif,bool reduceOnly,string stpMode,string positionSide,string cloid,uint64 nonce)` |
+| `scale_order` (with owner) | `MetaFluxTransaction:ScaleOrder(string metafluxChain,address owner,uint32 market,string side,uint32 n,uint64 pxLow,uint64 pxHigh,uint64 totalSize,string dist,bytes32 weights,string tif,bool reduceOnly,string stpMode,string positionSide,string cloid,uint64 nonce)` |
+| `cancel_scale` | `MetaFluxTransaction:CancelScale(string metafluxChain,uint32 market,string cloid,uint64 nonce)` |
+| `cancel_scale` (with owner) | `MetaFluxTransaction:CancelScale(string metafluxChain,address owner,uint32 market,string cloid,uint64 nonce)` |
+
+Notes on specific fields:
+
+- `weights` is a **`bytes32`** the client **pre-hashes** `T[]`-style:
+  `keccak256(concat(per-weight uint256 words))` for `dist == "custom"`, and the
+  **zero hash** (`0x00…00`) for every other `dist`. This binds the exact weight
+  vector without inflating the message — a 100-rung ladder signs the same size
+  message as a 2-rung one. The wire `params.weights` still carries the full array
+  (the server rebuilds and re-verifies it); for a non-`custom` `dist` send an
+  **empty** array.
+- `side` / `dist` / `tif` / `stpMode` / `positionSide` / `cloid` are EIP-712
+  **`string`s**, signed verbatim in their `snake_case` wire form (`positionSide`
+  is `""` when omitted).
+- `pxLow` / `pxHigh` / `totalSize` are `uint64` integers on the wire (widened
+  internally).
+
 ### Fields that are *not* in the typed digest {#fields-that-are-not-in-the-typed-digest}
 
 Two actions have `params` keys that the typed type string does **not** cover, so
@@ -448,8 +478,9 @@ the same result.
 ## Orders and cancels {#orders-and-cancels}
 
 Orders and cancels (`submit_order`, `batch_order`, `cancel_order`,
-`batch_cancel`) are submitted through the same `/exchange` envelope and signed the
-same EIP-712 typed-data way. Their action-body shapes are in the
+`batch_cancel`, and the [`scale_order` / `cancel_scale`](#scale-ladder) ladder
+actions) are submitted through the same `/exchange` envelope and signed the same
+EIP-712 typed-data way. Their action-body shapes are in the
 [`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
 
 ## See also {#see-also}

@@ -217,6 +217,8 @@ numbers (the node decodes them as `u64`, then widens internally). Addresses are
 | [`schedule_cancel`](#schedule_cancel) | Future-block cancel-all trigger | sender / agent | yes |
 | [`twap_order`](#twap_order) | Schedule a sliced (TWAP) order | sender / agent | by `twap_id` |
 | [`twap_cancel`](#twap_cancel) | Cancel a running TWAP parent | sender / agent | yes |
+| [`scale_order`](#scale_order) | Place an N-rung ladder / one signature | owner / agent | by `cloid` |
+| [`cancel_scale`](#cancel_scale) | Cancel a whole ladder by its shared `cloid` | owner / agent | yes |
 
 ### Spot trading {#spot-trading}
 
@@ -237,15 +239,15 @@ full conceptual model.
 ### Spot margin & Earn {#spot-margin--earn}
 
 :::info
-**Available on devnet (preview).** Leveraged spot ([spot margin](../../products/spot-margin.md)) and its lending supply side ([Earn](../../concepts/earn.md)) run end-to-end on **devnet today**: deposit collateral, borrow from the Earn pool, IOC-buy base on leverage, and close to repay. Treat it as a **preview** — forced liquidation is live and settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are governance parameters still being calibrated. Do not assume production safety at scale.
+**Spot margin is cross-collateralized.** Leveraged spot ([spot margin](../../products/spot-margin.md)) draws its margin from your **one unified USDC account** — the same collateral that backs your perpetual positions — and its lending supply side is [Earn](../../concepts/earn.md). The cross-collateralized model is **available from the scheduled network upgrade on testnet `114514`**. A pair enables only once governance calibrates its per-pair risk parameters, so treat it as a **preview**: forced liquidation settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are still being calibrated. Do not assume production safety at scale.
 :::
 
-A leveraged spot position is **isolated per `(account, pair)`**: posted quote collateral is a pure loss buffer, the buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All six actions are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) and [`earn_state`](./info/spot.md#earn_state).
+A leveraged spot position is **cross-margined against your one unified USDC account** — its initial-margin requirement is held against your account-wide free collateral, exactly like a perpetual open, so there is **no separate collateral deposit**. The buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Because collateral is shared, an open spot-margin position reduces your perpetual margin headroom, and a perpetual loss reduces the collateral that backs the spot-margin position (see [margin modes](../../concepts/margin-modes.md)). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All actions here are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) and [`earn_state`](./info/spot.md#earn_state).
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
-| [`spot_margin_deposit`](#spot_margin_deposit) | Post quote collateral for a pair | sender / agent | no |
-| [`spot_margin_withdraw`](#spot_margin_withdraw) | Withdraw free collateral | sender / agent | no |
+| [`spot_margin_deposit`](#spot_margin_deposit) | **Retired** — collateral is now your unified USDC account | sender / agent | no |
+| [`spot_margin_withdraw`](#spot_margin_withdraw) | **Retired** — collateral is now your unified USDC account | sender / agent | no |
 | [`spot_margin_open`](#spot_margin_open) | Borrow + IOC-buy base on leverage | sender / agent | no |
 | [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | sender / agent | no |
 | [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | sender / agent | no |
@@ -342,7 +344,6 @@ each.
 
 | Draft name | Native tag (if recognized) | Why not bridged |
 |-----------|----------------------------|-----------------|
-| `ScaleOrder` | — | No native action; ladder client-side into `batch_order` |
 | `UpdateMarginMode` | — | No native action; isolation is the `is_isolated` flag on `update_leverage` |
 | `MultiSig` | `multi_sig` | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts (post it as a normal `multi_sig` `/exchange` envelope). See [multi-sig](../../concepts/multi-sig.md#acting-as-multi-sig). (A non-wrapped action from a multi-sig account is still rejected.) |
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
@@ -396,7 +397,7 @@ approved agent). To place many orders under one signature, use
 | `market` | uint32 | `[0, market_count)` | Asset/market id (identity-mapped to `AssetId`) |
 | `side` | enum | `"bid"` / `"ask"` | — |
 | `kind` | enum | `"limit"` / `"market"` / `"stop_loss"` / `"take_profit"` | `limit` / `market` place a live order. `stop_loss` / `take_profit` are accepted **only when a `trigger` block is also present** — that pair parks a single reduce-only TP/SL leg (see [trigger orders](#trigger-orders-stop_loss--take_profit)); a `stop_loss` / `take_profit` *without* a `trigger` block is rejected (`unsupported order kind`) |
-| `trigger` | object \| null | — | Optional [trigger block](#trigger-orders-stop_loss--take_profit). Its presence — on **any** `kind` — turns this `submit_order` into a single parked reduce-only TP/SL leg instead of a live order: `{ "trigger_px": <u64>, "is_market": <bool>, "tpsl": "tp" \| "sl" }` |
+| `trigger` | object \| null | — | Optional [trigger block](#trigger-orders-stop_loss--take_profit). Its presence — on **any** `kind` — turns this `submit_order` into a single parked reduce-only TP/SL leg instead of a live order: `{ "trigger_px": <u64>, "is_market": <bool>, "tpsl": "tp" \| "sl" }`. `is_market: true` fires a market (IOC) exit; `is_market: false` rests a limit exit at the order's `limit_px` — see [trigger orders](#trigger-orders-stop_loss--take_profit) |
 | `size` | uint64 | `> 0` | Fixed-point tick units (widened to `u128`) |
 | `limit_px` | uint64 | `> 0` | Fixed-point tick units (widened to `i128`) |
 | `tif` | enum | `"gtc"`, `"ioc"`, `"alo"` | `"aon"` is rejected (`unsupported time-in-force` — no core equivalent) |
@@ -451,8 +452,11 @@ Switch an account into hedge mode (while flat) with
 A single-leg protective trigger (a stop-loss or take-profit) is expressed as a
 `submit_order` whose `order` body carries a `trigger` block. The block's
 **presence** — not the `kind` — is what routes it: the order is **parked** in the
-canonical trigger registry instead of going to the book, and fires later as a
-**reduce-only IOC** when the mark price crosses `trigger_px`.
+canonical trigger registry instead of going to the book. When the mark price
+crosses `trigger_px`, the leg fires as a **reduce-only market exit** (a
+slippage-bounded IOC) or, if `is_market: false`, **rests a reduce-only limit** at
+the order's `limit_px`. Both variants always reduce — a trigger can never open or
+grow a position.
 
 ```json
 {
@@ -474,9 +478,53 @@ canonical trigger registry instead of going to the book, and fires later as a
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `trigger.trigger_px` | uint64 | `> 0` | Trigger price in fixed-point tick units (widened to `i128`). The parked leg parks **at this price** — it is reused as the fired leg's price (the order's own `limit_px` is ignored for a trigger) |
-| `trigger.is_market` | bool | — | Advisory label (`true` = the fired leg is a market/IOC). The park path always fires reduce-only IOC regardless; carried for read-path fidelity, not control |
-| `trigger.tpsl` | enum | `"tp"` / `"sl"` | Advisory take-profit / stop-loss label. The executor infers the fire direction from the leg `side` vs the mark; this is surfaced in `/info`, not control |
+| `trigger.trigger_px` | uint64 | `> 0` | Trigger price in fixed-point tick units (widened to `i128`). The mark crossing this price fires the leg. For a **market** trigger it is also the fired price; for a **limit** trigger it drives the fire direction only (the resting price is `limit_px`) |
+| `trigger.is_market` | bool | — | Selects the fired exit. `true` = **market trigger**: fire a reduce-only slippage-bounded IOC. `false` = **limit trigger**: rest a reduce-only `gtc` limit at the order's `limit_px` (rules below) |
+| `trigger.tpsl` | enum | `"tp"` / `"sl"` | Take-profit / stop-loss label, surfaced in [`/info`](./info.md#order_status). The fire direction comes from the leg `side` versus the mark, not from this label |
+
+:::info
+**`is_market` controls the exit type from the scheduled network upgrade.** Before
+the upgrade the field is a label only and every trigger fires as a market IOC.
+From the scheduled network upgrade on testnet `114514`, `is_market` is **control**:
+`false` selects the new **limit** trigger. A submit that **omits** `is_market`
+defaults to `false` — after the upgrade that is a **limit** trigger, so a market
+stop **must** send `is_market: true`. A limit trigger with `limit_px: 0` (or an
+omitted `is_market` plus `limit_px: 0`) is rejected `InvalidParams`.
+:::
+
+**Market trigger (`is_market: true`).** On the mark cross the leg fires a
+reduce-only IOC bounded by the mark band, clamped to what actually reduces the
+position. `limit_px` is ignored. This is the only behaviour before the upgrade.
+
+**Limit trigger (`is_market: false`).** On the mark cross the leg places a
+reduce-only `gtc` limit at the order's `limit_px`, and that order rests on the
+book until it fills or you cancel it. Admission rules for a limit trigger:
+
+- `limit_px > 0` — a limit trigger with `limit_px: 0` is rejected `InvalidParams`.
+- `tif` must be `gtc`. `alo` / `ioc` on a limit trigger are rejected.
+- `trigger_px` keeps every role (park price, fire direction, mark cross);
+  `limit_px` is only the resting order's price.
+
+A limit-trigger example — rest a reduce-only sell at `41000.00` once the mark
+crosses `42000.00`:
+
+```json
+{
+  "type": "submit_order",
+  "order": {
+    "owner":       "0x00000000000000000000000000000000000000aa",
+    "market":       7,
+    "side":         "ask",
+    "kind":         "take_profit",
+    "size":         50000000,
+    "limit_px":     4100000000000,
+    "tif":          "gtc",
+    "stp_mode":     "cancel_oldest",
+    "reduce_only":  false,
+    "trigger":     { "trigger_px": 4200000000000, "is_market": false, "tpsl": "tp" }
+  }
+}
+```
 
 Semantics:
 
@@ -485,10 +533,21 @@ Semantics:
 - **The leg `side` chooses what is protected.** An `ask` trigger closes a long;
   a `bid` trigger closes a short. On a [hedge account](#position_side-hedge-mode),
   carry `position_side` to name the leg, exactly as for a live order.
-- **`trigger_px` is the parked price**, not the order's `limit_px` — send
-  `limit_px` as you like (`0` is fine); the trigger block's price is what is used.
-- **OCO.** Trigger legs grouped together collapse on fire (a fired leg retires;
-  its sibling is cancelled).
+- **A fired limit gets a new `oid`.** At conversion the parked leg retires and the
+  new resting limit is assigned a fresh `oid`; the parked `oid` reads terminal /
+  unknown afterwards, and the resting limit appears in
+  [`open_orders`](./info.md#open_orders). `cloid` is **not** carried onto the fired
+  order.
+- **A resting fired limit persists** until it fills or you cancel it through the
+  normal path.
+- **OCO collapse point differs by variant.** A market trigger and its sibling
+  collapse on the first fill. A **limit** trigger and its sibling collapse at
+  **conversion** — the instant the resting limit is placed, not when it fills —
+  because the live limit order is now the protection.
+- **One-way resting-closer.** A fired limit rests like any closing `gtc` order (a
+  resting order carries no reduce-only flag). On a one-way account, if the position
+  shrinks by other means before the limit fills, the eventual fill can grow
+  exposure the other way — the same behaviour as a manual resting close order.
 
 Admission returns the same per-order status union as a live `submit_order`. A
 trigger that parks reports through the order path; the eventual fire is a
@@ -787,6 +846,142 @@ Cancel a running TWAP parent. Already-filled slices stay filled; future slices s
 
 ---
 
+### Place a scale ladder {#scale_order}
+
+:::info
+**Available from the scheduled network upgrade on testnet `114514`.** A submit
+before the upgrade is rejected.
+:::
+
+Place one **scale ladder** — a compact request that the node expands into `n`
+resting limit rungs on one perpetual market, spread evenly across `[px_low,
+px_high]`. You sign the compact request (about ten fields), not the rung array.
+Every rung shares the one `cloid` you supply, which is the ladder handle for
+[`cancel_scale`](#cancel_scale). The body is carried under `action.params`;
+`owner` is optional (an approved agent / operator routes for the named account).
+
+```json
+{
+  "type": "scale_order",
+  "params": {
+    "market":       7,
+    "side":         "bid",
+    "n":            5,
+    "px_low":       9800000000,
+    "px_high":      10000000000,
+    "total_size":   500000000,
+    "dist":         "flat",
+    "weights":      [],
+    "tif":          "alo",
+    "reduce_only":  false,
+    "stp_mode":     "cancel_oldest",
+    "cloid":        "0x5c000000000000000000000000000001"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`) |
+| `side` | enum | `"bid"` / `"ask"` | Ladder side. Rung `0` sits at `px_low` for **both** sides |
+| `n` | uint32 | `2 … 100` | Rung count |
+| `px_low` | uint64 | `> 0`, on-tick, `< px_high` | Low end of the ladder, in the `1e8` price plane |
+| `px_high` | uint64 | on-tick | High end of the ladder, in the `1e8` price plane |
+| `total_size` | uint64 | `> 0`, on-lot | Total base size across every rung, in raw lots |
+| `dist` | enum | `"flat"` / `"lin_asc"` / `"lin_desc"` / `"custom"` | Size distribution across the rungs (see below) |
+| `weights` | uint32 array | length `n` for `custom`; **empty** otherwise | Per-rung weights. Send an **empty** array for any non-`custom` `dist` — a non-empty array on a non-`custom` `dist` is rejected |
+| `tif` | enum | `"alo"` / `"gtc"` | Time-in-force, uniform across rungs. `"ioc"` / `"aon"` are rejected (a ladder must rest) |
+| `reduce_only` | bool | — | Uniform across rungs |
+| `stp_mode` | enum | `"cancel_oldest"` / `"cancel_newest"` / `"cancel_both"` | Self-trade prevention, uniform across rungs. `"reject"` is rejected |
+| `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only**, uniform across rungs. Omit on a one-way account; send it on a hedge account |
+| `cloid` | hex string | `0x` + 32 hex chars (16 bytes), **required** | The ladder handle. Every rung carries it. Must not already be in use by one of your resting orders on `market` |
+| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for (self or an approved agent). Wire-only — dropped on lowering |
+
+**Size distribution.** The node derives each rung's weight from `dist`, then
+splits `total_size` in proportion (integer floor, with any leftover lots handed to
+the low rungs first — the split is deterministic and conserves `total_size`
+exactly):
+
+| `dist` | Per-rung weight | Effect |
+|--------|-----------------|--------|
+| `flat` | equal | Same size on every rung |
+| `lin_asc` | rises with rung index | Smallest at `px_low`, largest at `px_high` |
+| `lin_desc` | falls with rung index | Largest at `px_low`, smallest at `px_high` |
+| `custom` | your `weights[i]` | Each weight `≥ 1`; the array length must equal `n` |
+
+**Admission** (the whole ladder is rejected, nothing rests, if any check fails):
+
+- `2 ≤ n ≤ 100`.
+- `px_low > 0`, `px_low < px_high`, both on the market tick grid.
+- The span is wide enough for distinct rungs: `px_high − px_low ≥ (n − 1) ×
+  tick`. Too narrow and the ladder is rejected (rungs would collide).
+- `total_size > 0` and on the lot grid; every derived rung size is `≥ 1` lot. If
+  a rung would round to zero, raise `total_size` or lower `n`.
+- `custom`: `weights` length equals `n`, every weight `≥ 1`.
+- `cloid` is not already carried by one of your resting orders on `market`.
+
+**Per-rung placement.** The rungs are placed in order, rung `0` first, exactly as
+the [`batch_order`](#batch_order) legs are — placement is **not** all-or-nothing.
+Each rung runs the full order gate on its own: an `alo` rung that would cross the
+book is rejected in its own slot, and once free collateral runs out the remaining
+rungs are rejected while the earlier ones stay. The response echoes every rung's
+exact price, size, and assigned `oid` (or its error), in rung order, so you get
+the node-derived ladder back in one reply. You can also rebuild the ladder later
+from [`frontend_open_orders`](./info.md#frontend_open_orders) filtered by the
+shared `cloid`.
+
+**Seams to know:**
+
+- **A shared `cloid` is a group, not a unique id.** If you later place a single
+  order that reuses the ladder's `cloid`, that order **joins** the group and a
+  later [`cancel_scale`](#cancel_scale) cancels it too. Use a fresh handle per
+  ladder — the SDKs tag ladder handles with a `0x5c` prefix.
+- **A reduce-only ladder does not clamp per rung.** A resting order carries no
+  reduce-only flag, so a reduce-only ladder whose `total_size` is larger than your
+  net position over-rests: once the position closes, the extra rungs can open the
+  opposite side. Size the ladder to your position.
+
+---
+
+### Cancel a scale ladder {#cancel_scale}
+
+:::info
+**Available from the scheduled network upgrade on testnet `114514`.** A submit
+before the upgrade is rejected.
+:::
+
+Cancel a **whole ladder** in one action — every one of your resting orders on
+`market` that carries `cloid` is cancelled (cancel-all-by-`cloid`). This needs no
+`oid` and no read-before-cancel round trip. The body is carried under
+`action.params`; `owner` is optional (agent / operator routing).
+
+```json
+{
+  "type": "cancel_scale",
+  "params": {
+    "market": 7,
+    "cloid":  "0x5c000000000000000000000000000001"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `market` | uint32 | `[0, market_count)` | Perpetual market id the ladder rests on |
+| `cloid` | hex string | `0x` + 32 hex chars (16 bytes), **required** | The ladder handle to sweep |
+| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for. Wire-only — dropped on lowering |
+
+**Semantics.** Only **resting** orders are swept. Rungs that already filled are
+simply gone. A ladder with no live rungs left returns `order not found`. A cancel
+by a signer who is not the owner is rejected.
+
+**Seam — a parked trigger sharing the handle survives.** `cancel_scale` reaches
+only the resting book. A parked [TP/SL trigger leg](#trigger-orders-stop_loss--take_profit)
+that carries the same `cloid` is **not** swept, and can later fire into the group
+after the ladder is gone. Keep trigger legs on their own `cloid`.
+
+---
+
 ## Spot trading actions {#spot-trading-actions}
 
 Token-for-token [spot](../../products/spot.md) actions — no leverage, no positions,
@@ -886,65 +1081,46 @@ Leveraged [spot margin](../../products/spot-margin.md) and its
 (preview).** All actions here are sender-authorized and return the
 [`202 Accepted`](#202-accepted--non-order-admission) admission envelope.
 
-### Post collateral for spot margin {#spot_margin_deposit}
+### Post collateral for spot margin — retired {#spot_margin_deposit}
 
-:::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+:::warning
+**Retired from the scheduled network upgrade on testnet `114514`.** Spot margin is
+now [cross-collateralized](#spot-margin--earn-actions) against your unified USDC
+account, so there is no separate collateral to post. The action stays on the wire
+for signature compatibility, but the handler **rejects** it. Your account-wide
+free collateral is the collateral; [`spot_margin_open`](#spot_margin_open) holds
+the margin requirement against it directly — there is nothing to deposit first.
 :::
 
-Post quote (USDC) collateral into your `(account, pair)` margin account, debited from your spendable spot balance. Collateral is a pure **loss buffer** — it does not fund the buy (the [`spot_margin_open`](#spot_margin_open) borrow does). Sender-authorized; the body is carried under `action.params`. `pair` is the **spot pair id**. The account is created on first deposit and accumulates on repeat deposits.
-
-```json
-{
-  "type": "spot_margin_deposit",
-  "params": { "pair": 200, "amount": "100" }
-}
-```
-
-| Field | Type | Range / values | Description |
-|-------|------|----------------|-------------|
-| `pair` | uint32 | an active spot pair with margin enabled | Spot pair id (`SpotPairSpec.pair_id`) — **not** a token id |
-| `amount` | decimal string | `> 0` | Quote collateral to post (whole units), as a JSON string |
-
-**Gating.** Margin must be **enabled for the pair** — the pair needs per-pair risk parameters present, which are a governance setting still being calibrated. A deposit on a pair without them is rejected (`spot margin not enabled for pair`). An unknown pair, a non-positive `amount`, or an amount above your spendable quote balance are all rejected at admission.
-
-**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`). Confirm the credited collateral via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state). See [spot margin](../../products/spot-margin.md).
+Before the upgrade this action posted a per-pair collateral loss buffer. Under the
+cross-collateralized model that bucket is gone, so a submit is rejected. See
+[spot margin](../../products/spot-margin.md).
 
 ---
 
-### Withdraw free spot margin collateral {#spot_margin_withdraw}
+### Withdraw free spot margin collateral — retired {#spot_margin_withdraw}
 
-:::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+:::warning
+**Retired from the scheduled network upgrade on testnet `114514`.** With spot
+margin now [cross-collateralized](#spot-margin--earn-actions), there is no per-pair
+collateral bucket to withdraw from — free collateral lives in your one unified USDC
+account. The action stays on the wire for signature compatibility, but the handler
+**rejects** it. Manage collateral through your account balance, not this action.
 :::
 
-Move free collateral from your `(account, pair)` margin account back to your spendable quote balance. With **no open position** the full collateral is withdrawable (the drained account is pruned). With an **open position** the withdraw is gated at the initial-margin requirement against the held base marked at the pair's last spot trade price — if no mark exists the withdraw is rejected (a deterministic conservative rule). Sender-authorized; body under `action.params`.
-
-```json
-{
-  "type": "spot_margin_withdraw",
-  "params": { "pair": 200, "amount": "50" }
-}
-```
-
-| Field | Type | Range / values | Description |
-|-------|------|----------------|-------------|
-| `pair` | uint32 | an active spot pair | Spot pair id the margin account is keyed on |
-| `amount` | decimal string | `> 0`, `≤` posted collateral | Quote collateral to withdraw (whole units), as a JSON string |
-
-**Gating.** Rejected if there is no margin account for the pair, if `amount` exceeds the posted collateral, or (with an open position) if the remaining collateral would fall below the initial-margin requirement, or if there is no mark price to value the held base.
-
-**Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope. Confirm via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state).
+Before the upgrade this action moved a per-pair collateral bucket back to your
+spendable balance. Under the cross-collateralized model that bucket is gone, so a
+submit is rejected. See [spot margin](../../products/spot-margin.md).
 
 ---
 
 ### Open a leveraged spot position {#spot_margin_open}
 
 :::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats. Leverage works end-to-end on devnet, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)).
+**Available from the scheduled network upgrade on testnet `114514`.** The position is [cross-collateralized](#spot-margin--earn-actions) against your unified USDC account, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)). A pair enables only once governance calibrates its per-pair risk parameters.
 :::
 
-Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC-buy** `size` base at up to `limit_px`. The buy is funded 100% by the borrow; your posted collateral is the loss buffer (leverage ≈ notional / collateral). The bought base is held **segregated** on the margin account — it is not credited to your spendable balances. Any **unspent borrow is repaid instantly** after the IOC settles, so the outstanding loan equals only what the buy actually spent. A zero-fill IOC is an accepted no-op (full refund, nothing borrowed, account left open). v1 allows **one open position per `(account, pair)`** — no add-on. Sender-authorized; body under `action.params`.
+Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC-buy** `size` base at up to `limit_px`. The buy is funded 100% by the borrow; the position's margin requirement is **held against your account-wide free collateral** — the same unified USDC account that backs your perpetual positions — so there is **no separate collateral to post first** (leverage ≈ notional / free collateral). The bought base is held **segregated** on the margin account — it is not credited to your spendable balances. Any **unspent borrow is repaid instantly** after the IOC settles, so the outstanding loan equals only what the buy actually spent. A zero-fill IOC is an accepted no-op (full refund, nothing borrowed). v1 allows **one open position per `(account, pair)`** — no add-on. Sender-authorized; body under `action.params`.
 
 ```json
 {
@@ -960,9 +1136,9 @@ Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC
 | `limit_px` | uint64 | `> 0` | Limit price in the `1e8` plane |
 | `borrow` | decimal string | `> 0` | Quote principal to draw from the Earn pool (whole units), as a JSON string |
 
-**Initial-margin gate.** The open is gated up front on the **worst-case cost** (`limit_px × size`): the open is rejected unless `collateral ≥ init_ratio × worst_cost`, where `init_ratio` is the pair's calibrated initial-margin parameter. Because the gate uses the worst case, a passing open never needs to unwind — the realized spend can only be lower (maker prices `≤ limit_px`, clamped size).
+**Initial-margin gate.** The open is gated up front on the **worst-case cost** (`limit_px × size`): the open is rejected unless `free_collateral ≥ init_ratio × worst_cost`, where `free_collateral` is your account-wide free collateral (the same figure a perpetual open draws on) and `init_ratio` is the pair's calibrated initial-margin parameter. The held requirement then reduces your free collateral while the position is open. Because the gate uses the worst case, a passing open never needs to unwind — the realized spend can only be lower (maker prices `≤ limit_px`, clamped size).
 
-**Gating.** Rejected if margin is not enabled for the pair, if there is no margin account (deposit collateral first), if a position is already open on the pair, if the Earn pool's idle liquidity is below `borrow`, if spot trading is halted, or on a zero `size` / non-positive `borrow`.
+**Gating.** Rejected if margin is not enabled for the pair, if a position is already open on the pair, if your free collateral is below the initial-margin requirement, if the Earn pool's idle liquidity is below `borrow`, if spot trading is halted, or on a zero `size` / non-positive `borrow`.
 
 **Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid` — the inner IOC's fill is a committed effect). Observe the resulting `borrowed` / `base_held` via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state); the Earn pool's `total_borrowed` moves on [`earn_state`](./info/spot.md#earn_state). See [spot margin](../../products/spot-margin.md).
 
@@ -971,10 +1147,10 @@ Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC
 ### Close a leveraged spot position {#spot_margin_close}
 
 :::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+**Available from the scheduled network upgrade on testnet `114514`.** See the [Spot margin & Earn](#spot-margin--earn-actions) overview for the cross-collateralized model.
 :::
 
-Close the position: **IOC-sell** the held base at no less than `limit_px`, repay the accrued debt (principal + interest) to the Earn pool, and return the remainder to you. On a **full unwind** the collateral joins the repay budget, any leftover stays with you, and the account is pruned. A **partial fill keeps the account open**: unsold base goes back into the segregated holding, only the realized proceeds repay (collateral untouched), and the outstanding principal drops accordingly. v1 is full-close intent only (no `size` argument — the whole holding is offered). Sender-authorized; body under `action.params`.
+Close the position: **IOC-sell** the held base at no less than `limit_px`, repay the accrued debt (principal + interest) to the Earn pool, and return the remainder to your unified USDC account. On a **full unwind** the sale proceeds repay the debt, any leftover credits your account, the held margin requirement is released, and the position closes. A **partial fill keeps the position open**: unsold base goes back into the segregated holding, only the realized proceeds repay, and the outstanding principal drops accordingly. v1 is full-close intent only (no `size` argument — the whole holding is offered). Sender-authorized; body under `action.params`.
 
 ```json
 {
@@ -988,9 +1164,9 @@ Close the position: **IOC-sell** the held base at no less than `limit_px`, repay
 | `pair` | uint32 | an active spot pair | Spot pair id the position is on |
 | `limit_px` | uint64 | `> 0` | Floor price for the close sell, in the `1e8` plane |
 
-**Settlement.** Interest accrues `O(1)` off the pool's borrow index since the open. On a close where proceeds + collateral cannot cover the debt, the whole principal still leaves the pool's borrowed book and the **shortfall is socialized to suppliers** (the pool's supplied total is reduced, floored at zero). This `spot_margin_close` action is always a **voluntary** user-submitted close; a forced liquidation runs automatically through this same settlement path when the account falls through the maintenance floor (see [Liquidation](../../products/spot-margin.md#liquidation)) — it is not something the user submits.
+**Settlement.** Interest accrues `O(1)` off the pool's borrow index since the open. On a close where the sale proceeds cannot cover the debt, your **account collateral covers the shortfall first**; only a residual the account cannot cover leaves the pool's borrowed book and is **socialized to suppliers** (the pool's supplied total is reduced, floored at zero). This `spot_margin_close` action is always a **voluntary** user-submitted close; a forced liquidation runs automatically through this same settlement path when the **account** falls through the maintenance floor (see [Liquidation](../../products/spot-margin.md#liquidation)) — it is not something the user submits.
 
-**Gating.** Rejected if there is no margin account, if there is no open position (nothing held), or if the position carries debt but the pair's Earn pool is missing.
+**Gating.** Rejected if there is no open position (nothing held), or if the position carries debt but the pair's Earn pool is missing.
 
 **Response.** Returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope. Confirm full vs partial close and the repaid amount via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) (a pruned account no longer appears); supplier-side effects show on [`earn_state`](./info/spot.md#earn_state).
 
@@ -2111,7 +2287,6 @@ here only to redirect integrators to the supported path.
 | Draft name | Native tag | Disposition | Use instead |
 |-----------|-----------|-------------|-------------|
 | `Order` (multi) / `Cancel` (multi) | — | Single vs. batch are distinct tags | [`submit_order`](#submit_order) + [`batch_order`](#batch_order); [`cancel_order`](#cancel_order) + [`batch_cancel`](#batch_cancel) |
-| `ScaleOrder` | — | No native action | Ladder client-side into [`batch_order`](#batch_order) |
 | `UpdateMarginMode` | — | No native action | `is_isolated` flag on [`update_leverage`](#update_leverage) |
 | `MultiSig` | — | Collect-and-execute wrapper not bridged (preview / not executing) | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |

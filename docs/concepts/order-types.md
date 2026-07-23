@@ -66,24 +66,42 @@ STP is enforced at the match step, so it works across asset side, price, and tim
 
 ## Triggers {#triggers}
 
-A **trigger order** is a resting condition that, when met, fires an inner order onto the book.
+A **trigger order** is a reduce-only protective leg that parks off the book and
+fires when the mark price crosses its `trigger_px`. A trigger always **reduces** —
+it can never open or grow a position.
 
-| Trigger kind | Fires when | Inner order |
-|--------------|-----------|-------------|
-| `StopLoss` | Mark crosses `trigger_px` from "safe" → "loss" direction | Market or limit; reduce-only typical |
-| `TakeProfit` | Mark crosses `trigger_px` from "loss" → "profit" direction | Market or limit; reduce-only typical |
-| `StopLimit` | Same as `StopLoss` | Limit-only inner |
-| `TakeProfitLimit` | Same as `TakeProfit` | Limit-only inner |
+:::info
+**Market and limit triggers are live.** The `is_market` flag is control from the
+scheduled network upgrade on testnet `114514`: `is_market: true` fires a market
+exit, `is_market: false` rests a limit exit. Before the upgrade every trigger
+fires as a market exit.
+:::
 
-For a long position:
-- `StopLoss` fires when `mark ≤ trigger_px` (price falling cuts the long)
-- `TakeProfit` fires when `mark ≥ trigger_px` (price rising books the profit)
+The `tpsl` label names the intent; the fired direction comes from the leg `side`
+versus the mark, not from the label. An `ask` trigger closes a long; a `bid`
+trigger closes a short.
 
-For a short, the inequalities flip.
+| `tpsl` | Protects | Fires when |
+|--------|----------|-----------|
+| `sl` (stop-loss) | a long | mark falls to `trigger_px` |
+| `sl` (stop-loss) | a short | mark rises to `trigger_px` |
+| `tp` (take-profit) | a long | mark rises to `trigger_px` |
+| `tp` (take-profit) | a short | mark falls to `trigger_px` |
 
-`limit_px`:
-- `null` → fire a market (`Ioc`) order at the trigger
-- present → fire a limit order at `limit_px`
+`is_market` selects the fired exit:
+
+| `is_market` | On the mark cross |
+|-------------|-------------------|
+| `true` | Fire a reduce-only **market** exit — a slippage-bounded IOC clamped to what reduces the position. `limit_px` is ignored. |
+| `false` | Rest a reduce-only **limit** at the order's `limit_px` (`limit_px > 0`, `tif: gtc`). It rests until it fills or you cancel it. |
+
+`trigger_px` keeps every role for both variants — park price, fire direction, and
+the mark cross. For a limit trigger, `limit_px` is only the resting order's price.
+
+**OCO collapse.** Trigger legs grouped as OCO collapse when one fires. A **market**
+trigger and its sibling collapse on the first fill; a **limit** trigger and its
+sibling collapse at **conversion** — the instant the resting limit is placed —
+because the live limit order is now the protection.
 
 Trigger state machine:
 
@@ -96,7 +114,10 @@ stateDiagram-v2
     Triggered --> Cancelled: cancel
 ```
 
-Triggers are evaluated on every mark-price update (each commit). They survive across blocks and across restarts.
+Triggers are evaluated on every mark-price update (each commit). They survive
+across blocks and across restarts. See
+[`POST /exchange` → trigger orders](../api/rest/exchange.md#trigger-orders-stop_loss--take_profit)
+for the wire fields.
 
 ## Grouping {#grouping}
 
@@ -112,31 +133,53 @@ Use `PositionTpsl` for "I always want a stop on my net position" — the same TP
 
 ## Scale orders {#scale-orders}
 
-`ScaleOrder` places a ladder of limit orders.
+:::info
+**Scale ladders are live from the scheduled network upgrade on testnet `114514`.**
+:::
+
+A **scale ladder** is `n` resting limit rungs spread evenly across `[px_low,
+px_high]` on one perpetual market, placed from **one signature**. You sign a
+compact request — the range, the rung count, the total size, and a distribution —
+and the node expands it into the rungs. Every rung shares the one `cloid` you
+supply, which is the ladder handle.
 
 ```json
 {
-  "type": "ScaleOrder",
+  "type": "scale_order",
   "params": {
-    "asset": 0, "side": "Buy",
-    "total_size": "1000000000",
-    "start_price": "9900000000",
-    "end_price":   "9800000000",
-    "n_levels": 10,
-    "shape": "Flat"
+    "market": 7, "side": "bid",
+    "n": 5,
+    "px_low": 9800000000, "px_high": 10000000000,
+    "total_size": 500000000,
+    "dist": "flat", "weights": [],
+    "tif": "alo", "reduce_only": false,
+    "stp_mode": "cancel_oldest",
+    "cloid": "0x5c000000000000000000000000000001"
   }
 }
 ```
 
-Shapes:
+Rung `0` sits at `px_low` and rung `n − 1` at `px_high` for both sides.
+`total_size` is split across the rungs by the distribution:
 
-| Shape | Size distribution across legs |
-|-------|------------------------------|
-| `Flat` | Equal per leg |
-| `Linear` | Linear ramp from one end to the other |
-| `Geometric` | Geometric ramp (smaller near the spread, larger far away) |
+| `dist` | Size across rungs |
+|--------|-------------------|
+| `flat` | Equal on every rung |
+| `lin_asc` | Rises with rung index — smallest at `px_low`, largest at `px_high` |
+| `lin_desc` | Falls with rung index — largest at `px_low`, smallest at `px_high` |
+| `custom` | Your `weights` array (length `n`, each `≥ 1`); send an **empty** array for any other `dist` |
 
-Each leg gets an auto-assigned `cloid` derived from `cloid_prefix + leg_index`. Cancel the whole ladder by cancelling each leg, or use [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) with the prefix's expansion.
+`tif` is `alo` or `gtc` (a ladder must rest); `ioc` / `aon` are rejected.
+Placement is **not** all-or-nothing — each rung runs the full order gate on its
+own, and the response echoes every rung's price, size, and `oid`.
+
+**Cancel the whole ladder** with
+[`cancel_scale`](../api/rest/exchange.md#cancel_scale) — one action cancels every
+resting rung that carries the shared `cloid`, no `oid` needed. A parked trigger leg
+that carries the same `cloid` is **not** swept, so keep trigger legs on their own
+handle. Use a fresh handle per ladder — the SDKs tag ladder handles with a `0x5c`
+prefix. See [`POST /exchange` → scale_order](../api/rest/exchange.md#scale_order)
+for the full field table and admission rules.
 
 ## TWAP {#twap}
 
@@ -218,13 +261,14 @@ await client.twap({
   durationMs: 3_600_000, randomizePct: 20, reduceOnly: false
 });
 
-// 10-level scale buy
-await client.scale({
-  asset: 0, side: 'Buy',
-  totalSizeE8: '1000000000',
-  startPriceE8: '9900000000',
-  endPriceE8: '9800000000',
-  nLevels: 10, shape: 'Linear'
+// 5-rung scale buy ladder (one signature; node expands the rungs)
+await client.scaleOrder({
+  market: 0, side: 'bid',
+  n: 5,
+  pxLow: '9800000000', pxHigh: '10000000000',
+  totalSize: '500000000',
+  dist: 'flat',
+  cloid: '0x5c000000000000000000000000000001'
 });
 ```
 
