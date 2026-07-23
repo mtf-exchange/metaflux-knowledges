@@ -25,6 +25,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 - [Idempotency](./idempotency.md) — nonce strategy + safe retry
 - [Error handling](./error-handling.md) — admission vs commit vs network decision tree
 - [Risk-watcher pattern](./risk-watcher.md) — automated margin top-up
+- [Market-maker performance](./market-maker-performance.md) — async confirm + batch quotes + cloid for a finality-decoupled quote loop
 - [Migrating from HL](./migrating-from-hl.md) — switch a Hyperliquid bot to the MTF-native API
 
 ## SDKs {#sdks}
