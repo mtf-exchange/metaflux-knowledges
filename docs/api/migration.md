@@ -17,7 +17,7 @@ before upgrading a client.
 |------|-----|-----|
 | Address a market (reads) | `asset_id` / `market_id` (numeric) | **`coin`** (symbol, e.g. `"BTC"`) |
 | Address an account (reads) | `account_id` **or** `address` | **`address`** (0x hex) only |
-| Candle history | `candle` | **`candle_snapshot`** (the single candle query) |
+| Candle history | `candle` (executed-trade bars) | **`candle_snapshot`** (the single candle query) — **price** bars, `candle_type` `mark` (default) / `oracle` |
 | Composite frontend snapshot | `web_data2` (REST + WS) | **removed** — compose focused reads |
 | Margin ladder | `margin_table` query | **`margin_tiers`** inline on `market_info` / `markets` |
 | Recent trades by window | — | **`trades_by_time`** (new) |

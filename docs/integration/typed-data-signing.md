@@ -193,8 +193,8 @@ canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
-| `spot_margin_deposit` | `MetaFluxTransaction:SpotMarginDeposit(string metafluxChain,uint32 pair,string amount,uint64 nonce)` |
-| `spot_margin_withdraw` | `MetaFluxTransaction:SpotMarginWithdraw(string metafluxChain,uint32 pair,string amount,uint64 nonce)` |
+| `spot_margin_deposit` **(retired)** | `MetaFluxTransaction:SpotMarginDeposit(string metafluxChain,uint32 pair,string amount,uint64 nonce)` |
+| `spot_margin_withdraw` **(retired)** | `MetaFluxTransaction:SpotMarginWithdraw(string metafluxChain,uint32 pair,string amount,uint64 nonce)` |
 | `spot_margin_open` | `MetaFluxTransaction:SpotMarginOpen(string metafluxChain,uint32 pair,uint64 size,uint64 limitPx,string borrow,uint64 nonce)` |
 
 `amount` and `borrow` are canonical decimal strings; `size` and `limitPx` are

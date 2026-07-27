@@ -1188,7 +1188,7 @@ assigned `oid` with a `resting` or `filled` entry (or `error`), or `pending` if
 no commit lands within the order-wait window. The status union is the same as
 [`submit_order`](#200-ok--order-path-synchronous-oid). Spot balances / open
 orders are also queryable via [`/info`](./info.md); spot fills are not yet pushed
-to the WebSocket trades / candles feeds.
+to the WebSocket trades feed.
 
 ---
 

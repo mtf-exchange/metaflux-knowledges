@@ -120,6 +120,8 @@ const sidebars = {
       ],
     },
 
+    {type: 'doc', id: 'nodes/data-streams', label: 'Node data streams'},
+
     {
       type: 'category',
       label: 'EVM',

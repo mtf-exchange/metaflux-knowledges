@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, `explorer_txs`, and `candles` (rolling OHLCV bars, per `(coin, interval)`) — all push real committed data, change-driven (a channel emits a frame only when its state changed since the last commit) — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md#channel-status-at-a-glance) for the per-channel shapes and the up-to-date status list.
+**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, `explorer_txs`, and `candles` (rolling mark / oracle price bars, per `(coin, interval, candle_type)`) — all push real committed data, change-driven (a channel emits a frame only when its state changed since the last commit) — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md#channel-status-at-a-glance) for the per-channel shapes and the up-to-date status list.
 :::
 
 :::info

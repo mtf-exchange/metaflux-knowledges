@@ -1,7 +1,7 @@
 # WS subscription channels
 
 :::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit (the exception: `account_state` and `spot_state` additionally re-send an unchanged snapshot as a ~1s liveness heartbeat). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`; per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit (the exception: `account_state` and `spot_state` additionally re-send an unchanged snapshot as a ~1s liveness heartbeat). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`, and takes an optional `candle_type` (`mark` / `oracle`); per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
 
 :::warning
 **`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
@@ -35,7 +35,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `markets` | **live** | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
 | `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
-| `candles` | **live** | `coin` + `interval` (both required) | committed-block fills folded into OHLCV bars, on change |
+| `candles` | **live** | `coin` + `interval` (both required), `candle_type` (optional) | mark or oracle price samples folded into OHLCV bars, on change |
 | `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
 | `open_orders` | **live** | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
 | `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, on change |
@@ -313,39 +313,51 @@ The native channel name is `user_events` (snake_case).
 `user_events` is per-account data but currently has **no authentication** — any connection can subscribe to any address's feed. Do not treat it as a private channel until the auth-at-subscribe gate lands; for authenticated reads/writes use `post` with a signed action.
 :::
 
-### Rolling OHLCV bars for one market {#candles}
+### Rolling price bars for one market {#candles}
 
-Rolling OHLCV bars for one market at one bar size. **Requires both `coin` and `interval`** — they form the routing key together, so a `1m` and a `5m` subscription on the same market are independent subscriptions, each with its own snapshot and pushes.
+Rolling OHLCV bars for one market, one price series, at one bar size. **Requires both `coin` and `interval`**, and takes an optional `candle_type`. The three form the routing key together, so `1m` and `5m` on the same market — or `mark` and `oracle` at the same interval — are independent subscriptions, each with its own snapshot and pushes.
 
 ```json
-{ "method": "subscribe", "subscription": { "type": "candles", "coin": "BTC", "interval": "1m" } }
+{ "method": "subscribe", "subscription": { "type": "candles", "coin": "BTC", "interval": "1m", "candle_type": "mark" } }
 ```
 
 - `interval` ∈ `1m` / `5m` / `15m` / `1h` / `4h` / `1d`. A missing or unrecognized `interval` is normalized to **`1m`** (the ack echoes the interval actually used).
-- The ack echoes `interval` back in the subscription so a client can correlate `(coin, interval)`.
+- `candle_type` ∈ `mark` (**default**) / `oracle`. `mark` is the [mark price](../../concepts/mark-prices.md) series and serves perp and spot markets; `oracle` is the [oracle index price](../../concepts/oracle-prices.md) series and serves perp markets only. An unknown value — including the **retired** `trade` — is rejected with ``{"channel":"error","data":{"error":"invalid candle_type: trade (expected `mark` or `oracle`)"}}``. It is never served as the other series.
+- The ack echoes `interval` and `candle_type` (including the applied `mark` default) so a client can correlate `(coin, interval, candle_type)` and learn which series it reads.
 
-The **initial snapshot** is an **array** of the recent bars (closed + the open bar), oldest first — `[]` until the market has traded:
+:::warning
+**The executed-trade candle is RETIRED.** These bars carry a **price** series, never executions. Read executions from the [`trades`](#trades) channel.
+:::
+
+The **initial snapshot** is an **array** of the recent bars (closed + the open bar), oldest first — `[]` until the market has its first price sample in that series:
 
 ```json
 { "channel": "candles", "data": [
-  { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "12.5", "q": "837843.75", "n": 8 }
+  { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "0", "q": "0", "n": 12 }
 ] }
 ```
 
-Each **push** is a **single bar object** (not the array) — the current open bar for that `(coin, interval)`, re-emitted on every committed block whose fills land in this market:
+Each **push** is a **single bar object** (not the array) — the current open bar for that `(coin, interval, candle_type)`, re-emitted on every price sample that folds into this series:
 
 ```json
-{ "channel": "candles", "data": { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "12.5", "q": "837843.75", "n": 8 } }
+{ "channel": "candles", "data": { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "0", "q": "0", "n": 12 } }
 ```
 
-- `t` / `T` — bar open / close epoch-ms (consensus-derived); the bar covers `[t, T]` and a fill rolls into a new bar when its block timestamp crosses `T`.
+- `t` / `T` — bar open / close epoch-ms; the bar covers `[t, T]` and a sample rolls into a new bar when its timestamp crosses `T`.
 - `s` — coin / market symbol; `i` — interval bucket token.
 - `o` / `c` / `h` / `l` — open / close / high / low, **decimal USDC** strings (human dollars, e.g. `"67002.50"`).
-- `v` — base-asset volume folded into the bar (coin size). `q` — quote (USD) volume = `Σ price × size` over the bar's fills. `n` — number of fills in the bar.
+- `v` and `q` — always `"0"`. A price bar folds no trades, so it carries neither base-asset volume nor quote volume.
+- `n` — the **sample count**: how many price samples the bar folded. It is **not** a trade count. `0` on a carry-forward bar.
 
-The series is **gapless**: an interval with no trades emits a flat bar carrying the prior close forward (`o = h = l = c = previous close`, `v = q = 0`, `n = 0`). No bar is emitted before the market's first trade — the series begins at the bucket of the first print.
+The series is **gapless**: an interval with no sample emits a flat bar carrying the prior close forward (`o = h = l = c = previous close`, `v = q = 0`, `n = 0`). A bar needs **no trade**. A price exists at all times, so the series covers every window from the first price sample on — a market that has never traded still streams bars.
 
-A store keeps up to **1000 bars per `(coin, interval)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing.
+:::warning
+**These bars come from a SAMPLED price series, not from the continuous price path.** `o` and `c` are the **first and last sample** of the window. `h` and `l` are the **highest and lowest sample** — the extremes of the samples, not the true extremes of the price. A spike that starts and ends between two samples leaves no trace in the bar.
+
+Do not build wick analysis, liquidation-trigger reconstruction, or any "did the price touch X?" test on these bars. For the live price of one market, subscribe to [`active_asset_ctx`](#active_asset_ctx) or [`all_mids`](#all_mids) instead. The same warning and the sample grid are on the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
+:::
+
+A store keeps up to **1000 bars per `(coin, interval, candle_type)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing.
 
 ### Per-account order lifecycle events {#order_updates}
 

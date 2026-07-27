@@ -526,25 +526,43 @@ omitted). An out-of-window / never-traded market returns `"trades": []`.
 
 ### Get historical OHLCV candles {#candle_snapshot}
 
-Historical OHLCV bars for `(coin, interval)`. The single candle query
-(the standalone `candle` type has been **removed**): archive-first —
+Historical price bars for `(coin, candle_type, interval)`. The single candle
+query (the standalone `candle` type has been **removed**): archive-first —
 served from the archive when one is wired, falling back to bars folded from the
-public trade stream otherwise. The REST companion to the live
+live price stream otherwise. The REST companion to the live
 [`candles`](../../ws/subscriptions.md#candles) WS channel.
 
+`candle_type` selects the price series:
+
+| `candle_type` | Series | Available on |
+|---------------|--------|--------------|
+| `mark` (**default**) | [Mark price](../../../concepts/mark-prices.md) — the price positions mark at | perp and spot markets |
+| `oracle` | [Oracle index price](../../../concepts/oracle-prices.md) | perp markets only |
+
+:::warning
+**The executed-trade candle is RETIRED.** A bar carries a **price** series, never
+executions. `trade` is no longer a valid `candle_type`; it is rejected like any
+other unknown token. Read executions from [`recent_trades`](#recent_trades) or
+[`trades_by_time`](#trades_by_time).
+:::
+
 ```json
-{ "type": "candle_snapshot", "coin": "BTC", "interval": "1m", "start_time": 1783000000000, "end_time": 1783011600000 }
+{ "type": "candle_snapshot", "coin": "BTC", "interval": "1m", "candle_type": "mark", "start_time": 1783000000000, "end_time": 1783011600000 }
 ```
 
 | Arg | Type | Required | Description |
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol, e.g. `"BTC"` |
 | `interval` | string | yes | Bucket token — one of `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
+| `candle_type` | string | no | Price series — `mark` (default) or `oracle`. Lower-case, exact match |
 | `start_time` | uint64 | no | Window start (ms); filters on bar open. Default `0` |
 | `end_time` | uint64 | no | Window end (ms); filters on bar open. Default unbounded |
 
 Missing `coin` → `400 {"error":"missing field coin"}`; missing `interval` →
-`400 {"error":"missing field interval"}`.
+`400 {"error":"missing field interval"}`. An unknown `candle_type` (including the
+retired `trade`) →
+``400 {"error":"invalid candle_type: trade (expected `mark` or `oracle`)"}``. A
+rejected value is never served as the other series.
 
 Response:
 
@@ -555,14 +573,16 @@ Response:
     "candles": [
       {
         "t": 1783000020000,
-        "T": 1783000080000,
+        "T": 1783000079999,
+        "s": "BTC",
         "i": "1m",
-        "o": "6164610000000",
-        "c": "6165270000000",
-        "h": "6165270000000",
-        "l": "6164610000000",
-        "v": "576",
-        "n": 24
+        "o": "61646.1",
+        "c": "61652.7",
+        "h": "61652.7",
+        "l": "61646.1",
+        "v": "0",
+        "q": "0",
+        "n": 12
       }
     ]
   }
@@ -570,17 +590,43 @@ Response:
 ```
 
 Bars are ordered oldest-first by `t` (open time); the newest element is the
-forming bar. An empty `candles` array is the honest-empty answer for a market
-with no history (or no archive/fold source wired).
+forming bar. A bar needs **no trade**: a price exists at all times, so the series
+covers every window the samples cover. A market that has never traded still has
+bars. A window with no sample carries the previous close forward as a flat bar
+(`o = h = l = c`, `n = 0`).
+
+An empty `candles` array is the honest-empty answer for a market with no history
+in that series. A spot pair asked for `oracle` always answers empty — a spot pair
+has no oracle price.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `t` | uint64 | Bar **open** timestamp (ms, bucket-aligned) |
 | `T` | uint64 | Bar **close** timestamp (ms) |
+| `s` | string | Market symbol |
 | `i` | string | Interval bucket token |
-| `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **1e8 fixed-point** string (e.g. `"6165270000000"` = `61652.7`) |
-| `v` | Decimal string | **Base-asset volume** — Σ traded size in the bar (size units, NOT notional) |
-| `n` | uint64 | Trade (fill) count in the bar |
+| `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **whole-unit decimal** string (e.g. `"61652.7"`) — the same plane [`market_info`](#market_info) reports `mark_px` in |
+| `v` | Decimal string | Always `"0"`. A price bar folds no trades, so it carries no base-asset volume |
+| `q` | Decimal string | Always `"0"`. A price bar folds no trades, so it carries no quote volume |
+| `n` | uint64 | **Sample count** — how many price samples the bar folded. It is **not** a trade count. `0` on a carry-forward bar |
+
+:::warning
+**These bars come from a SAMPLED price series, not from the continuous price
+path.** The archived history samples each market price every **5 seconds** of
+block time. The live fallback folds one sample per price push.
+
+- `o` and `c` are the **first and last sample** of the window.
+- `h` and `l` are the **highest and lowest sample** of the window.
+
+`h` and `l` are therefore the extremes **of the samples**, not the true extremes
+of the price. A spike that starts and ends between two samples leaves no trace in
+the bar.
+
+Do not build wick analysis, liquidation-trigger reconstruction, or any
+"did the price touch X?" test on these bars. They answer only "where was the
+price at each sample". For a specific instant, read the price on
+[`market_info`](#market_info) or use the trade tape.
+:::
 
 ### Get funding premium history {#funding_history}
 
