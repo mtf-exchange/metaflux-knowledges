@@ -44,14 +44,9 @@ const config = {
 
   i18n: {
     defaultLocale: 'en',
-    locales: ['en', 'zh-Hans', 'ar', 'fr', 'ru', 'es'],
+    locales: ['en'],
     localeConfigs: {
       en: {label: 'English', htmlLang: 'en'},
-      'zh-Hans': {label: '简体中文', htmlLang: 'zh-Hans'},
-      ar: {label: 'العربية', htmlLang: 'ar', direction: 'rtl'},
-      fr: {label: 'Français', htmlLang: 'fr'},
-      ru: {label: 'Русский', htmlLang: 'ru'},
-      es: {label: 'Español', htmlLang: 'es'},
     },
   },
 
@@ -196,7 +191,6 @@ const config = {
               {to: '/integration/rust-sdk', label: 'Rust SDK'},
             ],
           },
-          {type: 'localeDropdown', position: 'right'},
           {href: 'https://mtf.exchange/', label: 'Site', position: 'right'},
           {
             href: 'https://github.com/mtf-exchange/metaflux-knowledges',
