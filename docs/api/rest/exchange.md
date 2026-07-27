@@ -305,8 +305,6 @@ A leveraged spot position is **cross-margined against your one unified USDC acco
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
-| [`spot_margin_deposit`](#spot_margin_deposit) | **Retired** — collateral is now your unified USDC account | master only | no |
-| [`spot_margin_withdraw`](#spot_margin_withdraw) | **Retired** — collateral is now your unified USDC account | master only | no |
 | [`spot_margin_open`](#spot_margin_open) | Borrow + IOC-buy base on leverage | master only | no |
 | [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | master only | no |
 | [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | master only | no |
@@ -1330,38 +1328,7 @@ Leveraged [spot margin](../../products/spot-margin.md) and its
 (preview).** All actions here are sender-authorized and return the
 [`202 Accepted`](#202-accepted--non-order-admission) admission envelope.
 
-### Post collateral for spot margin — retired {#spot_margin_deposit}
 
-:::warning
-**Retired from the scheduled network upgrade on testnet `114514`.** Spot margin is
-now [cross-collateralized](#spot-margin--earn-actions) against your unified USDC
-account, so there is no separate collateral to post. The action stays on the wire
-for signature compatibility, but the handler **rejects** it. Your account-wide
-free collateral is the collateral; [`spot_margin_open`](#spot_margin_open) holds
-the margin requirement against it directly — there is nothing to deposit first.
-:::
-
-Before the upgrade this action posted a per-pair collateral loss buffer. Under the
-cross-collateralized model that bucket is gone, so a submit is rejected. See
-[spot margin](../../products/spot-margin.md).
-
----
-
-### Withdraw free spot margin collateral — retired {#spot_margin_withdraw}
-
-:::warning
-**Retired from the scheduled network upgrade on testnet `114514`.** With spot
-margin now [cross-collateralized](#spot-margin--earn-actions), there is no per-pair
-collateral bucket to withdraw from — free collateral lives in your one unified USDC
-account. The action stays on the wire for signature compatibility, but the handler
-**rejects** it. Manage collateral through your account balance, not this action.
-:::
-
-Before the upgrade this action moved a per-pair collateral bucket back to your
-spendable balance. Under the cross-collateralized model that bucket is gone, so a
-submit is rejected. See [spot margin](../../products/spot-margin.md).
-
----
 
 ### Open a leveraged spot position {#spot_margin_open}
 

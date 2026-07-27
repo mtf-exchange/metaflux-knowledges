@@ -58,10 +58,6 @@ sender-authorized) drive the loop. Confirm committed state via
 | [`spot_margin_open`](../api/rest/exchange.md#spot_margin_open) | Borrow + IOC-buy base on leverage; gated by the account-wide initial-margin requirement |
 | [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close) | IOC-sell the held base, repay principal + interest, return the remainder to your account |
 
-The old per-pair `spot_margin_deposit` / `spot_margin_withdraw` actions are
-**retired** — collateral is your one unified USDC account, so there is nothing
-separate to post or withdraw. They stay on the wire for signature compatibility but
-are rejected.
 
 ### Margin {#margin}
 
