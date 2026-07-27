@@ -11,6 +11,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 | If you're starting from… | Go to |
 |--------------------------|-------|
 | Nothing — just want to try it | [Quickstart](./quickstart.md) |
+| A working key, now placing real orders | [Placing orders](./placing-orders.md) |
 | An existing HL bot / tool | [Migrating from HL](./migrating-from-hl.md) |
 | Greenfield TypeScript / browser | [TypeScript SDK](./typescript-sdk.md) |
 | Greenfield Rust service | [Rust SDK](./rust-sdk.md) |
@@ -19,6 +20,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 ## Topics {#topics}
 
 - [Quickstart](./quickstart.md) — 5-minute end-to-end (deposit → trade → withdraw)
+- [Placing orders](./placing-orders.md) — the canonical order guide: one order, batches, spot, cancels, and which order actions to skip
 - [Typed-data signing](./typed-data-signing.md) — the EIP-712 signing scheme, end-to-end with working examples
 - [Signing walkthrough](./signing.md) — pointer to typed-data signing (kept for older links)
 - [Agent wallets howto](./agent-wallets-howto.md) — concrete code for the hot-key pattern

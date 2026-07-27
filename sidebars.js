@@ -140,6 +140,7 @@ const sidebars = {
       link: {type: 'doc', id: 'integration/index'},
       items: [
         'integration/quickstart',
+        'integration/placing-orders',
         'integration/signing',
         'integration/typed-data-signing',
         'integration/agent-wallets-howto',

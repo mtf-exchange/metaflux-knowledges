@@ -65,6 +65,12 @@ You should see `data.account_value: "3000"`.
 
 ## Step 2 — Place a limit order {#step-2--place-a-limit-order}
 
+:::tip
+**Going further than this quickstart?** [Placing orders](./placing-orders.md) is
+the canonical order guide — the raw wire request and response, the two number
+planes, and a tiered map of every order action.
+:::
+
 The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux/sdk` — ships before mainnet; see [TypeScript SDK](./typescript-sdk.md)).
 
 ```typescript
@@ -110,14 +116,14 @@ id** (not a perp `market`), a `side`, a `limit_px`, a `size`, and a `tif`. A
 resting `gtc`/`alo` order locks reserved-balance escrow; `ioc` never rests.
 
 ```jsonc
-// the `action` you sign and POST to /exchange (sender-authorized, no `owner`)
+// the `action` you sign and POST to /exchange (sender-authorized; owner is optional)
 {
   "type": "spot_order",
   "order": {
     "pair":     200,           // spot pair id from /info, not a perp market id
     "side":     "bid",         // bid = buy base (pays quote); ask = sell base
     "size":     100000000,
-    "limit_px": 200000000,     // a limit is required — market spot is not yet supported
+    "limit_px": 200000000,     // 1e8 plane; 0 places a market order (must use tif "ioc")
     "tif":      "gtc",
     "stp_mode": "cancel_oldest"
   }
@@ -204,6 +210,7 @@ sequenceDiagram
 
 ## Next steps {#next-steps}
 
+- [Placing orders](./placing-orders.md) — the canonical order guide: batches, spot, cancels, number planes
 - [Signing](./signing.md) — what's inside the SDK's signing
 - [Agent wallets in practice](./agent-wallets-howto.md) — production hot-key pattern
 - [Order types](../concepts/order-types.md) — beyond plain limit orders

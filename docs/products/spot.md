@@ -36,9 +36,10 @@ or refunded to you on cancel.
 A spot order is just another [`/exchange`](../api/rest/exchange.md) action —
 [`spot_order`](../api/rest/exchange.md#spot_order) to place,
 [`spot_cancel`](../api/rest/exchange.md#spot_cancel) to cancel. Both are
-**sender-authorized** (the recovered signer is the trader; there is no `owner`
-field) and can be signed by the master account or an active
-[agent wallet](../concepts/agent-wallets.md).
+**sender-authorized by default** (omit `owner` and the recovered signer is the
+trader); both also take an **optional** `owner` so an approved
+[agent wallet](../concepts/agent-wallets.md) can trade for the account it is
+approved for.
 
 ## What a spot pair is {#what-a-spot-pair-is}
 
@@ -82,8 +83,10 @@ fuzz-verified across randomized rest/cross/cancel streams).
 You can never rest or fill more than you can fund. At admission the order size is
 **clamped** to what your balance covers:
 
-- a **bid** is clamped by `quote_balance ÷ limit_px`,
-- an **ask** is clamped by the base you actually own.
+- a priced **bid** (`limit_px > 0`) is clamped by `quote_balance ÷ limit_px`,
+- a **market bid** (`limit_px = 0`) is clamped by walking the resting asks level
+  by level against your quote balance — there is no single price to divide by,
+- an **ask**, priced or market, is clamped by the base you actually own.
 
 An order that is entirely unaffordable is an **accepted no-op** — nothing fills,
 nothing rests, no order id is burned. A partially-affordable order trades/rests
@@ -131,10 +134,12 @@ Spot orders carry the same TIF set as perps, with one spot-specific rule:
 `cancel_both`); `reject` is not supported.
 
 :::info
-**Limit only (for now).** Every spot order must carry a positive `limit_px`. A
-market order (`limit_px = 0`) is **not yet supported** — an unbounded market buy
-needs a book-walk affordability clamp that is still on the roadmap. Send a limit;
-the cost is then bounded by `limit_px × size`.
+**A market order must be `ioc`.** Send `limit_px = 0` to place a market order —
+it crosses the book at whatever price is available, bounded by your balance (a
+buy walks the asks up to what your quote funds; a sell is bounded by the base you
+own). A market order carries no resting price, so it must use `tif: "ioc"`;
+`gtc` or `alo` with `limit_px = 0` is rejected. A priced order (`limit_px > 0`)
+may use any `tif`.
 :::
 
 ## Lifecycle — cancel refunds escrow {#lifecycle--cancel-refunds-escrow}
@@ -211,8 +216,8 @@ A: Affordability clamping. The order size is reduced to what your quote balance
 funds at the limit price. An entirely unaffordable order is an accepted no-op.
 
 **Q: Can I place a spot market order?**
-A: Not yet — always send a positive `limit_px`. Market spot orders are on the
-roadmap.
+A: Yes — send `limit_px = 0` with `tif: "ioc"`. `gtc` / `alo` require a positive
+`limit_px`.
 
 **Q: Are spot fills and perp fills on the same book?**
 A: No. Spot has its own books, balances, and fee account, entirely separate from

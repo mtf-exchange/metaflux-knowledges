@@ -58,14 +58,21 @@ native `/exchange` is served directly at `http://localhost:8080`.
 :::info
 **No top-level `sender`.** The envelope carries no `sender` field. The account
 whose state mutates is determined per action:
-- **Owner-claiming actions** (`submit_order`, `cancel_order`) carry the owner
+- **Required-owner actions** (`submit_order`, `cancel_order`) carry the owner
   *inside* the action body — `action.order.owner` / `action.cancel.owner`. The
   server recovers the signer from the signature and requires it to equal that
   `owner` **or** an approved [agent](../../concepts/agent-wallets.md) of it.
-- **Sender-authorized actions** (governance, margin, vault-leader, staking, …)
-  carry **no** owner field at all: the recovered signer *is* the actor, and
-  action-level authorization (validator membership, vault-leader, etc.) runs at
-  dispatch.
+- **Optional-owner actions** — most other order / position actions
+  (`batch_order`, `spot_order`, `modify`, `cancel_by_cloid`, `scale_order`,
+  `chase_order`, `update_leverage`, RFQ, and more) — carry an **optional**
+  `owner`. Omit it and the recovered signer is the actor; send it and an
+  approved [agent](../../concepts/agent-wallets.md) of that `owner` can act
+  **as** it. Some of these bind `owner` into the signed digest, some resolve it
+  at admission only — each action's field table says which.
+- **Sender-authorized-only actions** (governance, vault-leader, staking
+  authority, …) carry **no** owner field at all: the recovered signer *is*
+  always the actor, and action-level authorization (validator membership,
+  vault-leader, etc.) runs at dispatch.
 :::
 
 The server reconstructs the EIP-712 typed struct from `action.type` +
@@ -204,6 +211,12 @@ numbers (the node decodes them as `u64`, then widens internally). Addresses are
 
 ### Order placement & lifecycle {#order-placement--lifecycle}
 
+:::tip
+**New here? Read [placing orders](../../integration/placing-orders.md) first.**
+That page starts with one perp limit order end-to-end, then tiers the table below
+so you can skip most of it on a first integration.
+:::
+
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
 | [`submit_order`](#submit_order) | Place one order | owner / agent | by `cloid` |
@@ -229,9 +242,10 @@ balances from perps. A resting spot order locks the funds it would owe on fill
 into a **reserved balance**: a `bid` reserves **quote** (its notional at the
 limit price), an `ask` reserves the **base** it offers. Order size is **clamped
 at admission** to what your balance funds, and fees are taken from the leg each
-side receives. Both actions are **sender-authorized** (the signer is the trader;
-there is no `owner`). See [spot trading](../../products/spot.md) for the
-full conceptual model.
+side receives. Both actions are **sender-authorized by default** (omit `owner`
+and the signer is the trader); both also take an **optional digest-bound `owner`**
+so an approved agent can act for the account it is approved for. See
+[spot trading](../../products/spot.md) for the full conceptual model.
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
@@ -584,10 +598,21 @@ N orders carried by ONE signed envelope / one nonce. Each entry is a full
 
 | Field | Type | Values | Description |
 |-------|------|--------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional **batch-level** owner the signer acts for (an approved agent / operator). Omitted = sender-authorized (the batch trades for the signer). Bound into the digest via a distinct type string |
 | `orders[*]` | order | — | Each entry has the full `submit_order` order shape |
 | `grouping` | enum | `"na"`, `"normalTpsl"`, `"positionTpsl"` | Order-family grouping; defaults to `"na"` if omitted |
 
-Returns an array of per-leg statuses (same union as `submit_order`).
+:::warning
+**Only `params.owner` routes a batch.** The per-leg `orders[*].owner` is required
+by the schema but the server **ignores** it — it is not in the signed digest and
+it does not authorize anything. Set the account you act for at `params.owner`.
+:::
+
+Returns an array of per-leg statuses (same union as `submit_order`) — **one entry
+per placed leg**, in input order, each echoing its own `cloid`. Legs are
+**independent**: each runs the full order gate on its own, so one rejected leg
+does not roll back the others. A batch carries at most **1000** orders; an empty
+`orders` array is rejected (`empty batch`).
 
 ---
 
@@ -629,6 +654,7 @@ cloid-only entries are rejected).
 {
   "type": "batch_cancel",
   "params": {
+    "owner": "0x...aa",
     "cancels": [
       { "owner": "0x...aa", "market": 1, "oid": 10 },
       { "owner": "0x...aa", "market": 2, "oid": 11 }
@@ -636,6 +662,17 @@ cloid-only entries are rejected).
   }
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `owner` | hex address \| omitted | Optional **batch-level** owner the signer acts for (an approved agent). Omitted = sender-authorized (the batch cancels for the signer). **Digest-bound** when present |
+| `cancels[*]` | cancel | Each entry has the full [`cancel_order`](#cancel_order) cancel shape |
+
+:::warning
+**Only `params.owner` routes a batch.** The per-entry `cancels[*].owner` is
+required by the schema but the server **ignores** it — set the account you act
+for at `params.owner`.
+:::
 
 Same per-entry response shape as `cancel_order`.
 
@@ -645,8 +682,8 @@ Same per-entry response shape as `cancel_order`.
 
 Cancel by client order id. Useful when the caller hasn't seen the server-side
 `oid` yet (race between the `submit_order` response and a cancellation decision).
-This is a **sender-authorized** action (no `owner` field — the recovered signer is
-the actor).
+**Sender-authorized by default** — omit `owner` and the recovered signer is the
+actor; an approved agent may cancel **as** an `owner` it acts for.
 
 ```json
 {
@@ -660,6 +697,7 @@ the actor).
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 | `asset` | uint32 | Asset/market id |
 | `cloid` | hex string | `0x` + 32 hex chars (16 bytes) |
 
@@ -670,6 +708,8 @@ Same response shape as `cancel_order`.
 ### Cancel all resting orders {#cancel_all_orders}
 
 Cancel all of the sender's resting orders, optionally filtered to one asset.
+**Sender-authorized by default**; an approved agent may cancel **as** an `owner`
+it acts for.
 
 ```json
 {
@@ -680,6 +720,7 @@ Cancel all of the sender's resting orders, optionally filtered to one asset.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 | `asset` | uint32 \| null | `null` / omitted = all assets; `Some(a)` = only asset `a` |
 
 Returns a count of cancelled orders.
@@ -691,6 +732,8 @@ Returns a count of cancelled orders.
 Amend a resting order's price and/or size in place. At least one of `new_px` /
 `new_size` must be present. The target order is addressed **by `oid`** or **by
 `cloid`** (the client order id the order was placed with) — send one or the other.
+**Sender-authorized by default**; an approved agent may amend **as** an `owner`
+it acts for.
 
 ```json
 {
@@ -720,6 +763,7 @@ Address by `cloid` instead of `oid` (omit `oid`, or leave it `0`):
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: amend **as** this account (approved agents only). **Digest-bound** when present |
 | `market` | uint32 | Asset/market id |
 | `oid` | uint64 | Target order id. Defaults to `0` (= address by `cloid`) when omitted |
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes). When set, the target is resolved by client order id (the same resolver [`cancel_by_cloid`](#cancel_by_cloid) uses) instead of `oid`. A malformed `cloid` is rejected at admission |
@@ -750,7 +794,14 @@ Apply N `modify`s under one signature. Each entry has the same shape as
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional **batch-level** owner the signer acts for (an approved agent). Omitted = sender-authorized (the batch amends for the signer). **Digest-bound** when present |
 | `modifications[*]` | modify | Each entry has the full [`modify`](#modify) params shape (`market`, `oid`, optional `new_px` / `new_size`) |
+
+:::warning
+**Only `params.owner` routes a batch.** A per-entry `owner` inside
+`modifications[*]` is accepted by the schema but **ignored** — set the account
+you act for at `params.owner`.
+:::
 
 **Response.** Non-order action →
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
@@ -772,7 +823,8 @@ an entry with both `new_px` and `new_size` null errors (`nothing to modify`).
 ### Schedule a future cancel-all trigger {#schedule_cancel}
 
 Arm a future-block cancel-all: at `cancel_at_block`, all the sender's open orders
-are cancelled (a dead-man's switch).
+are cancelled (a dead-man's switch). **Sender-authorized by default**; an
+approved agent may arm it **as** an `owner` it acts for.
 
 ```json
 {
@@ -783,6 +835,7 @@ are cancelled (a dead-man's switch).
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: arm **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `cancel_at_block` | uint64 | Block height at which the sender's open orders are cancelled |
 
 ---
@@ -790,7 +843,8 @@ are cancelled (a dead-man's switch).
 ### Schedule a sliced TWAP order {#twap_order}
 
 Schedule a sliced (time-weighted) order. The parent is sliced into `slice_count`
-child orders spaced `delay_ms` apart.
+child orders spaced `delay_ms` apart. **Sender-authorized by default**; an
+approved agent may schedule it **as** an `owner` it acts for.
 
 ```json
 {
@@ -808,6 +862,7 @@ child orders spaced `delay_ms` apart.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: schedule **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `market` | uint32 | Asset/market id |
 | `side` | enum | `"bid"` / `"ask"` |
 | `total_size` | uint64 | Total size in fixed-point tick units (widened to `u128`) |
@@ -834,6 +889,8 @@ is roadmap).
 ### Cancel a running TWAP order {#twap_cancel}
 
 Cancel a running TWAP parent. Already-filled slices stay filled; future slices stop.
+**Sender-authorized by default**; an approved agent may cancel **as** an `owner`
+it acts for.
 
 ```json
 {
@@ -844,6 +901,7 @@ Cancel a running TWAP parent. Already-filled slices stay filled; future slices s
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 | `twap_id` | uint64 | The TWAP parent id returned by `twap_order` |
 
 ---
@@ -897,7 +955,7 @@ Every rung shares the one `cloid` you supply, which is the ladder handle for
 | `stp_mode` | enum | `"cancel_oldest"` / `"cancel_newest"` / `"cancel_both"` | Self-trade prevention, uniform across rungs. `"reject"` is rejected |
 | `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only**, uniform across rungs. Omit on a one-way account; send it on a hedge account |
 | `cloid` | hex string | `0x` + 32 hex chars (16 bytes), **required** | The ladder handle. Every rung carries it. Must not already be in use by one of your resting orders on `market` |
-| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for (self or an approved agent). Wire-only — dropped on lowering |
+| `owner` | hex address \| null | 40 hex chars | Optional: place **as** this account (approved agents only). **Digest-bound** when present. Omit for plain sender-authorized placement |
 
 **Size distribution.** The node derives each rung's weight from `dist`, then
 splits `total_size` in proportion (integer floor, with any leftover lots handed to
@@ -971,7 +1029,7 @@ Cancel a **whole ladder** in one action — every one of your resting orders on
 |-------|------|----------------|-------------|
 | `market` | uint32 | `[0, market_count)` | Perpetual market id the ladder rests on |
 | `cloid` | hex string | `0x` + 32 hex chars (16 bytes), **required** | The ladder handle to sweep |
-| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for. Wire-only — dropped on lowering |
+| `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
 **Semantics.** Only **resting** orders are swept. Rungs that already filled are
 simply gone. A ladder with no live rungs left returns `order not found`. A cancel
@@ -1028,7 +1086,7 @@ approved agent / operator routes for the named account).
 | `interval_blocks` | uint32 | `2 … 28800` | Reprice debounce: reprice at most once per this many committed blocks (roughly 0.5 s to 2 h at the current block cadence) |
 | `ttl_ms` | uint64 | `60000 … 604800000` | Time-to-live in consensus milliseconds (1 min .. 7 days). When it elapses the leg is cancelled and the chase ends |
 | `max_reprices` | uint32 | `1 … 100000` | Maximum reprices. When reached the leg is cancelled and the chase ends |
-| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for (self or an approved agent). Wire-only — dropped on lowering |
+| `owner` | hex address \| null | 40 hex chars | Optional: place **as** this account (approved agents only). **Digest-bound** when present. Omit for plain sender-authorized placement |
 
 **How the leg tracks the book.** The node pegs the leg one tick inside the touch:
 a buy chase rests one tick above the best bid, a sell chase one tick below the best
@@ -1113,7 +1171,7 @@ optional (agent / operator routing).
 |-------|------|----------------|-------------|
 | `market` | uint32 | `[0, market_count)` | The perpetual market the chase runs on. Must match the chase's market |
 | `chase_oid` | uint64 | a live chase handle | The **handle** from the `chase_order` response (the cancel key) — **not** the leg's `oid` |
-| `owner` | hex address \| null | 40 hex chars | Optional account the signer acts for. Wire-only — dropped on lowering |
+| `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
 **Semantics.** Only the account that owns the chase may cancel it. An unknown
 handle, a wrong-owner handle, or a wrong-market handle all return
@@ -1131,10 +1189,15 @@ with books and balances entirely separate from perps.
 
 Place a single order on a **spot** market. Spot trades are a token-for-token
 swap with no leverage and no positions; books and balances are entirely separate
-from perps. The order body is carried under `action.order`. Spot orders are
-**sender-authorized** — the recovered signer is the trader, so there is **no
-`owner` field**. `pair` is the **spot pair id** (`SpotPairSpec.pair_id`), which
-is distinct from a perp `market` id and from a token id.
+from perps. The order body is carried under `action.order`. A spot order is
+**sender-authorized by default** — omit `owner` and the recovered signer is the
+trader. An **optional** `owner` lets an approved
+[agent](../../concepts/agent-wallets.md) trade **as** the account it is approved
+for; when it is present the digest binds it (a distinct type string with
+`address owner` right after `metafluxChain`), so a signer that is not an approved
+agent of `owner` is rejected `401`. `pair` is the **spot pair id**
+(`SpotPairSpec.pair_id`), which is distinct from a perp `market` id and from a
+token id.
 
 ```json
 {
@@ -1153,11 +1216,12 @@ is distinct from a perp `market` id and from a token id.
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: trade **as** this account (approved agents only). **Digest-bound** when present. Omit for plain sender-authorized trading |
 | `pair` | uint32 | an active spot pair | Spot pair id (`SpotPairSpec.pair_id`) — **not** a token id |
 | `side` | enum | `"bid"` / `"ask"` | `bid` buys base (pays quote); `ask` sells base (receives quote) |
 | `size` | uint64 | `> 0` | Base-asset size in raw lots (`10^sz_decimals` per whole unit); widened to `u128` |
-| `limit_px` | uint64 | `> 0` | Limit price in the `1e8` plane. A market order (`0`) is **not supported yet** — always send a limit |
-| `tif` | enum | `"gtc"`, `"ioc"`, `"alo"` | `gtc` / `alo` residuals **rest** (escrow-backed); `ioc` never rests. `"aon"` is rejected |
+| `limit_px` | uint64 | `>= 0` | Limit price in the `1e8` plane. `0` places a **market** order — it crosses the book at whatever price is available and never rests |
+| `tif` | enum | `"gtc"`, `"ioc"`, `"alo"` | `gtc` / `alo` residuals **rest** (escrow-backed); `ioc` never rests. A market order (`limit_px = 0`) requires `"ioc"` — `gtc`/`alo` is rejected, since it has no price to rest at. `"aon"` is rejected |
 | `stp_mode` | enum | `"cancel_oldest"`, `"cancel_newest"`, `"cancel_both"` | Self-trade prevention. `"reject"` is rejected (no core equivalent) |
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client order id |
 
@@ -1168,9 +1232,12 @@ funds are not spendable; they are paid to the counterparty on fill, or refunded
 to you on cancel, self-trade-prevention, or market deactivation. Per-token
 balances are conserved exactly.
 
-**Affordability.** The order size is clamped at admission to what you can fund
-(a buy by `quote_balance ÷ limit_px`; a sell by the base you own). An entirely
-unaffordable order is an accepted no-op (no fill, nothing rests).
+**Affordability.** The order size is clamped at admission to what you can fund:
+a priced buy (`limit_px > 0`) by `quote_balance ÷ limit_px`; a sell by the base
+you own. A market buy (`limit_px = 0`) has no single price to divide by, so it
+is clamped by walking the resting asks level by level against your quote
+balance. An entirely unaffordable order is an accepted no-op (no fill, nothing
+rests).
 
 **Fees & settlement.** A fill swaps base for quote at the **maker's** resting
 price. The taker fee is taken from the leg the taker receives; the maker fee from
@@ -1209,6 +1276,7 @@ by the spot halt, so you can always exit a resting order and reclaim escrow.
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 | `pair` | uint32 | an active spot pair | Spot pair id the order rests on |
 | `oid` | uint64 | a resting spot `oid` | Server order id to cancel (cancel-by-`cloid` is not yet mapped for spot) |
 
@@ -1373,6 +1441,8 @@ positions. See [margin modes](../../concepts/margin-modes.md) and
 ### Set leverage and margin mode {#update_leverage}
 
 Set per-asset leverage and, optionally, flip the asset to isolated mode.
+**Sender-authorized by default**; an approved agent may set it **as** an `owner`
+it acts for.
 
 ```json
 {
@@ -1383,6 +1453,7 @@ Set per-asset leverage and, optionally, flip the asset to isolated mode.
 
 | Field | Type | Range | Description |
 |-------|------|-------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: set **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `asset` | uint32 | — | Target asset |
 | `leverage` | uint32 | `[1, 100]` and ≤ per-asset dynamic cap | New leverage |
 | `is_isolated` | bool | — | `true` also flips the asset to isolated mode |
@@ -1394,6 +1465,8 @@ There is no separate margin-mode action: isolation is the `is_isolated` flag her
 ### Adjust isolated margin by a delta {#update_isolated_margin}
 
 Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
+**Sender-authorized by default**; an approved agent may adjust it **as** an
+`owner` it acts for.
 
 ```json
 {
@@ -1404,6 +1477,7 @@ Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: adjust **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `asset` | uint32 | Target asset |
 | `delta` | decimal (string or number) | Signed margin delta; non-zero |
 
@@ -1412,6 +1486,8 @@ Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
 ### Add margin to a strict-isolated position {#top_up_isolated_only_margin}
 
 Add margin to a strict-isolated position. Top-up direction only (positive amount).
+**Sender-authorized by default**; an approved agent may top up **as** an `owner`
+it acts for.
 
 ```json
 {
@@ -1422,6 +1498,7 @@ Add margin to a strict-isolated position. Top-up direction only (positive amount
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `owner` | hex address \| omitted | Optional: top up **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `asset` | uint32 | Target asset |
 | `amount` | decimal (string or number) | Positive amount to add |
 
@@ -1900,10 +1977,11 @@ found`, `insufficient spot balance`.
 
 ### Toggle one-way vs hedge position mode {#set_position_mode}
 
-Toggle the sender's account between one-way (single net position per market) and
+Toggle the account between one-way (single net position per market) and
 [hedge mode](../../concepts/hedge-mode.md) (a separate long leg and short leg per
-market). This is a **sender-authorized** action — no `owner` field; the recovered
-signer is the actor.
+market). **Sender-authorized by default** — omit `owner` and the recovered
+signer is the actor; an approved agent may toggle it **as** an `owner` it acts
+for.
 
 ```json
 {
@@ -1914,6 +1992,7 @@ signer is the actor.
 
 | Field | Type | Values | Description |
 |-------|------|--------|-------------|
+| `owner` | hex address \| omitted | 40 hex chars | Optional: toggle **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `hedge` | bool | `true` / `false` | `true` = hedge (two-way), `false` = one-way (the default) |
 
 **Precondition — flat on all markets.** The toggle is only legal when the sender
@@ -2444,17 +2523,24 @@ here only to redirect integrators to the supported path.
 
 The response shape depends on the action class:
 
-- **Order-type actions** (`submit_order`) → `200 OK` with a `statuses` array (the
-  handler **waits** for commit + dispatch and returns the real assigned `oid`).
-- **All other actions** → `202 Accepted` with the admission envelope.
+- **Order-type actions** — [`submit_order`](#submit_order),
+  [`batch_order`](#batch_order), [`spot_order`](#spot_order),
+  [`scale_order`](#scale_order), [`chase_order`](#chase_order) → `200 OK` with a
+  `statuses` array (the handler **waits** for commit + dispatch and returns the
+  real assigned `oid`).
+- **All other actions** → the admission envelope: `200 OK` when the commit is
+  observed inside the wait window, `202 Accepted` when it is not. Treat both as
+  admitted and branch on `accepted` / `error`, not on the status code.
 - **Any admission-time rejection** → the rejection envelope (`accepted:false`),
   with the documented HTTP status.
 
 ### `200 OK` — order path (synchronous oid) {#200-ok--order-path-synchronous-oid}
 
-`submit_order` blocks up to the node's order-wait window (default ~5 s; devnet
-commits in ~250 ms) so the response carries the real `oid` + resting/filled
-status. On timeout it returns a `pending` entry — **never a fabricated oid**.
+An order-type action blocks up to the node's order-wait window (default 5 s;
+devnet commits in ~250 ms) so the response carries the real `oid` + resting/filled
+status. On timeout it returns a `pending` entry — **never a fabricated oid**. A
+`batch_order` / `scale_order` resolves to **one entry per placed leg or rung**; a
+single order to one entry.
 
 ```json
 { "statuses": [ { "resting": { "oid": 12345, "cloid": "0x..." } } ] }
@@ -2476,7 +2562,9 @@ returned `action_hash`.
 ### `202 Accepted` — non-order admission {#202-accepted--non-order-admission}
 
 Every non-order action (cancel, margin, vault, staking, governance, …) returns
-the admission envelope:
+the admission envelope. The status code is `200 OK` when the action commits
+inside the wait window and `202 Accepted` when it does not; the body is the same
+either way:
 
 ```json
 {
@@ -2600,6 +2688,7 @@ sequenceDiagram
 
 ## See also {#see-also}
 
+- [Placing orders](../../integration/placing-orders.md) — the guided order path; start here
 - [`POST /info`](./info.md) — read path (MTF-native)
 - [Agent wallets](../../concepts/agent-wallets.md)
 - [Signing walkthrough](../../integration/signing.md)

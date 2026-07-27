@@ -315,29 +315,44 @@ Response:
     "address":    "0x<addr>",
     "orders": [
       {
-        "oid":          12345,
-        "coin":         "BTC",
-        "side":         "bid",
-        "px":        "99000",
-        "size":      "700",
-        "cloid":        "0x000000000000000000000000cafef00d",
-        "inserted_at_ms": 1700000000000
+        "oid":         12345,
+        "coin":        "BTC",
+        "side":        "B",
+        "px":          "99000",
+        "sz":          "0.007",
+        "orig_sz":     null,
+        "cloid":       "0x000000000000000000000000cafef00d",
+        "tif":         "gtc",
+        "reduce_only": false,
+        "trigger":     null,
+        "inserted_at": 1700000000000
       }
     ]
   }
 }
 ```
 
+Every row is the **same canonical shape** the WS
+[`open_orders`](../ws/subscriptions.md#open_orders) snapshot renders, so REST and
+WS never drift. An unknown field renders `null`.
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
 | `orders[*].oid` | uint64 | Server order id (the real resting id; cancellable per-`oid`) |
-| `orders[*].coin` | string | Market symbol the order rests on (e.g. `"BTC"`) |
-| `orders[*].side` | `"bid"` / `"ask"` | Order side |
-| `orders[*].px` | Decimal string | Resting price, human-decimal (tick-snapped) |
-| `orders[*].size` | Decimal string | Remaining size, whole units |
+| `orders[*].coin` | string | Market symbol the order rests on (e.g. `"BTC"`, or a pair name like `"BTC/USDC"`) |
+| `orders[*].side` | `"B"` / `"A"` | Order side — **`B` = bid, `A` = ask**. The `/exchange` order body uses `"bid"` / `"ask"` instead |
+| `orders[*].px` | Decimal string | Resting price, whole units (tick-snapped) |
+| `orders[*].sz` | Decimal string | Remaining size, whole units |
+| `orders[*].orig_sz` | Decimal string \| null | Original size when known; `null` on a resting-order row |
 | `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none |
-| `orders[*].inserted_at_ms` | uint64 | Placement / insertion timestamp (consensus ms) |
+| `orders[*].tif` | string | Lowercase time-in-force (`"gtc"` / `"ioc"` / `"alo"`), or the literal `"trigger"` on a parked TP/SL row |
+| `orders[*].reduce_only` | bool | Reduce-only flag |
+| `orders[*].trigger` | object \| null | Trigger detail when the row is (or carries) a trigger; `null` otherwise |
+| `orders[*].inserted_at` | uint64 | Placement / insertion timestamp (consensus ms) |
+
+A parked TP/SL leg is an open order too: it renders with `tif: "trigger"` and a
+populated `trigger` block.
 
 ### Recent fill history for an account {#user_fills}
 
