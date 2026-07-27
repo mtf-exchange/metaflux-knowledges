@@ -46,7 +46,7 @@ The request was parsed, but rejected at admission. Status `400`, `401`, `404`, `
 
 | Class | Examples | Retry rule |
 |-------|----------|------------|
-| **Client bug** | `400 invalid_msgpack`, `400 unknown_action_variant`, `400 missing_field` | DO NOT retry — fix code |
+| **Client bug** | `400 action: <parse error>`, `400 unsupported action`, `400 action: unknown type` | DO NOT retry — fix code |
 | **Signing bug** | `401 signer_not_sender`, `401 unknown_chainId` | DO NOT retry — verify chainId / key / agent state |
 | **Nonce bug** | `400 nonce_must_increase` | Bump nonce; retry |
 | **Logical** | `422 price_not_tick_aligned`, `422 reduce_only_would_grow` | Compute the right value; retry |
@@ -135,7 +135,7 @@ The most ambiguous class. Did the server receive the request? Did the action com
 
 ```mermaid
 flowchart TD
-    E["upon network error:<br/>compute action_hash = keccak256(msgpack(action) ‖ sender ‖ nonce_be8)"]
+    E["upon network error:<br/>compute action_hash = keccak256(action_json ‖ owner ‖ nonce_be8)"]
     E --> L{"for attempt in 1..10:<br/>query /info openOrders or relevant info"}
     L --> H{"action_hash visible in committed state?"}
     H -->|yes| D1["admitted + committed &rarr — done"]
@@ -150,7 +150,23 @@ flowchart TD
 
 The cloid-on-orders pattern (see [idempotency](./idempotency.md)) makes this cheap: query open orders, see if your cloid is there.
 
-For non-order actions, match on `action_hash` — deterministic from your local msgpack encoding bound to the sender and nonce: `keccak256(msgpack(action) ‖ sender_20 ‖ nonce_be8)` (the sender + 8-byte big-endian nonce are concatenated after the action bytes, so a resubmit with the same params but a new nonce yields a different hash). The `userEvents` WS feed includes `action_hash` on every event.
+For non-order actions, match on `action_hash`. It is deterministic and you can
+compute it locally:
+
+```
+action_hash = keccak256( action_json ‖ owner_20 ‖ nonce_be8 )
+```
+
+- **`action_json` is the raw JSON bytes of the `action` field, exactly as you
+  sent them.** The node hashes the bytes it received. Re-serializing changes key
+  order or whitespace and gives a different hash. Keep the exact string you
+  posted.
+- **`owner_20` is the resolved account**, not the signer. For an agent-signed
+  order that is the master, not the agent.
+- `nonce_be8` is the nonce as 8 big-endian bytes.
+
+The same params with a new nonce give a different hash. The `userEvents` WS feed
+carries `action_hash` on every event.
 
 ## Production recipes {#production-recipes}
 
@@ -223,8 +239,9 @@ ws.subscribe('userEvents', { user: address }, (event) => {
 });
 
 async function submit(action: Action) {
-  // action_hash binds the action bytes to the sender + 8-byte big-endian nonce
-  const hash = keccak256(concat(msgpack(action), senderAddr, nonceBE8(action.nonce)));
+  // Hash the EXACT bytes you post. Re-serializing gives a different hash.
+  const actionJson = JSON.stringify(action);
+  const hash = keccak256(concat(utf8(actionJson), ownerAddr, nonceBE8(nonce)));
   const p = new Promise((resolve, reject) => pendingByHash.set(hash, { resolve, reject }));
   await client.exchange.submit(action);
   return Promise.race([p, timeout(5000)]);

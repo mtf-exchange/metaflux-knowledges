@@ -226,7 +226,7 @@ sequenceDiagram
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | `401 signer is not the sender` | Wrong `chainId` | Use `31337` for devnet |
-| `400 invalid msgpack` | Encoder reorders map keys | Use a standards-compliant msgpack lib |
+| `400 action: <parse error>` | Wrong field name, wrong type, or a missing required field | Check the action's entry in the catalog |
 | `404 unknown user` on info | Address has no on-chain state yet | Deposit first (faucet) |
 | `429 rate limit` | Too many requests | See [rate limits](../api/rate-limits.md); back off |
 | Withdrawal stuck on destination | MetaBridge withdrawal pending (dispute window) | Wait for the ⅔ co-signature + dispute window; then `claim` on the destination chain (see [bridge](../bridge/)) |

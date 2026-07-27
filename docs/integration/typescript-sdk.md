@@ -282,7 +282,7 @@ A: Yes — ES2020 build with browser-friendly polyfills for `secp256k1` and `kec
 A: ~150 KB minified (excluding crypto primitives, which are tree-shakeable). The crypto layer adds ~50 KB.
 
 **Q: What's the dependency tree?**
-A: `ethereum-cryptography` (or `@noble/*` equivalents), `@msgpack/msgpack`, `ws` (Node only). All MIT-licensed. No transitive dependencies with non-permissive licenses.
+A: none. The package declares no runtime dependencies. Signing and hashing are built in, and the WebSocket client uses the platform `WebSocket`.
 
 **Q: Can I plug in my own HTTP transport (axios, undici)?**
 A: Yes — pass `transport: { request: async (req) => ... }` in the constructor.

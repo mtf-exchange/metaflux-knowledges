@@ -35,7 +35,7 @@ flowchart TD
 |---------|:---------------:|:--------------:|
 | `202 admitted` | YES | NO — duplicate effect |
 | `400 nonce_must_increase` | NO (already past it) | NO — submit at a higher nonce |
-| `400 invalid_msgpack` / other parse errors | NO | YES — fix and resubmit at same nonce |
+| `400 action: <parse error>` / other parse errors | NO | YES — fix and resubmit at same nonce |
 | `401 signer_*` | NO | NO until the signing issue is fixed; the nonce is unconsumed |
 | `422 reduce_only_violation` and other admit-time logical errors | NO | YES once the logical issue is fixed |
 | `429 rate_limit` | NO | YES after `retry_after_ms` |
@@ -119,11 +119,14 @@ If still absent → admission failed (or was evicted from mempool). Submit again
 
 ### For transfers / withdrawals {#for-transfers--withdrawals}
 
-Query the account's `userFills` (which includes funding + transfers) or `block_info` around the time of the drop. Match by the action_hash you computed locally — every action has a deterministic hash (bound to the sender + nonce) regardless of admission outcome.
+Query the account's `userFills` (which includes funding + transfers) or `block_info` around the time of the drop. Match by the `action_hash` you computed locally — every action has a deterministic hash, bound to the account and the nonce, regardless of admission outcome.
 
 ```typescript
-// action_hash = keccak256(action bytes ‖ sender(20) ‖ nonce(8, big-endian))
-const actionHash = keccak256(concat(msgpack(action), senderAddr, nonceBE8(action.nonce)));
+// action_hash = keccak256(action_json ‖ owner(20) ‖ nonce(8, big-endian))
+// `action_json` is the RAW bytes of the `action` field you posted. Hash the
+// exact string — re-serializing reorders keys and changes the hash.
+// `owner` is the resolved account, not the signing agent.
+const actionHash = keccak256(concat(utf8(actionJson), ownerAddr, nonceBE8(nonce)));
 // search for events with this action_hash in WS history or info queries
 ```
 

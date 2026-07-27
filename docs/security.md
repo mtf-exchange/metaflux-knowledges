@@ -20,7 +20,7 @@ What the protocol guarantees, what it doesn't, and where you carry the risk.
 |-------|--------------------|
 | Consensus | M-of-N validator agreement; deterministic state transitions; signed blocks |
 | State machine | Identical execution across validators; deterministic time; integer-only arithmetic |
-| Signature recovery | EIP-712 over msgpack; secp256k1 recovery; agent-approval map |
+| Signature recovery | EIP-712 typed data; secp256k1 recovery; agent-approval map |
 | Mark price | Composition formula + sanity band as documented in [mark prices](./concepts/mark-prices.md) |
 | Liquidation | Tiered ladder fires deterministically against committed state |
 | Fee math | Tier table + burn ratio applied identically per fill |

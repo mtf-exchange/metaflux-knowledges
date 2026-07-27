@@ -6,23 +6,51 @@
 
 ## TL;DR {#tldr}
 
-MetaFlux supports a full ladder of order primitives — limit, IOC, ALO, FOK, market, stop-loss, take-profit, trigger limits, TWAP, scale, chase, and reduce-only — plus self-trade-prevention (STP) modes that gate matching against your own orders. Every variant is a `POST /exchange { type: "Order", ... }` shape; specialised flows like TWAP and Scale use their own action variants.
+**There is one perp order shape, not a list of order types.** You send
+[`submit_order`](../api/rest/exchange.md#submit_order) (or
+[`batch_order`](../api/rest/exchange.md#batch_order) for many at once) and pick
+the behaviour with fields on the order body:
+
+| You want | Set this | Not a separate action |
+|----------|----------|-----------------------|
+| Rest, take, or post-only | `tif` | ✅ |
+| A market order | `tif: "ioc"` at an extreme `limit_px` | ✅ |
+| Stop-loss / take-profit | a `trigger` block | ✅ |
+| Reduce-only | `reduce_only: true` | ✅ |
+| Self-trade behaviour | `stp_mode` | ✅ |
+| Entry + protective legs | `grouping` on `batch_order` | ✅ |
+
+Only four behaviours need their **own** action, because the node holds state for
+them or runs them over time: [TWAP](#twap), [scale](#scale-orders),
+[chase](#chase-orders), and the spot book
+([`spot_order`](../api/rest/exchange.md#spot_order), a separate engine).
+
+This page describes the fields. For the end-to-end request see
+[placing orders](../integration/placing-orders.md).
 
 ## Time-in-force {#time-in-force}
 
-| TIF | Behaviour | Use when |
-|-----|-----------|----------|
-| `Gtc` | Good-till-cancelled. Rest on the book until filled or cancelled. | Default; passive making, persistent quoting |
-| `Ioc` | Immediate-or-cancel. Match what's available, cancel any unfilled remainder. | Take liquidity now; never want to be on the book |
-| `Alo` | Add-limit-only ("post-only"). If any portion would cross the book, the entire order is cancelled. | Strict maker; guaranteed to never pay taker fee |
-| `Fok` | Fill-or-kill. Either fill the whole size immediately or cancel everything. | Atomic execution at a single price level |
+Wire field `tif` on the order body. The values are lowercase.
+
+| `tif` | Behaviour | Use when |
+|-------|-----------|----------|
+| `"gtc"` | Good-till-cancelled. Rest on the book until filled or cancelled. | Default; passive making, persistent quoting |
+| `"ioc"` | Immediate-or-cancel. Match what is available, cancel any unfilled remainder. | Take liquidity now; never rest on the book |
+| `"alo"` | Add-limit-only ("post-only"). If any portion would cross the book, the whole order is cancelled. | Strict maker; never pay a taker fee |
 
 ```
-Buy 1 BTC @ 100.5 Gtc      →  rests on book, fills as ask reaches 100.5 or lower
-Buy 1 BTC @ 100.5 Ioc      →  immediately matches asks ≤ 100.5; cancels rest
-Buy 1 BTC @ 100.5 Alo      →  IF any ask ≤ 100.5  THEN reject  ELSE rest
-Buy 1 BTC @ 100.5 Fok      →  IF total ≥ 1.0 @ ≤ 100.5  THEN fill  ELSE reject
+Buy 1 BTC @ 100.5 gtc      →  rests on book, fills as ask reaches 100.5 or lower
+Buy 1 BTC @ 100.5 ioc      →  immediately matches asks ≤ 100.5; cancels rest
+Buy 1 BTC @ 100.5 alo      →  IF any ask ≤ 100.5  THEN reject  ELSE rest
 ```
+
+:::warning
+**There is no fill-or-kill and no all-or-none.** The matching engine has exactly
+the three values above. The wire also parses `"aon"`, but the node **rejects** it
+rather than downgrade it to `ioc` — that would change execution semantics
+silently. To approximate fill-or-kill, send `ioc` and treat a partial fill as a
+failure in your own code.
+:::
 
 ## Reduce-only {#reduce-only}
 
@@ -39,30 +67,30 @@ Reduce-only is evaluated **at commit**, not admission, when the position is read
 
 ## Self-trade prevention {#self-trade-prevention}
 
-If a new order would match against an existing order from the same `sender`, STP kicks in.
+If a new order would match an existing order from the same account, STP acts.
+Wire field `stp_mode` on the order body. The values are lowercase.
 
-| STP mode | When new crosses old | When equal-priced both rest |
-|----------|---------------------|-----------------------------|
-| `None` | Trade allowed | Both rest |
-| `CancelNewest` | New is cancelled | New is cancelled |
-| `CancelOldest` | Old is cancelled, new can match elsewhere | Old is cancelled, new rests |
-| `CancelBoth` | Both cancelled | Both cancelled |
-| `DecrementAndCancel` | Match for `min(new, old)`; cancel the smaller; the larger keeps the remainder | Same — match then cancel smaller |
+| `stp_mode` | When new crosses old | When equal-priced both rest |
+|------------|---------------------|-----------------------------|
+| `"cancel_newest"` | New is cancelled | New is cancelled |
+| `"cancel_oldest"` | Old is cancelled, new can match elsewhere | Old is cancelled, new rests |
+| `"cancel_both"` | Both cancelled | Both cancelled |
 
-Worked example — `DecrementAndCancel`:
+`"cancel_newest"` is the default.
 
-```
-your resting bid:  buy 1 BTC @ 100.5  (oid 1)
-you place sell:    sell 0.4 BTC @ 100.5  (oid 2)  with stp=DecrementAndCancel
+:::warning
+**There is no "off" mode.** STP always acts. If you need two of your own orders
+to trade with each other, use two different accounts.
 
-result:
-  - oid 1 is decremented to 0.6 BTC remaining
-  - oid 2 is cancelled (smaller order)
-  - no trade fires (no fee, no fill event)
-  - your position is unchanged
-```
+The wire also parses `"reject"`, but the node **rejects** that value. The
+matching engine has a fourth internal mode, decrement-and-cancel, that
+`/exchange` **cannot** select — no wire value maps to it. Do not build against
+it.
+:::
 
-STP is enforced at the match step, so it works across asset side, price, and time. STP only considers orders signed against the same `sender` — orders from agents under the same master count.
+STP runs at the match step, so it applies across side, price, and time. STP
+groups orders by the account that owns them. Orders an agent places for a master
+count as that master's orders.
 
 ## Triggers {#triggers}
 
@@ -121,15 +149,17 @@ for the wire fields.
 
 ## Grouping {#grouping}
 
-`Order { grouping: ... }` groups legs into a family.
+`grouping` on [`batch_order`](../api/rest/exchange.md#batch_order) links legs into
+a family. It is the one **camelCase** corner of an otherwise snake_case wire.
 
-| Grouping | Meaning |
-|----------|---------|
-| `Na` | Independent orders |
-| `NormalTpsl` | Two orders: an entry + one of {StopLoss, TakeProfit}. Filling one cancels the other (OCO). |
-| `PositionTpsl` | Two trigger orders that attach to the **position**, not the entry order. They survive position changes (e.g. averaging in) and only cancel when the position closes. |
+| `grouping` | Meaning |
+|------------|---------|
+| `"na"` | Independent orders. The default. |
+| `"normalTpsl"` | An entry leg plus its protective legs. The entry is index 0. Filling one protective leg cancels the other (OCO). |
+| `"positionTpsl"` | Protective legs that attach to the **position**, not to an entry order. They survive position changes (for example averaging in) and cancel only when the position closes. |
 
-Use `PositionTpsl` for "I always want a stop on my net position" — the same TPSL braces stay armed as you add to or trim the position.
+Use `"positionTpsl"` when you always want a stop on your net position. The same
+braces stay armed as you add to or trim the position.
 
 ## Scale orders {#scale-orders}
 
@@ -235,7 +265,7 @@ field table and admission rules.
 
 ## TWAP {#twap}
 
-`TwapOrder` schedules slices over `duration_ms`.
+[`twap_order`](../api/rest/exchange.md#twap_order) schedules slices over `duration_ms`.
 
 ```
 duration = 1 hour = 3,600,000 ms
@@ -250,15 +280,25 @@ slice 60: send last IOC just before t = duration
 
 `randomize_pct` ∈ `[0, 50]` jitters slice times by ±`randomize_pct/100 × slice_interval`. Set higher to be harder to detect; set lower for tight time-control.
 
-Slices are submitted by the protocol; nothing for the client to do after submitting `TwapOrder`. Slice events ride the [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) (a dedicated `twap*` stream is roadmap).
+Slices are submitted by the protocol; nothing for the client to do after submitting `twap_order`. Slice events ride the [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) (a dedicated `twap*` stream is roadmap).
 
-TWAP is cancellable mid-run via `TwapCancel`; already-filled slices stay filled, future slices stop.
+TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange.md#twap_cancel); already-filled slices stay filled, future slices stop.
 
 ## Market orders {#market-orders}
 
-There is no distinct "market" action — a "market order" is an `Ioc` limit at an extreme price (`MAX_PRICE` for buys, `0` for sells). The SDKs do this for you when you call `marketBuy(...)`. The book matches at whatever liquidity exists; uncrossed remainder is cancelled.
+There is no market action and no market order type. A market order is an `ioc`
+limit at an extreme `limit_px` — a very high price to buy, `0` to sell. The book
+matches whatever liquidity exists and cancels the uncrossed remainder.
 
-Caveat: ALL market orders are subject to the **mark-price band** — if the best ask is 5% above mark, your market buy will fill the available liquidity up to `mark × (1 + band_pct)` and cancel the remainder. See [mark prices](./mark-prices.md).
+The order body also accepts `kind: "market"`. It is a **label only**: the
+matching engine has no order kind, so `"market"` and `"limit"` behave
+identically. Your `limit_px` and `tif` decide the behaviour. Sending
+`kind: "market"` with `tif: "gtc"` rests a normal limit order.
+
+Caveat: every market order is subject to the **mark-price band**. If the best ask
+is 5% above mark, your market buy fills the liquidity up to
+`mark × (1 + band_pct)` and cancels the remainder. See
+[mark prices](./mark-prices.md).
 
 ## Order lifecycle state machine {#order-lifecycle-state-machine}
 
@@ -287,53 +327,72 @@ Each state transition emits a corresponding event on [`userEvents`](../api/ws/su
 - **STP at admit vs at match.** STP is only enforced at the match step. Two opposite-side orders that don't cross will both rest. STP fires only when they would actually trade.
 - **TWAP mid-volatility.** Each slice is an IOC near mid — if liquidity dries up between slices, slices can return fully unfilled. Watch slice events.
 - **ALO + crossing book.** ALO that would cross *any* level is rejected entirely, not partially. To slip into the book at a tight price, use a non-crossing limit at one tick worse than best opposite.
-- **Trigger and TIF.** A `StopLoss` with `limit_px` set rests as a Gtc limit on trigger. Add a TWAP-like spray manually if you want sliced exit.
+- **Trigger and TIF.** A `stop_loss` leg with `is_market: false` rests a `gtc` limit at its `limit_px` on trigger. Add a TWAP-like spray yourself if you want a sliced exit.
 
 </details>
 
 ## Examples — TypeScript {#examples--typescript}
 
+`placeOrder` is the one entry point. Pass one leg or many. Each leg tags its
+venue, and the SDK picks the wire action: perp legs ride one `batch_order`, spot
+legs ride one `spot_order` each.
+
 ```typescript
-// limit buy, GTC, post-only
-await client.order({
-  asset: 0, side: 'Buy', priceE8: '10050000000', sizeE8: '100000000',
-  tif: 'Alo', reduceOnly: false, stpMode: 'CancelNewest'
+// One post-only limit buy. `venue` selects the perp book.
+await client.placeOrder({
+  venue: 'perp',
+  owner: '0x<your account>',
+  market: 0, side: 'bid', kind: 'limit',
+  size: 10000n, limit_px: 5000000000000n,
+  tif: 'alo', stp_mode: 'cancel_newest', reduce_only: false,
+  cloid: '0x0000000000000000000000000000ab01',
 });
 
-// stop-loss attached to a long position
-await client.trigger({
-  asset: 0, side: 'Sell', sizeE8: '100000000',
-  triggerPxE8: '9500000000', limitPxE8: null,
-  triggerKind: 'StopLoss', reduceOnly: true
+// A two-sided quote. Both legs ride ONE batch_order and ONE signature.
+await client.placeOrder([
+  { venue: 'perp', owner: '0x…', market: 0, side: 'bid', kind: 'limit',
+    size: 10000n, limit_px: 4990000000000n,
+    tif: 'gtc', stp_mode: 'cancel_oldest', reduce_only: false },
+  { venue: 'perp', owner: '0x…', market: 0, side: 'ask', kind: 'limit',
+    size: 10000n, limit_px: 5010000000000n,
+    tif: 'gtc', stp_mode: 'cancel_oldest', reduce_only: false },
+]);
+
+// A stop-loss is the same call with a trigger block. It is not a separate type.
+await client.placeOrder({
+  venue: 'perp',
+  owner: '0x<your account>',
+  market: 0, side: 'ask', kind: 'stop_loss',
+  size: 10000n, limit_px: 0n,
+  tif: 'gtc', stp_mode: 'cancel_newest', reduce_only: true,
+  trigger: { trigger_px: 4750000000000n, is_market: true, tpsl: 'sl' },
 });
 
-// 1-hour TWAP buy
-await client.twap({
-  asset: 0, side: 'Buy', sizeE8: '1000000000',
-  durationMs: 3_600_000, randomizePct: 20, reduceOnly: false
-});
-
-// 5-rung scale buy ladder (one signature; node expands the rungs)
-await client.scaleOrder({
-  market: 0, side: 'bid',
-  n: 5,
-  pxLow: '9800000000', pxHigh: '10000000000',
-  totalSize: '500000000',
-  dist: 'flat',
-  cloid: '0x5c000000000000000000000000000001'
-});
-
-// chase buy — one leg the node reprices to track the top of book
-await client.placeChase({
-  market: 0, side: 'bid',
-  size: '100000000',
-  stp_mode: 'cancel_oldest',
-  interval_blocks: 4,
-  ttl_ms: 3_600_000,
-  max_reprices: 500,
-  cloid: '0x5c000000000000000000000000000002'
+// A spot leg. Same call, different venue tag and a `pair` id.
+await client.placeOrder({
+  venue: 'spot',
+  pair: 110, side: 'bid',
+  size: 10000n, limit_px: 5000000000000n,
+  tif: 'gtc', stp_mode: 'cancel_oldest',
+  cloid: '0x0000000000000000000000000000ab02',
 });
 ```
+
+The four stateful behaviours keep their own methods, because the node runs them
+for you:
+
+```typescript
+await client.twapOrder({ /* … */ });   // sliced over time
+await client.placeScale({ /* … */ });  // N rungs from one signature
+await client.placeChase({ /* … */ });  // node re-prices to the touch
+```
+
+:::warning
+**A spot leg is not atomic with a perp leg.** The wire cannot batch spot, so N
+spot legs become N actions with N signatures and N nonces. Some can rest while
+others fail. `placeOrder` returns one `submissions` entry per spot action — read
+every entry.
+:::
 
 ## See also {#see-also}
 
@@ -350,13 +409,13 @@ await client.placeChase({
 **Q: Does an ALO order ever pay taker fee?**
 A: Never. If it would cross, the entire order is rejected at admission — no partial taker.
 
-**Q: Can a single `Order` action mix TIFs?**
+**Q: Can one `batch_order` mix TIFs?**
 A: Yes. `orders: []` is heterogeneous; each entry has its own `tif`.
 
 **Q: How does the matching engine break ties at the same price?**
 A: Strict FIFO — earliest `oid` wins. ALO orders gain priority by sitting on the book first; that's their natural fee-rebate edge.
 
 **Q: Do TWAP slices count against my rate limit?**
-A: No — they're submitted internally by the protocol, not by your client. Submitting the `TwapOrder` is one rate-limit charge.
+A: No — they're submitted internally by the protocol, not by your client. Submitting the `twap_order` is one rate-limit charge.
 
 </details>

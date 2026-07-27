@@ -170,21 +170,64 @@ network upgrade** onward. Until then send `0` / omit it (the only accepted value
 
 ## Signed-by semantics {#signed-by-semantics}
 
-Most actions can be signed by **either** the master account **or** an active [agent wallet](../../concepts/agent-wallets.md). A subset is **master-only** — agents are explicitly denied withdrawal authority and account-management privileges.
+An action is signed by the **master** key or by an approved
+[agent wallet](../../concepts/agent-wallets.md). One rule decides which:
 
-| Capability class | Master can sign? | Agent can sign? |
-|------------------|:----------------:|:---------------:|
-| Place / cancel / modify orders | yes | yes |
-| Update leverage / margin mode | yes | yes |
-| Vault deposit / withdraw | yes | yes |
-| Sub-account create | yes | no |
-| Sub-account transfer | yes | no |
-| Agent approval / revocation | yes | no |
-| External withdrawal (USDC, spot) | yes | no |
-| Convert to multi-sig | yes | no |
-| Multi-sig wrapper | (special — see [multi-sig](../../concepts/multi-sig.md)) | no |
+**An agent can sign an action only if that action carries an `owner` field.**
 
-Each action's entry in the [catalog](#action-catalog) lists its signed-by rule explicitly.
+There is no top-level `sender` field and no account header. The node reads the
+account from the action body. This gives exactly two classes.
+
+| Class | How the node finds the account | Who can sign |
+|-------|--------------------------------|--------------|
+| **`master / agent`** | The action carries `owner`. | The `owner` key, or an approved agent of `owner`. |
+| **`master only`** | The action has no `owner`. The signer **is** the account. | The account's own key. |
+
+The field-level tables below call the second class **sender-authorized**. The two
+names mean the same thing: no `owner` field, so the signer is the account. An
+action with an **optional** `owner` is `master / agent` when you send `owner`,
+and sender-authorized when you omit it.
+
+For a `master / agent` action the node compares the recovered signer against
+`owner`. A signer that is neither `owner` nor an approved agent of `owner` gets
+`401`.
+
+:::danger
+**A `master only` action signed by an agent key does not fail. It acts on the
+agent's own account.**
+
+The node sets the account to the recovered signer. So an agent-signed
+[`mb_withdraw`](#mb_withdraw) debits the **agent's** balance, not the master's,
+and an agent-signed [`approve_agent`](#approve_agent) approves an agent of the
+**agent**. You get no `401` and no error — you get the wrong account. Sign every
+`master only` action with the master key.
+:::
+
+Each action's entry in the [catalog](#action-catalog) carries its class. The two
+classes are the only values in the **Signed-by** column.
+
+### Which actions accept an agent {#which-actions-accept-an-agent}
+
+These actions carry an `owner`, so an approved agent can sign them. This list is
+complete.
+
+| Group | Actions |
+|-------|---------|
+| Perp orders | [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order), [`twap_order`](#twap_order) |
+| Cancels | [`cancel_order`](#cancel_order), [`batch_cancel`](#batch_cancel), [`cancel_by_cloid`](#cancel_by_cloid), [`cancel_all_orders`](#cancel_all_orders), [`cancel_scale`](#cancel_scale), [`cancel_chase`](#cancel_chase), [`twap_cancel`](#twap_cancel), [`schedule_cancel`](#schedule_cancel) |
+| Amends | [`modify`](#modify), [`batch_modify`](#batch_modify) |
+| Spot | [`spot_order`](#spot_order), [`spot_cancel`](#spot_cancel) |
+| Margin | [`update_leverage`](#update_leverage), [`update_isolated_margin`](#update_isolated_margin), [`top_up_isolated_only_margin`](#top_up_isolated_only_margin), [`set_position_mode`](#set_position_mode) |
+| Specialist venues | [`rfq_request`](#rfq_request), [`rfq_quote`](#rfq_quote), [`rfq_accept`](#rfq_accept), [`fba_submit`](#fba_submit) |
+
+**Every other action is `master only`.** That covers all fund movement
+(withdrawals, transfers, vaults, Earn, staking) and all account control (agent
+approval, sub-accounts, multi-sig, display name, referrer, builder-fee approval,
+portfolio-margin enrolment, abstraction config, priority bids, encrypted orders).
+
+On `submit_order` and `cancel_order` the `owner` field is **required**. On every
+other action in the table above it is **optional**: omit it and the signer trades
+for itself.
 
 ---
 
@@ -219,21 +262,21 @@ so you can skip most of it on a first integration.
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
-| [`submit_order`](#submit_order) | Place one order | owner / agent | by `cloid` |
-| [`batch_order`](#batch_order) | N orders / one signature | owner / agent | per-leg `cloid` |
-| [`cancel_order`](#cancel_order) | Cancel by `oid` | owner / agent | yes |
-| [`batch_cancel`](#batch_cancel) | N cancels / one signature | owner / agent | yes |
-| [`cancel_by_cloid`](#cancel_by_cloid) | Cancel by client order id | sender / agent | yes |
-| [`cancel_all_orders`](#cancel_all_orders) | Cancel all (optional asset filter) | sender / agent | yes |
-| [`modify`](#modify) | Amend a resting order's px / size | sender / agent | yes |
-| [`batch_modify`](#batch_modify) | N modifies / one signature | sender / agent | per-entry |
-| [`schedule_cancel`](#schedule_cancel) | Future-block cancel-all trigger | sender / agent | yes |
-| [`twap_order`](#twap_order) | Schedule a sliced (TWAP) order | sender / agent | by `twap_id` |
-| [`twap_cancel`](#twap_cancel) | Cancel a running TWAP parent | sender / agent | yes |
-| [`scale_order`](#scale_order) | Place an N-rung ladder / one signature | owner / agent | by `cloid` |
-| [`cancel_scale`](#cancel_scale) | Cancel a whole ladder by its shared `cloid` | owner / agent | yes |
-| [`chase_order`](#chase_order) | Place a self-repricing chase leg / one signature | owner / agent | by `cloid` |
-| [`cancel_chase`](#cancel_chase) | Cancel a chase by its handle | owner / agent | yes |
+| [`submit_order`](#submit_order) | Place one order | master / agent | by `cloid` |
+| [`batch_order`](#batch_order) | N orders / one signature | master / agent | per-leg `cloid` |
+| [`cancel_order`](#cancel_order) | Cancel by `oid` | master / agent | yes |
+| [`batch_cancel`](#batch_cancel) | N cancels / one signature | master / agent | yes |
+| [`cancel_by_cloid`](#cancel_by_cloid) | Cancel by client order id | master / agent | yes |
+| [`cancel_all_orders`](#cancel_all_orders) | Cancel all (optional asset filter) | master / agent | yes |
+| [`modify`](#modify) | Amend a resting order's px / size | master / agent | yes |
+| [`batch_modify`](#batch_modify) | N modifies / one signature | master / agent | per-entry |
+| [`schedule_cancel`](#schedule_cancel) | Future-block cancel-all trigger | master / agent | yes |
+| [`twap_order`](#twap_order) | Schedule a sliced (TWAP) order | master / agent | by `twap_id` |
+| [`twap_cancel`](#twap_cancel) | Cancel a running TWAP parent | master / agent | yes |
+| [`scale_order`](#scale_order) | Place an N-rung ladder / one signature | master / agent | by `cloid` |
+| [`cancel_scale`](#cancel_scale) | Cancel a whole ladder by its shared `cloid` | master / agent | yes |
+| [`chase_order`](#chase_order) | Place a self-repricing chase leg / one signature | master / agent | by `cloid` |
+| [`cancel_chase`](#cancel_chase) | Cancel a chase by its handle | master / agent | yes |
 
 ### Spot trading {#spot-trading}
 
@@ -249,8 +292,8 @@ so an approved agent can act for the account it is approved for. See
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
-| [`spot_order`](#spot_order) | Place one spot order | sender / agent | by `cloid` |
-| [`spot_cancel`](#spot_cancel) | Cancel a resting spot order by `oid` | sender / agent | yes |
+| [`spot_order`](#spot_order) | Place one spot order | master / agent | by `cloid` |
+| [`spot_cancel`](#spot_cancel) | Cancel a resting spot order by `oid` | master / agent | yes |
 
 ### Spot margin & Earn {#spot-margin--earn}
 
@@ -262,21 +305,21 @@ A leveraged spot position is **cross-margined against your one unified USDC acco
 
 | `type` | Purpose | Signed-by | Idempotent |
 |--------|---------|-----------|-----------|
-| [`spot_margin_deposit`](#spot_margin_deposit) | **Retired** — collateral is now your unified USDC account | sender / agent | no |
-| [`spot_margin_withdraw`](#spot_margin_withdraw) | **Retired** — collateral is now your unified USDC account | sender / agent | no |
-| [`spot_margin_open`](#spot_margin_open) | Borrow + IOC-buy base on leverage | sender / agent | no |
-| [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | sender / agent | no |
-| [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | sender / agent | no |
-| [`earn_withdraw`](#earn_withdraw) | Redeem pool shares (idle-bounded) | sender / agent | no |
+| [`spot_margin_deposit`](#spot_margin_deposit) | **Retired** — collateral is now your unified USDC account | master only | no |
+| [`spot_margin_withdraw`](#spot_margin_withdraw) | **Retired** — collateral is now your unified USDC account | master only | no |
+| [`spot_margin_open`](#spot_margin_open) | Borrow + IOC-buy base on leverage | master only | no |
+| [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | master only | no |
+| [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | master only | no |
+| [`earn_withdraw`](#earn_withdraw) | Redeem pool shares (idle-bounded) | master only | no |
 
 ### Margin & risk {#margin--risk}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`update_leverage`](#update_leverage) | Change leverage / iso toggle on an asset | sender / agent |
-| [`update_isolated_margin`](#update_isolated_margin) | Signed isolated-margin delta | sender / agent |
-| [`top_up_isolated_only_margin`](#top_up_isolated_only_margin) | Strict-iso margin top-up | sender / agent |
-| [`user_portfolio_margin`](#user_portfolio_margin) | Enroll / unenroll PM | sender / agent |
+| [`update_leverage`](#update_leverage) | Change leverage / iso toggle on an asset | master / agent |
+| [`update_isolated_margin`](#update_isolated_margin) | Signed isolated-margin delta | master / agent |
+| [`top_up_isolated_only_margin`](#top_up_isolated_only_margin) | Strict-iso margin top-up | master / agent |
+| [`user_portfolio_margin`](#user_portfolio_margin) | Enroll / unenroll PM | master only |
 
 ### RFQ, FBA & utility {#rfq-fba--utility}
 
@@ -287,66 +330,64 @@ planes and the digest-bound `owner` rule.
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`rfq_request`](#rfq_request) | Open an RFQ session (taker) | sender / agent (`owner` digest-bound) |
-| [`rfq_quote`](#rfq_quote) | Quote onto an open RFQ (maker) | sender / agent (`owner` digest-bound) |
-| [`rfq_accept`](#rfq_accept) | Accept a quote and settle (taker) | sender / agent (`owner` digest-bound) |
-| [`fba_submit`](#fba_submit) | Submit into a batch-auction window | sender / agent |
-| [`noop`](#noop) | Deliberate no-op (nonce burn / keepalive) | sender |
+| [`rfq_request`](#rfq_request) | Open an RFQ session (taker) | master / agent (`owner` digest-bound) |
+| [`rfq_quote`](#rfq_quote) | Quote onto an open RFQ (maker) | master / agent (`owner` digest-bound) |
+| [`rfq_accept`](#rfq_accept) | Accept a quote and settle (taker) | master / agent (`owner` digest-bound) |
+| [`fba_submit`](#fba_submit) | Submit into a batch-auction window | master / agent |
+| [`noop`](#noop) | Deliberate no-op (nonce burn / keepalive) | master only |
 
 ### Account management {#account-management}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`approve_agent`](#approve_agent) | Approve an agent wallet | sender / agent |
-| [`set_display_name`](#set_display_name) | Set the account handle | sender / agent |
-| [`set_referrer`](#set_referrer) | Bind to a referrer address | sender / agent |
-| [`approve_builder_fee`](#approve_builder_fee) | Approve a builder fee ceiling | sender / agent |
-| [`create_sub_account`](#create_sub_account) | Open a sub-account under the sender | sender / agent |
-| [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | sender / agent |
-| [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | sender / agent |
-| [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Lift account to multi-sig | sender / agent |
-| [`set_position_mode`](#set_position_mode) | Toggle one-way / hedge position mode | sender / agent |
+| [`approve_agent`](#approve_agent) | Approve an agent wallet | master only |
+| [`set_display_name`](#set_display_name) | Set the account handle | master only |
+| [`set_referrer`](#set_referrer) | Bind to a referrer address | master only |
+| [`approve_builder_fee`](#approve_builder_fee) | Approve a builder fee ceiling | master only |
+| [`create_sub_account`](#create_sub_account) | Open a sub-account under the master | master only |
+| [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | master only |
+| [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | master only |
+| [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Lift account to multi-sig | master only |
+| [`set_position_mode`](#set_position_mode) | Toggle one-way / hedge position mode | master / agent |
 
 ### Staking & abstraction {#staking--abstraction}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`c_deposit`](#c_deposit) | Move spot MTF into the free staking balance | sender / agent |
-| [`c_withdraw`](#c_withdraw) | Move the free staking balance back to spot MTF | sender / agent |
-| [`token_delegate`](#token_delegate) | Delegate / undelegate stake | sender / agent |
-| [`claim_rewards`](#claim_rewards) | Claim staking rewards | sender / agent |
-| [`link_staking_user`](#link_staking_user) | Alias a staking target | sender / agent |
-| [`user_dex_abstraction`](#user_dex_abstraction) | Toggle the user DEX-abstraction flag | sender / agent |
-| [`user_set_abstraction`](#user_set_abstraction) | Self-scope abstraction config | sender / agent |
-| [`agent_set_abstraction`](#agent_set_abstraction) | Agent-scope abstraction config | sender / agent |
-| [`priority_bid`](#priority_bid) | Pay a priority fee for block-front placement | sender / agent |
+| [`c_deposit`](#c_deposit) | Move spot MTF into the free staking balance | master only |
+| [`c_withdraw`](#c_withdraw) | Move the free staking balance back to spot MTF | master only |
+| [`token_delegate`](#token_delegate) | Delegate / undelegate stake | master only |
+| [`claim_rewards`](#claim_rewards) | Claim staking rewards | master only |
+| [`link_staking_user`](#link_staking_user) | Alias a staking target | master only |
+| [`user_set_abstraction`](#user_set_abstraction) | Self-scope abstraction config | master only |
+| [`agent_set_abstraction`](#agent_set_abstraction) | Agent-scope abstraction config | master only |
+| [`priority_bid`](#priority_bid) | Pay a priority fee for block-front placement | master only |
 
 ### Encrypted orders {#encrypted-orders}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`submit_encrypted_order`](#submit_encrypted_order) | Threshold-encrypted order ciphertext | sender / agent |
+| [`submit_encrypted_order`](#submit_encrypted_order) | Threshold-encrypted order ciphertext | master only |
 
 ### Vaults {#vaults}
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`create_vault`](#create_vault) | Leader creates a vault | sender / agent |
-| [`vault_transfer`](#vault_transfer) | Leader seed transfer | sender / agent |
-| [`vault_modify`](#vault_modify) | Leader-only vault config update | sender / agent |
-| [`vault_withdraw`](#vault_withdraw) | Follower share redemption | sender / agent |
+| [`create_vault`](#create_vault) | Leader creates a vault | master only |
+| [`vault_transfer`](#vault_transfer) | Leader seed transfer | master only |
+| [`vault_modify`](#vault_modify) | Leader-only vault config update | master only |
+| [`vault_withdraw`](#vault_withdraw) | Follower share redemption | master only |
 
 ### Bridge withdrawals {#bridge-withdrawals}
 
 External withdrawals leave the chain over [MetaBridge](../../bridge/index.md).
-The action is **sender-authorized**: the recovered signer is the account
-debited, so withdrawal authority is effectively **master-only** — an agent
-signature would act on the agent's own (separate) account, never the master's.
+Both actions are **`master only`**: the recovered signer is the account debited.
+An agent signature debits the agent's own account, never the master's.
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`core_evm_transfer`](#core_evm_transfer) | Move USDC from the Core ledger to MetaFluxEVM | sender (master) |
-| [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | sender (master) |
+| [`core_evm_transfer`](#core_evm_transfer) | Move USDC from the Core ledger to MetaFluxEVM | master only |
+| [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
 
 ### Not on the public `/exchange` path {#not-on-the-public-exchange-path}
 
@@ -2129,20 +2170,17 @@ Alias a staking target address to the sender.
 
 ---
 
-### Toggle DEX-abstraction for the account {#user_dex_abstraction}
+### Toggle DEX-abstraction for the account — removed {#user_dex_abstraction}
 
-Toggle the global DEX-abstraction flag for the sender.
+:::danger
+**Removed. Do not send this action.** `user_dex_abstraction` was deleted at the
+`0.7.0` re-genesis and has no handler. A submit returns
+`400 unsupported action`.
 
-```json
-{
-  "type": "user_dex_abstraction",
-  "params": { "enabled": true }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `enabled` | bool | `true` = opt-in, `false` = opt-out |
+MetaFlux runs one unified account with portfolio margin, so there are no separate
+DEXes to abstract over. There is no replacement action and none is planned. The
+action id stays permanently reserved and is never reused.
+:::
 
 ---
 
@@ -2352,7 +2390,7 @@ the sender's USDC cross-collateral on Core and mints the scale-converted
 Core → EVM asset transfer. **Sender-authorized** — no `owner` field; the
 recovered signer is the account debited. An agent signature therefore acts on
 the **agent's own** account, never the master's, so this is effectively
-master-only (consistent with the [signed-by table](#signed-by-semantics)).
+master only (consistent with the [signed-by table](#signed-by-semantics)).
 
 Its EIP-712 [typed-data](#signing) primary type is
 `MetaFluxTransaction:CoreEvmTransfer`.
@@ -2431,7 +2469,7 @@ validator co-signing (⅔ of active stake), after which the funds are released t
 `dst_addr` on the destination chain. **Sender-authorized** — no `owner` field;
 the recovered signer is the account debited. An agent signature therefore acts
 on the **agent's own** account, never the master's, so withdrawal authority is
-effectively master-only (consistent with the
+effectively master only (consistent with the
 [signed-by table](#signed-by-semantics)).
 
 ```json
@@ -2507,7 +2545,7 @@ here only to redirect integrators to the supported path.
 |-----------|-----------|-------------|-------------|
 | `Order` (multi) / `Cancel` (multi) | — | Single vs. batch are distinct tags | [`submit_order`](#submit_order) + [`batch_order`](#batch_order); [`cancel_order`](#cancel_order) + [`batch_cancel`](#batch_cancel) |
 | `UpdateMarginMode` | — | No native action | `is_isolated` flag on [`update_leverage`](#update_leverage) |
-| `MultiSig` | — | Collect-and-execute wrapper not bridged (preview / not executing) | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
+| `MultiSig` | `multi_sig` | **Bridged and executing.** Post it as a normal `multi_sig` envelope | [`multi_sig`](../../concepts/multi-sig.md#acting-as-multi-sig) acts; [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
 | `WithdrawUsdc` | — | Draft name; not a native tag | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
@@ -2516,6 +2554,7 @@ here only to redirect integrators to the supported path.
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to the canonical enroll/unenroll action; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
+| `UserDexAbstraction` | `user_dex_abstraction` | **Removed** at the `0.7.0` re-genesis → `unsupported action`. One unified account, so nothing to abstract | — (no replacement) |
 
 ---
 

@@ -108,7 +108,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **MIP — Market Improvement Proposal.** Numbered protocol improvement (analogous to the improvement-proposal schemes used by established on-chain perp protocols). See [MIP](../mip/).
 
-**msgpack.** Binary serialisation format. The signed payload of an action is msgpack bytes. See [signing](../integration/signing.md).
+**Action JSON.** An action goes on the wire as JSON. The signature covers the EIP-712 typed-data digest of the action, not the JSON bytes. The JSON bytes are hashed separately for the `action_hash` correlation key. See [signing](../integration/signing.md).
 
 **MTF.** The MetaFlux protocol token. Used for staking, governance, fee burns.
 

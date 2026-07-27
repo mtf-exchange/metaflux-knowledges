@@ -42,7 +42,7 @@ All non-2xx responses on MTF-native endpoints use:
 | `invalid hex` | Non-hex characters in `sender` / `signature` | Sanitize input |
 | `unknown action variant: <X>` | `action.type` misspelled or unsupported | Check the [action catalog](./rest/exchange.md#action-catalog) |
 | `missing field: params.<X>` | Required field omitted from a variant | Check the variant's table |
-| `invalid msgpack` | Action serialisation error / out-of-spec msgpack | Use a default-options msgpack lib |
+| `action: <parse error>` | The `action` object failed JSON parsing or schema validation | Check the field names and types against the action's catalog entry |
 | `nonce must increase` | Reused or out-of-order `nonce` | Use a monotonic counter (e.g. `Date.now()`) |
 | `duplicate cloid` | `Order`/`ModifyOrder` reused a client order id | Use a fresh `cloid` |
 | `empty batch` | `orders[]` or `cancels[]` empty | Send at least one entry |
