@@ -2,7 +2,7 @@
 
 :::info
 **Live on devnet.** The scenario engine is fully operational: users enroll via the
-`UserPortfolioMargin` action (equity-gated, default ≥ 100 K USDC), and the
+`user_portfolio_margin` action (equity-gated, default ≥ 100 K USDC), and the
 SPAN-style scenario grid (±5/10/20 % price × ±20/50 % vol) computes maintenance in
 real time. Both the action surface and the scenario engine are shipped and tested
 on a 4-node consensus run.
@@ -64,7 +64,7 @@ worst        = min( scenario_total over the grid )              # most negative
 pm_margin    = max(0, −worst) + concentration_penalty
 ```
 
-The grid + concentration coefficients are the engine defaults (`PortfolioMarginEngine::default`):
+The grid and concentration coefficients below are the protocol defaults:
 
 | Parameter | Default (code) |
 |-----------|----------------|
@@ -139,10 +139,10 @@ PM.
 ## Enrollment {#enrollment}
 
 ```json
-{ "type": "UserPortfolioMargin", "params": { "enabled": true } }
+{ "type": "user_portfolio_margin", "params": { "enroll": true } }
 ```
 
-Master-only. Symmetric to disable.
+Master-only. `enroll: false` disables — symmetric.
 
 | Constraint | Value |
 |------------|-------|
@@ -154,25 +154,20 @@ Disabling reverts to classical at next block. Disabling while in T0+ is allowed 
 
 ## Strict isolation {#strict-isolation}
 
-Even under PM, mark specific assets as **strictly isolated**. A strict-iso position:
+Even under PM, a specific asset can be **strictly isolated** so it never enters
+the scenario engine. A strict-iso position:
 
 - Computes its own margin standalone (classical model)
 - Does NOT enter the PM scenario engine
 - Liquidates independently — blowup contained to that asset
 
-Use cases:
-- New / illiquid assets where the correlation matrix isn't calibrated
-- Speculation budget firewalled from your hedged core
-- High-risk experiments
-
-```json
-{
-  "type": "UpdateMarginMode",
-  "params": { "asset": 7, "mode": "StrictIso" }
-}
-```
-
-See [margin modes](./margin-modes.md).
+This is **not something you request per position.** There is no action that
+marks one of your positions strict-iso; it is a per-market flag **governance**
+sets (a stake-weighted vote), which forces every position newly opened on
+that market into strict-iso regardless of the trader's PM enrollment. See
+[margin modes: governance-imposed strict isolation](./margin-modes.md#governance-imposed-strict-isolation-market-level)
+for the full mechanism, and check a market's live metadata before assuming
+your position on it will net inside PM.
 
 ## Liquidation under PM {#liquidation-under-pm}
 
@@ -221,13 +216,14 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 ```
 
 The native [`account_state`](../api/rest/info.md#account_state) read exposes
-`pm_enabled` (whether PM is active for the account) alongside `maint_margin`,
-`init_margin`, `health`, and `tier`. When PM is enabled, `maint_margin` already
-reflects the PM-derived maintenance:
+`abstraction: "portfolio"` (whether PM is active for the account) alongside
+`init_margin`, `health`, and `tier`; the account-level `maint_margin` figure —
+which already reflects the PM-derived maintenance when enrolled — lives on the
+lighter [`margin_summary`](../api/rest/info.md#margin_summary) read:
 
 ```json
 {
-  "pm_enabled":   true,
+  "abstraction": "portfolio",
   "maint_margin": "8",
   "init_margin":  "12",
   "health":       "...",
@@ -273,9 +269,9 @@ A: Yes. Each sub is independent. A master can be PM-enrolled while its subs are 
 A: Larger than classical (scenario grid), but bounded. The protocol caches per-account scenario results and only re-computes on position changes or scenario-parameter updates.
 
 **Q: Is PM transparent — can I see the exact maint number before placing an order?**
-A: Yes. `/info clearinghouseState` returns both classical and PM. SDKs surface this in their `getOrderImpact()` helper.
+A: You can read the current PM-derived `maint_margin` from [`/info account_state`](../api/rest/info.md#account_state) — see [Querying](#querying). There is no separate pre-trade "what would this order cost me" read; the per-scenario breakdown is not yet a surfaced field (see the note above).
 
 **Q: Do MIP-3 listings get PM credit?**
-A: Only if the listing's market spec includes the asset in the PM correlation matrix. Many long-tail listings will default to Strict-Iso for safety. Check `market_info.pm_eligible` per market.
+A: The engine has no per-pair correlation matrix (see the corrections note above) — every enrolled position nets through the same scenario grid unless its market is governance-flagged strict-isolated, which excludes it. Check a market's live `strict_isolated` field on [`market_info`](../api/rest/info/perpetuals.md#market_info); new long-tail listings are likely candidates for that flag.
 
 </details>

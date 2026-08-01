@@ -138,14 +138,14 @@ For spot assets use `sub_account_spot_transfer` (adds an `asset` field).
 
 The sub is a regular account. Sign with the sub's key (or an [approved agent](./agent-wallets.md)) and submit with the sub's address as `sender`.
 
-Common pattern: master signs `ApproveAgent` for each sub from the sub's address — the master holds delegation authority over its subs, so this is allowed even though `ApproveAgent` is otherwise master-only. Each sub then has its own hot-key trading flow.
+Common pattern: master signs `approve_agent` for each sub from the sub's address — the master holds delegation authority over its subs, so this is allowed even though `approve_agent` is otherwise master-only. Each sub then has its own hot-key trading flow.
 
 ```mermaid
 sequenceDiagram
     participant master
     participant hot_key
-    master->>master: signs sender = sub_addr_0, action = ApproveAgent { agent: 0x<hot_key>, expires_at_ms: ... }
-    hot_key->>hot_key: signs every subsequent trade sender = sub_addr_0, action = Order { ... }
+    master->>master: signs sender = sub_addr_0, action = approve_agent { agent: 0x<hot_key>, expires_at_ms: ... }
+    hot_key->>hot_key: signs every subsequent trade sender = sub_addr_0, action = submit_order { ... }
 ```
 
 The SDK exposes each sub as a separate `Client` instance with its own keypair, pointed at its derived address.
@@ -264,7 +264,7 @@ Quarterly comparison of NAV per sub determines which gets more allocation.
 - **`create_sub_account` takes effect at the next block**, like all state changes. A sub cannot approve an agent or trade, so there is no agent-traffic race to plan for.
 - **Master tries to transfer from sub during sub's T1 liquidation.** Rejected; sub's collateral is being used to defend. Transfer is allowed once sub re-enters Safe.
 - **Master deletes / abandons a sub.** Not in V1. Subs stick around forever in the index. Empty subs have zero state cost; not worth worrying about.
-- **Sub's agent key compromised.** Revoke via the master (master is sub's master, holds delegation authority). Use the same `ApproveAgent` with `expires_at_ms` in the past.
+- **Sub's agent key compromised.** Revoke via the master (master is sub's master, holds delegation authority). Use the same `approve_agent` with `expires_at_ms` in the past.
 - **Sub-of-sub.** Not supported, and not reachable — a sub cannot sign `create_sub_account`.
 
 </details>
@@ -279,7 +279,7 @@ sequenceDiagram
     master->>sub_0: T=0 master creates sub_0
     Note over sub_0: T+1 sub_0 active
     master->>sub_0: T+1 master transfers 1000 USDC into it
-    master->>sub_0: T+2 signs ApproveAgent { agent: hot_key, ... } AS sub_0
+    master->>sub_0: T+2 signs approve_agent { agent: hot_key, ... } AS sub_0
     Note over sub_0,hot_key: T+3 approval committed — hot_key can sign for sub_0
     hot_key->>sub_0: T+4 places first order on sub_0
     Note over sub_0: T+5 order admits — fills — sub_0 has a position
@@ -301,7 +301,7 @@ sequenceDiagram
 A: Yes. The 30-day volume tier rolls up across master + all subs. Trading inside subs counts for the master's tier discount.
 
 **Q: Can a sub receive funds from another account directly (not via master)?**
-A: Yes — `UsdcTransfer` to a sub's address works just like to any account. The funds aren't restricted to flow through master after that point; they're just funds in the sub's balance.
+A: Yes — the general account-to-account transfer action (`send_asset`) can target a sub's address just like any account. The funds aren't restricted to flow through master after that point; they're just funds in the sub's balance.
 
 **Q: Do subs share a nonce space with master?**
 A: No. Each sub has its own nonce sequence. Master's nonces are master's; sub_0's are sub_0's; etc.

@@ -6,18 +6,18 @@
 
 A risk-watcher is an automated process that monitors your account's health and intervenes — depositing margin, reducing position, or trading defensively — before the protocol's [tiered liquidation](../concepts/tiered-liquidation.md) ladder fires on you.
 
-Production trading bots that hold positions overnight should run one. The protocol's T0 yellow card buys you one block (~100ms); a risk-watcher uses that block productively.
+Production trading bots that hold positions overnight should run one. The protocol's T0 yellow card buys you exactly one committed block; a risk-watcher uses that block productively. Block cadence is a governed, per-deployment target, not a fixed duration — measure your own deployment's committed-round rate if your reaction budget depends on the wall-clock size of that window.
 
 ## TL;DR {#tldr}
 
-Subscribe to `marginEvents`, react to tier transitions, top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before `maint_margin` becomes binding.
+Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values, top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before `maint_margin` becomes binding.
 
 ## Architecture {#architecture}
 
 ```mermaid
 flowchart TD
     bot["trading bot<br/>places + manages orders<br/>shares signing key with risk-watcher (or uses sep)"]
-    watcher["risk-watcher<br/>WS subscribe: marginEvents { user }<br/>on tier ≥ T0: take action<br/>on health &lt — 1.2: pre-emptive top-up<br/>on tier T1+: emergency unwind"]
+    watcher["risk-watcher<br/>WS subscribe: notifications { user } + account_state { user }<br/>on tier ≥ T0: take action<br/>on derived ratio < 1.2: pre-emptive top-up<br/>on tier T1+: emergency unwind"]
     exchange["POST /exchange"]
 
     bot -->|"runs in same process or sidecar"| watcher
@@ -28,21 +28,22 @@ The watcher is a separate logical process even when co-located — its decisions
 
 ## Inputs {#inputs}
 
-- `marginEvents` WS push: live `account_value`, `maint_margin`, `health`, `tier`.
-- `mark` WS push (per held asset): for forward-looking estimation.
-- `fundingTicks` WS push: to anticipate hourly funding charges.
+- [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`) — the immediate signal that a tier changed.
+- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `maint_margin`, `tier`. Derive your own health ratio from the first two — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
+- [`active_asset_ctx`](../api/ws/subscriptions.md#active_asset_ctx) WS push (per held asset): `mark_px` for forward-looking estimation, and `funding.rate_per_hr` / `funding.next_payment_ts` to anticipate the next funding charge before it settles.
+- [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments — one record per settlement, AFTER it applies. This channel cannot anticipate the next charge; use `active_asset_ctx`'s `funding` block for that.
 
 ## Reaction rules {#reaction-rules}
 
 | Trigger | Action | Rationale |
 |---------|--------|-----------|
-| `health < 1.5` and falling for 5 consecutive samples | Pre-emptive deposit to bring health to 1.8 | Buffer before T0 |
+| Derived ratio < 1.5 and falling for 5 consecutive samples | Pre-emptive deposit to bring the ratio to 1.8 | Buffer before T0 |
 | `tier transition to T0` | Immediate deposit OR partial close | One block to act before T1 |
 | `tier transition to T1` | Emergency: full close on highest-loss position | Pre-empt the partial close at a worse price |
-| `funding payment in next 1 minute > 0.5 × free_collateral` | Pre-pay deposit | Funding charge can flip you into T0 |
+| Projected charge from `active_asset_ctx.funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × free_collateral | Pre-pay deposit before settlement | Funding charge can flip you into T0 |
 | Mark moves > 3× recent-1h sigma in 30s | Snapshot positions + alert operator | Possible regime shift |
 
-Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (health 1.3 floor). Conservative books: looser (health 1.8 floor).
+Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (ratio 1.3 floor). Conservative books: looser (ratio 1.8 floor).
 
 ## Implementation sketch (TypeScript) {#implementation-sketch-typescript}
 
@@ -52,36 +53,42 @@ import { MetaFluxClient } from '@metaflux/sdk';
 const trader = new MetaFluxClient({ /* trading agent */ });
 const watcher = new MetaFluxClient({ /* dedicated watcher agent */ });
 
-const TARGET_HEALTH = 1.8;
+const TARGET_RATIO = 1.8;
 const T0_DEPOSIT_USDC = 1000;  // tune to position size
 
 let recentSamples: number[] = [];
 
-watcher.ws().subscribe('marginEvents', { user: trader.address }, async (event) => {
-  const { health, tier, account_value, maint_margin } = event.data;
+// account_state carries account_value / maint_margin as separate fields, not
+// a ratio — its own `health` field is a signed dollar figure. Compute the
+// ratio locally for the pre-emptive trigger.
+watcher.ws().subscribe('account_state', { user: trader.address }, async (event) => {
+  const { account_value, maint_margin } = event.data;
+  const ratio = Number(maint_margin) === 0 ? Infinity : Number(account_value) / Number(maint_margin);
 
-  recentSamples.push(health);
+  recentSamples.push(ratio);
   if (recentSamples.length > 5) recentSamples.shift();
 
-  // Tier-based reactions
-  if (tier === 'T1') {
-    console.log('[ALERT] T1 — emergency unwind');
-    await emergencyUnwind(trader);
-    return;
-  }
-  if (tier === 'T0') {
-    console.log('[WARN] T0 — top up');
-    await deposit(watcher, T0_DEPOSIT_USDC);
-    return;
-  }
-
-  // Pre-emptive
   const allFalling = recentSamples.length === 5
     && recentSamples.every((h, i) => i === 0 || h < recentSamples[i-1]);
-  if (allFalling && health < 1.5) {
+  if (allFalling && ratio < 1.5) {
     console.log('[INFO] pre-emptive top-up');
-    const needed = Math.ceil((TARGET_HEALTH * maint_margin - account_value) / 1e6);
+    const needed = Math.ceil((TARGET_RATIO * Number(maint_margin) - Number(account_value)) / 1e6);
     await deposit(watcher, needed);
+  }
+});
+
+// notifications fires exactly on tier transitions — react to `kind` directly
+// instead of polling a threshold.
+watcher.ws().subscribe('notifications', { user: trader.address }, async (event) => {
+  for (const record of event.data) {
+    if (record.kind === 'forced_close_tier') {
+      console.log(`[ALERT] ${record.tier} — emergency unwind`);
+      await emergencyUnwind(trader);
+    }
+    if (record.kind === 'yellow_card') {
+      console.log('[WARN] T0 — top up');
+      await deposit(watcher, T0_DEPOSIT_USDC);
+    }
   }
 });
 
@@ -119,7 +126,7 @@ async function emergencyUnwind(c: MetaFluxClient) {
 
 ## Pre-deposit math {#pre-deposit-math}
 
-To bring health from H₀ to target H₁:
+To bring your derived ratio from H₀ to target H₁ (H here is the ratio from [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health), not the wire `health` field):
 
 ```
 needed_deposit = (H₁ - H₀) × maint_margin
@@ -134,17 +141,17 @@ Cap your watcher's per-block deposit to avoid spending too much on a transient r
 
 ```mermaid
 sequenceDiagram
-    Note over Watcher: T = 0  health = 1.6 (Safe)
-    Note over Watcher: T = 1s  mark drops 1% — health = 1.4 → sample drop
-    Note over Watcher: T = 2s  mark drops 0.5% — health = 1.3 → 2nd drop
-    Note over Watcher: T = 3s  ... → 3rd
-    Note over Watcher: T = 4s  ... → 4th
-    Note over Watcher: T = 5s  health = 1.0 → 5 samples falling — pre-empt
-    Note over Watcher: T = 5s  compute needed = (1.8 - 1.0) × maint = 0.8 × maint
-    Watcher->>Exchange: T = 5.1s  submit UpdateIsolatedMargin deposit
-    Exchange-->>Watcher: T = 5.2s  202 admitted
-    Note over Exchange: T = 5.3s  commit — health = 1.8 → Safe
-    Exchange-->>Watcher: T = 5.3s  marginEvents push: tier=Safe — reaction loop continues
+    Note over Watcher: ratio = 1.6 (Safe)
+    Note over Watcher: mark drops 1% — ratio = 1.4 → sample drop
+    Note over Watcher: mark drops 0.5% — ratio = 1.3 → 2nd drop
+    Note over Watcher: ... → 3rd
+    Note over Watcher: ... → 4th
+    Note over Watcher: ratio = 1.0 → 5 samples falling — pre-empt
+    Note over Watcher: compute needed = (1.8 - 1.0) × maint = 0.8 × maint
+    Watcher->>Exchange: submit UpdateIsolatedMargin deposit
+    Exchange-->>Watcher: 202 admitted
+    Note over Exchange: commit — ratio = 1.8 → Safe
+    Exchange-->>Watcher: account_state push: tier=Safe — reaction loop continues
 ```
 
 ## Failure modes {#failure-modes}
@@ -163,7 +170,8 @@ sequenceDiagram
 ## See also {#see-also}
 
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — the ladder you're defending against
-- [`userEvents` WS](../api/ws/subscriptions.md#userevents) — margin / tier transitions ride this channel
+- [`notifications` WS](../api/ws/subscriptions.md#notifications) — tier transitions ride this channel
+- [`account_state` WS](../api/ws/subscriptions.md#account_state) — continuous margin values
 - [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin)
 - [Agent wallets](../concepts/agent-wallets.md) — watcher needs its own approved agent
 - [Error handling](./error-handling.md) — for the deposit submission retry logic

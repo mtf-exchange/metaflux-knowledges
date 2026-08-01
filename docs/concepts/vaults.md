@@ -1,144 +1,172 @@
 # Vaults
 
 :::info
-**Live on devnet.** The full vault lifecycle — creation, deposit, withdraw,
-transfer, distribute, modify — is implemented and exercised on devnet.
-End-to-end consensus tests are still being added.
+**Live on devnet.** Vault creation, the leader's own seed transfer, config
+update, follower share redemption, and a third party's own self-service
+deposit are all implemented and exercised on devnet — see
+[Depositing into a vault](#depositing).
 :::
 
 ## TL;DR {#tldr}
 
-Two vault families: the protocol-operated **MFlux Vault** (the insurance/backstop pool), and **user vaults** (community-deployed strategies you can deposit into). Both share the same share-pricing primitive: deposits mint shares at the current `share_price`; withdrawals burn shares at the current `share_price`.
+Two vault kinds share one action set: the protocol-operated **Metaliquidity vault** (the MLP insurance/backstop pool) and **user vaults** (leader-run strategies). Both share the same share-pricing primitive: a deposit mints shares at the current `share_price`; a withdrawal burns shares at the current `share_price`.
 
-## MFlux Vault {#mflux-vault}
+## Metaliquidity vault {#metaliquidity-vault}
 
-The protocol's own pool. It plays three roles:
+A vault created with `kind: "Metaliquidity"` (gated to an MLP-whitelisted leader). It plays three roles:
 
-1. **Backstop counter-party**: when a T3 liquidation hands the position to the protocol, MFlux Vault absorbs the position and any residual loss.
-2. **Market making (planned)**: idle MFlux capital can be deployed into market-making strategies on selected markets.
+1. **Backstop counter-party**: when a T3 liquidation hands the position to the protocol, the Metaliquidity vault absorbs the position and any residual loss. This path is governance-armed, not on by default — check the live [T3 backstop](./tiered-liquidation.md#t3-backstop--netting-at-mark) state before relying on it.
+2. **Market making (planned)**: idle capital can be deployed into market-making strategies on selected markets.
 3. **Insurance**: holds reserves to socialise small losses without firing T4 ADL.
 
-### Depositing into MFlux Vault {#depositing-into-mflux-vault}
+## Depositing into a vault {#depositing}
+
+There are two distinct ways cash moves into a vault, and they are **not**
+interchangeable:
+
+- **[`vault_transfer`](../api/rest/exchange.md#vault_transfer)** — the
+  vault's own **leader** moves cash between their main account and the
+  vault, either direction, via a `deposit: true`/`false` flag. This is
+  **leader-only**: the handler rejects any other sender with `401`.
+- **`vault_distribute`** — a follower depositing USD on their own account
+  and receiving shares at the current NAV. This is **sender-authorized**
+  (the depositing follower signs it; there is no `owner` field) and is live
+  on `/exchange` today.
+
+```json
+{ "type": "vault_distribute", "params": { "vault_id": 4, "pnl": "250" } }
+```
+
+`vault_id` is the numeric id from [`create_vault`](#deploy); `pnl` is the
+deposit amount, whole USD (a verbatim decimal string — the field name is a
+wire-shape holdover, not a PnL figure). The deposit is rejected if the vault
+is paused, if the sender's free collateral is short of `pnl`, or — an
+anti-share-capture guard — if the vault already carries value but has zero
+shares outstanding (a leader must seed shares before any follower can
+deposit).
+
+### Leader seed transfer {#leader-seed-transfer}
 
 ```json
 {
-  "type": "VaultDeposit",
-  "params": {
-    "vault":       "<mflux_vault_addr>",
-    "amount":   "1000000000"
-  }
+  "type": "vault_transfer",
+  "params": { "vault_id": 4, "deposit": true, "amount": "1000" }
 }
 ```
 
-Mints `amount / share_price × 10^8` shares to the depositor at the next block.
+`vault_id` is the numeric id returned by [`create_vault`](#deploy) — not the
+vault's `0x` address. `amount` is whole USD. See [`vault_transfer`](../api/rest/exchange.md#vault_transfer) for the full field table.
 
 ### Withdrawing {#withdrawing}
 
+Redeeming shares (`vault_withdraw`) is open to any address holding shares in
+the vault — this is the follower's own exit path and is fully live:
+
 ```json
 {
-  "type": "VaultWithdraw",
-  "params": {
-    "vault":       "<mflux_vault_addr>",
-    "shares":   "100000000000"
-  }
+  "type": "vault_withdraw",
+  "params": { "vault_id": 4, "shares": "100" }
 }
 ```
 
-Burns `shares` shares; pays out `shares × share_price / 10^8` USDC at the next block.
+Burns `shares` shares at the current `share_price`; pays out the USD
+proceeds at the next block. `shares` is a whole-share decimal, not a raw
+1e8-scaled integer. See [`vault_withdraw`](../api/rest/exchange.md#vault_withdraw) for the full field table.
 
 ### Lock-up {#lock-up}
 
-MFlux Vault has a default lock-up of `24 h` from deposit to first eligible withdrawal. Per-share lock; withdrawals against shares older than 24 h are unrestricted.
+A withdrawal lock applies from deposit to first eligible withdrawal: **4 days**
+for a `User` vault, **7 days** for a `Metaliquidity` vault. `lock_period_secs`
+on [`create_vault`](#deploy) is currently **ignored** — every vault gets its
+kind's protocol-fixed lock regardless of what the request sends; the field is
+kept only for wire-shape stability. Whether a fresh deposit re-locks the
+follower's **whole** balance or only the newly-deposited shares depends on a
+network upgrade gate — check the live behavior rather than assuming per-share
+scoping.
 
 This prevents capital from depositing right before a known T3 event and withdrawing immediately after the loss is socialised (the "free-rider" problem).
 
-### Performance & fees {#performance--fees}
+### Fees {#fees}
 
-MFlux Vault charges:
-- **Management fee**: 0 bps (no manager — protocol-operated).
-- **Performance fee**: 0 bps.
-- **Withdrawal fee**: 0 bps.
-
-Returns net of T3 backstop losses + T1/T2 maker profits. Historical share-price chart is in the live `vault_state` query (see [`/info`](../api/rest/info.md#vault_state)).
+A vault charges one configurable fee: **management fee**, in basis points,
+capped at 2000 (20%), set via [`vault_modify`](#config)'s
+`new_management_fee_bps`. There is no separate performance fee or withdrawal
+fee action — the `performance_fee_bps` key the [`vault_state`](#querying)
+read exposes is the **same** management-fee number under a legacy key name
+(a wire-shape quirk, not two independent fees).
 
 ## User vaults {#user-vaults}
 
-Anyone can deploy a vault that pools USDC and runs strategies under a designated manager's signing authority.
+Any account can create a vault that pools USDC and runs strategies under its own (the **leader's**) signing authority.
 
 ### Lifecycle {#lifecycle}
 
 ```mermaid
 sequenceDiagram
-    participant deployer
+    participant leader
     participant chain
-    deployer->>chain: VaultDeploy { name, strategy_desc, performance_fee_bps, management_fee_bps, lock_period_ms, manager: 0x<mgr_addr> }
-    Note over chain: spawn vault_addr<br/>share_price = 1e8 (1 USDC = 1 share)
-    deployer->>chain: users deposit — VaultDeposit { vault_addr, amount }
-    deployer->>chain: manager trades (signs as vault_addr) — Order { ... } / Cancel / etc.
+    leader->>chain: create_vault { name, kind: "User" }
+    Note over chain: spawn vault_id + vault_address<br/>share_price = 1 USD/share (empty vault)
+    leader->>chain: seed the vault — vault_transfer { vault_id, deposit: true, amount }
+    leader->>chain: leader trades (signs as vault_address) — submit_order { ... } / cancel_order / etc.
     Note over chain: vault P&L updates share_price
-    deployer->>chain: users withdraw — VaultWithdraw { vault, shares }
+    leader->>chain: leader withdraws — vault_transfer { vault_id, deposit: false, amount }
+    Note over chain: a follower who already holds shares (however they were credited) redeems — vault_withdraw { vault_id, shares }
 ```
 
-The vault address is a first-class account in the state machine — it has its own positions, balance, and orders. The manager signs trades **on behalf of the vault** (the vault address is the `sender`, the manager's key signs; admission goes through the same agent-approval mechanism as regular agent wallets).
+The vault address is a first-class account in the state machine — it has its own positions, balance, and orders. The leader signs trades **as the vault** (the vault address is the `sender` the fill settles against; the leader's own key produces the signature).
 
 ### Deploy {#deploy}
 
 ```json
 {
-  "type": "VaultDeploy",
+  "type": "create_vault",
   "params": {
-    "name":                 "Yield Arb Strategy",
-    "description":          "Funding-rate arbitrage",
-    "manager":              "0x<mgr>",
-    "performance_fee_bps":  1500,
-    "management_fee_bps":   100,
-    "lock_period_ms":       86400000,
-    "high_water_mark":      true
+    "name":             "Yield Arb Strategy",
+    "lock_period_secs": 345600,
+    "parent":           null,
+    "kind":             "User"
   }
 }
 ```
 
 | Field | Range | Notes |
 |-------|-------|-------|
-| `performance_fee_bps` | `[0, 3000]` | Fee on positive returns above prior high-water mark |
-| `management_fee_bps` | `[0, 500]` annualised | Charged regardless of returns |
-| `lock_period_ms` | `[0, 30 days]` | Per-deposit lock |
-| `high_water_mark` | bool | If true, performance fee only on new highs |
+| `name` | string | Display name |
+| `lock_period_secs` | uint64 | **Ignored.** Kept for wire-shape stability; the actual lock is the kind's protocol-fixed value (see [Lock-up](#lock-up)) |
+| `parent` | must be `null` | User vaults have no parent |
+| `kind` | `"User"` (default) / `"Metaliquidity"` | `Metaliquidity` requires the leader to be MLP-whitelisted |
+
+Response carries the assigned `vault_id` and derived `vault_address`. See [`create_vault`](../api/rest/exchange.md#create_vault) for the full request/response shape.
 
 ### Pricing {#pricing}
 
 ```
-share_price(t) = vault_account_value(t) / total_shares(t) × 10^8
+share_price = NAV(vault) / total_shares
 ```
 
-`vault_account_value` includes unrealised PnL on open positions.
+`NAV` includes unrealised PnL on open positions. Pricing updates every commit — a deposit or withdrawal executes at the **post-commit** share price, not the price at request time.
 
-Pricing updates every commit. Deposits mint at the **post-commit** share price (you don't get the prior block's price); withdrawals burn at the post-commit share price.
+### Config update {#config}
 
-### Fees mechanic {#fees-mechanic}
-
-Performance fee accrues on the manager-designated address at each share-price tick above the prior high-water mark:
-
-```
-on every commit:
-    if share_price > high_water_mark:
-        gain     = (share_price - high_water_mark) * shares_outstanding
-        perf_fee = gain * performance_fee_bps / 1e4
-        accrue perf_fee to manager (paid as vault → manager USDC)
-        high_water_mark = share_price
-```
-
-Management fee is paid per-block linearly:
-
-```
-mgmt_per_block = management_fee_bps / 1e4 / (blocks_per_year)
+```json
+{
+  "type": "vault_modify",
+  "params": {
+    "vault_id":                4,
+    "new_name":                "v2",
+    "new_lock_period_secs":    null,
+    "new_management_fee_bps":  100,
+    "new_paused":              false
+  }
+}
 ```
 
-Both fees come out of vault NAV before share-price calculation — share price already reflects fee paid.
+Leader-only. `new_lock_period_secs` is **always rejected** if it is non-null and differs from the vault's current lock (anti-rug: a leader cannot shorten the lock after the fact). See [`vault_modify`](../api/rest/exchange.md#vault_modify) for the full field table.
 
 ### Risk {#risk}
 
-User vaults can lose money. If a vault's NAV ≥ liabilities + 1 base unit, withdrawals are honored at the prevailing share price. Below that, the vault is **paused** and withdrawals queue until NAV recovers (potentially by manager unwinding losing positions).
+A vault can lose money like any account. If NAV falls to or below its liabilities, withdrawals against it reflect that loss at the prevailing share price — there is no separate insolvency backstop for a `User` vault.
 
 A vault that goes T3 (its own liquidation tier) follows the [tiered liquidation](./tiered-liquidation.md) ladder. T4 ADL on a vault claws back from depositors via share-price markdown.
 
@@ -157,58 +185,60 @@ curl -X POST https://api.devnet.mtf.exchange/info \
   "data": {
     "vault":              "0x<addr>",
     "name":               "Yield Arb Strategy",
-    "manager":            "0x<mgr>",
-    "tvl":             "10000000000",
-    "share_price":     "11500000",
+    "tvl":                "10000000000",
+    "share_price":        "11500000",
     "depositor_count":    142,
-    "high_water_mark": "11500000",
-    "performance_fee_bps":1500,
-    "management_fee_bps": 100,
-    "lock_period_ms":     86400000,
-    "your_shares":     "5000000000",
-    "your_position_value": "575000",
-    "your_withdrawable_at_ts": 1735690000000
+    "high_water_mark":    "11500000",
+    "performance_fee_bps":100,
+    "lock_period_ms":     345600000,
+    "strategy":           "User"
   }
 }
 ```
 
+`performance_fee_bps` here is the vault's `new_management_fee_bps` (see
+[Fees](#fees)); `strategy` is the vault's `kind` (`"User"` or
+`"Metaliquidity"`). See [`vault_state`](../api/rest/info.md#vault_state) for
+the full field table. This read carries no `manager` field and no
+per-caller `your_*` fields — query [`user_vault_equities`](../api/rest/info.md#user_vault_equities) for one account's own share holding.
+
 ## Insurance pool {#insurance-pool}
 
-A subset of MFlux Vault is the **insurance pool** — a designated reserve that draws down during T3 backstop events. See [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark).
-
-When the insurance pool runs low, MFlux Vault auto-replenishes it from the broader pool (governance-set ratio, default 10% of MFlux NAV reserved as insurance).
+A subset of the Metaliquidity vault is the **insurance pool** — a designated reserve that draws down during T3 backstop events. See [tiered liquidation: T3 backstop](./tiered-liquidation.md#t3-backstop--netting-at-mark) for the armed/inert state before relying on this path.
 
 ## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
 
-- **Manager rotation.** A vault's manager can be replaced by the deployer (or by a multi-sig if the vault was deployed as a multi-sig deploy). The new manager inherits all signing authority.
-- **Manager goes silent.** Existing positions sit; no auto-trade. Depositors can still withdraw against share price (which reflects MTM of those positions). If positions get liquidated due to mark moves, that hits NAV.
-- **Deposit during liquidation.** A vault in T0/T1 still accepts deposits (good — new capital may rescue), unless `accept_deposits` is set to `false` by the manager.
-- **Lock-up math.** A 24 h lock is per-deposit. Two deposits 6 h apart unlock at different times; track per-deposit if you're managing inflows.
-- **High-water mark and withdrawals.** Withdrawing some shares doesn't reset the HWM; the manager still earns performance fee on the next gain above HWM, on the **remaining** shares.
+- **Leader rotation.** There is no live action that reassigns a vault's `leader` — the leader address is fixed at [`create_vault`](#deploy).
+- **Leader goes silent.** Existing positions sit; no auto-trade. Depositors can still withdraw against share price (which reflects MTM of those positions). If positions get liquidated due to mark moves, that hits NAV.
+- **Paused vault.** A leader can set `new_paused: true` via [`vault_modify`](#config); check the live `vault_state` / `web_data` read for the current paused flag before assuming withdrawals are open.
+- **Lock-up math.** The lock is the vault kind's fixed duration from [Lock-up](#lock-up), not a caller-chosen value.
 
 </details>
 
-## Sequence — deposit, manager trades, withdraw {#sequence--deposit-manager-trades-withdraw}
+## Sequence — leader seeds, trades, withdraws {#sequence--leader-seeds-trades-withdraws}
 
 ```mermaid
 sequenceDiagram
+    participant leader
     participant vault
-    Note over vault: T=0 user A deposits 1000 USDC<br/>vault NAV: 0 + 1000 = 1000<br/>shares_outstanding: 0 + 1000 = 1000 (1e8 share-price)
-    Note over vault: T+1 user B deposits 1000 USDC<br/>vault NAV: 1000 + 1000 = 2000<br/>shares_outstanding: 1000 + 1000 = 2000
-    Note over vault: T+2 manager opens a 2 BTC long at mark 100<br/>vault NAV: 2000 (unrealised 0)
-    Note over vault: T+3 mark rises to 110<br/>unrealised PnL on long: +20<br/>vault NAV: 2020 — share_price: 1.01
-    Note over vault: T+4 perf fee triggers on the +0.01 share-price gain<br/>fee = 0.01 × 2000 × 0.15 = 3<br/>NAV after fee: 2017<br/>share_price after: 1.0085
-    Note over vault: T+5 user A withdraws all (1000 shares)<br/>payout: 1000 * 1.0085 = 1008.5 USDC<br/>NAV: 2017 - 1008.5 = 1008.5<br/>shares_outstanding: 1000<br/>share_price: still 1.0085
+    leader->>vault: vault_transfer { deposit: true, amount: 1000 }
+    Note over vault: NAV: 0 + 1000 = 1000<br/>shares_outstanding: 1000 (1 USD/share)
+    leader->>vault: leader opens a 2 BTC long at mark 100 (signs as vault_address)
+    Note over vault: NAV: 1000 (unrealised 0)
+    Note over vault: mark rises to 110<br/>unrealised PnL: +20<br/>NAV: 1020 — share_price: 1.02
+    leader->>vault: vault_transfer { deposit: false, amount: 500 }
+    Note over vault: NAV: 1020 - 500 = 520<br/>shares_outstanding unchanged (a leader withdraw is a cash move, not a share burn)
 ```
 
 ## See also {#see-also}
 
 - [Tiered liquidation](./tiered-liquidation.md) — T3 backstop, insurance pool
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`userEvents` WS](../api/ws/subscriptions.md#userevents) — vault deposit / withdraw / fee events ride this channel
+- [`POST /info user_vault_equities`](../api/rest/info.md#user_vault_equities) — one account's own share holding
+- [`ledger_updates` WS](../api/ws/subscriptions.md#ledger_updates) — a leader's `vault_transfer` rides this channel (`kind: vault_transfer`); there is no live event today for `vault_distribute`, `vault_withdraw`, or fee accrual — poll [`vault_state`](../api/rest/info.md#vault_state) for share-price and NAV changes
 - [Staking](./staking.md) — separate from vaults
 
 ## FAQ {#faq}
@@ -216,16 +246,19 @@ sequenceDiagram
 <details>
 <summary>Show FAQ</summary>
 
-**Q: Are MFlux Vault deposits insured?**
+**Q: Are Metaliquidity vault deposits insured?**
 A: No. They earn from T1/T2 backstop activity and absorb T3 losses. Net returns are positive in normal conditions, can be negative during severe stress.
 
 **Q: Can a vault hold non-USDC assets?**
-A: V1 user vaults are USDC-denominated only. Spot-asset vaults are V2.
+A: V1 vaults are USDC-denominated only.
 
 **Q: Are vault shares transferable?**
-A: No — V1 shares are non-transferable. A depositor must withdraw and the receiver must deposit. V2 may add transferable share tokens.
+A: No — shares are non-transferable. A holder must withdraw; there is no share-transfer action.
 
-**Q: Can the manager withdraw vault capital to their own address?**
-A: No. The manager has only **trading** authority, not withdrawal authority. Withdrawal to non-depositors requires explicit vault-level governance (not in V1).
+**Q: Can a follower self-service deposit into a vault today?**
+A: Yes, via `vault_distribute` — see [Depositing into a vault](#depositing). The leader moves cash in separately via `vault_transfer`.
+
+**Q: Can the leader withdraw vault capital to their own address?**
+A: Yes, via `vault_transfer { deposit: false }` — this is the leader's own seed/unseed lane, not a follower path.
 
 </details>

@@ -110,16 +110,24 @@ Query by cloid:
 
 ```bash
 curl -X POST $BASE/info \
-  -d '{"type":"openOrders","user":"0x..."}' | jq '.[] | select(.cloid == "0x<cloid>")'
+  -d '{"type":"open_orders","address":"0x..."}' | jq '.[] | select(.cloid == "0x<cloid>")'
 ```
 
 If present → admitted; treat as success.
-If absent → check `userFills` for a fill against that cloid.
+If absent → check `user_fills` for a fill against that cloid.
 If still absent → admission failed (or was evicted from mempool). Submit again with the same cloid.
 
 ### For transfers / withdrawals {#for-transfers--withdrawals}
 
-Query the account's `userFills` (which includes funding + transfers) or `block_info` around the time of the drop. Match by the `action_hash` you computed locally — every action has a deterministic hash, bound to the account and the nonce, regardless of admission outcome.
+There is no per-action commit lookup for non-order actions. Reconcile from
+the resulting state instead: check the
+[`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) on-subscribe
+snapshot (the most recent 100 records for the account) for a matching
+record, or diff [`account_state`](../api/ws/subscriptions.md#account_state) (perp) / poll [`spot_clearinghouse_state`](../api/rest/info/spot.md#spot_clearinghouse_state) (plain spot balances — there is no live WS channel for these) across the drop.
+`action_hash` is deterministic and computable locally, but it is **not**
+echoed on any WS event or `/info` read today — it is only useful as the
+correlation key in the synchronous `/exchange` response you already have, not
+for a post-hoc lookup.
 
 ```typescript
 // action_hash = keccak256(action_json ‖ owner(20) ‖ nonce(8, big-endian))
@@ -127,7 +135,8 @@ Query the account's `userFills` (which includes funding + transfers) or `block_i
 // exact string — re-serializing reorders keys and changes the hash.
 // `owner` is the resolved account, not the signing agent.
 const actionHash = keccak256(concat(utf8(actionJson), ownerAddr, nonceBE8(nonce)));
-// search for events with this action_hash in WS history or info queries
+// Useful to log alongside the synchronous admission response for your own
+// audit trail — not for matching against a later WS event or info query.
 ```
 
 If you can't determine outcome:
@@ -193,6 +202,6 @@ A: Use the same `cloid` (for orders) and a fresh `nonce`. The server enforces de
 A: No. Cloids are globally unique per account, forever. Use a fresh one for every order.
 
 **Q: Does the WS feed give me commit-time confirmation I can use for reconcile?**
-A: Yes. Subscribe to `userEvents` and match on `action_hash` or `cloid`. The WS feed is the recommended way to confirm commit state during retry.
+A: Yes, for orders. Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates) or [`fills`](../api/ws/subscriptions.md#fills) and match on `cloid` — neither channel carries `action_hash`. The WS feed is the recommended way to confirm commit state during retry.
 
 </details>

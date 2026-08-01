@@ -67,8 +67,8 @@ The `account_id` echo field is gone from these responses.
 |---------|-------------|-------------|
 | `candle` | `400 unknown info type: candle` | [`candle_snapshot`](./rest/info/perpetuals.md#candle_snapshot) |
 | `margin_table` | `400 unknown info type: margin_table` | `margin_tiers` inline on [`market_info`](./rest/info/perpetuals.md#market_info) / [`markets`](./rest/info/perpetuals.md#markets) |
-| `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](./rest/info.md#account_state) + [`spot_clearinghouse_state`](./rest/info/spot.md#spot_clearinghouse_state) + [`frontend_open_orders`](./rest/info.md#frontend_open_orders) + [`user_vault_equities`](./rest/info.md#user_vault_equities) + [`exchange_status`](./rest/info.md#exchange_status) |
-| `web_data2` (WS channel) | `unknown channel: web_data2` | `account_state` + `spot_state` WS channels |
+| `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](./rest/info.md#account_state) + [`spot_clearinghouse_state`](./rest/info/spot.md#spot_clearinghouse_state) + [`open_orders`](./rest/info.md#open_orders) + [`user_vault_equities`](./rest/info.md#user_vault_equities) + [`exchange_status`](./rest/info.md#exchange_status) |
+| `web_data2` (WS channel) | `unknown channel: web_data2` | `account_state` WS channel + poll `spot_clearinghouse_state` (no live WS push for plain spot balances) |
 
 ## 4. `margin_tiers` — inline notional-banded ladder {#4-margin_tiers--inline-notional-banded-ladder}
 
@@ -129,7 +129,7 @@ Each `perp[]` element carries a market's **dynamic** fields only — the same dy
   header.
 - **`order_updates`**: on a `filled` record, the `order.sz` is the **FILLED** size
   and `order.orig_sz` the **original** order size.
-- **Active channels**: `account_state`, `spot_state`, `order_updates`, `fills`,
+- **Active channels**: `account_state`, `spot_margin_state`, `order_updates`, `fills`,
   `user_events`, `user_fundings`, `ledger_updates`, `l2_book`, `bbo`, `trades`,
   `candles`, `all_mids`, `active_asset_ctx`, `active_asset_data`,
   `explorer_block`, `explorer_txs`.

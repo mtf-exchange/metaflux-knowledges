@@ -45,7 +45,7 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Max order value** | OI-cap-derived size ceiling + margin gate (no fixed per-order $ cap) | [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) |
 | **Open-interest cap** | per-market OI ceiling + per-second OI velocity limit | [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap) |
 | **Margin modes** | Cross / Isolated / Strict-Iso (Strict-Iso also imposable at **market** level) | `strict_isolated` |
-| **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info.md#account_state) `pm_enabled` |
+| **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info.md#account_state) `abstraction` |
 | **FBA eligible** | whether [frequent batch auction](../concepts/fba.md) is enabled | `fba_enabled` |
 
 ## Reading a spec from the API {#reading-a-spec-from-the-api}
@@ -270,7 +270,7 @@ choosing Strict-Iso on their own position.
 
 ## Portfolio margin {#portfolio-margin}
 
-Opt-in cross-asset margin (`account_state` `pm_enabled`) that replaces the classical
+Opt-in cross-asset margin (`account_state` `abstraction == "portfolio"`) that replaces the classical
 per-asset maintenance sum with a single risk number from a **SPAN-style scenario
 grid** (full mechanics: [portfolio margin](../concepts/portfolio-margin.md)):
 

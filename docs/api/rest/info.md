@@ -100,7 +100,8 @@ Per-account snapshot.
 | `address` | hex address | yes |
 
 An **unknown address** (never seen on-chain) returns **200** with a fully zeroed
-record (`account_value:"0"`, empty `positions` / `balances.spot`), NOT a `404`.
+record (`account_value:"0"`, empty `clearinghouse_state` / `balances`), NOT a
+`404`.
 
 Response (a faucet-funded account, no positions):
 
@@ -111,37 +112,50 @@ Response (a faucet-funded account, no positions):
     "address":         "0x00000000000000000000000000000000000ca11e",
     "account_value":   "3000",
     "free_collateral": "3000",
-    "maint_margin":    "0",
     "init_margin":     "0",
     "health":          "3000",
     "tier":            "Safe",
-    "mode":            "Cross",
-    "pm_enabled":      false,
-    "positions": [],
-    "balances": {
-      "usdc": "3000",
-      "spot": { "MTF": { "total": "10", "hold": "0" } }
-    },
+    "abstraction":     "unified",
+    "clearinghouse_state": { "": { "positions": [] } },
+    "balances": [
+      { "asset": 100, "name": "USDC", "total": "3000", "hold": "0" }
+    ],
+    "pm_maint_margin":          "0",
+    "pm_net_value":             "0",
+    "pm_concentration_penalty": "0",
+    "position_mode":            "one_way",
     "height": 562,
     "time":   1700000000555
   }
 }
 ```
 
-Each `balances.spot` token is a `{total, hold}` object (HL parity): `hold` is
+`account_state` carries **no account-level `maint_margin`** — that scalar
+lives on the lighter [`margin_summary`](#margin_summary) read only, so a
+liquidation-health poll does not have to pull the full position/balance walk.
+`abstraction` is `"unified"` (default cross-collateral account) or
+`"portfolio"` (portfolio-margin enrolled) — derive PM enrollment as
+`abstraction == "portfolio"`. `pm_maint_margin` / `pm_net_value` /
+`pm_concentration_penalty` are always present (whole-USDC strings, `"0"` when
+not PM-enrolled) — see [portfolio margin](../../concepts/portfolio-margin.md).
+`position_mode` is `"one_way"` or `"hedge"` — see [hedge mode](../../concepts/hedge-mode.md).
+
+Each `balances[*]` row is `{asset, name, total, hold}` (HL parity): `hold` is
 the amount locked behind a resting spot order (escrow), `total` is the full
-balance; the spendable amount is `total − hold`. A token that is entirely held
-still appears. For a
-**light** read of just the margin scalars (no `positions` walk, no balance
+balance; the spendable amount is `total − hold`. Row 0 is always USDC (asset
+id `100`); a token that is entirely held still appears. For a
+**light** read of just the margin scalars (no position walk, no balance
 scan — the right call for a liquidation-health poll), use
 [`margin_summary`](#margin_summary).
 
-A positioned account adds entries under `positions`:
+A positioned account adds entries under `clearinghouse_state["<dex>"].positions`
+— the empty-string key `""` is the core dex; a MIP-3 deployer dex keys by the
+deployer's lowercase `0x` address:
 
 ```json
 {
-  "asset":             0,
-  "size":              "100000000",
+  "coin":              "BTC",
+  "size":              "1.00000",
   "entry":             "67000.00",
   "upnl":              "5.00",
   "isolated":          false,
@@ -150,6 +164,7 @@ A positioned account adds entries under `positions`:
   "roe":               "0.0075",
   "funding":           "-0.12",
   "margin":            "201.00",
+  "maint_margin":      "670.00",
   "notional":          "6705.00"
 }
 ```
@@ -158,26 +173,32 @@ A positioned account adds entries under `positions`:
 |-------|------|-------------|
 | `account_value` | Decimal string | Equity incl. settled PnL, **whole-USDC plane** (`"3000"` = 3000 USDC, NOT base units) |
 | `free_collateral` | Decimal string | Equity minus initial margin held by open positions |
-| `maint_margin` | Decimal string | Σ per-asset margin used (maintenance) |
 | `init_margin` | Decimal string | Held initial-margin requirement |
-| `health` | Decimal string | `account_value − maint_margin` (signed; can be negative) |
+| `health` | Decimal string | `account_value − maint_margin` (signed dollar figure; can be negative) — **not a ratio** |
 | `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / maint_margin`; `"Safe"` when no maint margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
-| `mode` | enum | `"Cross"`, `"Isolated"`, `"StrictIso"` (derived from the account's open positions) |
-| `pm_enabled` | bool | Portfolio margin opt-in state |
-| `positions[*].asset` | uint32 | Asset id |
-| `positions[*].size` | i128 string | Signed position size in **raw lots** — `size / 10^sz_decimals` = whole units (`sz_decimals` is the market's size precision, e.g. 5 for BTC). This is the SIZE plane, orthogonal to the 1e8 price plane. |
-| `positions[*].entry` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
-| `positions[*].upnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
-| `positions[*].isolated` | bool | `true` unless the position is cross-margined |
-| `positions[*].lev` | uint8 | Position max leverage |
-| `positions[*].liq` | Decimal string | Price (whole-USDC) at which this position alone would bring the account to maintenance — single-position cross approximation; `"0"` when size / leverage is zero (no finite liq price) |
-| `positions[*].roe` | Decimal string | `upnl / initial_margin` as a decimal fraction (`initial_margin = \|entry_notional\| / leverage`); `"0"` at zero leverage / notional |
-| `positions[*].funding` | Decimal string | Accrued-but-unsettled funding for the leg, **whole-USDC** (signed); `real_size × (cumulative_funding − funding_entry)` — the same form the funding settlement pays |
-| `positions[*].margin` | Decimal string | Maintenance margin the leg contributes, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
-| `positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
-| `positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
-| `balances.usdc` | Decimal string | **Mirrors `account_value`** (the cross USDC collateral), NOT a separate spot USDC balance |
-| `balances.spot` | object | Non-USDC spot token balances, keyed by **token name** (e.g. `"MTF"`); each value is a `{total, hold}` object (`hold` = escrow locked behind resting spot orders; spendable = `total − hold`); empty if none |
+| `abstraction` | enum | `"unified"` or `"portfolio"` (PM-enrolled) |
+| `clearinghouse_state` | object | Keyed by dex (`""` = core dex, else a MIP-3 deployer's `0x` address); each value is `{positions: [...]}` |
+| `clearinghouse_state["<dex>"].positions[*].coin` | string | Market symbol (e.g. `"BTC"`), not a numeric id |
+| `clearinghouse_state["<dex>"].positions[*].size` | Decimal string | Signed **real** size (`raw lots / 10^sz_decimals`); negative = short |
+| `clearinghouse_state["<dex>"].positions[*].entry` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
+| `clearinghouse_state["<dex>"].positions[*].upnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
+| `clearinghouse_state["<dex>"].positions[*].isolated` | bool | `true` unless the position is cross-margined |
+| `clearinghouse_state["<dex>"].positions[*].lev` | uint8 | Position's chosen leverage |
+| `clearinghouse_state["<dex>"].positions[*].liq` | Decimal string | Price (whole-USDC) at which this position alone would bring the account to maintenance — single-position cross approximation; `"0"` when size / leverage is zero (no finite liq price) |
+| `clearinghouse_state["<dex>"].positions[*].roe` | Decimal string | `upnl / initial_margin` as a decimal fraction; `"0"` at zero leverage / notional |
+| `clearinghouse_state["<dex>"].positions[*].funding` | Decimal string | Accrued-but-unsettled funding for the leg, **whole-USDC** (signed) |
+| `clearinghouse_state["<dex>"].positions[*].margin` | Decimal string | This leg's INITIAL margin, **whole-USDC** |
+| `clearinghouse_state["<dex>"].positions[*].maint_margin` | Decimal string | This leg's maintenance-margin contribution, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
+| `clearinghouse_state["<dex>"].positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
+| `clearinghouse_state["<dex>"].positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
+| `balances[*].asset` | uint32 | Asset id (`100` for USDC) |
+| `balances[*].name` | string | Token symbol (`"USDC"` for row 0) |
+| `balances[*].total` | Decimal string | Full balance (spendable + held) |
+| `balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow) |
+| `pm_maint_margin` | Decimal string | PM engine's maintenance requirement, whole-USDC; `"0"` when not PM-enrolled |
+| `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled |
+| `pm_concentration_penalty` | Decimal string | PM single-asset concentration penalty, whole-USDC; `"0"` when not PM-enrolled |
+| `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) |
 | `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
 | `time` | uint64 | Consensus block time in **milliseconds**. A **bare integer**. Advances on every commit, from the same consensus clock as `height` |
 
@@ -192,20 +213,20 @@ values, so a client can cross-check or de-duplicate REST and WS against it.
 
 ### Lightweight margin-only account summary {#margin_summary}
 
-The **margin scalars only** — `account_state` minus the `positions[]` walk and
-the spot-balance scan. The right call for a frequent liquidation-health poll (a
-risk-watcher bot, an automated margin top-up) where the position/balance detail
-is not needed. Required: `address` (0x hex).
+The **margin scalars only** — `account_state` minus the `clearinghouse_state`
+walk and the balance scan. The right call for a frequent liquidation-health
+poll (a risk-watcher bot, an automated margin top-up) where the
+position/balance detail is not needed. Required: `address` (0x hex).
 
 ```json
 { "type": "margin_summary", "address": "0x<addr>" }
 ```
 
 Response (`data`): `address`, `account_value`, `free_collateral`,
-`maint_margin`, `init_margin`, `health`, `tier`, `mode`, `pm_enabled` —
-identical field semantics to the same-named fields on
-[`account_state`](#account_state) (computed by the shared helper, so the two
-never disagree).
+`maint_margin`, `init_margin`, `health`, `tier`, `abstraction` — identical
+field semantics to the same-named fields on [`account_state`](#account_state)
+(computed by the shared helper, so the two never disagree). `maint_margin`
+lives **only** here — `account_state` drops it.
 
 ### Per-vault TVL, share price, and strategy {#vault_state}
 
@@ -229,10 +250,13 @@ Response:
     "high_water_mark": "10500000",
     "performance_fee_bps":1000,
     "lock_period_ms":     86400000,
-    "strategy":           "MarketNeutral"
+    "strategy":           "User"
   }
 }
 ```
+
+`strategy` is the vault's `kind` — `"User"` or `"Metaliquidity"` — not a
+free-text strategy label.
 
 ### Per-account staking and delegation state {#staking_state}
 
@@ -1375,7 +1399,7 @@ all history.
 ## Advanced query types (RFQ / FBA / portfolio margin) {#advanced-query-types-rfq--fba--portfolio-margin}
 
 These read the live state behind the RFQ, FBA, and portfolio-margin engines — they complement
-the `market_info.fba_enabled` / `account_state.pm_enabled` flags with the engine
+the `market_info.fba_enabled` flag / `account_state.abstraction` with the engine
 state itself. Same `{type, data}` envelope and MTF-native conventions. **Price
 plane:** RFQ + FBA prices / sizes are raw **1e8 fixed-point** integer strings
 (the book / order **submission** plane — the same 1e8 plane `/exchange` orders
@@ -1399,22 +1423,22 @@ Response:
     "rfqs": [
       {
         "rfq_id":              1,
-        "market_id":           7,
-        "side":                "bid",
-        "size":                "1000",
+        "coin":                "SOL",
+        "side":                "B",
+        "sz":                  "1000",
         "requester":           "0x<addr>",
         "requester_stp_group": 42,
-        "expiry_ms":           5000,
-        "limit_px":            "105",
-        "created_at_ms":       10,
+        "expiry":              5000,
+        "limit_px":            "0.00000105",
+        "created_at":          10,
         "quotes": [
           {
             "maker":           "0x<addr>",
             "maker_stp_group": null,
-            "price":           "104",
+            "price":           "0.00000104",
             "max_size":        "800",
-            "valid_until_ms":  4000,
-            "submitted_at_ms": 20
+            "valid_until":     4000,
+            "submitted_at":    20
           }
         ]
       }
@@ -1423,25 +1447,25 @@ Response:
 }
 ```
 
-`rfqs` iterates deterministically by `rfq_id`. An empty engine returns `"rfqs": []`.
+`rfqs` iterates deterministically by `rfq_id`. An empty engine returns `"rfqs": []`. This is a **read**, not the write side: unlike [`rfq_request`](./exchange.md#rfq_request)'s raw `u64` fields, every price/size here is a **human decimal string**, tick/lot-normalized the same way [`market_info`](./info/perpetuals.md#market_info) renders them — do not treat this as the 1e8 plane.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `rfqs[*].rfq_id` | uint64 | RFQ request id |
-| `rfqs[*].market_id` | uint32 | Asset / market id the RFQ is for |
-| `rfqs[*].side` | `"bid"` / `"ask"` | Side the requester wants to take |
-| `rfqs[*].size` | u128 string | Requested size, 1e8 fixed-point |
+| `rfqs[*].coin` | string | Market symbol the RFQ is for (join key, like `trades`/`fills`) |
+| `rfqs[*].side` | `"B"` / `"A"` | Side the requester wants to take — `B` = bid, `A` = ask (same convention as [`open_orders`](#open_orders), not the write-side `"Bid"`/`"Ask"`) |
+| `rfqs[*].sz` | decimal string | Requested size, whole units |
 | `rfqs[*].requester` | hex address | Requesting account |
 | `rfqs[*].requester_stp_group` | uint \| null | Requester self-trade-prevention group; `null` when unset |
-| `rfqs[*].expiry_ms` | uint64 | RFQ expiry timestamp (consensus ms) |
-| `rfqs[*].limit_px` | i128 string \| null | Requester limit price, 1e8 fixed-point; `null` when unset |
-| `rfqs[*].created_at_ms` | uint64 | Creation timestamp (consensus ms) |
+| `rfqs[*].expiry` | uint64 | RFQ expiry timestamp (consensus ms) |
+| `rfqs[*].limit_px` | decimal string \| null | Requester limit price, whole units, tick-rounded; `null` when unset |
+| `rfqs[*].created_at` | uint64 | Creation timestamp (consensus ms) |
 | `rfqs[*].quotes[*].maker` | hex address | Quoting maker |
 | `rfqs[*].quotes[*].maker_stp_group` | uint \| null | Maker STP group; `null` when unset |
-| `rfqs[*].quotes[*].price` | i128 string | Quote price, 1e8 fixed-point |
-| `rfqs[*].quotes[*].max_size` | u128 string | Max size the maker will fill, 1e8 fixed-point |
-| `rfqs[*].quotes[*].valid_until_ms` | uint64 | Quote validity deadline (consensus ms) |
-| `rfqs[*].quotes[*].submitted_at_ms` | uint64 | Quote submission timestamp (consensus ms) |
+| `rfqs[*].quotes[*].price` | decimal string | Quote price, whole units, tick-rounded |
+| `rfqs[*].quotes[*].max_size` | decimal string | Max size the maker will fill, whole units |
+| `rfqs[*].quotes[*].valid_until` | uint64 | Quote validity deadline (consensus ms) |
+| `rfqs[*].quotes[*].submitted_at` | uint64 | Quote submission timestamp (consensus ms) |
 
 ### RFQs an account requested or quoted {#rfq_user}
 
@@ -1643,45 +1667,12 @@ Response:
 
 State source: `spot_disabled`, `post_only_until_*`, `scheduled_freeze_height`, `mip3_market_specs` / `mip3_spot_pair_specs`.
 
-### Open orders with TIF and trigger detail {#frontend_open_orders}
-
-Like `open_orders`, plus each order's `tif` / `cloid` / `trigger` detail. Required: `address` (0x hex).
-
-```json
-{ "type": "frontend_open_orders", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{
-  "type": "frontend_open_orders",
-  "data": {
-    "address": "0x<addr>",
-    "orders": [
-      {
-        "oid": 7, "market_id": 0, "side": "bid", "px": "50000", "size": "20000",
-        "tif": "gtc", "cloid": "0x000…cafe",
-        "trigger": { "trigger_px": "49000", "trigger_above": false, "is_market": false, "limit_px": "48000" },
-        "inserted_at_ms": 1700000000000
-      }
-    ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `orders[*].oid` | uint64 | On-chain order id |
-| `orders[*].market_id` | uint32 | Asset id |
-| `orders[*].side` | `"bid" \| "ask"` | Order side |
-| `orders[*].px` / `size` | decimal string | Resting price / remaining size |
-| `orders[*].tif` | `"alo" \| "ioc" \| "gtc"` | Time-in-force |
-| `orders[*].cloid` | hex string \| null | Client order id, `null` if none |
-| `orders[*].trigger` | object \| null | `{trigger_px, trigger_above, is_market, limit_px}` if a trigger is registered for the oid, else `null`. `is_market` (bool) discriminates a market trigger from a limit trigger; `limit_px` is the limit trigger's resting price (fixed-point decimal string), `null` for a market trigger |
-| `orders[*].inserted_at_ms` | uint64 | Insertion timestamp (consensus ms) |
-
-State source: per-book resting orders + `Exchange.trigger_registry`.
+:::warning
+**`frontend_open_orders` has been REMOVED** (folded into `open_orders`, wire-v2
+phase 2). A request now returns `400 {"error":"unknown info type:
+frontend_open_orders"}`. The TIF / `cloid` / `trigger` detail it used to carry
+is on every [`open_orders`](#open_orders) row already — see that entry.
+:::
 
 ### Active TWAP parents for an account {#user_twaps}
 
@@ -2121,8 +2112,8 @@ data with stable, independently-versioned shapes:
 | Old `web_data2` section | Use instead |
 |-------------------------|-------------|
 | `clearinghouse` (margin + positions) | [`account_state`](#account_state) (REST) / `account_state` WS channel |
-| `spot_balances` | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (REST) / `spot_state` WS channel |
-| `open_orders` | [`frontend_open_orders`](#frontend_open_orders) |
+| `spot_balances` | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (REST only — no live WS push for plain spot balances) |
+| `open_orders` | [`open_orders`](#open_orders) (carries `tif` / `cloid` / `trigger` detail already) |
 | `vault_equities` | [`user_vault_equities`](#user_vault_equities) |
 | `exchange_status` | [`exchange_status`](#exchange_status) |
 :::
@@ -2149,9 +2140,9 @@ record for an address that has never appeared on-chain — they never 404.
 
 ## Read-after-write consistency {#read-after-write-consistency}
 
-`/info` reads from the most recent committed block. A `POST /exchange` admitted at time `T` is not visible in `/info` until the leader commits the block containing it (typically <200 ms at default tick).
+`/info` reads from the most recent committed block. A `POST /exchange` admitted at time `T` is not visible in `/info` until the leader commits the block containing it — one committed block later. Block cadence is a governed, per-deployment target, not a fixed duration; measure your own deployment's committed-round rate if you need a wall-clock estimate.
 
-For read-your-writes semantics, subscribe to the [`userEvents` WS channel](../ws/subscriptions.md#userevents); admitted-then-committed events arrive in order, removing the need to poll.
+For read-your-writes semantics, subscribe to [`order_updates`](../ws/subscriptions.md#order_updates) (order lifecycle) and [`fills`](../ws/subscriptions.md#fills) (executions); committed events arrive in commit order, removing the need to poll.
 
 ## Sequence — query an account, see your own order {#sequence--query-an-account-see-your-own-order}
 
@@ -2164,7 +2155,7 @@ sequenceDiagram
     gateway->>node: admit
     node-->>gateway: 202 Accepted
     gateway-->>client: 202 Accepted
-    Note over client,node: ... ~100 ms commit ...
+    Note over client,node: ... one committed block later ...
     client->>gateway: POST /info open_orders
     gateway->>node: 
     node->>node: read committed state

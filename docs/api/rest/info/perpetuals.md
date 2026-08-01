@@ -120,11 +120,27 @@ ladder **inline** as `margin_tiers` — an ascending list of upper-bound bands:
 - `maint_margin_ratio` — maintenance-margin ratio for the band, **decimal bps
   string** (`"100"` = 1.00%).
 
-A position's tier is the first band whose `max_open_interest` bound its open
-interest does not exceed (the `null` top band catches everything above the last
-finite bound). Leverage falls and the maintenance ratio rises as open interest
-grows. This replaces the removed standalone `margin_table` query — the ladder now
-rides on the market record itself.
+A position's tier is the first band, ascending, whose `max_open_interest` is
+**strictly greater than** the position's notional. The `null` top band always
+qualifies, so it catches everything above the last finite bound. A notional
+sitting exactly ON a bound belongs to the tier **above** that bound, not the
+tier the bound labels. Leverage falls and the maintenance ratio rises as
+notional grows. This replaces the removed standalone `margin_table` query — the
+ladder now rides on the market record itself.
+
+**Worked example**, against the `margin_tiers` sample above (bounds `100000` /
+`500000` / `2000000` / `null`):
+
+| Notional | First band with `max_open_interest` > notional | Tier applied |
+|----------|--------------------------------------------------|--------------|
+| `50000` | `100000` | `max_leverage: 50`, `maint_margin_ratio: "100"` |
+| `100000` (exact bound) | `500000` | `max_leverage: 20`, `maint_margin_ratio: "250"` |
+| `500000` (exact bound) | `2000000` | `max_leverage: 10`, `maint_margin_ratio: "500"` |
+| `3000000` | `null` | `max_leverage: 5`, `maint_margin_ratio: "1000"` |
+
+The two exact-boundary rows show the rule: `100000` does not qualify its own
+band (`max_open_interest` must be strictly greater, not equal), so it resolves
+to the next band up.
 :::
 
 :::info

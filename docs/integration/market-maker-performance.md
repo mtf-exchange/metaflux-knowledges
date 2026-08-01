@@ -21,7 +21,8 @@ handle instead of blocking until commit:
 
 You get no `oid` in the response (the `oid` is assigned at commit). Learn the outcome from the
 WebSocket feed (next section). A rejection that is only knowable at execution time arrives on the
-`order_updates` / `user_events` channel keyed by `action_hash`.
+[`order_updates`](../api/ws/subscriptions.md#order_updates) channel as `{"status":"rejected", "reason":"<free-text reason>"}` —
+correlate by `cloid`, not `action_hash` (`order_updates` carries no `action_hash` field).
 
 Use the synchronous path (`/exchange` without `?confirm=async`) only when you genuinely need the
 `oid` in the response — e.g. a one-shot order, not a quote refresh.
@@ -53,7 +54,7 @@ Subscribe to the per-account channels and react to deltas instead of polling `/i
 
 - `order_updates` — resting/fill/cancel transitions (correlate by `cloid` or `action_hash`).
 - `fills` / `user_fills` — your executions.
-- `account_state` / `spot_state` — margin, balances, positions.
+- `account_state` — perp margin, balances, positions. `spot_margin_state` — spot-margin positions (there is no live WS channel for plain spot-token balances; poll `spot_clearinghouse_state`).
 
 Subscriptions are cheap (1 weight at subscribe, 0 per message); `/exchange` is weight 5 per
 request and `/info` polling burns your rate budget. See [Rate limits](../api/rate-limits.md).

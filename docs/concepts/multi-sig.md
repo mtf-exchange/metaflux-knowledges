@@ -213,9 +213,9 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 
 | Question | Answer |
 |----------|--------|
-| Can a multi-sig account have sub-accounts? | Yes. `CreateSubAccount` is itself a multi-sig-wrapped action. Each sub inherits the multi-sig signing requirement. |
-| Can a multi-sig account approve agent wallets? | Yes. `ApproveAgent` is multi-sig-wrapped. Once approved, the agent can sign normally **without** further multi-sig collection — the agent's signature alone is enough for the actions it's allowed to perform. This is the typical institutional setup: multi-sig holds withdrawal authority + agent management; an agent runs the daily trading flow. |
-| Can the multi-sig account itself sign as an agent for another account? | Yes — multi-sig accounts can be approved as agents. Other accounts that approve them call `ApproveAgent { agent: <multisig_addr> }`. The multi-sig signer set then signs as needed. |
+| Can a multi-sig account have sub-accounts? | Yes. `create_sub_account` is itself a multi-sig-wrapped action. Each sub inherits the multi-sig signing requirement. |
+| Can a multi-sig account approve agent wallets? | Yes. `approve_agent` is multi-sig-wrapped. Once approved, the agent can sign normally **without** further multi-sig collection — the agent's signature alone is enough for the actions it's allowed to perform. This is the typical institutional setup: multi-sig holds withdrawal authority + agent management; an agent runs the daily trading flow. |
+| Can the multi-sig account itself sign as an agent for another account? | Yes — multi-sig accounts can be approved as agents. Other accounts that approve them call `approve_agent { agent: <multisig_addr> }`. The multi-sig signer set then signs as needed. |
 
 ## Edge cases {#edge-cases}
 
@@ -223,7 +223,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 <summary>Show edge cases</summary>
 
 - **Lost keys**: M-of-N tolerates up to `N - M` losses. Plan key custody to spread the loss surface (different jurisdictions, different HSMs, different humans).
-- **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — set rate-monitor alerts on `userEvents` for the multi-sig account.
+- **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — watch [`order_updates`](../api/ws/subscriptions.md#order_updates) and [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) for the multi-sig account for any action you didn't originate.
 - **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other returns `{"error":"nonce_too_small"}`. Coordinator should assign nonces.
 - **Signature expiry**: roster signatures over the inner blob don't expire on their own — a signature collected today is valid until the bundle is submitted. Some integrators add their own off-chain TTL. (The optional [action `expiresAfter`](../integration/typed-data-signing.md#action-expiry-expiresafter) applies to the **outer** `/exchange` envelope, not to the inner roster signatures.)
 
@@ -267,7 +267,7 @@ sequenceDiagram
     C->>Chain: POST /exchange
     Note over Chain: T-4 chain admits:<br/>recover both roster sigs over the inner blob ≥ threshold(2)<br/>dispatch inner order as user → admit to mempool
     Chain-->>C: return 202
-    Note over Chain: T+commit inner Order applied — orderEvents fires;<br/>multi-sig account now has the new resting order
+    Note over Chain: T+commit inner Order applied — order_updates fires;<br/>multi-sig account now has the new resting order
 ```
 
 ## See also {#see-also}

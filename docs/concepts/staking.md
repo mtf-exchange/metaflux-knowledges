@@ -1,14 +1,14 @@
 # Staking
 
 :::info
-**Live on devnet.** Delegation, undelegation, rewards claiming, and validator
-registration are active and verified end-to-end across consensus on the
-4-node devnet.
+**Live on devnet.** Deposit, delegation, undelegation, rewards claiming, and
+validator registration are active and verified end-to-end across consensus
+on the 4-node devnet.
 :::
 
 ## TL;DR {#tldr}
 
-Hold MTF, delegate to a validator, earn staking rewards. The ongoing source is protocol fee revenue: fees fund validators — the **20% validator share** of the [fee buyback](./fees.md) — and validators fund stakers, passing that share down minus commission. Early on this is topped up by a finite treasury-funded bootstrap budget (never new issuance). Stake is liquid up to the `lock_period`; unstake takes `7 days` to fully release. Slashing applies to validators who misbehave; delegators face partial slash exposure.
+Hold MTF, move it into the staking pool, delegate to a validator, earn staking rewards. The ongoing source is protocol fee revenue: fees fund validators — the **20% validator share** of the [fee buyback](./fees.md) — and validators fund stakers, passing that share down minus commission, already converted to MTF before it reaches you (see [Reward sources](#reward-sources)). Early on this is topped up by a finite treasury-funded bootstrap budget (never new issuance). A flexible (untiered) delegation unstakes any time; a locked delegation must first mature its lock tier. Either way, undelegated stake then serves a **governed unbonding window** before it is free to withdraw. Slashing applies to validators who misbehave; delegators face partial slash exposure.
 
 ## Actors {#actors}
 
@@ -24,100 +24,120 @@ Hold MTF, delegate to a validator, earn staking rewards. The ongoing source is p
 sequenceDiagram
     participant D as delegator
     participant P as protocol
-    D->>P: Delegate { validator, amount }
-    Note over P: stake registered next block
-    Note over D,P: reward accrual per block proportional to<br/>delegator's share of validator's total stake
-    D->>P: Claim { validator }
-    Note over P: pending_rewards → balance
-    D->>P: Undelegate { validator, amount }
-    Note over P: enter unbonding queue
-    Note over P: matures after lock_period (7 days)
-    Note over D,P: ... 7 days pass ...
-    D->>P: ClaimUnstaked { validator }
-    Note over P: unbonded MTF → balance
+    D->>P: c_deposit { amount }
+    Note over P: MTF moves spot balance → free staking pool (not yet delegated)
+    D->>P: token_delegate { validator, amount, is_undelegate: false, lock_months }
+    Note over P: pool → validator's delegation row<br/>reward accrual per block proportional to<br/>delegator's share of validator's total stake
+    D->>P: claim_rewards { validator }
+    Note over P: unclaimed_reward → spot MTF balance
+    D->>P: token_delegate { validator, amount, is_undelegate: true }
+    Note over P: leaves the delegation, enters the unbonding queue
+    Note over D,P: ... unbonding window elapses (a begin-block effect, no action needed) ...
+    Note over P: matured stake credits back to the free staking pool automatically
+    D->>P: c_withdraw { amount }
+    Note over P: free staking pool → spot MTF balance
 ```
 
 ## Actions {#actions}
 
-### `Delegate` {#delegate}
+There is no `Redelegate` and no `ClaimUnstaked` action — see the notes under
+each step below for what actually moves stake between those states.
+
+### Deposit to / withdraw from the staking pool — `c_deposit` / `c_withdraw` {#c_deposit--c_withdraw}
 
 ```json
+{ "type": "c_deposit", "params": { "amount": "1000" } }
+```
+```json
+{ "type": "c_withdraw", "params": { "amount": "1000" } }
+```
+
+Move whole-MTF between your spot balance and your **free staking pool** — an
+undelegated holding area, not a validator delegation. `c_withdraw` has no
+unbonding wait; it only touches the free pool, never a delegation. `amount`
+is a decimal string.
+
+### Delegate or undelegate — `token_delegate` {#token_delegate}
+
+One action handles both directions via `is_undelegate`:
+
+```json
+// delegate: pool -> validator
 {
-  "type": "Delegate",
-  "params": { "validator": "0x<val_addr>", "amount": "10000000000" }
+  "type": "token_delegate",
+  "params": { "validator": "0x<val_addr>", "amount": "10000000000", "is_undelegate": false, "lock_months": 0 }
+}
+```
+```json
+// undelegate: leaves the delegation, enters the unbonding queue
+{
+  "type": "token_delegate",
+  "params": { "validator": "0x<val_addr>", "amount": "10000000000", "is_undelegate": true }
 }
 ```
 
-Moves MTF from balance to the validator's delegation pool. Effective at next block. Earns rewards from then on.
+`lock_months` is one of `0` (flexible), `1`, `6`, `24` — ignored on undelegate.
+A locked tier (`> 0`) is only admitted for a governance-allowlisted validator,
+and re-locks the row's maturity on every top-up (so a top-up never shortens
+an in-flight lock). A **locked** row cannot start unbonding until its own
+lock matures; a **flexible** row (`lock_months: 0`) can undelegate any time.
+Delegating funds from the free pool credited by [`c_deposit`](#c_deposit--c_withdraw)
+— an under-funded pool rejects cleanly, no partial state change.
 
-### `Undelegate` {#undelegate}
+Undelegated stake does not return to your spot balance immediately: it sits
+in a per-delegator unbonding entry, still slashable, until the governed
+unbonding window elapses — then a begin-block effect (no action required)
+credits it back to your **free staking pool** automatically. Withdraw it to
+spot from there with [`c_withdraw`](#c_deposit--c_withdraw).
 
-```json
-{
-  "type": "Undelegate",
-  "params": { "validator": "0x<val_addr>", "amount": "10000000000" }
-}
-```
-
-Removes from active stake; enters unbonding queue. Doesn't earn rewards during unbonding. Matures at `now + lock_period_ms`.
-
-### `Redelegate` {#redelegate}
-
-```json
-{
-  "type": "Redelegate",
-  "params": { "from": "0x<val1>", "to": "0x<val2>", "amount": "10000000000" }
-}
-```
-
-Move stake between validators **without** entering the unbonding queue. Limited to one redelegation per `(from, to)` pair within a 24 h window (anti-whipsaw).
-
-### `Claim` {#claim}
+### Claim rewards — `claim_rewards` {#claim_rewards}
 
 ```json
-{
-  "type": "Claim",
-  "params": { "validator": "0x<val_addr>" }
-}
+{ "type": "claim_rewards", "params": { "validator": null } }
 ```
 
-Sweep accrued rewards from `pending_rewards` to the delegator's MTF balance. No-op if pending is zero.
+`validator: null` claims every delegation's accrued reward at once (plus your
+own validator-commission bucket, if you run one); `validator: "0x<addr>"`
+claims just that one delegation row. Credits your spot MTF balance. No-op —
+returns `claimed: "0"` — if nothing is pending.
 
-Auto-claim is **not** automatic — claim on a cadence (daily / weekly) or before changing delegation.
-
-### `ClaimUnstaked` {#claimunstaked}
+### Link staking user — `link_staking_user` {#link_staking_user}
 
 ```json
-{
-  "type": "ClaimUnstaked",
-  "params": { "validator": "0x<val_addr>" }
-}
+{ "type": "link_staking_user", "params": { "target": "0x<addr>" } }
 ```
 
-Sweep matured undelegations (those whose lock period has passed) back to MTF balance. Idempotent.
+Present in the wire vocabulary but **always rejects** today
+(`linkStakingUser disabled: claim-on-behalf requires target opt-in`) — the
+intended claim-on-behalf-of-a-cold-wallet flow was never wired past this
+fail-closed guard. Do not rely on it.
 
 ## Reward sources {#reward-sources}
 
-| Source | Cadence | Share |
-|--------|---------|-------|
-| Fee revenue — validator share of the buyback (fees → validators → stakers) | Per-epoch | `validator_share_inflow × stake_share × (1 - commission)` |
-| Bootstrap rewards (treasury-funded, early phase) | Per-block | `reward_per_block × stake_share × (1 - validator_commission)` |
+Both sources credit the **same MTF-denominated** `unclaimed_reward` bucket
+[`claim_rewards`](#claim_rewards) pays out — there is no separate USDC reward
+to claim, even though fee revenue is USDC-denominated at the source:
 
-Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), bought-back MTF splits **70% burn / 20% validators / 10% treasury**, and the validator 20% is passed down to stakers minus commission.
-`reward_per_block`: governance-set, drawn from the treasury bootstrap pool — **not new issuance**; current value in `staking_state` query.
-`validator_commission`: per-validator, capped at `20%` by governance.
+| Source | Mechanism | Share |
+|--------|-----------|-------|
+| Fee revenue — validator share of the buyback | The accrued USDC validator-fee pool periodically buys MTF on-book (batched behind a governance-tunable minimum pool size and a time throttle, not every block); the acquired MTF is what gets split below | `commission_bps` to the validator, the rest pro-rata by (delegation amount × lock multiplier) across delegators + the validator's own self-stake |
+| Bootstrap rewards (treasury-funded, early phase) | Begin-block emission from the treasury bootstrap budget — **never new issuance** | `stake_share × (1 - validator_commission)`, per the [APR curve](#apr-estimation) |
 
-Rewards are computed in MTF (bootstrap rewards) and USDC (fee revenue) — claim returns both. `staking_state` shows pending in each currency.
+Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), bought-back MTF splits **70% burn / 20% validators / 10% treasury**, and the validator 20% funds this path.
+`validator_commission` (`commission_bps`): per-validator, in `validator_summaries`, capped by governance.
 
-## Lock period {#lock-period}
+## Lock and unbonding {#lock-and-unbonding}
 
-Default: **7 days** for unstaking. Tunable by governance per stake-pool.
+Two separate durations apply, and only one is a per-delegation choice:
 
-| State | Duration | Earns rewards? | Slashable? |
-|-------|----------|:--------------:|:----------:|
-| Active (delegated) | indefinite | yes | yes |
-| Unbonding | `lock_period_ms` | no | yes (until matured) |
-| Unbonded (in claim queue) | until claimed | no | no |
+- **Lock tier** (`lock_months`: `0`/`1`/`6`/`24`) — your own choice at delegate time. A locked row cannot start unbonding before it matures; a flexible (`0`) row can undelegate any time.
+- **Unbonding window** — governance-set (**7 days** on live testnet today; a vote can only raise it, never below a 7-day floor). Applies after undelegating, regardless of lock tier. Read your own entry's maturity from [`staking_state`](../api/rest/info.md#staking_state)'s `pending_unstakes[].matures_at_ts` rather than assuming a fixed value.
+
+| State | Earns rewards? | Slashable? |
+|-------|:--------------:|:----------:|
+| Active (delegated) | yes | yes |
+| Unbonding (after `is_undelegate: true`) | no | yes (until matured) |
+| Matured, sitting in the free staking pool | no | no |
 
 Slash exposure during unbonding is the trap — a validator that gets slashed mid-unbond drags the unbonding delegators down with them, even though they've signalled exit.
 
@@ -232,20 +252,22 @@ net_apr  =  effective_apr  ×  (1 - validator_commission_bps/10_000)
 sequenceDiagram
     participant U as user
     participant V as validator V
-    Note over U,V: T=0 — user delegates 1000 MTF to validator V<br/>active stake on V: prev + 1000
-    Note over U,V: T+1 — block-by-block reward accrual:<br/>each block, V earns (block_reward * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
-    U->>V: T+30 days — Claim { V }
-    Note over U,V: 18 MTF + 5 USDC paid out (assuming ~18% APR + fee share)
-    U->>V: T+30 days + 1s — Undelegate { V, 1000 }
+    U->>V: c_deposit { amount: 1000 }
+    Note over U,V: 1000 MTF: spot balance → free staking pool
+    U->>V: token_delegate { validator: V, amount: 1000, is_undelegate: false }
+    Note over U,V: active stake on V: prev + 1000<br/>block-by-block reward accrual:<br/>each block, V earns (block_reward * V_stake / total_active_stake)<br/>user earns (V_earnings * 1000 / V_stake) * (1 - V_commission)
+    U->>V: claim_rewards { validator: V }
+    Note over U,V: accrued MTF reward paid to spot balance
+    U->>V: token_delegate { validator: V, amount: 1000, is_undelegate: true }
     Note over U,V: stake enters unbonding queue<br/>no further earnings on the 1000
-    Note over U,V: T+37 days — unbonding matures
-    U->>V: ClaimUnstaked { V }
-    Note over U,V: 1000 MTF returned to balance
+    Note over U,V: the governed unbonding window elapses<br/>a begin-block effect credits 1000 MTF back to the free staking pool — no action needed
+    U->>V: c_withdraw { amount: 1000 }
+    Note over U,V: 1000 MTF: free staking pool → spot balance
 ```
 
 ## See also {#see-also}
 
-- [`POST /exchange Delegate / Undelegate / Claim`](../api/rest/exchange.md)  (supported action variants on devnet)
+- [`POST /exchange`](../api/rest/exchange.md) — `c_deposit` / `c_withdraw` / `token_delegate` / `claim_rewards`
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
 - [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective bootstrap-reward APR + committed inputs
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)
@@ -260,10 +282,10 @@ sequenceDiagram
 A: Yes — staked MTF and USDC trading balances are separate sub-balances of the same account.
 
 **Q: Do I need an agent wallet to stake?**
-A: No — but you can use one. Agent wallets can call `Delegate` / `Undelegate` / `Claim` (no withdrawal authority required for staking changes).
+A: No, and you cannot delegate one for this: every staking action (`c_deposit`, `c_withdraw`, `token_delegate`, `claim_rewards`) is master-only — there is no agent-resolvable `owner` field, unlike order and margin actions.
 
-**Q: Can I cancel an unbonding?**
-A: No — once submitted, you wait the full `lock_period`. Redelegate instead if you anticipated needing the stake elsewhere.
+**Q: Can I cancel an unbonding, or move it to a different validator without the wait?**
+A: No — there is no redelegate action. Once you undelegate, the stake serves the full unbonding window before it is free; only then can you delegate it elsewhere.
 
 **Q: Where do staking rewards come from?**
 A: Fee revenue is the ongoing source: validators receive the **20% validator share** of the [fee buyback](./fees.md) (70% burn / 20% validators / 10% treasury) and distribute it to their stakers minus commission. Early on, a finite treasury-funded bootstrap budget tops this up. The protocol **never mints new MTF for rewards** — the only supply lever is the annual population re-peg ([tokenomics](./tokenomics.md)).

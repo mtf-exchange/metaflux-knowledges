@@ -59,7 +59,7 @@ the node yourself, the same native surface is served directly at
 ## Common patterns {#common-patterns}
 
 - **Maker bot** — agent-signed, persistent quoting, risk-watcher sidecar, ALO orders for guaranteed-maker tier
-- **Liquidation watcher** — WS subscriber on `marginEvents` + `userEvents` (`yellowCard`); fires top-ups before T1
-- **TWAP wrapper** — submits `TwapOrder`, watches `twapEvents` for slice telemetry, optional manual cancel mid-run
+- **Liquidation watcher** — WS subscriber on [`notifications`](../api/ws/subscriptions.md#notifications) (`yellow_card`) + [`account_state`](../api/ws/subscriptions.md#account_state); fires top-ups before T1
+- **TWAP wrapper** — submits `twap_order`, watches [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) + [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history) for slice telemetry, optional manual cancel mid-run
 - **Vault manager** — `VaultDeploy` once, then agent-signed Orders for the vault address as you re-balance
 - **Institutional custody** — multi-sig master + per-host agents + multi-sig wrapping for high-value flows

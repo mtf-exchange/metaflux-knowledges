@@ -125,10 +125,12 @@ const sub1 = ws.subscribe('l2Book', { coin: 'BTC' }, (event) => {
   // event.data has the typed payload
 });
 
-const sub2 = ws.subscribe('userEvents', { user: c.address }, (event) => {
-  switch (event.data.kind) {
-    case 'fill': /* ... */ break;
-    case 'orderCancelled': /* ... */ break;
+const sub2 = ws.subscribe('order_updates', { user: c.address }, (event) => {
+  for (const rec of event.data) {
+    switch (rec.status) {
+      case 'filled':  /* ... */ break;
+      case 'canceled': /* ... */ break;
+    }
   }
 });
 
@@ -212,10 +214,12 @@ await c.exchange.order({
 
 // wait for commit confirmation
 const filled = new Promise((resolve) => {
-  const sub = c.ws().subscribe('orderEvents', { user: c.address }, (event) => {
-    if (event.data.cloid === cloid && event.data.kind === 'resting') {
-      sub.unsubscribe();
-      resolve(event.data);
+  const sub = c.ws().subscribe('order_updates', { user: c.address }, (event) => {
+    for (const rec of event.data) {
+      if (rec.order.cloid === cloid && rec.status === 'open') {
+        sub.unsubscribe();
+        resolve(rec);
+      }
     }
   });
 });
@@ -234,8 +238,8 @@ await Promise.all(orders.map(o => c.exchange.cancel({ asset: o.asset, oid: o.oid
 
 ```typescript
 const fills = [];
-c.ws().subscribe('userFills', { user: c.address }, (e) => {
-  for (const fill of e.data.fills) fills.push(fill);
+c.ws().subscribe('fills', { user: c.address }, (e) => {
+  for (const fill of e.data) fills.push(fill);
 });
 ```
 

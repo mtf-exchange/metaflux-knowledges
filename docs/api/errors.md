@@ -89,10 +89,10 @@ Request was well-formed and the signature was valid, but the action itself is lo
 | `size below market minimum` | `size` < market min | Increase size or hit a different market |
 | `reduce_only would grow position` | Reduce-only set, but the order would open or extend position | Drop `reduce_only` or check current position |
 | `leverage above asset cap` | Requested leverage > `max_leverage` for asset | Use `≤ max_leverage` (see `meta` info) |
-| `pm_min_equity_not_met` | `UserPortfolioMargin{enabled:true}` but account below threshold | Increase equity or stay on classical |
+| `pm_min_equity_not_met` | `user_portfolio_margin{enroll:true}` but account below threshold | Increase equity or stay on classical |
 | `liquidation tier blocks action` | Account in T1+; further trades blocked | Top up margin, exit tier first |
-| `insufficient balance` | Withdrawal / transfer exceeds free balance | Check `clearinghouseState` first |
-| `out of bounds: <param>` | Governance bound violated (e.g. funding cap on `PerpDeployGasAuctionBid`) | Use a value within the published bound |
+| `insufficient balance` | Withdrawal / transfer exceeds free balance | Check [`account_state`](./rest/info.md#account_state) first |
+| `out of bounds: <param>` | Governance bound violated (e.g. a funding cap, or a `submit_gas_auction_bid` outside the published range) | Use a value within the published bound |
 
 ### 429 — rate limited {#429--rate-limited}
 
@@ -118,15 +118,16 @@ See [rate limits](./rate-limits.md) for budgets and burst handling.
 
 ### Commit-time errors (not HTTP, in event stream) {#commit-time-errors-not-http-in-event-stream}
 
-Some failures happen after `202 Accepted` because they're only knowable in the block-execution context. These appear on the `order_updates` / `user_events` WS channel as `{"error":"<reason>", "action_hash":"0x..."}`.
-
-| `error` | Cause |
-|---------|-------|
-| `reduce_only_violation_post_admit` | Position changed between admit and dispatch (other fills closed it) |
-| `stp_rejected` | Self-trade prevention killed the order at dispatch |
-| `mark_price_band_violation` | Order's price outside the market's allowed-deviation band when matched |
-| `evicted_under_cap_pressure` | Admitted but evicted from mempool before block proposal |
-| `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch |
+Some order failures happen after `202 Accepted` because they're only knowable
+in the block-execution context (a self-trade at match time, a reduce-only leg
+that closed between admit and dispatch, a margin check that fails once other
+fills landed first). These surface on the
+[`order_updates`](./ws/subscriptions.md#order_updates) WS channel as
+`{"status":"rejected", "reason":"<free-text reason>"}` (or `"cancel_rejected"`
+for a cancel). `order_updates` carries **no `action_hash` field** — correlate
+by `cloid`, per [error handling](../integration/error-handling.md#reconciliation-pattern).
+`reason` is a free-text string, not a fixed enum — treat it as
+human-readable, not a machine-matched code.
 
 ## Decision tree {#decision-tree}
 

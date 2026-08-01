@@ -27,16 +27,31 @@ In Cross, profitable positions can carry less-healthy ones — your free balance
 An order opening new exposure must post initial margin:
 
 ```
-notional        = |px × size|                         # raw integer product, Decimal scale-0
-effective_lev   = dynamic_risk_override.max_leverage   # if set, else position cap, else MAX_LEVERAGE_CAP (50)
+notional         = |px × size|                        # raw integer product, scale-0
+effective_lev    = the market's max leverage           # see the ladder below
 required_init    = ceil( notional / effective_lev )    # rounded UP — conservative
 free_collateral  = cross_account_value − Σ held_initial_margin
-reject  iff  required_init > free_collateral            # InsufficientMargin
+reject  iff  required_init > free_collateral
 ```
 
-So `init_margin = notional / max_leverage` — the classic `1 / max_leverage` ratio. `effective_lev` is `max(1, …)`; the global cap is `MAX_LEVERAGE_CAP = 50`, with a hard `UpdateLeverage` ceiling of **100×** and per-asset dynamic-risk overrides that can tighten it. Rounding is **up** (`Decimal::ceil`) so a remainder always tightens the gate. `reduce_only` orders bypass the gate (they only shrink exposure).
+So `init_margin = notional / max_leverage` — the classic `1 / max_leverage` ratio.
+
+`effective_lev` resolves in this order, and is never below 1:
+
+1. your own leverage preference for the asset, set with [`update_leverage`](../api/rest/exchange.md#update_leverage);
+2. tightened by the market's dynamic-risk override when governance has set one — with a margin-tier ladder, the rung your notional falls into decides the cap, so a larger position gets less leverage;
+3. bounded by the market's own maximum.
+
+`update_leverage` rejects any request above **100×**. A market listed through [MIP-3](../mip/mip-3.md) is separately capped at **50×** when it is deployed, so most markets sit well under the 100× ceiling. Read the live value from a market's fields on [`market_info`](../api/rest/info/perpetuals.md#market_info) rather than assuming either number.
+
+Rounding is **up** so a remainder always tightens the gate. `reduce_only` orders bypass the gate — they only shrink exposure.
 
 `held_initial_margin` sums `ceil(|entry_notional| / effective_lev(asset))` over every **cross** open position (isolated positions are excluded — their collateral is the separately-posted bucket).
+
+This gate applies to every live order path that can open new exposure:
+`submit_order` / `batch_order` (limit, IOC, ALO), `scale_order`, `chase_order`,
+`twap_order`, and an accepted RFQ quote (`rfq_accept`). Frequent batch auctions
+(FBA) are not a live exposure path today — no market has FBA armed.
 
 ### Maintenance margin & health {#maintenance-margin--health}
 
@@ -47,11 +62,11 @@ health = account_value / maint_margin
 - `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed `i128`.
 - `maint_margin` = the sum over every held position leg of `|entry_notional| × maint_margin_ratio` (derived live from positions) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`).
 
-The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol baseline of **300 bps = 3 %**. The derived forced-close slippage floor is half the effective ratio (1.5 % for a baseline market) unless explicitly overridden.
+The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol's baseline maintenance ratio — a governed parameter (`set_risk_base_maint_ratio`). Read the live value from a market's `maint_margin_ratio` field on [`market_info`](../api/rest/info/perpetuals.md#market_info) or [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta); never assume a fixed percentage. The derived forced-close slippage floor is half the effective ratio unless explicitly overridden.
 
 Maintenance sits below the initial requirement (`notional / max_leverage`), so a position can be opened and then ride down to the maintenance floor before liquidation. Health < 1.0 enters the [liquidation ladder](./tiered-liquidation.md) at the tier bands (1.1 / 1.0 / 0.8 / 0.667).
 
-> The arithmetic uses `Decimal` / `i128` throughout (no floats); the tier decision even right-shifts both operands by a common amount before the `Decimal` division when an account value would exceed `Decimal::MAX`, preserving the health ratio so the tier decision is unaffected.
+> The arithmetic is exact fixed-point throughout — no floating point anywhere on this path. At extreme account values the tier decision scales both operands down by the same factor before it divides, which leaves the health ratio unchanged, so the tier you land in is the same.
 
 ## Cross — the default {#cross--the-default}
 
@@ -110,12 +125,10 @@ You can deposit/withdraw to the bucket while the position is open:
 
 ```json
 // add 500 USDC to the isolated bucket on asset 0
-{ "type":"UpdateIsolatedMargin", "params": {
-  "asset": 0, "is_isolated": true, "isolated_amount": "500000000"
-}}
+{ "type":"update_isolated_margin", "params": { "asset": 0, "delta": "500" } }
 ```
 
-`isolated_amount` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected.
+`delta` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected. Flipping the position itself into isolated mode is a separate step — the `is_isolated` flag on [`update_leverage`](../api/rest/exchange.md#update_leverage); see [Transitions](#transitions).
 
 ## Strict-Iso {#strict-iso}
 
@@ -125,17 +138,21 @@ Same wall as Isolated, plus an explicit opt-out from PM scenario inclusion. Even
 - Does NOT receive netting credit
 - Is margined under the **classical** model (per-asset baseline)
 
-Use Strict-Iso for:
-- New / illiquid assets where PM's correlation assumptions don't apply
-- Speculation budget you want firewalled from your hedged core book
-- Listings (MIP-3) where the maintenance ratio is conservative until liquidity builds
+:::warning
+**Not a user choice.** Unlike Cross and Isolated, Strict-Iso is never
+something you request for your own position. It is stamped onto a position
+**only** by the governance market-level flag described below — there is no
+action that moves a position from Isolated into Strict-Iso, or back, at the
+trader's request.
+:::
 
 ## Governance-imposed strict isolation (market-level) {#governance-imposed-strict-isolation-market-level}
 
-The Strict-Iso mode above is a choice *you* make per asset. MetaFlux also lets
-**governance** impose strict isolation at the **market level** — a per-market risk
-flag that forces *every* participant in that market into isolated margin,
-regardless of their own preference. It is **not a user toggle**.
+MetaFlux lets **governance** impose strict isolation at the **market level** — a
+per-market risk flag that forces *every* participant in that market into
+Strict-Iso margin, regardless of their own preference. It is **not a user
+toggle**; the only way a position becomes Strict-Iso is by opening it on a
+market that already carries this flag.
 
 When a market carries the governance strict-isolated flag:
 
@@ -166,25 +183,27 @@ changes.
 |------|------|
 | Maximise capital efficiency on a coherent book | Cross (+ PM) |
 | Run multiple uncorrelated strategies under one account | Isolated per strategy, OR sub-accounts |
-| Contain one risky position from threatening the rest | Isolated or Strict-Iso |
+| Contain one risky position from threatening the rest | Isolated (your own choice) |
 | Hedge across assets, want netting credit | Cross + PM |
-| Trade a long-tail listing with unknown vol regime | Strict-Iso |
+| Trade a long-tail listing governance has flagged strict-isolated | Strict-Iso — automatic, not requested |
 
 For multi-strategy isolation, [sub-accounts](./sub-accounts.md) are usually a better fit than Isolated — sub-accounts isolate the entire account, including agent keys and order space, not just margin.
 
 ## Transitions {#transitions}
 
-Switching modes uses the [`update_leverage`](../api/rest/exchange.md#update_leverage) action (the `is_isolated` flag — there is no separate margin-mode action) and is allowed only when:
+Switching between Cross and Isolated uses the
+[`update_leverage`](../api/rest/exchange.md#update_leverage) action's
+`is_isolated` flag — there is no separate margin-mode action, and no way to
+request Strict-Iso (see [above](#strict-iso)).
 
-| From → To | Allowed when |
-|-----------|--------------|
-| Cross → Isolated | You specify `isolated_amount` covering at least the maintenance margin |
-| Isolated → Cross | Bucket merges into cross balance; allowed any time the merged account stays in `Safe` tier |
-| Isolated → Strict-Iso | Always (no margin movement) |
-| Strict-Iso → Isolated | Always |
-| Strict-Iso/Isolated → Cross (under PM-enrolled master) | Requires the position to fit under the PM scenario set |
-
-Switching mode mid-position is **not** a flat-and-reopen — the position stays, only the margin accounting changes.
+**You can only change mode on an asset while flat in it.** If you hold any
+open position (long or short) on that asset, an `update_leverage` call whose
+`is_isolated` differs from the position's current mode is rejected — the
+position keeps its mode until it is closed. A leverage-only change (same
+mode, different `leverage`) is unaffected and always allowed. Once flat,
+switching Cross → Isolated takes effect on the next position you open on
+that asset; funding its isolated bucket is a separate
+[`update_isolated_margin`](#maintenance-margin--health) call.
 
 ## Liquidation behaviour {#liquidation-behaviour}
 
@@ -215,11 +234,14 @@ flowchart TD
 sequenceDiagram
     participant client
     participant node
-    Note over client: initial: long 1 BTC cross<br/>free_balance = 5000 USDC
-    client->>node: UpdateIsolatedMargin<br/>asset=0, is_isolated=true,<br/>isolated_amount=1000000000 (1000 USDC)
-    Note over node: 1) check 1000 ≥ maint_margin(BTC, 1)<br/>2) move 1000 USDC: cross → BTC bucket<br/>3) BTC position now in Isolated mode
+    Note over client: initial: FLAT in BTC<br/>free_balance = 5000 USDC
+    client->>node: update_leverage<br/>asset=0, leverage=10, is_isolated=true
+    Note over node: mode preference for BTC becomes Isolated.<br/>Rejected if a BTC position were open.
+    client->>node: submit_order — open long 1 BTC
+    client->>node: update_isolated_margin<br/>asset=0, delta="1000"
+    Note over node: move 1000 USDC: cross → BTC bucket
     client->>node: /info account_state
-    node-->>client: cross free_balance = 4000<br/>BTC bucket = 1000<br/>margin_mode[BTC] = Isolated
+    node-->>client: cross free_balance = 4000<br/>BTC bucket = 1000<br/>margin mode for BTC = Isolated
 ```
 
 ## Edge cases {#edge-cases}
@@ -227,9 +249,9 @@ sequenceDiagram
 <details>
 <summary>Show edge cases</summary>
 
-- **Auto-deposit on margin add.** Isolated positions take maintenance shortfall from the bucket only — once the bucket is depleted, the position liquidates. Cross does NOT auto-cover an Isolated bucket; you must manually `UpdateIsolatedMargin` with positive `isolated_amount` to top up.
+- **Auto-deposit on margin add.** Isolated positions take maintenance shortfall from the bucket only — once the bucket is depleted, the position liquidates. Cross does NOT auto-cover an Isolated bucket; you must top it up yourself with [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) and a positive `delta`.
 - **Closing an Isolated position.** Closing the full position releases the bucket back into cross balance.
-- **Mode of a fresh asset.** New positions default to Cross unless the asset's `meta` flag `onlyIsolated: true` forces Isolated (set per-market at deploy time via [MIP-3](../mip/mip-3.md)).
+- **Mode of a fresh asset.** New positions default to Cross, unless governance has flagged the market strict-isolated — then every position on it opens in [Strict-Iso](#strict-iso), whatever you prefer. There is no per-asset "isolated only" field on the market metadata; the flag lives on the market's governance risk parameters.
 - **Isolated under PM master.** PM netting credit applies to Cross positions only. Isolated positions are summed classically. A PM-enrolled master with one giant Isolated position and tiny Cross book sees almost no PM benefit.
 
 </details>
@@ -247,7 +269,7 @@ sequenceDiagram
 <summary>Show FAQ</summary>
 
 **Q: Can one asset have both Isolated and Strict-Iso buckets?**
-A: No. The mode is per-asset, single-value: `Cross | Isolated | StrictIso`.
+A: No. The mode is per-asset and single-valued. The read surface reports it as `"cross"`, `"isolated"` or `"strict_iso"`.
 
 **Q: Does switching modes cost a trade?**
 A: No fees, no fills. It's a pure state transition.

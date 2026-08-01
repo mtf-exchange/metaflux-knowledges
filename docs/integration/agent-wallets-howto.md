@@ -9,7 +9,7 @@ Concrete code, end-to-end, walking through approval, trading, and rotation. For 
 ## TL;DR {#tldr}
 
 1. Generate an agent keypair locally.
-2. From the master account, submit `ApproveAgent { agent, expires_at_ms }`.
+2. From the master account, submit `approve_agent { agent, expires_at_ms }`.
 3. Wait one block.
 4. Sign every action with the agent key; submit with `sender = master_addr`.
 5. Before expiry, repeat with a new agent and let the old expire.
@@ -66,7 +66,7 @@ In raw curl, the action body is:
 
 ```json
 {
-  "type": "ApproveAgent",
+  "type": "approve_agent",
   "params": {
     "agent":        "0x<agent_addr>",
     "expires_at_ms": 1735689600000,
@@ -93,7 +93,7 @@ async function waitForApproval(c: MetaFluxClient, masterAddr: string, agentAddr:
 await waitForApproval(master, master.address, agentAddress);
 ```
 
-Alternative: subscribe to `userEvents` and look for `{ kind: "agentApproved" }`.
+There is no live push event for an agent approval landing — polling `/info agents` (above) is the only way to observe it today.
 
 ## Step 4 — trade from the agent {#step-4--trade-from-the-agent}
 
@@ -188,7 +188,7 @@ Nonces collide rarely (sub-millisecond resolution) and the colliding request get
 |--------|--------------|--------|
 | Unexpected orders from your master | A leaked agent key (or master key) | Tighten old agent's expiry to past; investigate |
 | 401s from an agent that should be valid | Approval expired or revoked; or wrong agent key | Verify via `/info agents`; re-approve if needed |
-| Sudden burst of orders you didn't authorise | Compromised agent | Immediately submit `ApproveAgent { agent: X, expires_at_ms: 0 }` to retire X; do this signed by master from cold storage |
+| Sudden burst of orders you didn't authorise | Compromised agent | Immediately submit `approve_agent { agent: X, expires_at_ms: 0 }` to retire X; do this signed by master from cold storage |
 
 The chain stores every approval, every expiry, every action's recovered signer. Forensics post-incident is mechanical.
 
@@ -197,7 +197,7 @@ The chain stores every approval, every expiry, every action's recovered signer. 
 A sub-account can have its own agent set (separate from master's):
 
 ```typescript
-// master signs ApproveAgent AS the sub
+// master signs approve_agent AS the sub
 const subClient = master.asSubAccount(0);  // helper that flips signing context
 
 await subClient.exchange.approveAgent({
@@ -216,15 +216,15 @@ This is the institutional pattern: master in cold storage; one agent per (sub ×
 ```
 T=0    generate agent keypair on host
 T=1    operator triggers approval from cold master
-       master signs ApproveAgent { agent, ttl=30d, name }
+       master signs approve_agent { agent, ttl=30d, name }
        POST /exchange
 T+1block  approval committed
-T+1block.1s  host's bot polls /info agents; sees approval; starts trading
+   next poll  host's bot polls /info agents; sees approval; starts trading
 ...    bot runs for 29 days, signing every action with agent key
 T+29d  scheduled rotation kicks in
-       cold master signs ApproveAgent for new key (ttl=30d)
+       cold master signs approve_agent for new key (ttl=30d)
        host's bot config updated to new key
-       cold master signs ApproveAgent for old key with ttl=1h
+       cold master signs approve_agent for old key with ttl=1h
 T+29d+1h  old agent expires; bot has fully migrated
 ```
 
@@ -243,13 +243,13 @@ T+29d+1h  old agent expires; bot has fully migrated
 <summary>Show FAQ</summary>
 
 **Q: Can an agent approve another agent?**
-A: No. `ApproveAgent` is master-only. This prevents key proliferation cascades.
+A: No. `approve_agent` is master-only. This prevents key proliferation cascades.
 
 **Q: How do I rotate the master itself?**
 A: V1 doesn't have a master-rotation primitive. The supported pattern: convert to multi-sig with the new key included, then update the multi-sig set to drop the old key. See [multi-sig](../concepts/multi-sig.md).
 
 **Q: What if an agent's host crashes mid-flight?**
-A: The pending request either committed (visible on `userEvents` / openOrders) or didn't (no event). Use the [reconcile pattern](./error-handling.md#reconciliation-pattern) on host restart.
+A: The pending request either committed (visible on `order_updates` / `open_orders`) or didn't (no event). Use the [reconcile pattern](./error-handling.md#reconciliation-pattern) on host restart.
 
 **Q: Can different agents trade different markets?**
 A: Not via the protocol. The protocol authorises an agent for the master's full trading-action surface. If you need per-market separation, use sub-accounts (each sub has its own agent set).

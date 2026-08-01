@@ -46,33 +46,35 @@ The fill price is **uniform** across all participants in the batch — no one is
 | Spot pairs | Continuous CLOB | Convention |
 | Index / structured products | FBA | Composite pricing needs synchronous clearing |
 
-Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Markets with FBA on accept both `FbaOrder` (batch-targeted) and [`submit_order`](../api/rest/exchange.md#submit_order) (treated as FBA orders for the next batch). See the [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` is a recognized-but-unmapped stub today.
+Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Markets with FBA on accept `fba_submit` into the live batch window. See [`fba_submit`](../api/rest/exchange.md#fba_submit) for the full action.
 
 ## Batch interval {#batch-interval}
 
-Default: 1 second (10 blocks at 100 ms block time). Governance-set per market in `market_info.fba_batch_interval_ms`. Typical range: 100 ms – 5 s.
+Governed per market as `period_ms`, bounded to `[100 ms, 5 s]`; read the live
+value from [`fba_batch_state`](../api/rest/info.md#fba_batch_state)`.period_ms`
+rather than assuming a fixed default — do not derive it from block cadence.
 
-Faster intervals reduce the wait but increase computational cost. The 1-second default balances HFT-neutralisation against UX.
+Faster intervals reduce the wait but increase computational cost.
 
 ## Order shape {#order-shape}
 
 ```json
 {
-  "type": "FbaOrder",
+  "type": "fba_submit",
   "params": {
-    "asset":     42,
-    "side":      "Buy",
-    "px":  "10050000000",
-    "size":   "100000000",
-    "batch_id":  9876,
-    "cloid":     "0x..."
+    "market": 42,
+    "side":   "Bid",
+    "size":   100000000,
+    "price":  10050000000
   }
 }
 ```
 
-`batch_id` selects which batch the order joins. The current batch id is in [`market_info`](../api/rest/info/perpetuals.md#market_info) under `fba_current_batch_id`. Orders with `batch_id < current` are rejected (`{"error":"batch already closed"}`); orders with `batch_id` > current are queued for that future batch.
-
-Omit `batch_id` to target the next batch — the server selects the one currently accepting orders.
+`size` / `price` are raw `u64` JSON numbers on the 1e8 plane, not decimal
+strings. There is no `batch_id` or `cloid` field — an `fba_submit` always
+joins whichever window is currently open for `market`; it cannot target a
+future batch. See [`fba_submit`](../api/rest/exchange.md#fba_submit) for the
+full field table.
 
 ## Worked example {#worked-example}
 
@@ -151,18 +153,25 @@ This is the FBA fairness property: at the clearing price, no participant gets a 
 ## Sequence {#sequence}
 
 ```
-t=0.0s   batch_id = 9876 opens
-t=0.2s   bob:    FbaOrder buy 5 @ 100.10, batch 9876
-t=0.4s   alice:  FbaOrder buy 3 @ 100.05, batch 9876
-t=0.5s   carol:  FbaOrder buy 2 @ 100.00, batch 9876
-t=0.6s   dave:   FbaOrder sell 3 @ 99.95, batch 9876
-t=0.7s   eve:    FbaOrder sell 4 @ 100.00, batch 9876
-t=0.8s   frank:  FbaOrder sell 2 @ 100.05, batch 9876
-t=1.0s   batch_id 9876 closes; clearing fires
-         p* = 100.05; 8 BTC clears
-         fills published on `trades` WS with batch_id and "kind":"fba"
-t=1.0s   batch_id = 9877 opens
+window opens
+bob:    fba_submit buy 5 @ 100.10
+alice:  fba_submit buy 3 @ 100.05
+carol:  fba_submit buy 2 @ 100.00
+dave:   fba_submit sell 3 @ 99.95
+eve:    fba_submit sell 4 @ 100.00
+frank:  fba_submit sell 2 @ 100.05
+window closes; clearing fires — p* = 100.05; 8 BTC clears
+next window opens
 ```
+
+FBA fills settle into each account's positions and balances like any other
+fill, but they carry **no live public event** today: they do not appear on
+[`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills),
+or [`user_events`](../api/ws/subscriptions.md#userevents), and there is no
+`/info` read that lists past fills for a closed window. Observe a settlement
+by diffing [`account_state`](../api/ws/subscriptions.md#account_state) before
+and after, or by watching [`fba_batch_state`](../api/rest/info.md#fba_batch_state)'s
+pool contents drain at the window boundary.
 
 ## Querying {#querying}
 
@@ -204,7 +213,7 @@ Prices / sizes are raw **1e8 fixed-point** integer strings (the book / order pla
 ## See also {#see-also}
 
 - [Order types](./order-types.md)
-- [`/exchange` action catalog](../api/rest/exchange.md#action-catalog) — `FbaOrder` (recognized-but-unmapped stub today)
+- [`fba_submit`](../api/rest/exchange.md#fba_submit) — the full action reference
 - [MIP-3](../mip/mip-3.md) — markets opt into FBA at deploy
 - [`market_info`](../api/rest/info/perpetuals.md#market_info) — check `fba_enabled` per market
 

@@ -47,7 +47,7 @@ grad         = D_t · sign(θ_t − θ_needed_t)
 
 `D_t` = round deficit, `B̂_needed` = the execution-price estimator's guess of the true need.
 
-**Step size η** (`AdlController::current_eta`):
+**Step size η**:
 - Default mode is **Adaptive** (paper Cor. 1): `η* = sqrt( (1 + 2·P_T^θ) / Σ D_t² )`, recomputed each round from running telemetry (`path_variation`, `cumulative_squared_deficit`).
 - On the first round (`Σ D_t² == 0`) it falls back to the governance-tunable `η₀ = 0.01` (`default_eta`).
 - A `Fixed(c)` mode pins `η = c` (governance kill-switch / reproducibility).
@@ -60,7 +60,7 @@ Reg_T^dyn  ≤  sqrt( (1 + 2·P_T^θ) · Σ D_t² )
 
 exposed as `analytical_bound()`; `check_bound(slack)` asserts empirical regret ≤ `slack · bound` (default slack 4) in the chaos tests.
 
-All fractional fields (`θ`, `η`, `path_variation`, …) are `rust_decimal::Decimal`; `sqrt` is an integer-Newton `Decimal` sqrt (no `f64`); every accumulator uses `saturating_*` (a `Decimal::from(u128 > MAX)` would otherwise panic and halt the kernel). State persists in BOLE accumulator **slot 5**.
+Every fractional field (`θ`, `η`, `path_variation`, …) is exact fixed-point, and the square root is an integer method — there is no floating point on this path. Every accumulator saturates instead of overflowing, so an extreme value cannot halt the chain. The controller state is committed, so all validators agree on it.
 
 ### 2. Allocation — deterministic capacity pro-rata {#2-allocation--deterministic-capacity-pro-rata}
 
@@ -109,41 +109,33 @@ A keeps the unrealised PnL on its remaining position; A only loses the *closed* 
 
 ## Notification {#notification}
 
-ADL events fire on [`userEvents` WS channel](../api/ws/subscriptions.md#userevents):
+ADL execution carries **no dedicated event on any channel today** — no
+[`notifications`](../api/ws/subscriptions.md#notifications) kind, no
+`user_events` entry, and no `ledger_updates` record. The haircut is a direct
+state mutation, so the only live signal is your position itself: the
+affected account's position size and unrealised PnL change on the next
+[`account_state`](../api/ws/subscriptions.md#account_state) push (it is
+change-driven — any position or PnL move triggers a frame).
 
-```json
-{
-  "kind":        "adl",
-  "asset":       0,
-  "haircut_sz": "50000000",
-  "realised_pnl": "5000000",
-  "block":       12345
-}
-```
-
-Plus an account-wide notification:
-
-```json
-{ "kind": "marginChange", "free": "...", ... }
-```
-
-For automated bots, treat `adl` events as you would a forced fill — your position changed, the protocol gave you the fill price (mark at the haircut block), you'd typically re-evaluate your strategy.
+For automated bots, subscribe to `account_state` and diff your position set
+between pushes; treat a shrink you did not order yourself as a forced event
+(ADL haircut or liquidation) and re-evaluate your strategy.
 
 ## Predicting ADL exposure {#predicting-adl-exposure}
 
-For risk monitors, the [`/info`](../api/rest/info.md) account state includes an `adl_rank_estimate` field:
+There is **no live field that ranks or scores your ADL exposure** — no
+`/info` read returns a percentile or a rank estimate. Allocation happens at
+the moment ADL actually fires, computed fresh (capacity-pro-rata, see above)
+against then-current haircut-able unrealised PnL; there is nothing to poll
+ahead of time.
 
-```json
-"adl_rank_estimate": {
-  "asset": 0,
-  "percentile": 95,
-  "score": 1.2
-}
-```
-
-`percentile: 95` means you're in the top 5% of accounts at risk on this asset. Accounts in the top decile face the most exposure if ADL fires.
-
-This is an estimate — actual ranking happens at the moment of ADL trigger against then-current state. For market makers running large books, the headline risk is concentration (one big position dominating the asset's open interest); diversifying across assets reduces ADL exposure.
+The closest proxy you can compute yourself: your position's unrealised PnL as
+a share of the asset's total profitable-side unrealised PnL — derived from
+your own [`account_state`](../api/rest/info.md#account_state) and the market's
+open interest on [`market_info`](../api/rest/info/perpetuals.md#market_info).
+For market makers running large books, the headline risk is concentration —
+one big winning position dominating the asset's profitable side; diversifying
+across assets reduces ADL exposure.
 
 ## Edge cases {#edge-cases}
 
@@ -183,7 +175,7 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 - [Tiered liquidation](./tiered-liquidation.md) — full ladder
 - [Insurance pool](./vaults.md#insurance-pool) — T3 mechanism
 - [Portfolio margin](./portfolio-margin.md) — how PM interacts with ADL
-- [`userEvents` WS](../api/ws/subscriptions.md#userevents) — receive ADL notifications
+- [`account_state` WS](../api/ws/subscriptions.md#account_state) — the only live signal that an ADL haircut changed your position
 
 ## FAQ {#faq}
 

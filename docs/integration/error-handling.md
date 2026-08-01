@@ -22,7 +22,7 @@ flowchart TD
 | Layer | When fires | How surfaced |
 |-------|-----------|--------------|
 | Admission | At `/exchange` request | HTTP status + body |
-| Commit | At block commit, post-admission | `userEvents` / `orderEvents` WS push, or visible in `userFills` / `openOrders` |
+| Commit | At block commit, post-admission | [`order_updates`](../api/ws/subscriptions.md#order_updates) / [`fills`](../api/ws/subscriptions.md#fills) WS push, or visible in `user_fills` / `open_orders` |
 | Network | Anywhere | TCP error, timeout, partial response |
 
 Each layer has different semantics. Confusing them is the most common production bug.
@@ -103,21 +103,34 @@ The action was admitted (`202`) but failed at commit. You learn about it only vi
 | `evicted_under_cap_pressure` | Admitted but evicted from mempool before block | YES (with backoff) |
 | `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch | NO — fix margin first |
 
-Subscribe to [`userEvents` WS](../api/ws/subscriptions.md#userevents) (order lifecycle events ride this channel) and dispatch on the event kind:
+Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates) — the live, per-account order-lifecycle channel — and dispatch on `status`:
 
 ```typescript
-ws.subscribe('orderEvents', { user: address }, (event) => {
-  switch (event.data.kind) {
-    case 'resting':       /* order is on the book; track oid */            break;
-    case 'partialFill':   /* size partially filled; cloid still on book */ break;
-    case 'filled':        /* fully filled; remove from open-order set */   break;
-    case 'cancelled':     /* terminal */                                   break;
-    case 'error':         /* commit-time error; handle per table above */
-      handleCommitError(event.data);
-      break;
+ws.subscribe('order_updates', { user: address }, (event) => {
+  for (const rec of event.data) {
+    switch (rec.status) {
+      case 'open':             /* resting on the book; track oid */             break;
+      case 'filled':           /* fully filled; remove from open-order set */   break;
+      case 'canceled':         /* terminal */                                   break;
+      case 'rejected':         /* commit-time error; rec.reason has the cause */
+        handleCommitError(rec);
+        break;
+      case 'cancel_rejected':  /* the cancel itself failed; rec.reason has the cause */
+        handleCommitError(rec);
+        break;
+    }
   }
 });
 ```
+
+A partial fill does not get its own `status`: a maker leg reports its per-match
+`filled_sz` with `status` still `open` while size rests, and a taker's fully
+filled record carries `status: 'filled'` with `filled_sz` / `avg_px` set. See
+[`order_updates`](../api/ws/subscriptions.md#order_updates) for the full field
+table — including the gap on `modify` / `batchModify` / engine-initiated
+cancels, which carry no per-order delta on this channel (use
+[`open_orders`](../api/ws/subscriptions.md#open_orders) instead, a full
+resting-set snapshot re-emitted on every change).
 
 ## Layer 3 — network errors {#layer-3--network-errors}
 
@@ -165,8 +178,14 @@ action_hash = keccak256( action_json ‖ owner_20 ‖ nonce_be8 )
   order that is the master, not the agent.
 - `nonce_be8` is the nonce as 8 big-endian bytes.
 
-The same params with a new nonce give a different hash. The `userEvents` WS feed
-carries `action_hash` on every event.
+The same params with a new nonce give a different hash. `action_hash` is
+returned synchronously in the `/exchange` admission response — it is **not**
+echoed on any per-account WS event. For a committed order, correlate by
+`cloid` on [`order_updates`](../api/ws/subscriptions.md#order_updates) /
+[`open_orders`](../api/ws/subscriptions.md#open_orders) instead. For a global,
+hash-keyed check, the public
+[`explorer_txs`](../api/ws/subscriptions.md#explorer_txs) feed carries the
+same hash (as `hash`) for every transaction in the latest block.
 
 ## Production recipes {#production-recipes}
 
@@ -225,25 +244,31 @@ async function cancelSafely(client: Client, asset: number, oid: number) {
 
 ### WS commit reconciliation {#ws-commit-reconciliation}
 
+`order_updates` has no `action_hash` field — correlate by `cloid` instead
+(set one on every order you place):
+
 ```typescript
-const pendingByHash = new Map<string, PendingAction>();
+const pendingByCloid = new Map<string, PendingAction>();
 
-ws.subscribe('userEvents', { user: address }, (event) => {
-  const hash = event.data.action_hash;
-  const pending = pendingByHash.get(hash);
-  if (!pending) return;
+ws.subscribe('order_updates', { user: address }, (event) => {
+  for (const rec of event.data) {
+    const cloid = rec.order?.cloid;
+    const pending = cloid && pendingByCloid.get(cloid);
+    if (!pending) continue;
 
-  if (event.data.kind === 'error') pending.reject(new CommitError(event.data));
-  else                              pending.resolve(event.data);
-  pendingByHash.delete(hash);
+    if (rec.status === 'rejected' || rec.status === 'cancel_rejected') {
+      pending.reject(new CommitError(rec));
+    } else {
+      pending.resolve(rec);
+    }
+    pendingByCloid.delete(cloid);
+  }
 });
 
-async function submit(action: Action) {
-  // Hash the EXACT bytes you post. Re-serializing gives a different hash.
-  const actionJson = JSON.stringify(action);
-  const hash = keccak256(concat(utf8(actionJson), ownerAddr, nonceBE8(nonce)));
-  const p = new Promise((resolve, reject) => pendingByHash.set(hash, { resolve, reject }));
-  await client.exchange.submit(action);
+async function submit(order: Order) {
+  const cloid = order.cloid;
+  const p = new Promise((resolve, reject) => pendingByCloid.set(cloid, { resolve, reject }));
+  await client.exchange.order(order);
   return Promise.race([p, timeout(5000)]);
 }
 ```

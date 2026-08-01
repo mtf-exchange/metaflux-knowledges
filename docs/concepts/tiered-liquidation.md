@@ -23,7 +23,7 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 
 The bands below are the **literal code constants**, not approximations.
 
-`BoleEngine::decide(account, account_value: i128, maintenance_margin: u128, ts_ms)` is a **pure function** — it reads cooldown state but never mutates — returning one `BoleDecision`:
+The tier decision takes the account, its account value, its maintenance margin and the block timestamp. It is a **pure decision** — it reads cooldown state but never changes it — and it returns exactly one outcome:
 
 ```
 if maintenance_margin == 0            → Idle
@@ -47,7 +47,7 @@ else                                                  → PartialMarket50 { size
 | Full-market floor (T3 entry) | `0.667` (≈ 2/3) | `full_market_floor` |
 | Partial→full cooldown | `30_000 ms` | `DEFAULT_PARTIAL_COOLDOWN_MS` |
 
-- All comparisons are `rust_decimal::Decimal` (no floats). When `account_value` would exceed `Decimal::MAX`, `decide` right-shifts both operands by a common bit-count first — this preserves the health ratio so the chosen tier is unchanged at those magnitudes.
+- All comparisons are exact fixed-point — no floating point. At account values too large to compare directly, both operands scale down by the same factor first. That leaves the health ratio unchanged, so the chosen tier is the same.
 - **Only `PartialMarket50` arms the cooldown** (`record_attempt`); a `FullMarket` or `Backstop` does not block subsequent partials. So the T1 partial→full escalation only fires when a *prior partial* is still inside its 30 s window.
 - `size_to_close` for a partial is `maintenance_margin / 2` (integer-truncated). The `deficit` for backstop is `maintenance_margin − account_value` when `account_value ≥ 0`, else `maintenance_margin + |account_value|`.
 - The driver evaluates an **incremental dirty set** each block (event-dirtied accounts + a rolling self-heal slice), not a full scan — proven equivalent to a from-scratch scan by fuzz test. T0 accounts get their resting ALO liquidity force-cancelled after classification.
@@ -124,7 +124,7 @@ T0 is a **one-block hysteresis layer**. You enter the band; the chain freezes yo
 - close part of the position manually,
 - or do nothing — in which case T1 fires on the next eval.
 
-At a 100 ms block time the grace window is short but deterministic and large enough for an automated risk process to react.
+The grace window is exactly **one committed block** — short but deterministic, and large enough for an automated risk process to react. Block cadence is a governed, per-deployment target, not a fixed duration; measure your own deployment's committed-round rate if your risk process needs a wall-clock reaction budget.
 
 ### Why only ALO orders get cancelled {#why-only-alo-orders-get-cancelled}
 
@@ -253,16 +253,47 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 |----------|----------|
 | Headed for T0 | Top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross). Pre-position trigger orders before stress. |
 | Already at T0 | Same. ALO orders are already cancelled; place fresh limits at protective levels. |
-| Bouncing in/out of T0 | Tighten internal alerts to `health < 1.2`. Look at what's driving — funding payment? mark band edge? oracle outage? |
+| Bouncing in/out of T0 | Tighten your internal ratio alert toward `1.2` (the derived ratio from `account_value` / `maint_margin` — see [two meanings of health](#two-meanings-of-health), not the wire `health` field). Look at what's driving it — funding payment? mark band edge? oracle outage? |
 | T1 partial just fired | Re-eval. Position is 50% smaller; consider closing the remainder voluntarily before cooldown's full-close escalation. |
 | Repeated T1 cooldown traps | The position size is wrong for the bucket. Don't refill the bucket without also resizing. |
 
+## Two meanings of "health" {#two-meanings-of-health}
+
+The word **health** names two different quantities, and mixing them up
+produces alerts that never fire.
+
+1. **The tier-decision ratio.** The engine above computes
+   `health = account_value / maintenance_margin` and compares that RATIO
+   against the yellow-card / partial / full-market thresholds. This ratio
+   decides your tier. No read returns it as its own field — derive it
+   yourself from `account_value` and `maint_margin`, both on
+   [`account_state`](../api/rest/info.md#account_state) /
+   `margin_summary`.
+2. **The wire `health` field.** The `health` field that `account_state` and
+   `margin_summary` actually return is a signed DOLLAR DIFFERENCE —
+   `account_value − maint_margin` — not a ratio. A healthy account can show a
+   large positive dollar figure; it does not sit near `1.0`.
+
+**Never compare the wire `health` field against a ratio-scale threshold**
+such as `1.1` or `1.2` — it is dollars, so the comparison is meaningless. To
+track the tier decision instead:
+
+- read the `tier` field directly (`Safe` / `T0` / `T1` / `T2` / `T3`, on
+  `account_state`, `margin_summary`, and every
+  [`notifications`](../api/ws/subscriptions.md#notifications) record), or
+- compute the ratio yourself from `account_value` / `maint_margin`.
+
+The yellow-card / partial / full-market thresholds are governance-tunable
+per-market parameters, not fixed forever. The `tier` field always reflects
+whichever thresholds are currently live, so prefer reading it over
+hardcoding a ratio boundary in your own alerting.
+
 ## How to stay clear {#how-to-stay-clear}
 
-- Watch `health` via [`account_state`](../api/rest/info.md#account_state) queries.
-- Set internal alerts at `health < 1.2` — well above T0.
-- For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when health crosses a threshold.
-- Watch [`userEvents`](../api/ws/subscriptions.md#userevents) on the WS feed for immediate tier transitions (margin / liquidation events ride this channel).
+- Watch `account_value` and `maint_margin` via [`account_state`](../api/rest/info.md#account_state) queries and derive your own ratio from them — see [two meanings of health](#two-meanings-of-health) above; the wire `health` field is a dollar figure, not this ratio.
+- Set an internal alert when your derived ratio drops under `1.2` — comfortably above the yellow-card entry.
+- For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when your `tier` crosses a threshold.
+- Watch [`notifications`](../api/ws/subscriptions.md#notifications) on the WS feed for immediate tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`), and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values.
 
 ## Edge cases {#edge-cases}
 
@@ -282,7 +313,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 - [ADL allocation algorithm](./adl.md) — math behind T4
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso scopes the ladder
 - [Mark prices](./mark-prices.md) — what drives health
-- [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) — tier transitions ride this channel
+- [`notifications` WS channel](../api/ws/subscriptions.md#notifications) — tier transitions ride this channel
 - [Risk-watcher pattern](../integration/risk-watcher.md) — automated margin top-up
 
 ## FAQ {#faq}

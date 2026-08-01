@@ -1,7 +1,7 @@
 # WebSocket API
 
 :::info
-**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, `explorer_txs`, and `candles` (rolling mark / oracle price bars, per `(coin, interval, candle_type)`) — all push real committed data, change-driven (a channel emits a frame only when its state changed since the last commit) — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md#channel-status-at-a-glance) for the per-channel shapes and the up-to-date status list.
+**Status.** Live on the node today for `l2_book`, `bbo` (book/top-of-book), `trades`, `active_asset_ctx` (per-market mark/oracle/funding/OI), `all_mids`, `markets`, `fills`, `user_events`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_margin_state`, `explorer_block`, `explorer_txs`, and `candles` (rolling mark / oracle price bars, per `(coin, interval, candle_type)`) — all push real committed data, change-driven (a channel emits a frame only when its state changed since the last commit) — plus `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md#channel-status-at-a-glance) for the per-channel shapes and the up-to-date status list.
 :::
 
 :::info
@@ -125,7 +125,16 @@ Updates are **change-driven**: after each commit the node publishes a frame for 
 
 ### `post` (request/response over WS) {#post-requestresponse-over-ws}
 
-A `post` lets you issue a one-shot request/response call over the same socket instead of opening a REST connection. The `request` body is the same `{type, payload}` envelope the REST routes accept and is dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature verification on actions included.
+:::warning
+**Not available on the public endpoint yet.** `post` is implemented on the validator's own WebSocket,
+but the public endpoint is served by the gateway, and the gateway does not carry `post` today. A
+`post` frame sent to the public endpoint gets no response.
+
+Until that lands, place and cancel orders over [`POST /exchange`](../rest/exchange.md) and take your
+market data from the subscription channels on this page. Track it as the WS write lane.
+:::
+
+A `post` lets you issue a one-shot request/response call over the same socket instead of opening a REST connection. The `request` body is the same `{type, payload}` envelope the REST routes accept and is dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature verification on actions included. The shapes below are what the validator serves, and what the gateway will serve when the lane opens.
 
 Request:
 

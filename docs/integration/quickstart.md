@@ -149,7 +149,7 @@ Or, subscribe to live updates (preferred for any non-trivial usage):
 
 ```typescript
 const ws = client.ws();
-ws.subscribe('userEvents', { user: client.address }, (event) => {
+ws.subscribe('order_updates', { user: client.address }, (event) => {
   console.log('event:', event);
 });
 ```
@@ -194,7 +194,7 @@ sequenceDiagram
     gateway->>node: admit
     node->>consensus: commit
     node-->>gateway: 202 Accepted
-    gateway-->>client: orderEvents
+    gateway-->>client: order_updates push
 
     client->>gateway: POST /exchange Cancel
     gateway->>node: admit + commit

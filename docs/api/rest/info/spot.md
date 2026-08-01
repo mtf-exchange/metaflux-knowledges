@@ -230,10 +230,12 @@ Response:
 | `time` | uint64 | Consensus block time in **milliseconds** — a **bare integer**, same consensus clock as `height` |
 
 `height` / `time` are an **as-of stamp** (identical semantics to the perp
-[`account_state`](../info.md#account_state) read, and matching the WS
-[`spot_state`](../../ws/subscriptions.md#spot_state) channel): they advance every
+[`account_state`](../info.md#account_state) read): they advance every
 commit even when no balance moved, letting a client distinguish a fresh-but-quiet
-account from a stalled read path.
+account from a stalled read path. There is no live WS channel that pushes this
+plain per-token balance view — poll this read instead. (The WS
+[`spot_margin_state`](../../ws/subscriptions.md#spot_margin_state) channel is a
+different, leveraged-position view, not a balances push.)
 
 Token set is the union of the account's balance and escrow (`reserved`) keys —
 a token that is entirely held with zero spendable still appears. Range-scanned
@@ -261,7 +263,7 @@ Response:
     "user": "0x<addr>",
     "accounts": [
       {
-        "pair": 200,
+        "pair": "MTF/USDC",
         "collateral": "0",
         "borrowed": "20",
         "borrow_index_snapshot": "1",
@@ -276,7 +278,7 @@ Response:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `accounts[*].pair` | uint32 | Spot pair id the position is on |
+| `accounts[*].pair` | string | Spot pair symbol (e.g. `"MTF/USDC"`), not a numeric id |
 | `accounts[*].collateral` | decimal string | **Vestigial.** Spot margin is now cross-collateralized against your unified USDC account, so there is no per-pair collateral bucket. Reads `"0"`; kept only for wire-shape compatibility |
 | `accounts[*].borrowed` | decimal string | Outstanding loan **principal** (at the snapshot index) |
 | `accounts[*].borrow_index_snapshot` | decimal string | Pool borrow index captured at open (debt-accrual basis) |

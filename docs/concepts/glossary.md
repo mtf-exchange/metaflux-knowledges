@@ -60,8 +60,6 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **FIFO — First-In-First-Out.** Order matching priority at the same price level on the continuous CLOB.
 
-**FOK — Fill-or-Kill.** TIF that fills the entire order or cancels everything. See [order types](./order-types.md#time-in-force).
-
 **Funding rate.** Per-asset discrete user-to-user payment (default 1h period, governance-configurable per asset) that pegs perp price to underlying oracle. See [funding rates](./funding-rates.md).
 
 ## G {#g}
@@ -82,7 +80,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **Idempotency.** Property whereby retrying a request causes the same observable effect. See [idempotency](../integration/idempotency.md).
 
-**Insurance pool.** Subset of MFlux Vault reserved for T3 backstop coverage. See [vaults](./vaults.md#insurance-pool).
+**Insurance pool.** Subset of the Metaliquidity vault reserved for T3 backstop coverage. See [vaults](./vaults.md#insurance-pool).
 
 **Isolated margin.** Margin mode where a per-asset bucket caps the loss on that asset. See [margin modes](./margin-modes.md).
 
@@ -104,7 +102,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **Master account.** The account whose state is mutated by actions; can be signed by itself or by an approved agent. See [agent wallets](./agent-wallets.md).
 
-**MFlux Vault.** Protocol-operated insurance + market-making pool. See [vaults](./vaults.md#mflux-vault).
+**Metaliquidity vault.** Protocol-operated insurance + market-making pool (vault `kind: "Metaliquidity"`). See [vaults](./vaults.md#metaliquidity-vault).
 
 **MIP — Market Improvement Proposal.** Numbered protocol improvement (analogous to the improvement-proposal schemes used by established on-chain perp protocols). See [MIP](../mip/).
 
@@ -120,7 +118,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## O {#o}
 
-**Oid — Order ID.** Server-assigned uint64; returned in the `Order` response and on `userEvents`/`orderEvents`. See [exchange.md](../api/rest/exchange.md).
+**Oid — Order ID.** Server-assigned uint64; returned in the `Order` response and on the [`order_updates`](../api/ws/subscriptions.md#order_updates) / [`fills`](../api/ws/subscriptions.md#fills) / [`open_orders`](../api/ws/subscriptions.md#open_orders) WS channels. See [exchange.md](../api/rest/exchange.md).
 
 **Oracle.** External price feed composed from CEX prices via TWA. Input to mark price + funding. See [mark prices](./mark-prices.md#the-oracle-c1-anchor).
 
@@ -158,7 +156,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **Tick size.** Minimum price increment for a market. Orders must align.
 
-**TIF — Time-In-Force.** Order parameter: GTC / IOC / ALO / FOK. See [order types](./order-types.md#time-in-force).
+**TIF — Time-In-Force.** Order parameter: GTC / IOC / ALO. There is no FOK (fill-or-kill) or all-or-none value. See [order types](./order-types.md#time-in-force).
 
 **TPSL — Take-Profit / Stop-Loss.** Trigger-order grouping for protective braces. See [order types](./order-types.md#triggers).
 

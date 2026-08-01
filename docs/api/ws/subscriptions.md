@@ -1,11 +1,11 @@
 # WS subscription channels
 
 :::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit (the exception: `account_state` and `spot_state` additionally re-send an unchanged snapshot as a ~1s liveness heartbeat). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`, and takes an optional `candle_type` (`mark` / `oracle`); per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
+**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_margin_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit (the exception: `account_state` and `spot_margin_state` additionally re-send an unchanged snapshot every 4 committed blocks, as a commit-count liveness heartbeat — not a wall-clock interval). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`, and takes an optional `candle_type` (`mark` / `oracle`); per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
 
 :::warning
 **`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
-[`account_state`](#account_state) + [`spot_state`](#spot_state) + `order_updates`
+[`account_state`](#account_state) + [`spot_margin_state`](#spot_margin_state) + `order_updates`
 (or the REST focused reads). Subscribing to `web_data2` now returns
 `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
 :::
@@ -44,8 +44,8 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, on change |
 | `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), on change |
 | `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`; `state.twapId` is the parent id to pass to `twap_cancel`, alongside coin/side/sz/executedSz/minutes/reduceOnly: activated / finished / terminated), on change |
-| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change + ~1s heartbeat |
-| `spot_state` | **live** | `user`/`address` (required) | per-account SPOT clearinghouse state — per-token balances — on change + ~1s heartbeat |
+| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change + heartbeat every 4 committed blocks |
+| `spot_margin_state` | **live** | `user`/`address` (required) | per-account spot-margin positions — on change + heartbeat every 4 committed blocks |
 | `explorer_block` | **live** | none | latest committed block header, on each new block |
 | `explorer_txs` | **live** | none | transactions in the latest committed block, on each new block |
 
@@ -477,30 +477,46 @@ with no funds), not an empty array.
   "channel": "account_state",
   "data": {
     "address": "0x<addr>",
-    "account_value": "10000", "free_collateral": "8500", "maint_margin": "300",
-    "init_margin": "1500", "health": "0.97", "tier": 0,
-    "mode": "cross", "pm_enabled": false,
-    "positions": [
-      { "asset": 0, "size": "600", "entry": "62000", "upnl": "441",
-        "isolated": false, "lev": 7, "side": "long" }
+    "account_value": "10000", "free_collateral": "8500",
+    "init_margin": "1500", "health": "9700", "tier": "Safe",
+    "abstraction": "unified",
+    "clearinghouse_state": { "": { "positions": [
+      { "coin": "BTC", "size": "0.00600", "entry": "62000", "upnl": "441",
+        "isolated": false, "lev": 7, "liq": "0", "roe": "0.35",
+        "funding": "-0.02", "margin": "53.14", "maint_margin": "11.16",
+        "notional": "372.60" }
+    ] } },
+    "balances": [
+      { "asset": 100, "name": "USDC", "total": "10000", "hold": "0" },
+      { "asset": 3, "name": "MTF", "total": "12.5", "hold": "0" }
     ],
-    "balances": { "usdc": "10000", "spot": { "MTF": { "total": "12.5", "hold": "0" } } },
+    "pm_maint_margin": "0", "pm_net_value": "0", "pm_concentration_penalty": "0",
+    "position_mode": "one_way",
     "height": 562,
     "time": 1700000000555
   }
 }
 ```
 
-- Margin scalars (`account_value` / `free_collateral` / `maint_margin` /
-  `init_margin` / `health`) are **whole-USDC** decimal strings, identical to the
-  REST account read's `MarginScalars`; `tier` is the liquidation tier index,
-  `mode` the account default, `pm_enabled` whether portfolio margin is on.
-- `positions[]` — one entry per open perp position: `asset` (numeric id), `size`
-  (signed 1e8-plane string), `entry` / `upnl` (whole-USDC),
-  `isolated`, `lev`, and `side` (`long` / `short`, present in
-  hedge mode).
-- `balances` — `{usdc, spot}`: `usdc` is the quote collateral (whole-USDC); `spot`
-  maps token → `{total, hold}`.
+- Margin scalars (`account_value` / `free_collateral` / `init_margin`) are
+  **whole-USDC** decimal strings, identical to the REST account read's
+  `MarginScalars`. `health` is `account_value − maint_margin`, a **signed
+  whole-USDC dollar figure, not a ratio**. `tier` is the liquidation tier name
+  (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`). `abstraction` is `"unified"`
+  or `"portfolio"` (PM-enrolled) — there is no account-level `maint_margin` or
+  `mode`/`pm_enabled` field; poll [`margin_summary`](../rest/info.md#margin_summary)
+  for the account-level `maint_margin`.
+- `clearinghouse_state` — keyed by dex (`""` = core dex, else a MIP-3
+  deployer's `0x` address); each value is `{positions: [...]}`. A position row
+  carries `coin` (market symbol, not a numeric id), `size` (signed **real**
+  size, decimal string — negative is short), `entry` / `upnl` / `margin` /
+  `maint_margin` / `notional` (whole-USDC), `isolated`, `lev`, `liq`, `roe`,
+  `funding`, and `side` (`long` / `short`, present only in hedge mode).
+- `balances` — an array of `{asset, name, total, hold}` rows; row 0 is always
+  USDC (asset id `100`).
+- `pm_maint_margin` / `pm_net_value` / `pm_concentration_penalty` — the folded
+  portfolio-margin figures (whole-USDC), always present, `"0"` when not
+  PM-enrolled. `position_mode` is `"one_way"` or `"hedge"`.
 - `height` / `time` — the **as-of stamp**: `height` is the committed block height
   the frame was rendered against and `time` the consensus block time in ms. Both
   are **bare integers** (not Decimal strings) and advance on **every** commit,
@@ -509,12 +525,15 @@ with no funds), not an empty array.
   the change-gate** below (the stamp advancing never by itself triggers a push),
   so a client can use them to tell a fresh-but-quiet account from a stalled feed.
 
-Frequency: change-driven, **plus a liveness heartbeat** — a frame is sent when the
-account's state changes since the last commit, and additionally the current full
-snapshot (unchanged body, only a fresh `height`/`time` stamp) is re-sent about
-once per second (every 4 commits at the ~250 ms Core cadence) even when nothing
-changed. The heartbeat lets a client confirm the feed is live and distinguish a
-quiet account from a stalled connection.
+Frequency: change-driven, **plus a liveness heartbeat**. A frame is sent when the
+account's state changes since the last commit. The current full snapshot
+(unchanged body, only a fresh `height`/`time` stamp) is also re-sent every 4
+committed blocks, even when nothing changed. This interval is **commit-count
+based, not wall-clock** — block cadence is a governed, per-deployment target, so
+4 commits maps to a different real-time span on different deployments. Read the
+`height` field's own advance rate if you need a wall-clock estimate. The
+heartbeat lets a client confirm the feed is live and distinguish a quiet account
+from a stalled connection.
 
 :::warning
 `account_state` is per-account data but currently has **no authentication** — any
@@ -522,47 +541,58 @@ connection can subscribe to any address. Do not treat it as private until the
 auth-at-subscribe gate lands.
 :::
 
-### Per-account spot clearinghouse state {#spot_state}
+### Per-account spot-margin positions {#spot_margin_state}
 
-Per-account **SPOT** clearinghouse state — the per-token spot balances for one
-account — pushed when they change. Requires `user`. The initial snapshot is the live
-balance set (`[]` for an account with no spot holdings).
+Per-account **spot-margin** positions — the leveraged spot-margin book for one
+account (see [spot margin](../../products/spot-margin.md)) — pushed when it
+changes. Requires `user`. The initial snapshot is the live position set (`[]`
+for an account with no spot-margin positions). This is **not** a plain
+spot-token-balance feed — there is no live WS channel for that today; poll
+the REST [`spot_clearinghouse_state`](../rest/info/spot.md#spot_clearinghouse_state)
+read for plain per-token spot balances instead.
 
 ```json
-{ "method": "subscribe", "subscription": { "type": "spot_state", "user": "0x<address>" } }
+{ "method": "subscribe", "subscription": { "type": "spot_margin_state", "user": "0x<address>" } }
 ```
 
 ```json
 {
-  "channel": "spot_state",
+  "channel": "spot_margin_state",
   "data": {
-    "address": "0x<addr>",
-    "balances": [
-      { "asset": 1, "name": "USDC", "total": "2500", "hold": "100" },
-      { "asset": 2, "name": "MTF", "total": "12.5", "hold": "0" }
-    ],
-    "height": 562,
-    "time": 1700000000555
+    "user": "0x<addr>",
+    "accounts": [
+      {
+        "pair": "MTF/USDC",
+        "collateral": "0",
+        "borrowed": "20",
+        "borrow_index_snapshot": "1",
+        "base_held": "9.99",
+        "current_debt": "22",
+        "params": { "init_bps": 2000, "maint_bps": 1000 }
+      }
+    ]
   }
 }
 ```
 
-- `balances[]` — one entry per held spot token: `asset` (numeric id), `name`
-  (token symbol), `total` (whole-token decimal string), `hold` (amount reserved
-  by resting spot orders). Identical to the REST spot-balances read.
-- `height` / `time` — the **as-of stamp**: `height` is the committed block height
-  the frame was rendered against and `time` the consensus block time in ms, both
-  **bare integers** that advance on **every** commit even when the balances are
-  unchanged. Identical values to the REST
-  [`spot_clearinghouse_state`](../rest/info/spot.md#spot_clearinghouse_state) read
-  and excluded from the change-gate, so a client can tell a quiet account from a
-  stalled feed.
+- `accounts[]` — one entry per open spot-margin position, in pair-id order; the
+  same body the REST [`spot_margin_state`](../rest/info/spot.md#spot_margin_state)
+  read renders (single-source). `pair` is the pair's symbol (e.g. `"MTF/USDC"`),
+  not a numeric id. `collateral` reads `"0"` — spot margin is cross-collateralized
+  against the unified USDC account; the field is kept only for wire-shape
+  compatibility. `current_debt` is `borrowed` accrued to now against the pool's
+  live borrow index. `params` is `null` when margin is not enabled/calibrated
+  for the pair.
 
-Frequency: change-driven, **plus a liveness heartbeat** — a frame is sent when the
-spot balances change since the last commit, and additionally the current full
-snapshot (unchanged body, only a fresh `height`/`time` stamp) is re-sent about
-once per second (every 4 commits at the ~250 ms Core cadence) even when nothing
-changed, so a client can confirm the feed is live.
+Frequency: change-driven, **plus a liveness heartbeat**, because `current_debt`
+accrues every commit even with no trading activity. A frame is sent when the
+position set changes since the last commit. The current full snapshot
+(unchanged body) is also re-sent every 4 committed blocks, even when nothing
+changed. This interval is **commit-count based, not wall-clock** — block
+cadence is a governed, per-deployment target, so 4 commits maps to a different
+real-time span on different deployments. Measure your own deployment's commit
+rate if you need a wall-clock estimate. This lets a client confirm the feed is
+live.
 
 ### Per-account realized funding payments {#user_fundings}
 
@@ -587,6 +617,48 @@ from the just-committed settlement; the initial snapshot is `[]`.
 - `szi` — the signed position size the payment was computed against (base units).
 - `fundingRate` — the per-asset rate applied at this settlement (decimal string).
 - `time` — settlement timestamp (consensus ms).
+
+### Per-account TWAP slice fills {#user_twap_slice_fills}
+
+Per-account TWAP slice fills — one record each time a running `twap_order`'s
+slice crosses the book. Requires `user` (the 0x address; `address` is also
+accepted) — NOT a `coin`. Each frame's `data` is an array of slice-fill
+records from the just-committed block; the initial snapshot is `[]`.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "user_twap_slice_fills", "user": "0x<address>" } }
+```
+
+```json
+{ "channel": "user_twap_slice_fills", "data": [
+  { "fill": { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "1000000", "time": 1735689600123, "oid": 42, "cloid": null, "tid": 1234567890, "crossed": true }, "twapId": 17 }
+] }
+```
+
+- `fill` — the same taker-leg record shape [`fills`](#fills) carries.
+- `twapId` — the parent TWAP's id, the same value [`twap_cancel`](../rest/exchange.md#twap_cancel) takes.
+
+### Per-account TWAP lifecycle {#user_twap_history}
+
+Per-account TWAP parent lifecycle — one record on each state transition
+(`activated` / `finished` / `terminated`). Requires `user`. Each frame's
+`data` is an array of transition records; the initial snapshot is `[]`.
+
+```json
+{ "method": "subscribe", "subscription": { "type": "user_twap_history", "user": "0x<address>" } }
+```
+
+```json
+{ "channel": "user_twap_history", "data": [
+  { "time": 1735689600123,
+    "state": { "twapId": 17, "coin": "BTC", "side": "B", "sz": "10000000", "executedSz": "1000000", "minutes": 60, "reduceOnly": false, "timestamp": 1735689600123 },
+    "status": { "status": "activated" } }
+] }
+```
+
+- `state.twapId` — the parent id to pass to [`twap_cancel`](../rest/exchange.md#twap_cancel) — the id appears nowhere else pre-fill.
+- `state.sz` / `state.executedSz` — total / executed size, size-plane decimal strings.
+- `status.status` ∈ `activated` / `finished` / `terminated`.
 
 ### Latest committed block header {#explorer_block}
 
@@ -644,7 +716,12 @@ Not a subscription channel, but the way to do one-shot reads and signed writes o
 { "method": "post", "id": 1, "request": { "type": "info", "payload": { "type": "l2_book", "coin": "BTC" } } }
 ```
 
-This is the supported path for authenticated reads and for submitting signed actions over WS today.
+:::warning
+**The public endpoint does not serve `post` yet.** It is implemented on the validator WebSocket only;
+the gateway that fronts the public endpoint does not carry it. Send orders over
+[`POST /exchange`](../rest/exchange.md) for now. See the warning in the
+[WS README](./index.md#post-requestresponse-over-ws).
+:::
 
 ---
 

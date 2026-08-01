@@ -404,9 +404,10 @@ each.
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |
-| `BorrowLend` | — | Not bridged |
-| (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` |
-| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to [`user_portfolio_margin`](#user_portfolio_margin) (enroll / unenroll). `pm_rebalance` has been **removed** — rejected as an unknown action |
+| (legacy CCTP withdraw) | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use mb_withdraw"`) — use [`mb_withdraw`](#mb_withdraw) |
+| (BOLE pool) | `borrow_lend` | **Bridged and live** — `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` are open to any account; `"Borrow"` is refused unless the sender is an approved liquidator |
+| (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit; see [vaults](../../concepts/vaults.md#depositing) |
+| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag — enroll via [`user_portfolio_margin`](#user_portfolio_margin). `pm_unenroll` **is** a bridged alias (no params) for the same action's `enroll:false` form. `pm_rebalance` has been **removed** — rejected as an unknown action |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` |
 
 ---
@@ -919,9 +920,10 @@ approved agent may schedule it **as** an `owner` it acts for.
 The parent `twap_id` (uint64) is assigned **at commit** from a deterministic
 per-chain counter and carried in the commit outcome — it is **not** in the HTTP
 response. Track the commit via the returned `action_hash`. A zero `total_size`
-or a zero `slice_count` errors at commit. Slice events ride the
-[`user_events` WS channel](../ws/subscriptions.md) (a dedicated `twap*` stream
-is roadmap).
+or a zero `slice_count` errors at commit. Slice fills ride the dedicated
+[`user_twap_slice_fills`](../ws/subscriptions.md#user_twap_slice_fills) WS
+channel; parent lifecycle transitions ride
+[`user_twap_history`](../ws/subscriptions.md#user_twap_history).
 
 ---
 
@@ -1026,8 +1028,7 @@ book is rejected in its own slot, and once free collateral runs out the remainin
 rungs are rejected while the earlier ones stay. The response echoes every rung's
 exact price, size, and assigned `oid` (or its error), in rung order, so you get
 the node-derived ladder back in one reply. You can also rebuild the ladder later
-from [`frontend_open_orders`](./info.md#frontend_open_orders) filtered by the
-shared `cloid`.
+from [`open_orders`](./info.md#open_orders) filtered by the shared `cloid`.
 
 **Seams to know:**
 
@@ -2090,7 +2091,8 @@ enters a slashable unbonding window before the stake returns to that balance.
   "params": {
     "validator":     "0x00000000000000000000000000000000000000aa",
     "amount":        "100.5",
-    "is_undelegate": false
+    "is_undelegate": false,
+    "lock_months":   0
   }
 }
 ```
@@ -2100,6 +2102,7 @@ enters a slashable unbonding window before the stake returns to that balance.
 | `validator` | hex address | 20-byte validator address |
 | `amount` | decimal (string or number) | Stake amount |
 | `is_undelegate` | bool | `true` = unstake / queue undelegation; `false` = delegate |
+| `lock_months` | uint8 | Optional, default `0`. One of `0` (flexible) / `1` / `6` / `24`. Ignored on undelegate; a non-zero value is admitted only for a governance-allowlisted validator |
 
 ---
 
@@ -2515,10 +2518,10 @@ here only to redirect integrators to the supported path.
 | `MultiSig` | `multi_sig` | **Bridged and executing.** Post it as a normal `multi_sig` envelope | [`multi_sig`](../../concepts/multi-sig.md#acting-as-multi-sig) acts; [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
-| `WithdrawUsdc` | — | Draft name; not a native tag | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
-| `BorrowLend` | — | Not bridged | — |
-| (vault distribute) | `vault_distribute` | Partial/stub handler; not bridged on `/exchange` | — |
-| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | Map to the canonical enroll/unenroll action; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
+| `WithdrawUsdc` | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use mb_withdraw"`) | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
+| (BOLE pool) | `borrow_lend` | **Bridged and live.** `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` open to any account; `"Borrow"` refused unless the sender is an approved liquidator | — |
+| (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit | [vaults](../../concepts/vaults.md#depositing) |
+| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` **is** a bridged alias (no params) for the canonical action's `enroll:false` form; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
 | `UserDexAbstraction` | `user_dex_abstraction` | **Removed** at the `0.7.0` re-genesis → `unsupported action`. One unified account, so nothing to abstract | — (no replacement) |
@@ -2542,9 +2545,9 @@ The response shape depends on the action class:
 
 ### `200 OK` — order path (synchronous oid) {#200-ok--order-path-synchronous-oid}
 
-An order-type action blocks up to the node's order-wait window (default 5 s;
-devnet commits in ~250 ms) so the response carries the real `oid` + resting/filled
-status. On timeout it returns a `pending` entry — **never a fabricated oid**. A
+An order-type action blocks up to the node's order-wait window (default 5 s) so
+the response carries the real `oid` + resting/filled status. On timeout it
+returns a `pending` entry — **never a fabricated oid**. A
 `batch_order` / `scale_order` resolves to **one entry per placed leg or rung**; a
 single order to one entry.
 
@@ -2656,7 +2659,7 @@ flowchart LR
     D -.-> D2["appears in /info and WS feeds"]
 ```
 
-Track commit status via the [WS feed](../ws/subscriptions.md) (`orderEvents` / `userEvents`) or poll `/info` for `openOrders` / `userFills`. The `action_hash` returned at admission appears unchanged in commit events.
+Track commit status via the [WS feed](../ws/subscriptions.md) — [`order_updates`](../ws/subscriptions.md#order_updates) / [`fills`](../ws/subscriptions.md#fills) — or poll `/info` for `open_orders` / `user_fills`. Correlate by `cloid`: the `action_hash` returned at admission is not echoed on any per-account WS event today. The public [`explorer_txs`](../ws/subscriptions.md#explorer_txs) feed does carry it (as `hash`), for every transaction in the latest block, if you need a hash-keyed check.
 
 ## Sequence diagram — place an order and see it on the book {#sequence-diagram--place-an-order-and-see-it-on-the-book}
 
@@ -2674,8 +2677,8 @@ sequenceDiagram
     node->>consensus: leader proposes block
     consensus-->>node: 2-chain commit
     Note over node: apply order to book
-    node-->>gateway: WS orderEvents {resting, oid:...}
-    gateway-->>client: WS orderEvents {resting, oid:...}
+    node-->>gateway: WS order_updates {status: open, oid:...}
+    gateway-->>client: WS order_updates {status: open, oid:...}
 ```
 
 ## Edge cases {#edge-cases}
@@ -2683,7 +2686,7 @@ sequenceDiagram
 <details>
 <summary>Show edge cases</summary>
 
-- **Race between `ApproveAgent` and first agent-signed order.** Submit `ApproveAgent`, await `orderEvents`/commit, then start agent traffic. Or, accept that the first 1–2 requests will `401` and retry with linear backoff for ≤2 blocks (~200 ms).
+- **Race between `ApproveAgent` and first agent-signed order.** Submit `ApproveAgent`, await its commit via [`order_updates`](../ws/subscriptions.md#order_updates) or by polling `/info`, then start agent traffic. Or, accept that the first 1–2 requests will `401` and retry with linear backoff for a couple of committed blocks.
 - **Cancel arrives after fill commits.** Returns `"order not found"`. Harmless. Watch fills first if accuracy matters.
 - **Order admits but fails at commit** (e.g. reduce-only violation discovered post-admit because of intervening fills). The commit event carries `{"error":"<reason>"}`; the order is not on the book.
 - **Numeric overflow on fixed-point fields.** Anything fitting in `u128` is accepted. The server rejects with `400 invalid numeric` if your encoded string exceeds `2^128 - 1`.

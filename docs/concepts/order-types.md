@@ -280,7 +280,7 @@ slice 60: send last IOC just before t = duration
 
 `randomize_pct` ∈ `[0, 50]` jitters slice times by ±`randomize_pct/100 × slice_interval`. Set higher to be harder to detect; set lower for tight time-control.
 
-Slices are submitted by the protocol; nothing for the client to do after submitting `twap_order`. Slice events ride the [`userEvents` WS channel](../api/ws/subscriptions.md#userevents) (a dedicated `twap*` stream is roadmap).
+Slices are submitted by the protocol; nothing for the client to do after submitting `twap_order`. Slice fills ride the dedicated [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) WS channel; parent lifecycle transitions (activated / finished / terminated) ride [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history).
 
 TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange.md#twap_cancel); already-filled slices stay filled, future slices stop.
 
@@ -316,14 +316,14 @@ stateDiagram-v2
     Filled --> [*]: "(no further events)"
 ```
 
-Each state transition emits a corresponding event on [`userEvents`](../api/ws/subscriptions.md#userevents) (order-lifecycle events ride this channel).
+Each state transition emits a corresponding event on [`order_updates`](../api/ws/subscriptions.md#order_updates), the live order-lifecycle channel.
 
 ## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
 
-- **Reduce-only race with fill.** Stop is reduce-only; a fill closes the position; the stop fires; commit-time check fails with `reduce_only_violation_post_admit`. Solution: wire `userFills` events back into your bot to cancel braces on full close.
+- **Reduce-only race with fill.** Stop is reduce-only; a fill closes the position; the stop fires; commit-time check fails with `reduce_only_violation_post_admit`. Solution: wire [`fills`](../api/ws/subscriptions.md#fills) events back into your bot to cancel braces on full close.
 - **STP at admit vs at match.** STP is only enforced at the match step. Two opposite-side orders that don't cross will both rest. STP fires only when they would actually trade.
 - **TWAP mid-volatility.** Each slice is an IOC near mid — if liquidity dries up between slices, slices can return fully unfilled. Watch slice events.
 - **ALO + crossing book.** ALO that would cross *any* level is rejected entirely, not partially. To slip into the book at a tight price, use a non-crossing limit at one tick worse than best opposite.

@@ -124,10 +124,12 @@ c.exchange.fba_order(FbaOrderParams { .. }).await?;
 ```
 
 :::warning
-**Margin controls are perp-only.** `update_leverage`, `update_isolated_margin`,
-and `update_margin_mode` apply to perpetual positions only. Spot positions do not
-support leverage or isolated margin in V1 — spot trading uses the
-reserved-balance escrow model via the spot order path instead.
+**Margin controls are perp-only.** `update_leverage` and
+`update_isolated_margin` apply to perpetual positions only — there is no
+separate margin-mode action; `update_leverage`'s `is_isolated` flag IS the
+mode switch. Spot positions do not support leverage or isolated margin in
+V1 — spot trading uses the reserved-balance escrow model via the spot order
+path instead.
 :::
 
 ### `ws` {#ws}
@@ -142,11 +144,10 @@ while let Some(event) = stream.next().await {
 
 let mut user = ws.subscribe_user_events(c.address()).await?;
 while let Some(event) = user.next().await {
-    match event?.data {
-        UserEvent::Fill(fill)       => { /* ... */ }
-        UserEvent::OrderCancelled(o) => { /* ... */ }
-        _ => {}
-    }
+    // `user_events` carries only fills: `{"fills": [<fill>]}`. It is not a
+    // tagged union — there is no cancel / order-lifecycle variant on this
+    // channel; use `order_updates` for that.
+    let fills = event?.data.fills;
 }
 ```
 
