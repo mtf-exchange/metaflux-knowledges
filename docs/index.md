@@ -3,7 +3,7 @@ description: Integration reference, API surface, and core concepts for the MetaF
 slug: /
 ---
 
-<img src="/img/og.svg" alt="MetaFlux — derivatives, on first principles" class="hero-banner" />
+<img src="/img/og.png" alt="MetaFlux — derivatives, on first principles" class="hero-banner" />
 
 # MetaFlux Knowledge Base
 

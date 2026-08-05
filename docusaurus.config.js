@@ -1,5 +1,45 @@
 // @ts-check
-import {themes as prismThemes} from 'prism-react-renderer';
+
+/**
+ * Syntax highlighting, on the theme's own palette.
+ *
+ * Three hues and nothing else: the primary carries keywords, the second voice
+ * carries strings, the warn hue carries numbers, and everything structural —
+ * function names, tags, properties — is plain ink. Off-the-shelf themes reach for
+ * eight or ten, which on a reference page means the code block is louder than the
+ * prose explaining it. Neutrals are the same ink ramp the body text uses, so the
+ * block reads as part of the page rather than a pasted-in terminal.
+ *
+ * Each entry is measured against the card surface it sits on, not against white.
+ */
+const codeTheme = (p) => ({
+  plain: {color: p.ink2, backgroundColor: p.card},
+  styles: [
+    {types: ['comment', 'prolog', 'cdata', 'doctype'], style: {color: p.ink3, fontStyle: 'italic'}},
+    {types: ['punctuation', 'operator', 'entity'], style: {color: p.ink3}},
+    {
+      types: ['keyword', 'atrule', 'rule', 'important', 'builtin', 'boolean', 'null', 'unit'],
+      style: {color: p.key},
+    },
+    {types: ['string', 'char', 'attr-value', 'regex', 'url', 'inserted'], style: {color: p.str}},
+    {types: ['number', 'constant', 'symbol'], style: {color: p.num}},
+    {
+      types: ['function', 'class-name', 'tag', 'selector', 'property', 'attr-name', 'variable'],
+      style: {color: p.ink},
+    },
+    {types: ['deleted'], style: {color: p.del}},
+    {types: ['namespace'], style: {opacity: 0.7}},
+  ],
+});
+
+const prismLight = codeTheme({
+  card: '#f1f1ec', ink: '#322f28', ink2: '#625e53', ink3: '#6f6a5e',
+  key: '#1a6670', str: '#4e6b3a', num: '#8a5a12', del: '#a33b52',
+});
+const prismDark = codeTheme({
+  card: '#24231f', ink: '#e9e3d8', ink2: '#aba598', ink3: '#948e80',
+  key: '#7fc7ce', str: '#a9c294', num: '#e0b450', del: '#e88b9f',
+});
 
 // Use Algolia only when real creds are present; otherwise fall back to the
 // credential-free local search so search works in dev / PR previews / any deploy.
@@ -143,8 +183,10 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       image: 'img/og.png',
+      // Light-first, following the OS — the same default the app resolves to
+      // (app.html stamps `theme: 'system'` pre-paint).
       colorMode: {
-        defaultMode: 'dark',
+        defaultMode: 'light',
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
@@ -152,9 +194,10 @@ const config = {
         theme: {light: 'neutral', dark: 'dark'},
         options: {
           themeVariables: {
-            primaryColor: '#5BCEFA',
-            lineColor: '#F5A9B8',
-            fontFamily: 'Geist, system-ui, sans-serif',
+            // The two voices: teal primary, sage second.
+            primaryColor: '#1a6670',
+            lineColor: '#5b7449',
+            fontFamily: 'Figtree, system-ui, sans-serif',
           },
         },
       },
@@ -171,14 +214,18 @@ const config = {
         },
       }),
       navbar: {
-        // Brand is the two-tone "Meta" + serif-italic-pink "Flux" wordmark (see custom.css).
+        // The brand is the real lockup asset — mark + drawn wordmark — straight
+        // from ../metaflux-web/static/brand, in the same two theme cuts the app's
+        // BrandLockup swaps between. It is NOT type set in the UI's own faces, and
+        // it does NOT follow the accent: the v2 retheme changed the product
+        // palette, not the identity, so the wordmark keeps its own flux gradient.
+        logo: {
+          alt: 'MetaFlux',
+          src: 'brand/metaflux-lockup-color-light.svg',
+          srcDark: 'brand/metaflux-lockup-color-dark.svg',
+          href: '/',
+        },
         items: [
-          {
-            type: 'html',
-            position: 'left',
-            value:
-              '<a class="mtf-brand" href="/" aria-label="MetaFlux"><img class="mtf-brand-mark" src="/img/logo.svg" alt="" /><span class="mtf-word"><span class="b-meta">Meta</span><span class="b-flux">Flux</span></span></a>',
-          },
           {type: 'docSidebar', sidebarId: 'docsSidebar', position: 'left', label: 'Docs'},
           {to: '/integration/quickstart', label: 'Quickstart', position: 'left'},
           {to: '/api', label: 'API', position: 'left'},
@@ -201,8 +248,8 @@ const config = {
       },
       // Footer intentionally omitted (removed per request).
       prism: {
-        theme: prismThemes.github,
-        darkTheme: prismThemes.vsDark,
+        theme: prismLight,
+        darkTheme: prismDark,
         additionalLanguages: ['rust', 'bash', 'json', 'typescript', 'solidity'],
       },
       docs: {

@@ -1,7 +1,7 @@
 # WS subscription channels
 
-:::info
-**Status.** `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `all_mids`, `markets`, `fills`, `user_events`, `candles`, `order_updates`, `open_orders`, `notifications`, `ledger_updates`, `active_asset_data`, `user_fundings`, `user_twap_slice_fills`, `user_twap_history`, `account_state`, `spot_margin_state`, `explorer_block`, and `explorer_txs` are live and push real committed data — change-driven, a channel emits a frame only when its state actually changed since the last commit (the exception: `account_state` and `spot_margin_state` additionally re-send an unchanged snapshot every 4 committed blocks, as a commit-count liveness heartbeat — not a wall-clock interval). Everything else under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md). Per-market channels (`l2_book`, `bbo`, `trades`, `active_asset_ctx`) require a `coin`; `candles` requires a `coin` **and** an `interval`, and takes an optional `candle_type` (`mark` / `oracle`); per-account channels (`fills`, `user_events`, `open_orders`) require a `user` (the 0x address); `active_asset_data` requires **both** a `user` and a `coin`; the global channels `all_mids`, `markets`, `explorer_block`, and `explorer_txs` take neither.
+::::info
+Channels are **change-driven**: a channel emits a frame only when its state actually changed since the last commit. The exception is `account_state` and `spot_margin_state`, which additionally re-send an unchanged snapshot every 4 committed blocks as a commit-count liveness heartbeat — not a wall-clock interval. Anything under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md).
 
 :::warning
 **`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
@@ -9,7 +9,7 @@
 (or the REST focused reads). Subscribing to `web_data2` now returns
 `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
 :::
-:::
+::::
 
 :::info
 **Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`.
@@ -23,31 +23,31 @@ The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**
 
 and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: true`), then live change-driven `{"channel":...,"data":...}` pushes (`is_snapshot: false`). A push lands only when that channel's state actually changed since the last commit; an unchanged channel emits nothing. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
 
-## Channel status at a glance {#channel-status-at-a-glance}
+## Channels at a glance {#channels-at-a-glance}
 
-| Channel | Status | key | Live source |
-|---------|--------|:-------:|-------------|
-| `l2_book` | **live** | `coin` (required) | committed book, on change |
-| `bbo` | **live** | `coin` (required) | committed book, on change |
-| `trades` | **live** | `coin` (required) | committed-block fills, on new fills |
-| `active_asset_ctx` | **live** | `coin` (required) | per-market mark / oracle / funding / OI, on change |
-| `all_mids` | **live** | none | per-market mark, on change |
-| `markets` | **live** | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
-| `fills` | **live** | `user`/`address` (required) | committed-block fills for that account |
-| `user_events` | **live** | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
-| `candles` | **live** | `coin` + `interval` (both required), `candle_type` (optional) | mark or oracle price samples folded into OHLCV bars, on change |
-| `order_updates` | **live** | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
-| `open_orders` | **live** | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
-| `notifications` | **live** | `user`/`address` (required) | per-account margin / liquidation notices, on change |
-| `ledger_updates` | **live** | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), on change |
-| `active_asset_data` | **live** | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, on change |
-| `user_fundings` | **live** | `user`/`address` (required) | per-account realized funding payments, on change |
-| `user_twap_slice_fills` | **live** | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), on change |
-| `user_twap_history` | **live** | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`; `state.twapId` is the parent id to pass to `twap_cancel`, alongside coin/side/sz/executedSz/minutes/reduceOnly: activated / finished / terminated), on change |
-| `account_state` | **live** | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change + heartbeat every 4 committed blocks |
-| `spot_margin_state` | **live** | `user`/`address` (required) | per-account spot-margin positions — on change + heartbeat every 4 committed blocks |
-| `explorer_block` | **live** | none | latest committed block header, on each new block |
-| `explorer_txs` | **live** | none | transactions in the latest committed block, on each new block |
+| Channel | key | Source |
+|---------|:-------:|--------|
+| `l2_book` | `coin` (required) | committed book, on change |
+| `bbo` | `coin` (required) | committed book, on change |
+| `trades` | `coin` (required) | committed-block fills, on new fills |
+| `active_asset_ctx` | `coin` (required) | per-market mark / oracle / funding / OI, on change |
+| `all_mids` | none | per-market mark, on change |
+| `markets` | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
+| `fills` | `user`/`address` (required) | committed-block fills for that account |
+| `user_events` | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
+| `candles` | `coin` + `interval` (both required), `candle_type` (optional) | mark or oracle price samples folded into OHLCV bars, on change |
+| `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
+| `open_orders` | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
+| `notifications` | `user`/`address` (required) | per-account margin / liquidation notices, on change |
+| `ledger_updates` | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), on change |
+| `active_asset_data` | `user` **and** `coin` (both required) | per-(user, coin) leverage / margin-mode / max-trade context, on change |
+| `user_fundings` | `user`/`address` (required) | per-account realized funding payments, on change |
+| `user_twap_slice_fills` | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), on change |
+| `user_twap_history` | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`; `state.twapId` is the parent id to pass to `twap_cancel`, alongside coin/side/sz/executedSz/minutes/reduceOnly: activated / finished / terminated), on change |
+| `account_state` | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change + heartbeat every 4 committed blocks |
+| `spot_margin_state` | `user`/`address` (required) | per-account spot-margin positions — on change + heartbeat every 4 committed blocks |
+| `explorer_block` | none | latest committed block header, on each new block |
+| `explorer_txs` | none | transactions in the latest committed block, on each new block |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 

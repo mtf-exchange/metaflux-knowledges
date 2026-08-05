@@ -1,47 +1,94 @@
 /**
- * MetaFlux docs theme — canonical with ../metaflux-site/DESIGN.md.
- * "The Honest Instrument": near-black field, one quiet aurora, Liquid Glass panels.
- * Cormorant Garamond (display/headings) · Geist (body) · Geist Mono (labels/code).
- * PT Serif italic ONLY for the "Flux" wordmark. Two-voice blue #5BCEFA / rose #F5A9B8.
+ * MetaFlux docs theme — canonical with ../metaflux-web/src/routes/layout.css
+ * ("Perps Desktop v2", derived from the Organic design system).
+ *
+ * The app is themeable on six axes (theme · ground · accent · pnl · serif · density).
+ * A docs site has no appearance panel, so it pins ONE point in that space and maps
+ * its two polarities onto Docusaurus' light / dark. The app's `data-theme` attribute
+ * happens to be the same attribute Infima toggles, so the two systems share it.
+ *
+ * The pinned point is the app's own default appearance: `mist` ground, `teal`
+ * accent, display type on.
+ *
+ * Ground, with ONE adaptation. Mist frames the site — desk, navbar and sidebar are
+ * the preset's own tones, so what surrounds you is the app's ground. The reading
+ * column is not: it drops to a near-neutral pulled from the same hue.
+ *
+ *   desk       #d9e1d5  mist   → <body>
+ *   chrome     #e4eae0  mist   → navbar, doc sidebar
+ *   COLUMN     #f1f2ed  neutral→ the reading surface (main)
+ *   card       #e9ebe4  neutral→ code frames, tables, callouts, cards
+ *   card-deep  #dfe2d9  neutral→ table headers, nested callouts, inset fields
+ *
+ * Why: every ground preset in the app is chromatic, and it can afford to be — a
+ * terminal never holds 700px of unbroken prose. A knowledge base does nothing else,
+ * and sustained reading on a colour-cast field is what tires the eye. So the colour
+ * stays where it is seen and not read. It is one gentle step from chrome to column,
+ * not the near-white jump tried earlier, which read as a hard seam.
+ *
+ * The ink is softened with it: #2b2a27 rather than the app's #201e1d, landing body
+ * text at ~12.8:1 instead of 14.6:1. Maximum contrast is not maximum readability —
+ * near-black on near-white haloes, and it is a known fatigue source over long
+ * sessions. Every secondary step still clears AA.
+ *
+ * Warm paper grounds, a deep-teal primary with a sage second voice, real elevation.
+ * Caprasimo (display headings) · Figtree (body) · Inter (numerals + micro-labels).
+ * The near-black field, the aurora, Liquid Glass on data and Cormorant/Geist all
+ * retire with the v1 theme.
+ *
+ * The BRAND is not part of this. The v2 retheme changed the product palette, not
+ * the identity: the mark and the lockup keep their own blue→rose flux gradient in
+ * the app and they keep it here. Nothing in this file recolours them, and the
+ * wordmark is the drawn asset, never type set in the UI's faces.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=PT+Serif:ital@1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   1 · Fonts & shared scale
+   1 · Type, space, motion — shared across both planes
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --mtf-sans:  "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --mtf-mono:  "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --mtf-serif: "Cormorant Garamond", "Iowan Old Style", Cambria, Georgia, serif;
-  --mtf-serif-flux: "PT Serif", "Iowan Old Style", Cambria, Georgia, serif;
+  /* Three voices, verbatim from the app. Plus one the app doesn't need: a
+     monospace for code. The terminal has no code surface, so it ships no mono
+     face; rather than invent a fourth brand voice we take the platform's. */
+  --mtf-heading: 'Caprasimo', Georgia, serif;
+  --mtf-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mtf-num: 'Inter', system-ui, sans-serif;
+  --mtf-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-  --mtf-blue:      #5bcefa;
-  --mtf-pink:      #f5a9b8;
-  --mtf-lavender:  #8b7cf6;
-
-  --ifm-font-family-base: var(--mtf-sans);
+  --ifm-font-family-base: var(--mtf-body);
   --ifm-font-family-monospace: var(--mtf-mono);
-  --ifm-heading-font-family: var(--mtf-serif);
+  --ifm-heading-font-family: var(--mtf-heading);
+  /* The terminal sets body at 13px. Docs are long-form reading, not a blotter —
+     16px stands, and the density scale below is the one thing NOT inherited. */
   --ifm-font-size-base: 16px;
-  --ifm-line-height-base: 1.6;
+  --ifm-line-height-base: 1.7;
   --ifm-code-font-size: 0.875em;
 
-  /* Rounded scale (canonical) */
-  --mtf-r-sm: 8px;
-  --mtf-r-md: 16px;
-  --mtf-r-lg: 20px;
-  --mtf-r-xl: 24px;
+  /* Type scale. Caprasimo is a heavy display serif — it carries far more weight
+     per point than the retired Cormorant, so every display step comes down. */
+  --mtf-text-xs: 0.75rem;
+  --mtf-text-sm: 0.875rem;
+  --mtf-text-base: 1rem;
+  --mtf-text-lg: 1.12rem;
+  --mtf-text-h3: 1.25rem;
+  --mtf-text-h2: 1.6rem;
+  /* The app's "readout" label voice: Inter, uppercase, lightly tracked, bold —
+     NOT the v1 mono. Table headers, sidebar categories, admonition labels. */
+  --mtf-label-tracking: 0.02em;
 
-  /* Type scale — semantic tokens (perfect-fourth-ish for display, tight steps for UI) */
-  --mtf-text-xs:   0.75rem;   /* micro-labels, table cells */
-  --mtf-text-sm:   0.875rem;  /* secondary UI, sidebar links */
-  --mtf-text-base: 1rem;      /* body */
-  --mtf-text-lg:   1.15rem;   /* lede / lead paragraph */
-  --mtf-text-h3:   1.6rem;
-  --mtf-text-h2:   2.15rem;
-  /* The "instrument readout" label voice (Geist Mono, uppercase, tracked) */
-  --mtf-label-tracking: 0.08em;
+  /* Radius (app's --radius-*). `panel` is the tile radius the terminal draws. */
+  --mtf-r-sm: 8px;
+  --mtf-r-panel: 14px;
+  --mtf-r-md: 16px;
+  --mtf-r-lg: 28px;
+  --mtf-r-pill: 999px;
+
+  /* Motion — the app's spring pair. State-conveying only. */
+  --mtf-ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --mtf-ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --mtf-dur: 180ms;
+
   --ifm-container-width-xl: 1380px;
   --ifm-navbar-height: 64px;
   --ifm-navbar-item-padding-horizontal: 0.85rem;
@@ -52,543 +99,781 @@
   --ifm-link-hover-decoration: none;
   --ifm-toc-padding-vertical: 0.4rem;
   --ifm-menu-link-padding-vertical: 0.45rem;
-  --ifm-global-radius: 10px;
-
-  /* Motion — ease-out-quint; calm, no bounce. State-conveying only (product register). */
-  --mtf-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --mtf-dur: 180ms;
+  --ifm-global-radius: var(--mtf-r-sm);
+  --ifm-global-shadow-lw: none;
+  --ifm-global-shadow-md: none;
+  --ifm-global-shadow-tl: none;
+  --ifm-navbar-shadow: none;
+  --ifm-alert-shadow: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   2 · Light mode — clean, airy, fully designed (not an afterthought)
+   2 · Light plane — ground `mist`, accent `teal`. The app's default appearance.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --mtf-bg:        #ffffff;
-  --mtf-surface:   #f7f8fb;
-  --mtf-surface-2: #eef1f7;
-  --mtf-border:    #e6e9f0;
-  --mtf-border-strong: #d4d9e4;
-  --mtf-text:      #0d1117;
-  --mtf-text-mid:  #4a5566;
-  --mtf-text-dim:  #6b7585;   /* was #828d9e (3.36:1) → 4.66:1 AA */
-  --mtf-accent:    #15749f;   /* was #1f8fc4 (3.63:1) → 5.2:1 AA */
-  --mtf-wash:      rgba(31, 143, 196, 0.06);
-  --mtf-wash-rose: rgba(201, 82, 108, 0.06);
-  /* Liquid Glass degrades to clean translucent-white panels in light mode */
-  --mtf-glass-bg:  rgba(255, 255, 255, 0.72);
-  --mtf-glass-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 14px 34px -16px rgba(20, 30, 50, 0.18);
-  --mtf-glass-blur: blur(14px) saturate(135%);
-  --mtf-glow-blue: 0 14px 40px -12px rgba(31, 143, 196, 0.28);
-  --mtf-glow-rose: 0 14px 40px -12px rgba(201, 82, 108, 0.26);
+  color-scheme: light;
 
-  --ifm-color-primary:          #15749f;   /* was #1f8fc4 — every body link/anchor/active item */
-  --ifm-color-primary-dark:     #1c81b1;
-  --ifm-color-primary-darker:   #1a7aa7;
-  --ifm-color-primary-darkest:  #156489;
-  --ifm-color-primary-light:    #229dd7;
-  --ifm-color-primary-lighter:  #29a5df;
-  --ifm-color-primary-lightest: #44b6ec;
+  /* The reading surface. */
+  --mtf-bg: #faf9f6;
+  /* Cards ON the reading surface: code frames, tables, callouts, cards. */
+  --mtf-surface: #f1f1ec;
+  /* One step deeper: table headers, nested callouts, inset fields. */
+  --mtf-surface-2: #e6e7e0;
+  /* Chrome — the app's ground, kept where it is seen rather than read. */
+  --mtf-chrome: #e9ede4;
+  /* The "desk" the app sits on — one step behind everything. */
+  --mtf-seam: #dee4d8;
+
+  /* Warm-neutral hairlines. The green-tinted pair the ground used to supply
+     read as a colour cast once the reading surface stopped being green. */
+  --mtf-line: rgba(50, 47, 40, 0.14);
+  --mtf-line-strong: rgba(50, 47, 40, 0.3);
+
+  /* Ink is measured, not picked. Body lands at 12.7:1 — near-black on near-white
+     is 21:1 and haloes over a long session. Secondary and tertiary are stated
+     outright rather than mixed from the body ink: an alpha mix drifts with
+     whatever it composites over, and these have to hold 6:1 / 4.5:1 on BOTH the
+     page and the card. */
+  --mtf-content: #322f28; /* 12.68:1 on page */
+  --mtf-content-mid: #625e53; /*  6.15:1 on page, 5.71 on card */
+  --mtf-content-dim: #6f6a5e; /*  5.12:1 on page, 4.75 on card — the AA floor */
+
+  /* The primary is a MID teal, not the app's near-black one. A link has to be
+     identifiable by hue at body size; #24494f cleared contrast at 8.5:1 but read
+     as "slightly blue-ish black" in prose, which is a link nobody sees. */
+  --mtf-accent: #1a6670; /* 6.28:1 on page */
+  --mtf-accent-100: #ddeaec;
+  --mtf-accent-200: #c6dcdf;
+  --mtf-accent-300: #93bec4;
+  --mtf-accent-600: #155760;
+  --mtf-accent-700: #10454c;
+  --mtf-accent-800: #0d383e;
+
+  /* Sage takes the app's own accent-2-600 rather than accent-2: one step deeper
+     clears 4.5:1 as a label, so no component needs a per-surface override. */
+  --mtf-accent-2: #5b7449; /* 4.94:1 on page */
+  --mtf-accent-2-100: #e4ebda;
+  --mtf-accent-2-200: #d6e3c9;
+  --mtf-accent-2-300: #ccdbb2;
+  --mtf-accent-2-600: #4e6540;
+  --mtf-accent-2-700: #48603a;
+  --mtf-accent-2-800: #3a4e2f;
+
+  /* State hues are already label-safe, so the admonition heading takes the token
+     directly instead of a darkened copy of it. */
+  --mtf-warn: #8a5a12; /* 5.62:1 on page */
+  --mtf-down: #a33b52; /* 6.04:1 on page */
+
+  /* A tint of the primary, for active/hover fills. */
+  --mtf-wash: color-mix(in oklch, var(--mtf-accent) 9%, transparent);
+  --mtf-wash-2: color-mix(in oklch, var(--mtf-accent-2) 12%, transparent);
+
+  /* Elevation is BACK (the v1 terminal killed every shadow; v2 restored them).
+     Tuned to the warm light ground with the design's own ink. */
+  --mtf-shadow-sm: 0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
+  --mtf-shadow-md: 0 3px 10px color-mix(in srgb, #2e2b25 16%, transparent);
+  --mtf-shadow-lg: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+
+  --ifm-color-primary: var(--mtf-accent);
+  --ifm-color-primary-dark: var(--mtf-accent-600);
+  --ifm-color-primary-darker: var(--mtf-accent-700);
+  --ifm-color-primary-darkest: var(--mtf-accent-800);
+  --ifm-color-primary-light: #2f5d64;
+  --ifm-color-primary-lighter: #376d75;
+  --ifm-color-primary-lightest: #438791;
 
   --ifm-background-color: var(--mtf-bg);
   --ifm-background-surface-color: var(--mtf-surface);
-  --ifm-color-content: #21262e;
-  --ifm-color-content-secondary: var(--mtf-text-mid);
-  --ifm-heading-color: var(--mtf-text);
+  --ifm-color-content: var(--mtf-content);
+  --ifm-color-content-secondary: var(--mtf-content-mid);
+  --ifm-heading-color: var(--mtf-content);
 
-  --ifm-navbar-background-color: rgba(255, 255, 255, 0.8);
-  --ifm-footer-background-color: var(--mtf-surface);
+  --ifm-navbar-background-color: color-mix(in srgb, var(--mtf-chrome) 84%, transparent);
+  --ifm-footer-background-color: var(--mtf-seam);
 
-  --ifm-toc-border-color: var(--mtf-border);
-  --ifm-hr-background-color: var(--mtf-border);
-  --ifm-table-border-color: var(--mtf-border);
-  --ifm-table-stripe-background: var(--mtf-surface);
-  --ifm-blockquote-color: var(--mtf-text-mid);
-  --ifm-color-emphasis-300: var(--mtf-border-strong);
+  --ifm-toc-border-color: var(--mtf-line);
+  --ifm-hr-background-color: var(--mtf-line);
+  --ifm-table-border-color: var(--mtf-line);
+  --ifm-table-stripe-background: color-mix(in oklch, var(--mtf-content) 3.5%, transparent);
+  --ifm-blockquote-color: var(--mtf-content-mid);
+  --ifm-color-emphasis-300: var(--mtf-line-strong);
 
-  --ifm-color-info:    #1c77b0;   /* all four admonition colors lifted to ≥4.5:1 AA */
-  --ifm-color-success: #157f44;
-  --ifm-color-warning: #9a6700;
-  --ifm-color-danger:  #c62f47;
+  --ifm-color-info: var(--mtf-accent);
+  --ifm-color-success: var(--mtf-accent-2);
+  --ifm-color-warning: var(--mtf-warn);
+  --ifm-color-danger: var(--mtf-down);
 
-  --docusaurus-highlighted-code-line-bg: rgba(31, 143, 196, 0.10);
+  --docusaurus-highlighted-code-line-bg: color-mix(in oklch, var(--mtf-accent) 12%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   3 · Dark mode — mirrors the marketing site
+   3 · Dark plane — the app's dark `mist` ground + dark `teal` accent.
+   Warm cream ink on a deep green-black, not the retired near-black + white.
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-theme='dark'] {
-  --mtf-bg:        #06070b;
-  --mtf-surface:   #0c0e14;
-  --mtf-surface-2: #12151d;
-  --mtf-border:    #1c2130;
-  --mtf-border-strong: #2a3042;
-  --mtf-text:      #f0f3f7;
-  --mtf-text-mid:  #98a3b5;
-  --mtf-text-dim:  #757f92;   /* was #5a6273 (3.2:1) → 4.5+:1 on every dark surface */
-  --mtf-accent:    var(--mtf-blue);
-  --mtf-wash:      rgba(91, 206, 250, 0.10);
-  --mtf-wash-rose: rgba(245, 169, 184, 0.10);
-  /* Liquid Glass: translucent dark + lit top-edge + ambient drop + backdrop blur */
-  --mtf-glass-bg:  rgba(12, 14, 20, 0.55);
-  --mtf-glass-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.02),
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 24px 60px -18px rgba(0, 0, 0, 0.6);
-  --mtf-glass-blur: blur(22px) saturate(170%);
-  --mtf-glow-blue: 0 18px 50px -16px rgba(91, 206, 250, 0.35);
-  --mtf-glow-rose: 0 18px 50px -16px rgba(245, 169, 184, 0.32);
+  color-scheme: dark;
 
-  --ifm-color-primary:          #5bcefa;
-  --ifm-color-primary-dark:     #3cc1f9;
-  --ifm-color-primary-darker:   #2dbbf8;
-  --ifm-color-primary-darkest:  #0aa3ec;
-  --ifm-color-primary-light:    #7adbfb;
-  --ifm-color-primary-lighter:  #89e0fc;
-  --ifm-color-primary-lightest: #b6ecfd;
+  --mtf-bg: #1b1a17;
+  --mtf-surface: #24231f;
+  --mtf-surface-2: #2d2c27;
+  --mtf-chrome: #232722;
+  --mtf-seam: #121310;
+
+  --mtf-line: rgba(233, 227, 216, 0.14);
+  --mtf-line-strong: rgba(233, 227, 216, 0.28);
+
+  /* Not an inversion: a warm near-black ground under a warm off-white ink. */
+  --mtf-content: #e9e3d8; /* 13.63:1 on page */
+  --mtf-content-mid: #aba598; /*  7.10:1 */
+  --mtf-content-dim: #948e80; /*  5.34:1 on page, 4.82 on card */
+
+  /* The two voices only gain lightness across the planes; the hue does not move. */
+  --mtf-accent: #7fc7ce; /* 9.08:1 on page */
+  --mtf-accent-100: #17383d;
+  --mtf-accent-200: #1f4a50;
+  --mtf-accent-300: #4e8a93;
+  --mtf-accent-600: #99d5db;
+  --mtf-accent-700: #b3e2e7;
+  --mtf-accent-800: #b3e2e7;
+
+  --mtf-accent-2: #a9c294; /* 8.98:1 */
+  --mtf-accent-2-100: #2b3a24;
+  --mtf-accent-2-200: #38492e;
+  --mtf-accent-2-300: #6f8a5f;
+  --mtf-accent-2-600: #bcd2a8;
+  --mtf-accent-2-700: #cbdcbb;
+  --mtf-accent-2-800: #cbdcbb;
+
+  --mtf-warn: #e0b450; /* 8.96:1 */
+  --mtf-down: #e88b9f; /* 7.15:1 */
+
+  --mtf-wash: color-mix(in oklch, var(--mtf-accent) 12%, transparent);
+  --mtf-wash-2: color-mix(in oklch, var(--mtf-accent-2) 14%, transparent);
+
+  /* Dark elevation: ambient darkness rather than an ink-tinted drop. */
+  --mtf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --mtf-shadow-md: 0 3px 12px rgba(0, 0, 0, 0.55);
+  --mtf-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.62);
+
+  --ifm-color-primary: var(--mtf-accent);
+  --ifm-color-primary-dark: var(--mtf-accent-600);
+  --ifm-color-primary-darker: var(--mtf-accent-700);
+  --ifm-color-primary-darkest: var(--mtf-accent-800);
+  --ifm-color-primary-light: #a7c6c9;
+  --ifm-color-primary-lighter: #98babe;
+  --ifm-color-primary-lightest: #85adb1;
 
   --ifm-background-color: var(--mtf-bg);
   --ifm-background-surface-color: var(--mtf-surface);
-  --ifm-color-content: #d7deea;
-  --ifm-color-content-secondary: var(--mtf-text-mid);
-  --ifm-heading-color: var(--mtf-text);
+  --ifm-color-content: var(--mtf-content);
+  --ifm-color-content-secondary: var(--mtf-content-mid);
+  --ifm-heading-color: var(--mtf-content);
 
-  --ifm-navbar-background-color: rgba(8, 10, 16, 0.72);
-  --ifm-footer-background-color: #07080d;
+  --ifm-navbar-background-color: color-mix(in srgb, var(--mtf-chrome) 84%, transparent);
+  --ifm-footer-background-color: var(--mtf-seam);
 
-  --ifm-toc-border-color: var(--mtf-border);
-  --ifm-hr-background-color: var(--mtf-border);
-  --ifm-table-border-color: var(--mtf-border);
-  --ifm-table-stripe-background: rgba(255, 255, 255, 0.02);
-  --ifm-blockquote-color: var(--mtf-text-mid);
-  --ifm-color-emphasis-300: var(--mtf-border-strong);
+  --ifm-toc-border-color: var(--mtf-line);
+  --ifm-hr-background-color: var(--mtf-line);
+  --ifm-table-border-color: var(--mtf-line);
+  --ifm-table-stripe-background: color-mix(in oklch, var(--mtf-content) 4%, transparent);
+  --ifm-blockquote-color: var(--mtf-content-mid);
+  --ifm-color-emphasis-300: var(--mtf-line-strong);
 
-  --ifm-color-info:    #5bcefa;
-  --ifm-color-success: #6ee7a3;
-  --ifm-color-warning: #e8c06a;
-  --ifm-color-danger:  #ff7a8c;
+  --ifm-color-info: var(--mtf-accent);
+  --ifm-color-success: var(--mtf-accent-2);
+  --ifm-color-warning: var(--mtf-warn);
+  --ifm-color-danger: var(--mtf-down);
 
-  --docusaurus-highlighted-code-line-bg: rgba(91, 206, 250, 0.14);
+  --docusaurus-highlighted-code-line-bg: color-mix(in oklch, var(--mtf-accent) 16%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    4 · Base
    ═══════════════════════════════════════════════════════════════════════════ */
 html {
-  font-feature-settings: "ss01", "cv11";
   font-variant-numeric: lining-nums tabular-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
   font-kerning: normal;
   font-optical-sizing: auto;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-::selection { background: var(--mtf-pink); color: #06070b; }
-
-/* Light-on-dark compensation: a hair of tracking so Geist body holds up on the dark field */
-[data-theme='dark'] .markdown p,
-[data-theme='dark'] .markdown li { letter-spacing: 0.008em; }
-
-/* Ambient backdrop as a fixed, full-viewport layer BEHIND content (z-index:-1) —
-   not a body background. This never produces a fixed-height band/cutoff on long pages. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: -15%;
-  z-index: -1;
-  pointer-events: none;
-  will-change: transform;
-  animation: mtf-aurora 32s ease-in-out infinite alternate;
-}
-/* Quiet aurora — blue / rose / lavender / white blooms over the near-black field.
-   The palette is identity, never captioned (The Quiet Signal Rule). */
-[data-theme='dark'] body::before {
-  background:
-    radial-gradient(820px 620px at 14% -6%, rgba(91, 206, 250, 0.10), transparent 58%),
-    radial-gradient(760px 600px at 86% 2%, rgba(245, 169, 184, 0.085), transparent 56%),
-    radial-gradient(900px 760px at 72% 34%, rgba(139, 124, 246, 0.06), transparent 60%),
-    radial-gradient(820px 700px at 24% 82%, rgba(91, 206, 250, 0.05), transparent 60%),
-    radial-gradient(620px 600px at 96% 92%, rgba(245, 169, 184, 0.045), transparent 55%);
-}
-[data-theme='light'] body::before {
-  background:
-    radial-gradient(820px 600px at 90% -8%, rgba(31, 143, 196, 0.05), transparent 60%),
-    radial-gradient(720px 560px at 6% 4%, rgba(201, 82, 108, 0.035), transparent 58%);
-}
-@keyframes mtf-aurora {
-  from { transform: translate3d(-1.5%, -1%, 0) scale(1.04); }
-  to   { transform: translate3d(1.5%, 2%, 0) scale(1.1); }
+::selection {
+  background: color-mix(in oklch, var(--mtf-accent) 30%, transparent);
 }
 
-a { color: var(--ifm-color-primary); font-weight: 500; }
-.markdown a:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+/* The desk, exactly as the app paints its own <body>. Mostly it sits behind the
+   chrome and the tile; it shows on overscroll and wherever the column runs out. */
+html,
+body {
+  background-color: var(--mtf-seam);
+}
+/* The reading column is a tile laid on that desk — `main` is the doc content and
+   its TOC gutter, with the rail its sibling. */
+.main-wrapper main {
+  background-color: var(--mtf-bg);
+}
 
-/* Headings — Cormorant Garamond display serif: "the serif carries the claim".
-   Low weight, large, tight tracking. h4 is the sans "instrument readout" for contrast. */
-.markdown h1, .markdown h2, .markdown h3 {
-  font-family: var(--mtf-serif);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+a {
+  color: var(--ifm-color-primary);
+  font-weight: 500;
+}
+.markdown a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* Headings — Caprasimo, the app's display voice, at weight 400 (its only cut).
+   It is far heavier per point than the serif it replaces, so h1–h3 sit lower on
+   the scale. h4 and below drop to Figtree bold: a docs page carries an order of
+   magnitude more headings than a terminal panel, and Caprasimo at 1rem reads as
+   a blot rather than a label. */
+.markdown h1,
+.markdown h2 {
+  font-family: var(--mtf-heading);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.markdown h1,
+.markdown h2,
+.markdown h3 {
   text-wrap: balance;
-  overflow-wrap: break-word;   /* long API tokens never overflow the viewport */
+  overflow-wrap: break-word; /* long API tokens never overflow the viewport */
 }
 .markdown h1:first-child {
-  font-size: clamp(2.05rem, 6.2vw, 3.7rem);   /* scales down to ~33px on a 360px phone */
-  line-height: 1.04;
-  letter-spacing: -0.025em;
+  font-size: clamp(1.7rem, 4vw, 2.45rem);
+  line-height: 1.08;
   margin-bottom: 1rem;
 }
 /* API reference titles (`POST /exchange` — submit a signed action, etc.) carry a
-   long sentence plus an inline code token — at the full marketing display size they
-   dominate the page and wrap awkwardly. Detect them by the inline `code` (only these
-   reference titles have one) and give them a reference-scale rather than hero-scale size. */
+   long sentence plus an inline code token — at full display size they dominate
+   the page and wrap awkwardly. Detect them by the inline `code` (only these
+   reference titles have one) and give them a reference scale, not a hero one. */
 .markdown h1:first-child:has(code) {
-  font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+  font-size: clamp(1.3rem, 2.6vw, 1.65rem);
   line-height: 1.25;
   letter-spacing: -0.01em;
 }
 .markdown h2 {
   font-size: var(--mtf-text-h2);
-  line-height: 1.05;
+  line-height: 1.12;
   margin-top: 2.9rem;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid var(--mtf-border);
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--mtf-line);
 }
-.markdown h3 { font-size: var(--mtf-text-h3); line-height: 1.1; margin-top: 1.9rem; }
-.markdown h4 {
-  font-family: var(--mtf-sans);
-  font-weight: 700;
-  font-size: 1.02rem;
-  letter-spacing: -0.01em;
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-family: var(--mtf-body);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+.markdown h3 {
+  font-size: var(--mtf-text-h3);
+  line-height: 1.3;
+  margin-top: 1.9rem;
+}
+.markdown h4,
+.markdown h5,
+.markdown h6 {
   margin-top: 1.5rem;
 }
+.markdown h4 {
+  font-size: 1.02rem;
+}
 .markdown > p:first-of-type,
-.markdown > .theme-admonition:first-child + p { font-size: var(--mtf-text-lg); line-height: 1.55; color: var(--mtf-text); }
+.markdown > .theme-admonition:first-child + p {
+  font-size: var(--mtf-text-lg);
+  line-height: 1.6;
+  color: var(--mtf-content);
+}
+
+/* Numerals — the app sets every figure in Inter with tabular lining figures.
+   In prose that applies to the places docs actually hold values: tables. */
+.markdown table td,
+.markdown table th {
+  font-family: var(--mtf-num);
+  font-variant-numeric: tabular-nums lining-nums;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   5 · Navbar
+   5 · Navbar — glass, the app's TopBar material
+   Glass is chrome only: it floats over the page and is never a data surface.
    ═══════════════════════════════════════════════════════════════════════════ */
 .navbar {
-  backdrop-filter: var(--mtf-glass-blur);
-  -webkit-backdrop-filter: var(--mtf-glass-blur);
-  border-bottom: 1px solid var(--mtf-border);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 14px 40px -24px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(28px) saturate(108%);
+  -webkit-backdrop-filter: blur(28px) saturate(108%);
+  border-bottom: 1px solid var(--mtf-line);
+  box-shadow: none;
 }
-/* Mobile menu drawer fix. `.navbar-sidebar` (and its backdrop) are position:fixed and
-   expect the VIEWPORT as containing block — top/bottom:0 → full height. But a
-   backdrop-filter on an ancestor makes THAT ancestor the containing block for fixed
-   descendants, so the drawer resolved top/bottom against the 64px navbar box and
-   collapsed to navbar height, hiding the menu below it (looked like a z-index issue,
-   wasn't one). When the drawer is open, drop the navbar's backdrop-filter so the
-   viewport is the containing block again — the open drawer covers the navbar anyway,
-   so the glass blur isn't visible here. */
+/* Mobile menu drawer fix. `.navbar-sidebar` (and its backdrop) are position:fixed
+   and expect the VIEWPORT as containing block — top/bottom:0 → full height. But a
+   backdrop-filter on an ancestor makes THAT ancestor the containing block for
+   fixed descendants, so the drawer resolved top/bottom against the 64px navbar
+   box and collapsed to navbar height, hiding the menu below it (looked like a
+   z-index issue, wasn't one). When the drawer is open, drop the navbar's
+   backdrop-filter so the viewport is the containing block again — the open drawer
+   covers the navbar anyway, so the blur isn't visible here. */
 .navbar.navbar-sidebar--show {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-/* The drawer borrowed the navbar's blur for legibility; now that we drop that blur
-   while open, give the drawer its own frosted surface so page content doesn't bleed
-   through the translucent menu. (A backdrop-filter here is safe — the drawer has no
+/* The drawer borrowed the navbar's blur for legibility; now that we drop that
+   blur while open, give the drawer its own frosted surface so page content
+   doesn't bleed through. (A backdrop-filter here is safe — the drawer has no
    fixed descendants that need the viewport as their containing block.) */
 .navbar-sidebar {
-  background: var(--mtf-glass-bg);
-  backdrop-filter: var(--mtf-glass-blur);
-  -webkit-backdrop-filter: var(--mtf-glass-blur);
+  background: color-mix(in srgb, var(--mtf-chrome) 97%, transparent);
+  backdrop-filter: blur(36px) saturate(108%);
+  -webkit-backdrop-filter: blur(36px) saturate(108%);
 }
 .navbar__link {
   font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--mtf-text-mid);
+  font-weight: 600;
+  color: var(--mtf-content-mid);
 }
-.navbar__link:hover, .navbar__link--active { color: var(--mtf-text); }
-.navbar__link--active::after { display: none; }
+.navbar__link:hover,
+.navbar__link--active {
+  color: var(--mtf-content);
+}
+.navbar__link--active::after {
+  display: none;
+}
 
-/* Docusaurus always renders an (empty) .navbar__brand when no logo/title is set;
-   its margin-right was pushing our wordmark off the gutter. Kill it so the brand
-   left-aligns exactly with the sidebar/content. */
-.navbar__brand:empty { display: none; }
+/* The brand lockup (mark + drawn wordmark), sized as the app sizes it in its
+   expanded rail: 26px tall. It is a fixed asset — the identity survived the v2
+   retheme untouched, so nothing here recolours it. */
+.navbar__brand {
+  margin-right: 1.1rem;
+}
+.navbar__logo {
+  height: 26px;
+  margin-right: 0;
+}
+.navbar__logo img {
+  height: 26px;
+  width: auto;
+}
+/* Infima reserves space for a `.navbar__title` next to the logo; the wordmark is
+   part of the asset, so there is no title to show. */
+.navbar__brand .navbar__title {
+  display: none;
+}
 
-/* html-injected brand item: flex-center so it never drifts, trim default padding */
-.navbar__items > .navbar__item:has(.mtf-brand) {
-  display: flex;
-  align-items: center;
-  align-self: stretch;
-  margin: 0 0.7rem 0 0;
-  padding: 0;
-}
-.mtf-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-family: var(--mtf-sans);
-  font-weight: 550;
-  font-size: 1.24rem;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  white-space: nowrap;
-  color: var(--mtf-text);
-}
-.mtf-brand:hover { color: var(--mtf-text); text-decoration: none; }
-.mtf-brand-mark { height: 23px; width: auto; flex: none; display: block; }
-.mtf-word { display: inline-flex; align-items: baseline; }
-.mtf-word .b-meta { color: var(--mtf-text); }
-.mtf-word .b-flux {
-  font-family: var(--mtf-serif-flux);
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.06em;
-  color: var(--mtf-pink);
-}
-[data-theme='light'] .mtf-word .b-flux { color: #c9526c; }
-
-/* Dropdown — Liquid Glass */
+/* Dropdown — `.surface-glass-pop`: near-opaque, hairline, real elevation. */
 .dropdown__menu {
-  border: 1px solid var(--mtf-border);
-  background: var(--mtf-glass-bg);
-  backdrop-filter: var(--mtf-glass-blur);
-  -webkit-backdrop-filter: var(--mtf-glass-blur);
-  box-shadow: var(--mtf-glass-shadow);
-  border-radius: var(--mtf-r-md);
+  border: 1px solid var(--mtf-line);
+  background: color-mix(in srgb, var(--mtf-bg) 97%, transparent);
+  backdrop-filter: blur(36px) saturate(108%);
+  -webkit-backdrop-filter: blur(36px) saturate(108%);
+  box-shadow: var(--mtf-shadow-lg);
+  border-radius: var(--mtf-r-panel);
 }
-.dropdown__link { border-radius: 7px; font-size: 0.88rem; }
-.dropdown__link:hover { background: var(--mtf-wash); color: var(--ifm-color-primary); }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   6 · Sidebar
-   ═══════════════════════════════════════════════════════════════════════════ */
-.theme-doc-sidebar-container { border-right: 1px solid var(--mtf-border); }
-/* menu left-padding(0.75) + menu__link left-padding(default 0.75) == 1.5rem == navbar gutter */
-.menu { padding: 1rem 0.75rem !important; font-weight: 500; }
-.menu__list .menu__list { padding-left: 0.4rem; }
-.menu__link {
-  font-size: 0.875rem;
-  line-height: 1.35;
-  border-radius: 8px;
-  color: var(--mtf-text-mid);
+.dropdown__link {
+  border-radius: var(--mtf-r-sm);
+  font-size: 0.88rem;
 }
-.menu__link:hover, .menu__list-item-collapsible:hover {
-  background: var(--mtf-wash);
-  color: var(--mtf-text);
-}
-.menu__link--active:not(.menu__link--sublist) {
+.dropdown__link:hover {
   background: var(--mtf-wash);
   color: var(--ifm-color-primary);
-  font-weight: 650;
 }
-.menu__list-item-collapsible--active { background: transparent; }
-.menu__caret:hover { background: transparent; }
 
-/* Top-level category labels: the Geist Mono "instrument readout" voice */
-.theme-doc-sidebar-item-category-level-1 > .menu__list-item-collapsible > .menu__link {
-  font-family: var(--mtf-mono);
-  font-size: 0.7rem;
+/* ═══════════════════════════════════════════════════════════════════════════
+   6 · Sidebar — the app's nav rail, one level deeper
+   The rail sits on `bg-elev`, one step BEHIND the page: chrome recedes, the
+   reading column leads. Its items are plain bold ink with a sage-tinted active
+   state — the app has no uppercase micro-label voice in navigation, and mixing
+   one in here is what made a tree of ~40 entries read as noise: shouting section
+   headers and quiet page links alternated at the same indent, so depth had to be
+   inferred from typography instead of being drawn.
+   Depth is now drawn: one indent + one rail per level, weight and ink stepping
+   down as you descend.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.theme-doc-sidebar-container {
+  background: var(--mtf-chrome);
+  border-right: 1px solid var(--mtf-line);
+}
+.theme-doc-sidebar-container .menu {
+  padding: 1rem 0.75rem 2rem !important;
+}
+.menu__link,
+.menu__list-item-collapsible {
+  border-radius: 11px;
+}
+/* Level 1 — top of the tree. Categories and standalone pages look identical
+   here on purpose; the caret is what says "this opens", not the type. */
+.menu__link {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--mtf-content);
+}
+/* Level 2+ — a step down in size, weight and ink, behind a rail. */
+.menu__list .menu__list {
+  margin-left: 0.85rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--mtf-line);
+}
+.menu__list .menu__list .menu__link {
+  font-size: 0.82rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--mtf-label-tracking);
-  color: var(--mtf-text-dim);
+  color: var(--mtf-content-mid);
+}
+.menu__list .menu__list .menu__list .menu__link {
+  font-weight: 500;
+}
+/* Hover is the app's text-alpha wash, so one rule reads on both grounds. */
+.menu__link:hover,
+.menu__list-item-collapsible:hover {
+  background: color-mix(in oklch, var(--mtf-content) 6%, transparent);
+  color: var(--mtf-content);
+}
+/* Active = the app's own selected idiom: a SAGE tint, not the teal primary.
+   Teal is the link colour; if the selected page also went teal, every visited
+   route in the tree would compete with it. */
+.menu__link--active:not(.menu__link--sublist) {
+  background: var(--mtf-accent-2-100);
+  color: var(--mtf-accent-2-800);
+  font-weight: 700;
+}
+.menu__list-item-collapsible--active {
+  background: transparent;
+}
+.menu__caret:hover {
+  background: transparent;
+}
+/* Breathing room between top-level branches — the one thing a flat list of 14
+   level-1 entries can't do without. */
+.theme-doc-sidebar-menu > .theme-doc-sidebar-item-category-level-1:not(:first-child),
+.theme-doc-sidebar-menu > .theme-doc-sidebar-item-link-level-1:not(:first-child) {
+  margin-top: 0.2rem;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    7 · TOC + breadcrumbs + pagination
    ═══════════════════════════════════════════════════════════════════════════ */
-.table-of-contents { font-size: 0.8rem; border-left: 1px solid var(--mtf-border); }
-.table-of-contents__link { color: var(--mtf-text-mid); }
-.table-of-contents__link:hover { color: var(--mtf-text); }
-.table-of-contents__link--active { color: var(--ifm-color-primary); font-weight: 600; }
+.table-of-contents {
+  font-size: 0.8rem;
+  border-left: 1px solid var(--mtf-line);
+}
+.table-of-contents__link {
+  color: var(--mtf-content-mid);
+}
+.table-of-contents__link:hover {
+  color: var(--mtf-content);
+}
+.table-of-contents__link--active {
+  color: var(--ifm-color-primary);
+  font-weight: 700;
+}
 
 .breadcrumbs__link {
-  font-family: var(--mtf-mono);
+  font-family: var(--mtf-num);
   font-size: 0.76rem;
+  font-weight: 500;
   letter-spacing: 0.01em;
-  color: var(--mtf-text-mid);
+  color: var(--mtf-content-mid);
 }
-.breadcrumbs__link:hover { color: var(--mtf-text); background: var(--mtf-wash); }
-.theme-doc-breadcrumbs { margin-bottom: 1.3rem; }
+.breadcrumbs__link:hover {
+  color: var(--mtf-content);
+  background: var(--mtf-wash);
+}
+.theme-doc-breadcrumbs {
+  margin-bottom: 1.3rem;
+}
 
+/* Pagination cards — flat panel at rest, tactile press, elevation on hover.
+   (The app's `.tactile`: snap down over 0.07s, spring back over 0.22s.) */
 .pagination-nav__link {
-  border: 1px solid var(--mtf-border);
-  border-radius: var(--mtf-r-md);
-  background: var(--mtf-glass-bg);
-  backdrop-filter: var(--mtf-glass-blur);
-  -webkit-backdrop-filter: var(--mtf-glass-blur);
-  box-shadow: var(--mtf-glass-shadow);
-  transition: border-color var(--mtf-dur) var(--mtf-ease), transform var(--mtf-dur) var(--mtf-ease), box-shadow var(--mtf-dur) var(--mtf-ease);
+  border: 1px solid var(--mtf-line);
+  border-radius: var(--mtf-r-panel);
+  background: var(--mtf-surface);
+  transition:
+    border-color var(--mtf-dur) var(--mtf-ease-spring),
+    background-color var(--mtf-dur) var(--mtf-ease-spring);
 }
 .pagination-nav__link:hover,
 .pagination-nav__link:focus-visible {
-  border-color: var(--ifm-color-primary);
-  transform: translateY(-3px);
-  box-shadow: var(--mtf-glass-shadow), var(--mtf-glow-blue);
+  border-color: var(--mtf-accent);
+  background: var(--mtf-surface-2);
 }
-.pagination-nav__link:focus-visible { outline-offset: 4px; }
-.pagination-nav__sublabel { color: var(--mtf-text-dim); }
-.pagination-nav__label { font-weight: 650; font-size: 1.02rem; }
+.pagination-nav__link:active {
+  transform: translateY(0.5px) scale(0.99);
+  transition-duration: 0.07s;
+}
+.pagination-nav__link:focus-visible {
+  outline-offset: 4px;
+}
+.pagination-nav__sublabel {
+  font-family: var(--mtf-num);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--mtf-label-tracking);
+  color: var(--mtf-content-mid);
+}
+.pagination-nav__label {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    8 · Code
    ═══════════════════════════════════════════════════════════════════════════ */
 code {
-  font-size: 0.85em;
-  background: var(--mtf-surface-2);
-  border: 1px solid var(--mtf-border);
-  border-radius: var(--mtf-r-sm);
-  padding: 0.1em 0.4em;
+  font-size: 0.875em;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: var(--mtf-content);
+  font-weight: 500;
 }
-/* Mono renders literally: no coding ligatures merging `=>`/`->`/`!=`, no sans `ss01/cv11`. */
-code, pre, kbd, .theme-code-block {
+/* Mono renders literally: no coding ligatures merging `=>`/`->`/`!=`. */
+code,
+pre,
+kbd,
+.theme-code-block {
   font-variant-ligatures: none;
   font-feature-settings: normal;
 }
-a code { color: inherit; }
-/* Code frame carries the glass shadow (ring + lit-edge + ambient) but keeps an
-   opaque code surface — drifting aurora behind code text would hurt legibility. */
-.theme-code-block {
-  border-radius: var(--mtf-r-lg);
-  border: 1px solid var(--mtf-border);
-  box-shadow: var(--mtf-glass-shadow);
+a code {
+  color: inherit;
 }
-.theme-code-block pre { border-radius: var(--mtf-r-lg); }
-pre code { border: 0; background: transparent; padding: 0; font-size: 0.875rem; line-height: 1.7; }
-.theme-code-block-highlighted-line { background: var(--docusaurus-highlighted-code-line-bg); }
-.theme-code-block .buttonGroup button { border-radius: 7px; }
+/* A code block is an always-on data surface, so it is `.panel`: flat fill, one
+   hairline, the tile radius — no glass, no shadow. `--prism-*` is set as an
+   INLINE style by Docusaurus' CodeBlock container, so overriding it from a
+   stylesheet needs !important; the Prism theme still owns every token colour. */
+.theme-code-block {
+  --prism-background-color: var(--mtf-surface) !important;
+  border-radius: var(--mtf-r-panel);
+  border: 1px solid var(--mtf-line);
+  box-shadow: none;
+  overflow: hidden;
+}
+.theme-code-block pre {
+  background-color: var(--mtf-surface) !important;
+  border-radius: 0;
+}
+pre code {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.theme-code-block-highlighted-line {
+  background: var(--docusaurus-highlighted-code-line-bg);
+}
+.theme-code-block .buttonGroup button {
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--mtf-content) 6%, transparent);
+  border-color: var(--mtf-line);
+}
+.theme-code-block .buttonGroup button:hover {
+  background: var(--mtf-wash);
+  color: var(--ifm-color-primary);
+}
+/* The code-block title bar sits on the panel, so it needs the panel's hairline. */
+.theme-code-block > div:first-child:not(pre) {
+  border-bottom: 1px solid var(--mtf-line);
+  font-family: var(--mtf-num);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    9 · Admonitions
    ═══════════════════════════════════════════════════════════════════════════ */
 /* Full-border tinted callouts (no side-stripe): the border, wash, heading and
-   icon all carry the type color — colour is never the sole signal (icon + label). */
+   icon all carry the type colour — colour is never the sole signal (icon + label). */
 .theme-admonition {
-  border: 1px solid var(--mtf-border);
+  border: 1px solid var(--mtf-line);
   border-radius: var(--mtf-r-md);
-  background: var(--ifm-background-surface-color);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: var(--mtf-surface);
+  box-shadow: none;
+}
+/* A nested callout would vanish on its parent's own tone. */
+.theme-admonition .theme-admonition {
+  background: var(--mtf-surface-2);
 }
 .theme-admonition .admonitionHeading,
 .theme-admonition [class*='admonitionHeading'] {
-  font-family: var(--mtf-mono);
+  font-family: var(--mtf-num);
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   letter-spacing: var(--mtf-label-tracking);
-  font-weight: 600;
-}
-.theme-admonition-note {
-  border-color: color-mix(in srgb, var(--mtf-text-dim) 35%, var(--mtf-border));
-  background: color-mix(in srgb, var(--mtf-text-dim) 5%, var(--ifm-background-surface-color));
-}
-.theme-admonition-info {
-  border-color: color-mix(in srgb, var(--ifm-color-info) 38%, var(--mtf-border));
-  background: color-mix(in srgb, var(--ifm-color-info) 7%, var(--ifm-background-surface-color));
-}
-.theme-admonition-tip,
-.theme-admonition-success {
-  border-color: color-mix(in srgb, var(--ifm-color-success) 38%, var(--mtf-border));
-  background: color-mix(in srgb, var(--ifm-color-success) 7%, var(--ifm-background-surface-color));
+  font-weight: 700;
 }
 .theme-admonition-warning {
-  border-color: color-mix(in srgb, var(--ifm-color-warning) 40%, var(--mtf-border));
-  background: color-mix(in srgb, var(--ifm-color-warning) 8%, var(--ifm-background-surface-color));
+  border-color: color-mix(in srgb, var(--ifm-color-warning) 28%, var(--mtf-line));
 }
 .theme-admonition-danger {
-  border-color: color-mix(in srgb, var(--ifm-color-danger) 40%, var(--mtf-border));
-  background: color-mix(in srgb, var(--ifm-color-danger) 8%, var(--ifm-background-surface-color));
+  border-color: color-mix(in srgb, var(--ifm-color-danger) 28%, var(--mtf-line));
 }
-/* Light mode: the 0.7rem mono heading sits on the tinted callout bg, which pulls the
-   type-color below 4.5:1. Darken just the heading label (danger 4.51 already clears). */
-[data-theme='light'] .theme-admonition-info .admonitionHeading,
-[data-theme='light'] .theme-admonition-info [class*='admonitionHeading'] { color: #196699; }
-[data-theme='light'] .theme-admonition-warning .admonitionHeading,
-[data-theme='light'] .theme-admonition-warning [class*='admonitionHeading'] { color: #855900; }
-[data-theme='light'] .theme-admonition-tip .admonitionHeading,
-[data-theme='light'] .theme-admonition-success .admonitionHeading,
-[data-theme='light'] .theme-admonition-tip [class*='admonitionHeading'],
-[data-theme='light'] .theme-admonition-success [class*='admonitionHeading'] { color: #13733d; }
+/* No per-surface label darkening: every state token clears 4.5:1 on the card in
+   its own right (info 5.8, sage 4.6, amber 5.2, rose 5.6), which is why they were
+   chosen at those values rather than for their swatch. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    10 · Tables, blockquotes, lists, misc
    ═══════════════════════════════════════════════════════════════════════════ */
 .markdown table {
-  display: block;            /* restore horizontal scroll (Infima default) */
+  display: block; /* restore horizontal scroll (Infima default) */
   width: max-content;
   max-width: 100%;
-  overflow-x: auto;          /* was `overflow: hidden` — THE bug that clipped wide API tables */
+  overflow-x: auto; /* was `overflow: hidden` — THE bug that clipped wide API tables */
   -webkit-overflow-scrolling: touch;
   font-size: 0.875rem;
-  border: 1px solid var(--mtf-border);
-  border-radius: 10px;
+  background: var(--mtf-surface);
+  border: 1px solid var(--mtf-line);
+  border-radius: var(--mtf-r-panel);
   border-collapse: separate;
   border-spacing: 0;
 }
-.markdown table th, .markdown table td {
+.markdown table th,
+.markdown table td {
   padding: 0.6rem 0.9rem;
   vertical-align: top;
   border: 0;
-  border-bottom: 1px solid var(--mtf-border);
+  border-bottom: 1px solid var(--mtf-line);
 }
 .markdown table thead th {
   background: var(--mtf-surface-2);
-  font-family: var(--mtf-mono);
-  font-weight: 600;
+  font-family: var(--mtf-num);
+  font-weight: 700;
   font-size: 0.72rem;
-  letter-spacing: 0.03em;
+  letter-spacing: var(--mtf-label-tracking);
   text-transform: uppercase;
   text-align: left;
   white-space: nowrap;
-  color: var(--mtf-text-dim);
-  border-bottom: 1px solid var(--mtf-border-strong);
+  color: var(--mtf-content-mid);
+  border-bottom: 1px solid var(--mtf-line);
 }
-/* thead text is small (0.72rem mono) — needs its own AA-clearing color per theme
-   (the global --mtf-text-dim is tuned against the page bg, not the header surface). */
-[data-theme='dark'] .markdown table thead th { background: rgba(255, 255, 255, 0.045); color: #828ca0; }
-[data-theme='light'] .markdown table thead th { color: #5d6675; }
-.markdown table tbody tr:last-child td { border-bottom: 0; }
-.markdown table tbody tr { background: transparent; }
-.markdown table tbody tr:nth-child(2n) { background: var(--ifm-table-stripe-background); }
-[data-theme='light'] .markdown table tbody tr:nth-child(2n) { background: #f3f5f9; }
+.markdown table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.markdown table tbody tr {
+  background: transparent;
+}
+.markdown table tbody tr:nth-child(2n) {
+  background: var(--ifm-table-stripe-background);
+}
+/* The app's row hover is a wash of the SECOND accent, so it never reads as a
+   selection in the primary. */
+.markdown table tbody tr:hover {
+  background: color-mix(in oklch, var(--mtf-accent-2) 9%, transparent);
+}
 /* dense API field tables: pin only the first (code/field) column on one line; let
-   every other column wrap. NB: do NOT nowrap col 2 — on /api it's a short type token
-   (`enum`) so nowrap is harmless, but on /bridge it's a full sentence, and a second
-   nowrap column starves the flexible last column to ~1ch (overflow-wrap lets it
-   collapse) so rows explode vertically. One pinned column is the safe ceiling. */
-.markdown table th:first-child, .markdown table td:first-child { white-space: nowrap; }
-.markdown table th:nth-child(2), .markdown table td:nth-child(2) { color: var(--mtf-text-mid); }
-.markdown table td { overflow-wrap: anywhere; }
-/* clean inline code inside cells — no chip clutter on code-dense API tables */
-.markdown table code { background: transparent; border: 0; padding: 0 0.1em; font-size: 0.92em; color: var(--mtf-text); }
-.markdown table th code { font-weight: 600; }
-@media (max-width: 996px) { .theme-doc-markdown table { min-width: 640px; } }
+   every other column wrap. NB: do NOT nowrap col 2 — on /api it's a short type
+   token (`enum`) so nowrap is harmless, but on /bridge it's a full sentence, and
+   a second nowrap column starves the flexible last column to ~1ch (overflow-wrap
+   lets it collapse) so rows explode vertically. One pinned column is the ceiling. */
+.markdown table th:first-child,
+.markdown table td:first-child {
+  white-space: nowrap;
+}
+.markdown table th:nth-child(2),
+.markdown table td:nth-child(2) {
+  color: var(--mtf-content-mid);
+}
+.markdown table td {
+  overflow-wrap: anywhere;
+}
+.markdown table code {
+  font-size: 0.92em;
+}
+.markdown table th code {
+  font-weight: 700;
+}
+@media (max-width: 996px) {
+  .theme-doc-markdown table {
+    min-width: 640px;
+  }
+}
 
 .markdown blockquote {
-  border: 1px solid var(--mtf-border);
-  background: var(--mtf-wash);
+  border: 1px solid var(--mtf-line);
+  background: var(--mtf-surface);
   border-radius: var(--mtf-r-md);
   padding: 0.7rem 1.1rem;
-  color: var(--mtf-text-mid);
+  color: var(--mtf-content-mid);
 }
-.markdown blockquote > :last-child { margin-bottom: 0; }
+.markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
 
-.markdown p { margin-bottom: 1.25rem; text-wrap: pretty; }
-.markdown li { margin-top: 0.45rem; line-height: 1.55; }
-.markdown ul ul, .markdown ol ol, .markdown ul ol, .markdown ol ul { margin-top: 0.45rem; }
-.markdown li > p { margin-bottom: 0.4rem; }
-.markdown hr { height: 1px; border: 0; background: var(--mtf-border); margin: 2.4rem 0; }
-.hash-link { color: var(--mtf-accent); }
+.markdown p {
+  margin-bottom: 1.25rem;
+  text-wrap: pretty;
+}
+.markdown li {
+  margin-top: 0.45rem;
+  line-height: 1.6;
+}
+.markdown ul ul,
+.markdown ol ol,
+.markdown ul ol,
+.markdown ol ul {
+  margin-top: 0.45rem;
+}
+.markdown li > p {
+  margin-bottom: 0.4rem;
+}
+.markdown hr {
+  height: 1px;
+  border: 0;
+  background: var(--mtf-line);
+  margin: 2.4rem 0;
+}
+.hash-link {
+  color: var(--mtf-accent);
+}
 
-/* Prose holds a ~70ch measure, but tables must break OUT of it. The article element
-   carries BOTH .theme-doc-markdown and .markdown, so capping it at 46rem made the
-   table's own `max-width: 100%` resolve to 100%-of-46rem (~736px) — wide rate tables
-   got crammed into the prose column and scrolled horizontally even on a wide screen,
-   with empty space to their right. Instead: let the column run full-width and re-apply
-   the 46rem measure to prose blocks ONLY. Tables now grow to the full content width
-   (their `max-width: 100%` = the real column) before they ever need to scroll. */
-.theme-doc-markdown { max-width: none; }
-.markdown > :not(table) { max-width: 46rem; }
+/* Prose holds a ~70ch measure, but tables must break OUT of it. The article
+   element carries BOTH .theme-doc-markdown and .markdown, so capping it at 46rem
+   made the table's own `max-width: 100%` resolve to 100%-of-46rem (~736px) — wide
+   rate tables got crammed into the prose column and scrolled horizontally even on
+   a wide screen, with empty space to their right. Instead: let the column run
+   full-width and re-apply the 46rem measure to prose blocks ONLY. */
+.theme-doc-markdown {
+  max-width: none;
+}
+.markdown > :not(table) {
+  max-width: 46rem;
+}
 
 /* Tabs */
-.tabs__item { font-weight: 600; font-size: 0.88rem; border-radius: 8px 8px 0 0; }
-.tabs__item--active { border-bottom-color: var(--ifm-color-primary); color: var(--ifm-color-primary); }
+.tabs__item {
+  font-weight: 700;
+  font-size: 0.88rem;
+  border-radius: var(--mtf-r-sm) var(--mtf-r-sm) 0 0;
+}
+.tabs__item--active {
+  border-bottom-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
 
-/* Buttons */
-.button--primary { font-weight: 600; }
+/* Buttons — the app's tactile press. */
+.button {
+  border-radius: var(--mtf-r-sm);
+  transition:
+    transform 0.22s var(--mtf-ease-spring),
+    filter 0.15s var(--mtf-ease-spring),
+    background-color 0.18s var(--mtf-ease-spring),
+    border-color 0.18s ease;
+}
+.button:active {
+  transform: translateY(0.5px) scale(0.985);
+  transition-duration: 0.07s;
+}
+.button--primary {
+  font-weight: 700;
+  color: var(--mtf-bg);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    11 · Overview hero banner (og.svg on docs/index.md)
@@ -598,69 +883,97 @@ pre code { border: 0; background: transparent; padding: 0; font-size: 0.875rem; 
   width: 100%;
   height: auto;
   margin: 0 0 2rem;
-  border-radius: var(--mtf-r-xl);
-  border: 1px solid var(--mtf-border);
-  box-shadow: var(--mtf-glass-shadow);
+  border-radius: var(--mtf-r-md);
+  border: 1px solid var(--mtf-line);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   12 · Polish — colored callouts, anchor offset, focus, scrollbars, cards
+   12 · Cards, collapsibles, focus, scrollbars
    ═══════════════════════════════════════════════════════════════════════════ */
-/* (Admonition callout styling lives in section 9 — full tinted border, no side-stripe.) */
-
 /* Anchor jumps must clear the sticky 64px navbar */
-.markdown :where(h1, h2, h3, h4, h5, h6) { scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem); }
+.markdown :where(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: calc(var(--ifm-navbar-height) + 1rem);
+}
 
-/* Focus ring + reduced motion + themed scrollbars.
-   Tabs (<li role=tab>) and native <summary> aren't anchors/buttons — list them
+/* Focus ring — 2px accent, 2px offset, exactly as the app draws it. Tabs
+   (<li role=tab>) and native <summary> aren't anchors/buttons — list them
    explicitly or keyboard focus is invisible on them (WCAG 2.4.7). */
 :where(a, button, summary, .tabs__item, .menu__link, .pagination-nav__link):focus-visible {
-  outline: 2px solid var(--ifm-color-primary);
+  outline: 2px solid var(--mtf-accent);
   outline-offset: 2px;
   border-radius: var(--mtf-r-sm);
 }
-.tabs__item:hover { background: var(--mtf-wash); color: var(--mtf-text); }
-.markdown details > summary:hover { color: var(--ifm-color-primary); }
-@media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-  body::before { animation: none; will-change: auto; }   /* fully stop the aurora ping-pong */
+.tabs__item:hover {
+  background: var(--mtf-wash);
+  color: var(--mtf-content);
 }
-.menu, .table-of-contents, .theme-code-block pre, .markdown table {
+.markdown details > summary:hover {
+  color: var(--ifm-color-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Scrollbars — the app's text-alpha thumb, so one rule reads on both grounds. */
+.menu,
+.table-of-contents,
+.theme-code-block pre,
+.markdown table {
   scrollbar-width: thin;
-  scrollbar-color: var(--mtf-border-strong) transparent;
+  scrollbar-color: color-mix(in oklch, var(--mtf-content) 22%, transparent) transparent;
 }
 .menu::-webkit-scrollbar,
 .table-of-contents::-webkit-scrollbar,
 .theme-code-block pre::-webkit-scrollbar,
-.markdown table::-webkit-scrollbar { width: 9px; height: 9px; }
+.markdown table::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
 .menu::-webkit-scrollbar-thumb,
 .table-of-contents::-webkit-scrollbar-thumb,
 .theme-code-block pre::-webkit-scrollbar-thumb,
 .markdown table::-webkit-scrollbar-thumb {
-  background: var(--mtf-border-strong);
-  border-radius: 99px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  background: color-mix(in oklch, var(--mtf-content) 18%, transparent);
+  border-radius: var(--mtf-r-pill);
+  border: 2.5px solid transparent;
+  background-clip: content-box;
 }
 .menu::-webkit-scrollbar-thumb:hover,
+.table-of-contents::-webkit-scrollbar-thumb:hover,
 .theme-code-block pre::-webkit-scrollbar-thumb:hover,
-.markdown table::-webkit-scrollbar-thumb:hover { background: var(--mtf-text-dim); background-clip: padding-box; }
+.markdown table::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--mtf-content) 34%, transparent);
+  background-clip: content-box;
+}
 .menu::-webkit-scrollbar-track,
 .table-of-contents::-webkit-scrollbar-track,
 .theme-code-block pre::-webkit-scrollbar-track,
-.markdown table::-webkit-scrollbar-track { background: transparent; }
+.markdown table::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-/* TOC active rail + non-clickable-looking active breadcrumb + softer light h2 rule */
+/* TOC active rail + non-clickable-looking active breadcrumb */
 .table-of-contents__link--active {
   border-left: 2px solid var(--ifm-color-primary);
   margin-left: -1px;
   padding-left: calc(var(--ifm-toc-padding-horizontal) - 1px);
 }
-.breadcrumbs__item--active .breadcrumbs__link { background: transparent; font-weight: 650; color: var(--ifm-color-primary); }
-[data-theme='light'] .markdown h2 { border-bottom-color: var(--mtf-surface-2); }
+.breadcrumbs__item--active .breadcrumbs__link {
+  background: transparent;
+  font-weight: 700;
+  color: var(--ifm-color-primary);
+}
 
 /* Homepage link-card grid. The markdown list inside <div class="mtf-cardgrid">…</div>
-   renders as <ul><li><a> (CommonMark, blank lines around the list keep links locale-aware). */
+   renders as <ul><li><a> (CommonMark, blank lines around the list keep links
+   locale-aware). `.card-surface` in the app: the elevated tone, md radius, flat. */
 .mtf-cardgrid ul {
   display: grid;
   /* min() guard so a card never exceeds a narrow container (no horizontal overflow) */
@@ -673,93 +986,162 @@ pre code { border: 0; background: transparent; padding: 0; font-size: 0.875rem; 
 .mtf-cardgrid li {
   margin: 0;
   padding: 1.05rem 1.2rem;
-  border: 1px solid var(--mtf-border);
-  border-radius: var(--mtf-r-lg);
-  background: var(--mtf-glass-bg);
-  backdrop-filter: var(--mtf-glass-blur);
-  -webkit-backdrop-filter: var(--mtf-glass-blur);
-  box-shadow: var(--mtf-glass-shadow);
+  border: 1px solid var(--mtf-line);
+  border-radius: var(--mtf-r-md);
+  background: var(--mtf-surface);
   font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--mtf-text-mid);
-  transition: border-color var(--mtf-dur) var(--mtf-ease), transform var(--mtf-dur) var(--mtf-ease), box-shadow var(--mtf-dur) var(--mtf-ease);
+  line-height: 1.55;
+  color: var(--mtf-content-mid);
+  transition:
+    border-color var(--mtf-dur) var(--mtf-ease-spring),
+    background-color var(--mtf-dur) var(--mtf-ease-spring);
 }
-.mtf-cardgrid li:hover, .mtf-cardgrid li:focus-within { transform: translateY(-4px); }
-/* Two-Voice Rule: blue and rose alternate as a deliberate call-and-response.
+.mtf-cardgrid li:hover,
+.mtf-cardgrid li:focus-within {
+  background: var(--mtf-surface-2);
+}
+/* The two voices alternate as a deliberate call-and-response: teal, then sage.
    :focus-within mirrors the hover so keyboard focus shows the same affordance. */
 .mtf-cardgrid li:nth-child(odd):hover,
 .mtf-cardgrid li:nth-child(odd):focus-within {
-  border-color: var(--mtf-blue);
-  box-shadow: var(--mtf-glass-shadow), var(--mtf-glow-blue);
+  border-color: var(--mtf-accent);
 }
 .mtf-cardgrid li:nth-child(even):hover,
 .mtf-cardgrid li:nth-child(even):focus-within {
-  border-color: var(--mtf-pink);
-  box-shadow: var(--mtf-glass-shadow), var(--mtf-glow-rose);
+  border-color: var(--mtf-accent-2);
 }
-.mtf-cardgrid li a { font-family: var(--mtf-serif); font-size: 1.3rem; font-weight: 600; letter-spacing: -0.01em; }
-.mtf-cardgrid li a:hover { text-decoration: none; }
-.mtf-cardgrid li a:focus-visible { outline: none; }  /* the card carries the focus affordance */
+/* Card titles are h3-scale, so they follow the h3 rule: body face, not the
+   display one. */
+.mtf-cardgrid li a {
+  font-family: var(--mtf-body);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+  color: var(--mtf-content);
+}
+.mtf-cardgrid li a:hover {
+  text-decoration: none;
+  color: var(--ifm-color-primary);
+}
+.mtf-cardgrid li a:focus-visible {
+  outline: none; /* the card carries the focus affordance */
+}
 
 /* Native <details> collapsibles for FAQ / edge-case tails */
 .markdown details {
-  border: 1px solid var(--mtf-border);
-  border-radius: 10px;
-  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--mtf-line);
+  border-radius: var(--mtf-r-panel);
+  background: var(--mtf-surface);
   padding: 0.4rem 1rem;
   margin: 0.8rem 0;
 }
-.markdown details > summary { font-weight: 600; cursor: pointer; }
+.markdown details > summary {
+  font-weight: 700;
+  cursor: pointer;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   13 · Responsive & input adaptation
+   13 · Search (local search / DocSearch chrome)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.navbar__search-input {
+  background-color: var(--mtf-surface-2);
+  border: 1px solid var(--mtf-line);
+  border-radius: var(--mtf-r-sm);
+  font-family: var(--mtf-body);
+}
+.navbar__search-input:focus {
+  border-color: var(--mtf-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--mtf-accent) 16%, transparent);
+  outline: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   14 · Responsive & input adaptation
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* Touch (coarse pointer): grow tap targets toward the 44px minimum + more spacing */
 @media (pointer: coarse) {
-  .menu__link { padding-top: 0.7rem; padding-bottom: 0.7rem; }
-  .navbar__link { padding-top: 0.75rem; padding-bottom: 0.75rem; }
-  .dropdown__link { padding-top: 0.7rem; padding-bottom: 0.7rem; }
-  .table-of-contents__link { padding: 0.4rem 0; }
-  .breadcrumbs__link { padding: 0.45rem 0.6rem; }
-  .menu__caret { padding: 0.5rem; }
+  .menu__link {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+  .navbar__link {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+  .dropdown__link {
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+  .table-of-contents__link {
+    padding: 0.4rem 0;
+  }
+  .breadcrumbs__link {
+    padding: 0.45rem 0.6rem;
+  }
+  .menu__caret {
+    padding: 0.5rem;
+  }
+  /* Full-viewport backdrop-filter is the most expensive mobile-GPU paint. */
+  .navbar {
+    backdrop-filter: blur(16px) saturate(108%);
+    -webkit-backdrop-filter: blur(16px) saturate(108%);
+  }
+  .navbar-sidebar,
+  .dropdown__menu {
+    backdrop-filter: blur(18px) saturate(108%);
+    -webkit-backdrop-filter: blur(18px) saturate(108%);
+  }
 }
 
-/* Touch (no hover): don't let a tap leave a sticky lifted/glowing state */
+/* Touch (no hover): don't let a tap leave a sticky lifted state */
 @media (hover: none) {
-  .mtf-cardgrid li:hover,
-  .pagination-nav__link:hover { transform: none; box-shadow: var(--mtf-glass-shadow); }
+  .pagination-nav__link:hover {
+    transform: none;
+  }
 }
 
-/* Phones: tighten the display rhythm so big Cormorant headings don't dominate,
-   and trim the aurora's pull a touch. Single-column docs layout is handled by Docusaurus. */
+/* Phones: tighten the display rhythm so the heavy Caprasimo headings don't
+   dominate. The single-column docs layout is handled by Docusaurus. */
 @media (max-width: 640px) {
-  .markdown h2 { font-size: 1.75rem; margin-top: 2.1rem; }
-  .markdown h3 { font-size: 1.4rem; margin-top: 1.5rem; }
+  .markdown h2 {
+    font-size: 1.5rem;
+    margin-top: 2.1rem;
+  }
+  .markdown h3 {
+    font-size: 1.22rem;
+    margin-top: 1.5rem;
+  }
   .markdown > p:first-of-type,
-  .markdown > .theme-admonition:first-child + p { font-size: 1.05rem; }
-  .mtf-cardgrid li { padding: 0.85rem 1rem; }
-  .mtf-cardgrid li a { font-size: 1.15rem; }
-  .hero-banner { border-radius: var(--mtf-r-lg); margin-bottom: 1.5rem; }
-  body::before { animation: none; will-change: auto; }   /* save battery / release GPU layer */
+  .markdown > .theme-admonition:first-child + p {
+    font-size: 1.05rem;
+  }
+  .mtf-cardgrid li {
+    padding: 0.85rem 1rem;
+  }
+  .mtf-cardgrid li a {
+    font-size: 1.05rem;
+  }
+  .hero-banner {
+    border-radius: var(--mtf-r-panel);
+    margin-bottom: 1.5rem;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   14 · Polish — motion-token parity, hover consistency, scrollbar hygiene
+   15 · Motion-token parity
+   All nav/label colour hovers share ONE tokenized curve (else they fall through
+   to Infima's 200ms easing and the UI mixes two motion curves).
    ═══════════════════════════════════════════════════════════════════════════ */
-/* All nav/label color hovers share ONE tokenized curve (else they fall through to
-   Infima's 200ms easing and the UI mixes two motion curves). Reduced-motion neutralizes it. */
 .navbar__link,
 .dropdown__link,
 .menu__link,
 .menu__list-item-collapsible,
 .table-of-contents__link,
-.breadcrumbs__link {
-  transition: color var(--mtf-dur) var(--mtf-ease),
-              background-color var(--mtf-dur) var(--mtf-ease),
-              border-color var(--mtf-dur) var(--mtf-ease);
+.breadcrumbs__link,
+.markdown table tbody tr {
+  transition:
+    color var(--mtf-dur) var(--mtf-ease-spring),
+    background-color var(--mtf-dur) var(--mtf-ease-spring),
+    border-color var(--mtf-dur) var(--mtf-ease-spring);
 }
-/* Code-block action buttons get the house wash-hover instead of Infima grey */
-.theme-code-block .buttonGroup button:hover { background: var(--mtf-wash); color: var(--ifm-color-primary); }
-/* TOC scrollbar thumb was missing from the hover group */
-.table-of-contents::-webkit-scrollbar-thumb:hover { background: var(--mtf-text-dim); background-clip: padding-box; }
