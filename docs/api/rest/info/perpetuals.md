@@ -339,7 +339,7 @@ Response (perp truncated to one entry; the `spot` section is identical to
           { "max_open_interest": null,      "max_leverage": 5,  "maint_margin_ratio": "1000" }
         ],
         "strict_isolated": false,
-        "disable_open":    false,
+        "open":            true,
         "disable_close":   false,
         "mark_source":     "oracle_median",
         "fba_enabled":     false,
@@ -370,7 +370,7 @@ the per-commit dynamic fields (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
 | `perp[*].init_margin_ratio` | bps string | Base initial-margin ratio, decimal bps |
 | `perp[*].margin_tiers` | array | Notional-banded leverage ladder (see [`market_info`](#market_info)); each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
-| `perp[*].disable_open` / `disable_close` | bool | Open / close disabled for this market |
+| `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden |
 | `perp[*].oi_cap` | Decimal string | Governance open-interest cap, in the market's size units; **OMITTED** entirely when the market is uncapped (never a fabricated `"0"`) |
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
@@ -554,12 +554,18 @@ live price stream otherwise. The REST companion to the live
 |---------------|--------|--------------|
 | `mark` (**default**) | [Mark price](../../../concepts/mark-prices.md) — the price positions mark at | perp and spot markets |
 | `oracle` | [Oracle index price](../../../concepts/oracle-prices.md) | perp markets only |
+| `trade` | Executed-trade OHLCV, folded from prints | perp and spot markets |
 
 :::warning
-**The executed-trade candle is RETIRED.** A bar carries a **price** series, never
-executions. `trade` is no longer a valid `candle_type`; it is rejected like any
-other unknown token. Read executions from [`recent_trades`](#recent_trades) or
-[`trades_by_time`](#trades_by_time).
+**The three series are NOT interchangeable, and one never falls back to another.**
+An unknown `candle_type` is rejected rather than silently answered with a
+different series — charting the wrong price is a trading hazard.
+
+**A price bar and a trade bar differ in more than price.** A price series has a
+bar in every window its samples cover. A **trade** series is SPARSE: a window
+with no fill has **no bar at all**, never a carried-forward one. And `v` / `n`
+mean different things — a price bar reports `v` as `"0"` with `n` as the sample
+count, while a trade bar carries real volume and a real trade count.
 :::
 
 ```json

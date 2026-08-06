@@ -38,8 +38,16 @@ are governance-configurable and shared with the MIP-3 machinery.
 
 ## Note on numbering {#note-on-numbering}
 
-In the current implementation the `spotDeploy` actions live in the same module as
-the `perpDeploy` actions and were historically labelled "MIP-3". Per the
-[MIP registry](./index.md) spot deployment is properly **MIP-1** and perp
-deployment is **MIP-3** (mirroring the spot-vs-perp split on established venues).
-The behaviour is unchanged; only the label is being realigned.
+The `spotDeploy` actions were historically labelled "MIP-3" because they shipped
+alongside `perpDeploy`. Per the [MIP registry](./index.md) spot deployment is
+properly **MIP-1** and perp deployment is **MIP-3**, mirroring the spot-versus-perp
+split on established venues.
+
+**That realignment is now more than a label.** The two lanes had ONE governance
+switch, so disabling permissionless perps also disabled spot deployment. From the
+scheduled network upgrade they have **separate switches**: turning off MIP-3
+leaves MIP-1 spot deployment running, and vice versa.
+
+The change arrives at a fixed height. Below it a single switch still governs both,
+so a client reading a rejection reason may see the older wording on historical
+blocks.

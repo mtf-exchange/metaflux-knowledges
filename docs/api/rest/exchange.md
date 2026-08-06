@@ -384,7 +384,7 @@ An agent signature debits the agent's own account, never the master's.
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
-| [`core_evm_transfer`](#core_evm_transfer) | Move USDC from the Core ledger to MetaFluxEVM | master only |
+| [`core_evm_transfer`](#core_evm_transfer) | Move a spot asset from the Core ledger to MetaFluxEVM, optionally with an EVM payload | master only |
 | [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
 
 ### Not on the public `/exchange` path {#not-on-the-public-exchange-path}
@@ -2402,6 +2402,22 @@ Its EIP-712 [typed-data](#signing) primary type is
 | `amount` | decimal string | `> 0` | Amount in the **whole-USDC** plane (the Core cross-collateral unit), as a JSON string. Carried verbatim into the signed digest, then parsed. The EVM side receives `amount × 1e6` FiatToken base units (6-decimal scale) |
 | `to_evm` | bool | `true` only | Direction. `true` = **Core → EVM** (the only supported direction on this path). `false` (**EVM → Core**) is **rejected** — see below |
 | `destination` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). The sender's own EVM address for a self-bridge; any EVM account otherwise (the EVM credit is a mint to this address, with no owner check) |
+| `asset` | uint32 | market asset id | Optional, defaults to `0` (USDC cross-collateral). A non-zero asset moves that spot token instead, debiting the spot ledger |
+| `data` | byte array | up to 4096 bytes | Optional EVM calldata. When present it is run against `destination` **after** the credit lands, as a real transaction with its own receipt. See the revert rule below |
+| `destination_chain_id` | uint32 | `0` or the local EVM chain id | Optional delivery chain. **Any other value is rejected today** — cross-chain delivery is not built, and the field exists so the capability has a signed slot rather than being delivered locally in silence |
+
+**The payload never unwinds the credit.** If `data` reverts, runs out of gas, or
+fails for any reason, the transfer still stands: the Core side was debited, the
+EVM side was credited, and the call is additional. Read its receipt to learn what
+happened — without one you could not tell a delivered-and-executed transfer from
+a delivered-and-reverted one.
+
+**Signing: your envelope picks the type string.** An envelope carrying **neither**
+`data` **nor** `destination_chain_id` signs under
+`MetaFluxTransaction:CoreEvmTransfer`, byte-identically to before these fields
+existed — an existing client needs no change. Including **either** key selects
+`MetaFluxTransaction:CoreEvmTransferV2`. **Presence is the selector, not
+emptiness**: `"data": []` and `"destination_chain_id": 0` both count as present.
 
 **Direction (Core → EVM only).** Only `to_evm: true` is accepted here. An
 **EVM → Core** move (`to_evm: false`) is **rejected at commit** (`EVM->Core

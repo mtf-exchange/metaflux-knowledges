@@ -50,6 +50,12 @@ On unknown resource (e.g. unknown vault id): `404 Not Found` with `{"error":"<re
 
 ### Static node identity and protocol version {#node_info}
 
+:::warning
+**Operator lane only — this query is REFUSED on the public API.** It answers
+with the same error an unknown type gets. It stays available to node operators
+reading a node directly.
+:::
+
 Static node identity + protocol version. No parameters.
 
 ```json
@@ -82,7 +88,7 @@ Response:
 | `validator_index` | uint32 \| null | This node's index in the active validator set; **FLAGGED:** `null` until the runtime calls `set_validator_index` |
 | `build_commit` | hex string | Operator-published build identifier; **FLAGGED:** `"unknown"` until published |
 | `version` | semver string | Node software release version, baked in at build time. A release shares one `version` across its binaries — `build_commit` is the per-build distinguisher |
-| `freeze_halt_supported` | bool | Always `true` for this binary — capability flag: the node honors [`exchange_status.scheduled_freeze_height`](#exchange_status), halting cleanly with exit code `77` once the freeze height commits so a node supervisor can swap in the next release |
+| `freeze_halt_supported` | bool | Always `true` for this binary — capability flag: the node halts cleanly with exit code `77` once the freeze height commits so a node supervisor can swap in the next release |
 | `uptime_seconds` | uint64 | Process uptime; **FLAGGED:** `0` until the runtime calls `set_uptime_seconds` |
 
 These are **per-node** fields (node identity / runtime), NOT consensus state, so they legitimately differ across nodes.
@@ -413,6 +419,7 @@ Response:
         "tid":            90123,
         "fee":            "4.19",
         "closed_pnl":     "0",
+        "cause":          "twap",
         "dir":            "Open Long",
         "start_position": "0",
         "block":          562,
@@ -442,6 +449,7 @@ a recent window, not all history. An account with no fills returns
 | `fills[*].dir` | string | Direction label, e.g. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Signed leg size BEFORE the fill, **base units** (whole-unit, signed) |
 | `fills[*].block` | uint64 | Committed block height the fill settled in (on-chain locator) |
+| `fills[*].cause` | string | **Present only when this leg did NOT execute by its own order crossing.** `"forced_close_partial"` / `"forced_close_full"` — the liquidation ladder; `"forced_close_isolated"` — an isolated leg breached its own bucket; `"trigger"` — a TP/SL fired; `"twap"` — a TWAP slice. **Absent on an ordinary fill and on EVERY maker leg** — a counterparty that was merely hit is not itself forced |
 | `fills[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets the fill be traced on-chain. A taker leg carries its order's hash; from the scheduled network upgrade a **maker leg carries the hash of the maker's own resting order** (its original `submit_order`), so both legs of a match are traceable to the action that placed them. **Empty string (`""`)** when there is no signed user order behind the leg — a system / begin-block / liquidation print — and, for maker legs, on fills recorded before the network upgrade |
 
 ### Fill history filtered by time window {#user_fills_by_time}
@@ -580,8 +588,19 @@ registry and fill ring are keyed by `oid`):
 
 ### Latest committed block metadata {#block_info}
 
+:::warning
+**Operator lane only — this query is REFUSED on the public API.** It answers
+with the same error an unknown type gets. It stays available to node operators
+reading a node directly.
+:::
+
 Committed block metadata. No required args (`height` is accepted but ignored —
 the read state keeps only the latest committed context).
+
+Two of its fields were only ever restatements. `round` **equals** `height` —
+each committed block advances exactly one round under the two-chain commit rule.
+`epoch` is `height` divided by the fixed epoch length of `100000`. Derive both
+from a height you already have.
 
 ```json
 { "type": "block_info" }
@@ -1649,10 +1668,10 @@ Response:
   "type": "exchange_status",
   "data": {
     "spot_disabled": false,
-    "post_only_until_time_ms": 0,
-    "post_only_until_height": 0,
-    "scheduled_freeze_height": null,
-    "mip3_enabled": true
+    "post_only": false,
+    "mip3_enabled": true,
+    "frozen": false,
+    "timestamp": 1735689600000
   }
 }
 ```
@@ -1660,12 +1679,16 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `spot_disabled` | bool | Spot trading globally disabled |
-| `post_only_until_time_ms` | uint64 | Post-only window end (consensus ms); `0` = none |
-| `post_only_until_height` | uint64 | Post-only window end (height); `0` = none |
-| `scheduled_freeze_height` | uint64 \| null | Scheduled upgrade-halt height, `null` if none |
+| `post_only` | bool | A post-only window is in force — new orders must be maker-only |
+| `frozen` | bool | The chain is in a pending upgrade halt |
+| `timestamp` | uint64 | Consensus block time, ms — the "as of" for every field above |
 | `mip3_enabled` | bool | `true` once any MIP-3 market/pair spec is registered |
 
-State source: `spot_disabled`, `post_only_until_*`, `scheduled_freeze_height`, `mip3_market_specs` / `mip3_spot_pair_specs`.
+:::info
+**This answers "can I trade, and as of when" — nothing more.** The pending
+upgrade height and the node's replay progress used to appear here and no longer
+do. `frozen` still tells you a halt is coming; it does not date it.
+:::
 
 :::warning
 **`frontend_open_orders` has been REMOVED** (folded into `open_orders`, wire-v2
