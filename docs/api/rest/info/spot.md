@@ -245,7 +245,7 @@ per account (not a full-table walk). State source:
 ### Every spot-margin position for an account {#spot_margin_state}
 
 :::info
-**Cross-collateralized from the scheduled network upgrade on testnet `114514`.** Read surface for leveraged [spot margin](../../../products/spot-margin.md); the position's margin is held against your one unified USDC account, not a per-pair bucket. See the concept page for the model.
+**Cross-collateralized .** Read surface for leveraged [spot margin](../../../products/spot-margin.md); the position's margin is held against your one unified USDC account, not a per-pair bucket. See the concept page for the model.
 :::
 
 Every spot-margin position held by one account. Required: `user` (0x hex).

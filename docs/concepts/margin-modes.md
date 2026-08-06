@@ -83,9 +83,8 @@ Implication: a 10% adverse move on BTC reduces account-wide health, even if your
 
 ### Spot margin joins the cross account {#spot-margin-cross}
 
-From the scheduled network upgrade on testnet `114514`, a
-[spot-margin](../products/spot-margin.md) position is **cross-margined against the
-same unified USDC account**. Its initial-margin requirement is subtracted from
+A [spot-margin](../products/spot-margin.md) position is **cross-margined against
+the same unified USDC account**. Its initial-margin requirement is subtracted from
 `free_collateral` (like a perpetual open), and its unrealised PnL and maintenance
 requirement enter the account-level health decision. Two consequences follow:
 

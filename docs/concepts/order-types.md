@@ -99,10 +99,8 @@ fires when the mark price crosses its `trigger_px`. A trigger always **reduces**
 it can never open or grow a position.
 
 :::info
-**Market and limit triggers are live.** The `is_market` flag is control from the
-scheduled network upgrade on testnet `114514`: `is_market: true` fires a market
-exit, `is_market: false` rests a limit exit. Before the upgrade every trigger
-fires as a market exit.
+**Market and limit triggers are live.** `is_market` is control:
+`is_market: true` fires a market exit, `is_market: false` rests a limit exit.
 :::
 
 The `tpsl` label names the intent; the fired direction comes from the leg `side`
@@ -164,7 +162,7 @@ braces stay armed as you add to or trim the position.
 ## Scale orders {#scale-orders}
 
 :::info
-**Scale ladders are live from the scheduled network upgrade on testnet `114514`.**
+**Scale ladders are live .**
 :::
 
 A **scale ladder** is `n` resting limit rungs spread evenly across `[px_low,

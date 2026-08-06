@@ -151,9 +151,8 @@ Send an `expires_after` (uint64 milliseconds) next to `action` / `nonce` /
   past, and dropped at execution if consensus time passes it before it commits.
 
 :::info
-**Availability.** Non-zero `expires_after` is accepted **from the scheduled
-network upgrade** onward. Until then send `0` / omit it (the only accepted value)
-— a non-zero expiry submitted before the upgrade is rejected.
+**`expires_after` is a deadline, not a delay.** It is a consensus timestamp in ms,
+not a duration. Send `0` or omit it for no expiry.
 :::
 
 ## Numeric conventions {#numeric-conventions}
@@ -298,7 +297,7 @@ so an approved agent can act for the account it is approved for. See
 ### Spot margin & Earn {#spot-margin--earn}
 
 :::info
-**Spot margin is cross-collateralized.** Leveraged spot ([spot margin](../../products/spot-margin.md)) draws its margin from your **one unified USDC account** — the same collateral that backs your perpetual positions — and its lending supply side is [Earn](../../concepts/earn.md). The cross-collateralized model is **available from the scheduled network upgrade on testnet `114514`**. A pair enables only once governance calibrates its per-pair risk parameters, so treat it as a **preview**: forced liquidation settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are still being calibrated. Do not assume production safety at scale.
+**Spot margin is cross-collateralized.** Leveraged spot ([spot margin](../../products/spot-margin.md)) draws its margin from your **one unified USDC account** — the same collateral that backs your perpetual positions — and its lending supply side is [Earn](../../concepts/earn.md). The cross-collateralized model is A pair enables only once governance calibrates its per-pair risk parameters, so treat it as a **preview**: forced liquidation settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are still being calibrated. Do not assume production safety at scale.
 :::
 
 A leveraged spot position is **cross-margined against your one unified USDC account** — its initial-margin requirement is held against your account-wide free collateral, exactly like a perpetual open, so there is **no separate collateral deposit**. The buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Because collateral is shared, an open spot-margin position reduces your perpetual margin headroom, and a perpetual loss reduces the collateral that backs the spot-margin position (see [margin modes](../../concepts/margin-modes.md)). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All actions here are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) and [`earn_state`](./info/spot.md#earn_state).
@@ -539,9 +538,9 @@ grow a position.
 | `trigger.tpsl` | enum | `"tp"` / `"sl"` | Take-profit / stop-loss label, surfaced in [`/info`](./info.md#order_status). The fire direction comes from the leg `side` versus the mark, not from this label |
 
 :::info
-**`is_market` controls the exit type from the scheduled network upgrade.** Before
+**`is_market` controls the exit type .** Before
 the upgrade the field is a label only and every trigger fires as a market IOC.
-From the scheduled network upgrade on testnet `114514`, `is_market` is **control**:
+`is_market` is **control**:
 `false` selects the new **limit** trigger. A submit that **omits** `is_market`
 defaults to `false` — after the upgrade that is a **limit** trigger, so a market
 stop **must** send `is_market: true`. A limit trigger with `limit_px: 0` (or an
@@ -950,7 +949,7 @@ it acts for.
 ### Place a scale ladder {#scale_order}
 
 :::info
-**Available from the scheduled network upgrade on testnet `114514`.** A submit
+**Available .** A submit
 before the upgrade is rejected.
 :::
 
@@ -1046,7 +1045,7 @@ from [`open_orders`](./info.md#open_orders) filtered by the shared `cloid`.
 ### Cancel a scale ladder {#cancel_scale}
 
 :::info
-**Available from the scheduled network upgrade on testnet `114514`.** A submit
+**Available .** A submit
 before the upgrade is rejected.
 :::
 
@@ -1334,7 +1333,7 @@ Leveraged [spot margin](../../products/spot-margin.md) and its
 ### Open a leveraged spot position {#spot_margin_open}
 
 :::info
-**Available from the scheduled network upgrade on testnet `114514`.** The position is [cross-collateralized](#spot-margin--earn-actions) against your unified USDC account, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)). A pair enables only once governance calibrates its per-pair risk parameters.
+**Available .** The position is [cross-collateralized](#spot-margin--earn-actions) against your unified USDC account, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)). A pair enables only once governance calibrates its per-pair risk parameters.
 :::
 
 Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC-buy** `size` base at up to `limit_px`. The buy is funded 100% by the borrow; the position's margin requirement is **held against your account-wide free collateral** — the same unified USDC account that backs your perpetual positions — so there is **no separate collateral to post first** (leverage ≈ notional / free collateral). The bought base is held **segregated** on the margin account — it is not credited to your spendable balances. Any **unspent borrow is repaid instantly** after the IOC settles, so the outstanding loan equals only what the buy actually spent. A zero-fill IOC is an accepted no-op (full refund, nothing borrowed). v1 allows **one open position per `(account, pair)`** — no add-on. Sender-authorized; body under `action.params`.
@@ -1364,7 +1363,7 @@ Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC
 ### Close a leveraged spot position {#spot_margin_close}
 
 :::info
-**Available from the scheduled network upgrade on testnet `114514`.** See the [Spot margin & Earn](#spot-margin--earn-actions) overview for the cross-collateralized model.
+**Available .** See the [Spot margin & Earn](#spot-margin--earn-actions) overview for the cross-collateralized model.
 :::
 
 Close the position: **IOC-sell** the held base at no less than `limit_px`, repay the accrued debt (principal + interest) to the Earn pool, and return the remainder to your unified USDC account. On a **full unwind** the sale proceeds repay the debt, any leftover credits your account, the held margin requirement is released, and the position closes. A **partial fill keeps the position open**: unsold base goes back into the segregated holding, only the realized proceeds repay, and the outstanding principal drops accordingly. v1 is full-close intent only (no `size` argument — the whole holding is offered). Sender-authorized; body under `action.params`.

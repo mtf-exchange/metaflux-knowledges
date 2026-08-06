@@ -133,10 +133,8 @@ any account.
 ### User-bound inner signatures {#user-bound-inner-signatures}
 
 :::info
-**Availability.** The user-bound scheme is the signing scheme **from the
-scheduled network upgrade**. Before that upgrade the network accepts the previous
-(unbound) scheme; from the upgrade onward it accepts **only** the user-bound
-scheme. Exactly one scheme is valid at a time — there is no dual-accept window —
+**One scheme, not two.** The network accepts **only** the user-bound scheme.
+Exactly one scheme is valid at a time — there is no dual-accept window —
 so a signer must produce the user-bound digest for any bundle that will land
 at/after the upgrade.
 :::
@@ -168,8 +166,7 @@ user-bound struct for any bundle submitted at/after the upgrade.
 
 :::info
 **Availability.** Rotating or disabling the signer set through the quorum is
-available **from the scheduled network upgrade**.
-:::
+available :::
 
 There is no separate "update" action. To rotate the roster, the account's current
 signers **re-run [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)

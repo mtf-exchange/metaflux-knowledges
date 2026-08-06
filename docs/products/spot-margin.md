@@ -4,8 +4,7 @@
 **Cross-collateralized against your unified USDC account.** Leveraged spot trading
 funded by the [Earn](../concepts/earn.md) lending pool. [Plain spot](./spot.md) is
 balance-only (no leverage); spot margin is the overlay that adds borrow + leverage
-on top. The cross-collateralized model is **available from the scheduled network
-upgrade on testnet `114514`** — the borrow → leveraged-buy → close loop and
+on top. The cross-collateralized model is **live** — the borrow → leveraged-buy → close loop and
 automatic [forced liquidation](#liquidation) run against your one unified USDC
 account. A pair enables only once governance calibrates its per-pair risk
 parameters, so treat it as a **preview**: per-pair **maintenance ratios are still

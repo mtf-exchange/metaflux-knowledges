@@ -43,11 +43,6 @@ alongside `perpDeploy`. Per the [MIP registry](./index.md) spot deployment is
 properly **MIP-1** and perp deployment is **MIP-3**, mirroring the spot-versus-perp
 split on established venues.
 
-**That realignment is now more than a label.** The two lanes had ONE governance
-switch, so disabling permissionless perps also disabled spot deployment. From the
-scheduled network upgrade they have **separate switches**: turning off MIP-3
-leaves MIP-1 spot deployment running, and vice versa.
-
-The change arrives at a fixed height. Below it a single switch still governs both,
-so a client reading a rejection reason may see the older wording on historical
-blocks.
+**That realignment is more than a label.** The two lanes share no governance
+switch. Turning off MIP-3 leaves MIP-1 spot deployment running, and turning off
+MIP-1 leaves permissionless perp deployment running.

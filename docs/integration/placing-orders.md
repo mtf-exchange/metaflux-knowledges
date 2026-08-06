@@ -343,7 +343,7 @@ One signature buys a behaviour that would otherwise cost a client loop.
 | Action | Reach for it when | Availability |
 |--------|-------------------|--------------|
 | [`twap_order`](../api/rest/exchange.md#twap_order) · [`twap_cancel`](../api/rest/exchange.md#twap_cancel) | You spread one large order over time | live |
-| [`scale_order`](../api/rest/exchange.md#scale_order) · [`cancel_scale`](../api/rest/exchange.md#cancel_scale) | You want N rungs across a price band from one signature | from the scheduled network upgrade |
+| [`scale_order`](../api/rest/exchange.md#scale_order) · [`cancel_scale`](../api/rest/exchange.md#cancel_scale) | You want N rungs across a price band from one signature | live |
 | [`chase_order`](../api/rest/exchange.md#chase_order) · [`cancel_chase`](../api/rest/exchange.md#cancel_chase) | You want one post-only leg the node re-prices to the touch | preview — confirm on your network |
 
 ### Tier 4 — specialist venues {#tier-4}
