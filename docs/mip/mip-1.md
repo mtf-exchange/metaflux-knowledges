@@ -36,6 +36,27 @@ pair). Each bid escrows a USDC amount (refunded on loss minus a small fee) and
 carries the market spec. Auction parameters (decay, refund window, slot interval)
 are governance-configurable and shared with the MIP-3 machinery.
 
+### What you pay in {#quote-currency}
+
+The auction **floor is always governed and quoted in USDC**, and the descending
+clock runs in USDC cents whichever currency settles.
+
+Governance selects the **settlement currency**: USDC today, MTF once the MTF spot
+pair is deep enough to price against. Under MTF the amount is derived from the
+USDC ask at charge time. Nothing about how you bid changes — only which balance
+is debited.
+
+:::warning
+**Every way the quote can fail is a REJECTION, never a free listing.** Under MTF
+settlement a deploy is refused when there is no governed reference price, when the
+reference and the last print disagree beyond the band, or when the amount would
+round to zero base units. The price comes from a band-clamped anchor, not from
+the live book, so lifting the pair for a block does not buy a cheap listing.
+:::
+
+The floor also has an **absolute lower bound** below which no vote can set it, so
+the clock can never descend to free.
+
 ## Note on numbering {#note-on-numbering}
 
 The `spotDeploy` actions were historically labelled "MIP-3" because they shipped
