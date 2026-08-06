@@ -2198,7 +2198,8 @@ The core handler enforces the agent-approval check against `user` at dispatch.
 
 ### Pay for priority block placement {#priority_bid}
 
-Pay a priority fee (bps) to push the sender's flow toward the front of the next block.
+Pay a priority fee to move your flow toward the front of the next block. The bid
+is a RATE in basis points, and it applies to ONE asset.
 
 ```json
 {
@@ -2210,7 +2211,27 @@ Pay a priority fee (bps) to push the sender's flow toward the front of the next 
 | Field | Type | Description |
 |-------|------|-------------|
 | `asset` | uint32 | Asset this bid is bound to |
-| `bid_bps` | uint16 | Bid in bps (capped at 8 by the core handler) |
+| `bid_bps` | uint16 | Bid rate in basis points, `1` to `8` |
+
+**Bounds.** `bid_bps` must be `1` or more and `8` or less. A bid of `0`, or a bid
+above `8`, is rejected. A rejected bid stores nothing and costs nothing.
+
+**One bid per asset.** A second `priority_bid` on the same asset REPLACES the
+first. Bids on different assets are independent.
+
+**What you pay.** The bid is a rate, not an amount. Your next perpetual order on
+that asset carries the charge. The exchange multiplies the FILLED notional of
+that order by `bid_bps / 10000` and truncates toward zero. The charge is
+additional to your usual taker fee, and it goes to the same protocol fee pools.
+
+**When the bid is used up.** Your next perpetual order on that asset consumes the
+bid. This is true whether the order fills or not, and true when the charge
+truncates to zero. An unused bid stays until an order on that asset uses it. To
+keep priority for a later order, send a new `priority_bid`.
+
+**What you get.** The bid moves your flow toward the front of the block. It is a
+placement preference, not a guarantee. It does not reserve a price, it does not
+change how the order matches, and it does not skip a risk check.
 
 ---
 

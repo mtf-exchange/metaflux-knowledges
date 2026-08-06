@@ -72,8 +72,8 @@ Response:
     "day_ntl_vlm":   "3772.890084",
     "change_24h":    "-0.00274143",
     "prev_day_px":   "61719.4",
-    "disable_open":  false,
-    "disable_close": false,
+    "open":  true,
+    "close": true,
     "halted":        false,
     "strict_isolated": false,
     "asset_id":      0,
@@ -176,7 +176,7 @@ served by [`markets`](#markets) (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`,
 `change_24h`, `halted`) and the **static** fields served by
 [`markets_meta`](#markets_meta) (`sz_decimals`, `tick_size`, `step_size`,
 `min_order`, `max_leverage`, the margin ratios, `margin_tiers`,
-`strict_isolated`, `disable_open` / `disable_close`, `oi_cap`, `mark_source`,
+`strict_isolated`, `open` / `close`, `oi_cap`, `mark_source`,
 `fba_enabled`, `asset_id`, the optional `token` block). See those two reads for per-field semantics.
 
 ### Get live state for all markets {#markets}
@@ -287,7 +287,7 @@ these same dynamic rows (a full snapshot on subscribe, then changed-row deltas).
 
 The **static** per-market fields (`sz_decimals`, `tick_size`, `step_size`,
 `min_order`, `max_leverage`, `maint_margin_ratio`, `init_margin_ratio`,
-`margin_tiers`, `strict_isolated`, `disable_open` / `disable_close`, `oi_cap`,
+`margin_tiers`, `strict_isolated`, `open` / `close`, `oi_cap`,
 `mark_source`, `fba_enabled`, `asset_id`) are **not** on this read — fetch them
 from [`markets_meta`](#markets_meta). For the spot pair / token field semantics
 see [the spot registry](./spot.md#spot_meta).
