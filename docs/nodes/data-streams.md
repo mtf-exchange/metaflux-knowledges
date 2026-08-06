@@ -19,7 +19,7 @@ Each envelope holds zero or more **records**.
 The node does not serve these files. It only writes them. You read them with your
 own indexer, archiver, or analytics job.
 
-Nine streams exist. Seven carry block events. Two carry order-book state.
+Ten streams exist. Six carry block events. Two sample on a timer. Two carry order-book state.
 
 | Stream | On-disk root | Content |
 |--------|--------------|---------|
@@ -29,6 +29,7 @@ Nine streams exist. Seven carry block events. Two carry order-book state.
 | [`node_funding`](#node_funding) | `<data_dir>/node_funding/` | Realized funding payments |
 | [`node_ledger`](#node_ledger) | `<data_dir>/node_ledger/` | Signed non-funding balance deltas |
 | [`node_equity_snapshots`](#node_equity_snapshots) | `<data_dir>/node_equity_snapshots/` | Hourly account-value samples |
+| [`node_asset_ctxs`](#node_asset_ctxs) | `<data_dir>/node_asset_ctxs/` | Per-market mark and oracle price samples, every 5 s |
 | [`replica_cmds`](#replica_cmds) | `<data_dir>/replica_cmds/` | One block envelope per block, header plus events |
 | [`l4_book_diffs`](#l4_book_diffs) | `<data_dir>/l4_book_diffs.jsonl` | Per-order book diffs, with owner |
 | [`l2_book_diffs`](#l2_book_diffs) | `<data_dir>/l2_book_diffs.jsonl` | Per-price-level book diffs, anonymous |
@@ -514,6 +515,45 @@ misses bridge credits and can go negative.
 
 The sample costs one walk over every account and every market, so it stays off
 the validator path. The node does not sample during start-up replay.
+
+## `node_asset_ctxs` {#node_asset_ctxs}
+
+A sample tape, not an event tape. One line per sample, one sample every **5
+seconds** of consensus block time. Each line carries **every** market in the
+committed universe — perps first, then tradable spot pairs, each group in
+ascending market id.
+
+```json
+{
+  "block_number": 941006700,
+  "block_time": 1735689600000,
+  "ctxs": [
+    { "market": 0, "mark_px": "5000000000000", "oracle_px": "4999500000000" },
+    { "market": 3, "mark_px": "125000000", "oracle_px": "0" }
+  ]
+}
+```
+
+| Field | Type | Units | Meaning |
+|-------|------|-------|---------|
+| `market` | uint32 | — | Market id. Perps come first, then spot pairs |
+| `mark_px` | decimal string | **raw 1e8** | The market's committed mark price |
+| `oracle_px` | decimal string | **raw 1e8** | The committed oracle price |
+
+:::warning
+**`"0"` means NO COMMITTED PRICE, not a price of zero.** Every spot pair reads
+`"0"` for `oracle_px`, because a spot pair has no oracle. A perp also reads `"0"`
+before its first oracle push. Treat `"0"` as absent — a consumer that averages it
+in will drag every derived number toward zero.
+:::
+
+Both prices are on the **raw 1e8** plane, like the rest of the `node_*` family.
+Divide by `100000000` before you display them.
+
+Use this stream to build mark and oracle candles. The 5-second cadence gives the
+smallest (1-minute) candle twelve samples. It is a price series, not a trade
+series: a bar exists in every window the samples cover, whether or not anything
+traded.
 
 ## `replica_cmds` {#replica_cmds}
 

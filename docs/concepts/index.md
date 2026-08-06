@@ -22,8 +22,9 @@ linking to its deep-dive page below.
 6. [Funding rates](./funding-rates.md) — per-asset discrete user-to-user payment
 7. [Fees](./fees.md) — maker/taker tiers + burn
 8. [Fee schedule](./fee-schedule.md) — volume, maker-rebate, and staking discount tiers
-9. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
-10. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
+9. [Broker codes](./broker-codes.md) — charge your own fee on orders you route
+10. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
+11. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
 
 ## Earn & related products {#earn--related-products}
 
