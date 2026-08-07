@@ -99,19 +99,25 @@ fill drop.
 Spot matching is the same price-time CLOB the rest of MetaFlux uses. A fill swaps
 base for quote at the **maker's resting price**.
 
-Fees are charged **from the leg each side receives**:
-
-- the **taker** fee is taken from the leg the taker receives,
-- the **maker** fee is taken from the leg the maker receives.
-
-So a buyer (receiving base) pays its fee in base; a seller (receiving quote) pays
-its fee in quote. Fees accrue to a dedicated spot fee account, separate from the
-perp fee pool.
+**Today both sides pay their fee in the QUOTE token of the pair.** The fee leaves
+the payer's spendable quote balance, never the base balance. Fees accrue to a
+dedicated spot fee account, separate from the perp fee pool.
 
 | Side | Fee taken from | Rate |
 |------|----------------|------|
-| **Taker** | the leg you receive (buyer → base, seller → quote) | pair `taker_fee_bps`, else the global spot default |
-| **Maker** | the leg you receive | pair `maker_fee_bps`, else the global spot default |
+| **Taker** | your spendable quote balance | pair `taker_fee_bps`, else the global spot default |
+| **Maker** | your spendable quote balance | pair `maker_fee_bps`, else the global spot default |
+
+:::caution Scheduled change — a BUY will pay its fee in the BASE token
+Built, not yet active; it switches on at one announced block height. From that
+height a **buy** is credited the base token **minus** its fee, taker and maker
+alike, and a **sell** keeps paying from the USDC it receives. So the fill `sz`
+stays gross while the balance credit is net — **read the balance, never the sum
+of fill sizes**. Buy admission also stops reserving quote fee headroom, so a
+given quote balance admits a slightly larger buy than it does today. The full
+rule, the in-kind referrer share and the sub-lot dust are in
+[fees](../concepts/fees.md#spot-buy-fee-in-base).
+:::
 
 Spot fees are **per-pair**: a pair may set its own `taker_fee_bps` /
 `maker_fee_bps`, and when unset the global spot default applies. Spot uses a flat
@@ -193,7 +199,7 @@ Both are **opt-in overlays**; plain spot is unaffected by them.
 
 - [`spot_order`](../api/rest/exchange.md#spot_order) / [`spot_cancel`](../api/rest/exchange.md#spot_cancel) — the wire actions and field tables
 - [Order types](../concepts/order-types.md) — TIF and STP semantics shared with perps
-- [Fees](../concepts/fees.md#spot-fees) — the spot fee schedule and received-leg charging
+- [Fees](../concepts/fees.md#spot-fees) — the spot fee schedule and quote-side charging
 - [Spot margin](./spot-margin.md) — the planned leveraged spot track
 - [MIP-1](../mip/mip-1.md) — spot token standard and market deploy
 

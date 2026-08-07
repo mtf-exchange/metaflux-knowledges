@@ -47,7 +47,7 @@ The trader signs one action:
 
 ```json
 {
-  "type": "approve_builder_fee",
+  "type": "approve_broker_fee",
   "params": { "builder": "0x<your address>", "max_bps": 7 }
 }
 ```
@@ -56,25 +56,53 @@ The trader signs one action:
 recognized broker who charges nothing, which is different from not being approved
 at all.
 
-Read a trader's approvals with the `approved_brokers` query, or one specific
+Read a trader's approvals with the `approved_builders` query, or one specific
 grant with `max_builder_fee`.
 
 :::warning
-**The wire still says `builder`.** The action type, the `builder` parameter and
-the `max_builder_fee` query keep that name because they are frozen surfaces —
-the action name is part of what every historical signature signed, so renaming it
-would break signature verification and block replay. The rest of the system calls
-this a broker. **This is deliberate. Do not report it as an inconsistency.**
+**The action type is `approve_broker_fee`. Some older `builder` names stay, on
+purpose.** Read this before you file an inconsistency.
+
+**Both action names work.** Send `approve_broker_fee` in new code.
+`approve_builder_fee` is still accepted, and always will be. A committed block
+keeps the exact JSON that the trader submitted, and every node reads those blocks
+again when it replays the chain. An accepted action name is therefore never
+withdrawn.
+
+**These names do not move.** Committed data fixes each one:
+
+| Name | Where you meet it |
+|------|-------------------|
+| `builder` | the parameter of `approve_broker_fee`, and the broker block on an order |
+| `max_builder_fee` | the single-grant query |
+| `approved_builders` | the enumerated-grant query |
+
+**The EIP-712 type string still reads `ApproveBuilderFee`.** You send
+`approve_broker_fee`, but you sign
+`MetaFluxTransaction:ApproveBuilderFee(string metafluxChain,address builder,uint16 maxFeeBps,uint64 nonce)`.
+**This mismatch is deliberate. Do not report it as a bug.** The type string is
+hashed into every signature ever made for this action. Change one byte of it and
+every one of those signatures stops verifying. A `broker` spelling can only
+arrive later as a SECOND type string, selected per request. It can never be an
+edit to this one. See
+[typed-data signing](../integration/typed-data-signing.md#account-staking--vault).
 :::
 
 ## Charging {#charging}
 
-Attach the broker to the order:
+Attach a `builder` block to the order:
+
+```json
+"builder": { "fee": 5, "user": "0x<your address>" }
+```
 
 | Field | Meaning |
 |-------|---------|
-| `builderFee` | Your rate for this order, in whole bps |
-| `builderUser` | Your address |
+| `fee` | Your rate for this order, in whole bps |
+| `user` | Your address |
+
+The EIP-712 `submit_order` type string names the same two values `builderFee`
+and `builderUser`. Your signing library reads them; you do not send them.
 
 Then, on every fill of that order:
 
@@ -85,7 +113,7 @@ taker pays = base taker fee + broker fee
 The two are **separate debits**. The broker fee is `notional × rate`, rounded
 toward zero, and credited to your address in full.
 
-A **zero-rate broker is still validated.** Setting `builderFee: 0` is a no-op
+A **zero-rate broker is still validated.** Setting `"fee": 0` is a no-op
 charge, but the address must still be real and still approved. This keeps the
 attribution path identical whether or not you charge.
 
@@ -114,8 +142,11 @@ yours — the trader pays both.
 Fees accrue to a running balance. Claim it with:
 
 ```json
-{ "type": "claim_broker_rewards" }
+{ "type": "claim_builder_rewards" }
 ```
+
+This action keeps the `builder` spelling. Only `approve_broker_fee` has a second
+name today.
 
 The whole accrued balance moves into your spendable collateral and the entry is
 removed. The call is **idempotent**: claiming again with nothing accrued claims

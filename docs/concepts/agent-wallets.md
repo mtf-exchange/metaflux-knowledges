@@ -261,7 +261,7 @@ That is the whole rule. It gives agents the trading surface and nothing else.
 **Everything else is master-key work**, including every withdrawal and transfer
 (`mb_withdraw`, `core_evm_transfer`, `send_asset`, `usd_class_transfer`), every
 vault action, Earn and spot-margin, staking, sub-accounts, multi-sig conversion,
-`approve_builder_fee`, `set_referrer`, `set_display_name`, portfolio-margin
+`approve_broker_fee`, `set_referrer`, `set_display_name`, portfolio-margin
 enrolment, and `approve_agent` itself. There is no agent-of-agent recursion.
 
 :::danger

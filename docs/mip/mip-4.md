@@ -80,7 +80,7 @@ Internalization revenue feeds the **same fee-distribution waterfall as MIP-3** �
 - **20%** — validators, who distribute it to their stakers as the dividend
 - **10%** — Foundation / Treasury
 
-On the retail side, the builder-code fee (capped at 8 bps) is the natural economic seat for a retail UI to charge — the same place a retail broker monetizes its order flow.
+On the retail side, the broker-code fee (capped at 8 bps) is the natural economic seat for a retail UI to charge — the same place a retail broker monetizes its order flow.
 
 ## Outcomes → MIP-6, deferred to V3 {#outcomes--mip-6-deferred-to-v3}
 

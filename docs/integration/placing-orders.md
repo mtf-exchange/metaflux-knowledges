@@ -265,7 +265,7 @@ Everything else belongs to one shape only:
 | `kind`, `trigger` | perp order | Spot has no trigger registry |
 | `reduce_only` | perp order | Spot has no positions |
 | `position_side` | perp order | [Hedge mode](../concepts/hedge-mode.md) leg selection |
-| `builder` | perp order | Builder-fee carve |
+| `builder` | perp order | [Broker fee](../concepts/broker-codes.md). A spot order carries no such field, so it can charge no broker fee |
 | `grouping` | `batch_order` | Links legs into a TP/SL family |
 | `owner` (required) | `submit_order`, `cancel_order` | The routing claim |
 | `owner` (optional) | `batch_order`, `spot_order`, `spot_cancel`, and most of tiers 2–3 (`modify`, `cancel_by_cloid`, `cancel_all_orders`, `scale_order`, `chase_order`, `twap_order`, and more) | Absent = the signer acts for itself. See each action's page for whether `owner` is digest-bound |

@@ -143,7 +143,7 @@ For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
 |---------------|--------------|
 | `approve_agent` | `MetaFluxTransaction:ApproveAgent(string metafluxChain,address agentAddress,string agentName,uint64 nonce)` |
 | `set_referrer` | `MetaFluxTransaction:SetReferrer(string metafluxChain,address referrer,uint64 nonce)` |
-| `approve_builder_fee` | `MetaFluxTransaction:ApproveBuilderFee(string metafluxChain,address builder,uint16 maxFeeBps,uint64 nonce)` |
+| `approve_broker_fee` | `MetaFluxTransaction:ApproveBuilderFee(string metafluxChain,address builder,uint16 maxFeeBps,uint64 nonce)` |
 | `set_display_name` | `MetaFluxTransaction:SetDisplayName(string metafluxChain,string displayName,uint64 nonce)` |
 | `set_position_mode` | `MetaFluxTransaction:SetPositionMode(string metafluxChain,bool hedge,uint64 nonce)` |
 | `user_portfolio_margin` | `MetaFluxTransaction:UserPortfolioMargin(string metafluxChain,bool enroll,uint64 nonce)` |
@@ -160,6 +160,12 @@ Notes on specific fields:
 - `claim_rewards`: `validator` = the zero address means **claim across all
   delegations**.
 - `create_vault`: `kind` is `0` = User, `1` = Metaliquidity.
+- `approve_broker_fee`: the row above is **not** a typographic error. The action
+  type says `broker`; the `encodeType` says `ApproveBuilderFee`. Sign the string
+  exactly as printed. The type string is hashed into every signature ever made
+  for this action, so one changed byte stops every historical signature from
+  verifying. The older action type `approve_builder_fee` is still accepted and
+  signs the same string. See [broker codes](../concepts/broker-codes.md#approval).
 
 ### Margin {#margin}
 

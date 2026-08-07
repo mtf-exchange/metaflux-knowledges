@@ -7,7 +7,7 @@ description: The MetaFlux perpetual fee schedule — volume fee tiers, maker reb
 :::info
 **Rate card.** This page is the user-facing schedule of perpetual trading rates.
 For the underlying mechanics — how a fee is split, the buyback-and-distribute
-flow, and the referrer and builder credits — see [Fees](./fees.md). Tier values
+flow, and the referrer and broker credits — see [Fees](./fees.md). Tier values
 are network parameters and can be updated by governance.
 :::
 

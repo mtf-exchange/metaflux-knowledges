@@ -340,7 +340,7 @@ planes and the digest-bound `owner` rule.
 | [`approve_agent`](#approve_agent) | Approve an agent wallet | master only |
 | [`set_display_name`](#set_display_name) | Set the account handle | master only |
 | [`set_referrer`](#set_referrer) | Bind to a referrer address | master only |
-| [`approve_builder_fee`](#approve_builder_fee) | Approve a builder fee ceiling | master only |
+| [`approve_broker_fee`](#approve_builder_fee) | Approve a broker fee ceiling | master only |
 | [`create_sub_account`](#create_sub_account) | Open a sub-account under the master | master only |
 | [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | master only |
 | [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | master only |
@@ -459,7 +459,7 @@ approved agent). To place many orders under one signature, use
 | `stp_mode` | enum | `"cancel_oldest"`, `"cancel_newest"`, `"cancel_both"` | `"reject"` is rejected (`unsupported stp_mode` — no core equivalent) |
 | `reduce_only` | bool | — | If true, rejected at commit if it would grow position |
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client order id; enables `cancel_by_cloid` and dedup |
-| `builder` | object \| null | — | Optional builder-fee carve: `{ "fee": <bps u16>, "user": <0x-hex address> }` |
+| `builder` | object \| null | — | Optional [broker fee](../../concepts/broker-codes.md), charged on top of the taker fee: `{ "fee": <bps u16>, "user": <0x-hex address> }`. The field keeps the `builder` name |
 | `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only.** Target leg for the order. **Omit on a one-way account** (the default) and **send it on a hedge account** — a one-way account that sends it, or a hedge account that omits it, is rejected. `reduce_only` is evaluated against the named leg only. See [hedge mode](#position_side-hedge-mode) below |
 
 **Idempotency**: a duplicate `cloid` on the same account is rejected at admission with `error: "duplicate cloid"`. Use `cloid` as your client-side dedup key.
@@ -1823,13 +1823,13 @@ Settable **once** per account; subsequent attempts return `{"error":"referrer al
 
 ---
 
-### Approve a builder fee ceiling {#approve_builder_fee}
+### Approve a broker fee ceiling {#approve_builder_fee}
 
-Approve a builder address up to a fee ceiling (bps). `0` revokes; the core handler caps at 8 bps.
+Approve a broker address up to a fee ceiling (bps). `0` revokes; the core handler caps at 8 bps.
 
 ```json
 {
-  "type": "approve_builder_fee",
+  "type": "approve_broker_fee",
   "params": {
     "builder": "0x00000000000000000000000000000000000000aa",
     "max_bps": 7
@@ -1839,8 +1839,16 @@ Approve a builder address up to a fee ceiling (bps). `0` revokes; the core handl
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `builder` | hex address | 20-byte builder address |
+| `builder` | hex address | 20-byte broker address. The field keeps the `builder` name |
 | `max_bps` | uint16 | Max approved fee in bps (`0` revokes; capped at 8) |
+
+:::note
+**Both action types are accepted.** `approve_broker_fee` is the name to send.
+`approve_builder_fee` still decodes and always will: a committed block keeps the
+JSON the trader submitted, and replay reads it again. The EIP-712 type string
+stays `ApproveBuilderFee`, which no signature lets you change — see
+[broker codes](../../concepts/broker-codes.md#approval).
+:::
 
 ---
 

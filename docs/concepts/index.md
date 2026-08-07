@@ -23,8 +23,9 @@ linking to its deep-dive page below.
 7. [Fees](./fees.md) — maker/taker tiers + burn
 8. [Fee schedule](./fee-schedule.md) — volume, maker-rebate, and staking discount tiers
 9. [Broker codes](./broker-codes.md) — charge your own fee on orders you route
-10. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
-11. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
+10. [Priority fees](./priority-fees.md) — pay for ordering inside a block, and how that differs from a broker fee
+11. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
+12. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
 
 ## Earn & related products {#earn--related-products}
 

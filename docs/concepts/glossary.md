@@ -28,7 +28,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **bps — Basis point.** 0.01% (= `1e-4`). Fee rates are denominated in bps; `5 bps` = 0.05%.
 
-**Builder credit.** Fee share paid to the address that originated an order (front-end, aggregator, automation service). See [fees](./fees.md#builder-credit).
+**Broker credit.** Extra fee charged on top of the taker fee and paid to the address that originated an order (front-end, aggregator, automation service). See [fees](./fees.md#builder-credit) and [broker codes](./broker-codes.md).
 
 ## C {#c}
 

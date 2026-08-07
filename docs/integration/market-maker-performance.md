@@ -12,6 +12,14 @@ three built-in fast paths. Adopting all three removes commit latency from the qu
 
 ## 1. Submit with `?confirm=async`
 
+:::warning
+**`?confirm=async` is honoured by a node, not by the public endpoint today.** The public endpoint is
+served by a gateway, and the gateway forwards the `/exchange` body without the query string. Sent
+there, the parameter is discarded and you get the default synchronous reply. Test your endpoint
+before you build the quote loop on it — see
+[optimizing latency](./latency.md#choose-the-transport).
+:::
+
 `POST /exchange?confirm=async` returns **`202 Accepted` immediately (T+0)** with a correlation
 handle instead of blocking until commit:
 

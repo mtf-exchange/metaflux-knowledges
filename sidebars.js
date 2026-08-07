@@ -35,6 +35,7 @@ const sidebars = {
       link: {type: 'doc', id: 'concepts/index'},
       items: [
         'concepts/architecture',
+        'concepts/usdc',
         {
           type: 'category',
           label: 'Trading',
@@ -147,6 +148,8 @@ const sidebars = {
         'integration/idempotency',
         'integration/error-handling',
         'integration/risk-watcher',
+        'integration/market-maker-performance',
+        'integration/latency',
         'integration/migrating-from-hl',
         {
           type: 'category',

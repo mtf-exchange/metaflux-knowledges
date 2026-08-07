@@ -2,7 +2,7 @@
 
 :::info
 **Concepts page.** This page explains how a trading fee is computed per fill, the
-builder and referrer credits, spot and liquidation fees, and where collected fees
+broker and referrer credits, spot and liquidation fees, and where collected fees
 go. For the actual rates — volume fee tiers, maker-rebate tiers, and staking
 discount tiers — see the [Fee schedule](./fee-schedule.md). Fee values are network
 parameters and can be updated by governance.
@@ -11,8 +11,8 @@ parameters and can be updated by governance.
 ## TL;DR {#tldr}
 
 Every fill charges a maker and a taker fee, set by the [Fee schedule](./fee-schedule.md).
-A builder credit can route a share to the order-flow originator, and a referrer
-credit can route a share of the taker fee to a referrer. After maker rebates are
+A broker credit adds a charge for the order-flow originator, and a referrer
+credit routes a share of the taker fee to a referrer. After maker rebates are
 paid, the protocol splits the remaining fee revenue **~70% buyback / ~20%
 validators / ~10% treasury**. The buyback share buys MTF on the open market and
 locks it forever in a keyless protocol address — permanently removing it from
@@ -33,7 +33,7 @@ rounded to a whole cent or dollar.
 notional    = |price × size|
 taker_fee   = notional × taker_rate
 maker_fee   = notional × maker_rate
-builder_fee = notional × builder_rate    # additive, taker-only, capped
+broker_fee  = notional × broker_rate     # additive, taker-only, capped
 ```
 
 The taker and maker rates come from your tier on the [Fee schedule](./fee-schedule.md):
@@ -45,19 +45,23 @@ same flow — the protocol never pays out more than it takes in.
 Per-fill fee appears in every [`userFills`](../api/rest/info.md#user_fills) entry as
 `fee` (USDC base units; positive = paid, negative = rebate received).
 
-## Builder credit {#builder-credit}
+## Broker credit {#builder-credit}
 
-An order-flow originator can claim a share of the taker fee by setting a builder
-address on the order. The credit is paid per fill to that address. Typical uses:
+An order-flow originator can charge its own fee. It sets a broker address on the
+order. The charge is **additive**: the taker pays it on top of the base taker
+fee. It does not reduce the referrer share and it does not reduce the protocol
+split. The credit is paid per fill to that address. Typical uses:
 
 - a front-end or aggregator that routed the flow,
 - a market-data API that bundles execution,
 - an automated risk service that placed protective orders.
 
-The builder must be a registered address (see
-[`approve_builder_fee`](../api/rest/exchange.md#approve_builder_fee)). Unregistered
-builders are silently dropped. The builder credit is additive and taker-only, with
-a per-order cap; it does not change the maker side.
+The trader must approve the broker first (see
+[`approve_broker_fee`](../api/rest/exchange.md#approve_builder_fee)). An order
+that names an unapproved broker is **rejected before it rests**. So is an order
+whose rate is above the trader's approved ceiling or above the protocol cap. The
+broker credit is taker-only, with a per-order cap. It does not change the maker
+side. For the full rules, see [broker codes](./broker-codes.md).
 
 ## Referrer credit {#referrer-credit}
 
@@ -69,7 +73,7 @@ Referrals are single-level (no multi-level chain — anti-Ponzi). A referrer is 
 once with [`set_referrer`](../api/rest/exchange.md#set_referrer) and is immutable
 thereafter; setting yourself as your own referrer is rejected.
 
-A builder credit and a referrer credit can both apply to the same fill — they pay
+A broker credit and a referrer credit can both apply to the same fill — they pay
 out independently.
 
 ## Where fees go {#where-fees-go}
@@ -136,18 +140,60 @@ MTF (or delegate to a validator) to receive a larger slice — see [Staking](./s
 ## Spot fees {#spot-fees}
 
 The same maker/taker shape applies to spot fills, but spot fees are charged on a
-**separate fee account** from perps, and they are taken **from the leg each side
-receives** — not always from the quote balance:
+**separate fee account** from perps.
 
-- the **taker** fee is taken from the leg the taker receives,
-- the **maker** fee is taken from the leg the maker receives.
+**Today both sides pay in the QUOTE token of the pair.** The fee leaves the
+payer's spendable quote balance, never the base balance. Each spot pair may set
+its own maker/taker rate; when a pair leaves them unset, the global spot default
+applies. See the spot tiers in the
+[`/info fee_schedule`](../api/rest/info.md#fee_schedule) response, and
+[spot trading](../products/spot.md#matching-fills-and-fees) for the settlement
+model.
 
-So a spot **buyer** (receiving base) pays its fee in **base**, and a **seller**
-(receiving quote) pays its fee in **quote**. Each spot pair may set its own
-maker/taker rate; when a pair leaves them unset, the global spot default applies.
-See the spot tiers in the [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
-response, and [spot trading](../products/spot.md#matching-fills-and-fees) for the
-settlement model.
+### A spot BUY will pay its fee in the BASE token {#spot-buy-fee-in-base}
+
+:::caution Scheduled change — read this before you reconcile balances
+This rule is **built but not yet active**. It switches on at one announced block
+height. Below that height the behavior above applies unchanged. The height is
+published in the release notes; there is no field on the wire that flips with it,
+so the height is the only boundary you can key on.
+:::
+
+**Each side pays out of the leg it RECEIVES.** A sell receives USDC and already
+pays from it. A **buy receives the base token, so the buy fee comes out of the
+base**, for the taker and the maker alike. The rule closes a real hole: a fee
+denominated in a token the buyer is not receiving can be charged against an empty
+balance, and a resting buyer holding no spendable quote paid nothing.
+
+Four consequences a caller must handle:
+
+1. **The fill `sz` is GROSS; the balance credit is NET.** A taker buying `1.0`
+   BTC at a `0.035%` rate sees `sz: "1.0"` on the fill and receives
+   `0.99965` BTC. **Summing fill sizes over-counts holdings.** Read the balance,
+   not the sum of fills, to know what you own. The fill's `fee` field stays `"0"`
+   for spot at every height and gains **no** fee-token field — the fee is
+   observable as the difference between `sz` and the balance change, and
+   deliberately nowhere else, so the committed trade record is unchanged.
+2. **A referrer share and a maker rebate on a BUY arrive IN KIND.** They are
+   credited as a spot balance in that pair's **base token**, directly at the fill.
+   They do **not** enter the claimable USDC
+   [referrer credit](#referrer-credit) — that accumulator is USDC-denominated and
+   a base amount cannot join it. So a referrer of a BTC buyer receives BTC, with
+   nothing to claim; a referrer of a seller still receives claimable USDC.
+3. **Netted balances carry permanent sub-lot dust.** The fee is computed
+   **exactly**, not quantized to the token's tradeable lot, so the netted credit
+   ends below one lot of precision (a 1-lot BTC taker buy leaves about `3.5e-9`
+   BTC). That residue is real and yours, but it is **smaller than one lot, so no
+   order can sell it**. It is truncated when you withdraw. This is deliberate:
+   quantizing instead would keep balances clean but re-open a zero-fee window —
+   any BTC buy under ten lots would pay nothing — and a window can be farmed while
+   dust cannot.
+4. **A zero-rate pair still rolls NO volume into the tier ladder.** Volume rolls
+   only when a positive fee is actually collected. On a positive-rate pair that is
+   now every fill, including the resting-buy fills that used to roll nothing. On a
+   pair whose rate is zero, nothing rolls — so a free pair cannot be used to farm
+   a cheaper tier. The 30-day ladder itself stays **USD-denominated**: a
+   base-token fee does not change the currency volume is measured in.
 
 ## Fees on liquidation fills {#fees-on-liquidation-fills}
 
@@ -180,8 +226,8 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 - **Tier evaluation cadence.** Tiers are re-evaluated continuously on the current
   30-day window — there is no periodic snapshot. A trade that pushes you into a new
   tier applies on the next fill.
-- **Builder credit ≠ referrer credit.** Both can apply to the same fill — a user's
-  account has a referrer and that fill's order specified a builder. Both routes pay
+- **Broker credit ≠ referrer credit.** Both can apply to the same fill — a user's
+  account has a referrer and that fill's order specified a broker. Both routes pay
   out independently.
 - **Negative-fee maker tier.** When the net maker rate is below zero, the maker is
   paid from taker fees collected on the same flow (and across all fills in the same
@@ -209,7 +255,7 @@ A: Per-fill. A partially-filled order accrues fee in proportion to the filled si
 at each fill event.
 
 **Q: Are fees paid in USDC or in MTF?**
-A: You pay in the fill currency (USDC for perps; the received leg for spot). The
+A: You pay in the fill currency (USDC for perps; the pair's quote token for spot). The
 protocol splits that fee revenue ~70/20/10; the ~70% buyback share buys MTF on the
 open market and locks it out of circulation, while the validator and treasury
 shares stay in the fill currency.
@@ -224,8 +270,8 @@ display-vs-internal precision, the charged value is what you see.
 A: Yes — each slice is an IOC at the protocol's discretion. Total TWAP fee = sum of
 slice fees.
 
-**Q: Can the builder credit be zero?**
-A: Yes. If you don't set a builder on an order, no credit is allocated; the full
+**Q: Can the broker credit be zero?**
+A: Yes. If you don't set a broker on an order, no credit is allocated; the full
 protocol share flows into the buyback-and-distribute pipeline.
 
 **Q: How do stakers earn from fees?**
