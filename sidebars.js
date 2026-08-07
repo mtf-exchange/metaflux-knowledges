@@ -45,6 +45,8 @@ const sidebars = {
             'concepts/rfq',
             'concepts/fees',
             'concepts/fee-schedule',
+            'concepts/broker-codes',
+            'concepts/priority-fees',
             'concepts/funding-rates',
             'concepts/oracle-prices',
             'concepts/mark-prices',
