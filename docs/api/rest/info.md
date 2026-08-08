@@ -13,7 +13,7 @@ description: The POST /info read endpoint — query types, envelope, and convent
 Single endpoint, multi-type. Dispatches on the request body's `type` field. Read-only — never mutates state, never requires a signature.
 
 :::tip
-**Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md). This page covers the envelope, conventions, and account/governance/vault/validator reads.
+**Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md); closed-position lifecycle queries are on [position history](./info/position-history.md). This page covers the envelope, conventions, and account/governance/vault/validator reads.
 :::
 
 ## URL {#url}
@@ -388,6 +388,13 @@ populated `trigger` block.
 
 Account-scoped fill history, served directly from committed on-node state (a
 bounded per-account fill ring folded into the AppHash — no external indexer).
+
+:::tip
+**One row per EXECUTION.** This is the per-trade log. For one row per
+**opened-then-closed position** — peak size, average entry, average close,
+realized PnL and funding folded over a whole life — use
+[position history](./info/position-history.md) instead.
+:::
 
 ```json
 { "type": "user_fills", "address": "0x<addr>" }

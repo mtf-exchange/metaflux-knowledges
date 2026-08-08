@@ -213,7 +213,7 @@ Response:
   "type": "spot_clearinghouse_state",
   "data": {
     "address": "0x<addr>",
-    "balances": [ { "asset": 104, "name": "MTF", "total": "10", "hold": "0" } ],
+    "balances": [ { "asset": 104, "name": "MTF", "total": "10", "hold": "0", "avg_entry_px": "2.54" } ],
     "height": 562,
     "time":   1700000000555
   }
@@ -226,6 +226,61 @@ Response:
 | `balances[*].name` | string | Token / pair name, else `asset:<id>` |
 | `balances[*].total` | decimal string | Full balance, truncated toward zero |
 | `balances[*].hold` | decimal string | Locked behind resting spot orders (escrow); spendable = `total − hold` |
+| `balances[*].avg_entry_px` | decimal string \| null | Weighted-average acquisition cost, **whole USDC per whole token**. It is a PRICE, not a total. `null` when the account has no recorded basis for this token. See [cost basis](#avg-entry-px) |
+
+#### Cost basis and spot PnL {#avg-entry-px}
+
+:::caution
+**Treat a missing key exactly like `null`** — no basis known. An older node
+serves `balances` rows carrying `asset`, `name`, `total` and `hold` only.
+:::
+
+`avg_entry_px` is what the account paid, per token, for what it holds. It is the
+one input spot PnL needs:
+
+```
+unrealized_spot_pnl = (mark_px − avg_entry_px) × total
+```
+
+It is a PRICE and not a total on purpose. `total` includes the part locked behind
+resting orders (`hold`), so a server-computed notional would have to choose which
+quantity to multiply by, and you could not see which it chose. Multiply by the
+quantity YOU mean.
+
+**The rule behind it — basis is recorded on spot BUYS only.**
+
+- A spot **buy** rolls the weighted average acquisition cost forward.
+- A spot **sell** reduces the balance but **keeps the per-unit average
+  unchanged**. Selling does not re-price what remains.
+- **Deposits record no basis.** Tokens that arrive by bridge deposit, by a
+  Core↔EVM credit, by a spot transfer from another account, or by a governance
+  adjustment were not bought on this chain, so there is no price to record.
+
+**Consequences to code against:**
+
+- A holding acquired **entirely** by deposit or transfer has **`avg_entry_px:
+  null`**. It is never `"0"`. A zero would claim the tokens were free and make
+  the whole balance look like profit; `null` says plainly that the basis is not
+  known. This matches the `null`-over-wrong-but-plausible rule used by the
+  [position history](./position-history.md#honesty-flags) completeness flags.
+- A holding **partly** bought and partly transferred in prices the transferred
+  tokens at the standing average, because the transfer wrote no basis of its own.
+  `avg_entry_px` is then a real number, but it covers the bought portion's price
+  applied across the whole balance.
+- Do not render a PnL figure when `avg_entry_px` is `null`. Render "—" instead. A
+  PnL computed against a null basis is not a small error; it is the entire
+  notional reported as gain.
+
+**Perp positions are unaffected.** They carry their own entry price in
+[`account_state`](../info.md#account_state); `avg_entry_px` is the spot ledger's
+equivalent.
+
+:::info
+**No basis on the unified USDC pool.** `avg_entry_px` appears on spot token rows
+only. USDC is the quote asset — its cost basis in USDC is meaningless — and
+under [USDC unification](../../../concepts/usdc.md) the spot ledger holds no
+spendable USDC row at all.
+:::
 | `height` | uint64 | Committed block height this snapshot reflects — a **bare integer**, not a Decimal string. Advances on **every** commit, even when the balances are unchanged |
 | `time` | uint64 | Consensus block time in **milliseconds** — a **bare integer**, same consensus clock as `height` |
 

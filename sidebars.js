@@ -104,7 +104,11 @@ const sidebars = {
               type: 'category',
               label: 'info',
               link: {type: 'doc', id: 'api/rest/info'},
-              items: ['api/rest/info/perpetuals', 'api/rest/info/spot'],
+              items: [
+                'api/rest/info/perpetuals',
+                'api/rest/info/spot',
+                'api/rest/info/position-history',
+              ],
             },
             'api/rest/faucet',
           ],

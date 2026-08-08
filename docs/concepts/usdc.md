@@ -217,6 +217,16 @@ the account is empty. Poll [`account_state`](#account-state) instead. Use
 `spot_clearinghouse_state` for the **other** tokens (MTF, listed base tokens).
 :::
 
+The two reads therefore return **disjoint asset sets** for most accounts:
+`account_state` surfaces the unified USDC pool, and `spot_clearinghouse_state`
+lists the spot tokens. Neither read is a superset of the other, so a client that
+wants the whole picture calls both and merges them by `asset`.
+
+Cost basis follows the same split. `spot_clearinghouse_state` carries
+[`avg_entry_px`](../api/rest/info/spot.md#avg-entry-px) per spot token, which is what
+spot PnL needs. The unified USDC pool carries none — a cost basis on the quote
+asset in terms of itself has no meaning.
+
 ### A worked check {#worked-check}
 
 Claim the devnet [faucet](../networks.md#faucet), which grants 3000 USDC and
