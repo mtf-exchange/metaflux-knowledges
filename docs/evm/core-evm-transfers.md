@@ -10,9 +10,44 @@ custody) is live.
 Value moves between **Core** (the L1 clearinghouse / spot ledger) and the **EVM**
 side in two directions. Both are deterministic and account-scoped.
 
+## Moving VALUE from EVM to Core {#evm--core-value}
+
+**This is the lane you want if you are moving a balance.** Send an ordinary EVM
+transaction to the system withdraw sink:
+
+```
+to:   0x0000000000000000000000000000000000000602
+data: abi.encode(uint256 asset_id, uint256 amount)   // 64 bytes, exactly two words
+```
+
+The node burns `amount` of your system token on the EVM side and credits the
+SAME account on Core — USDC (`asset_id` 0) to your perp cross-collateral, any
+other asset to your spot balance. The credit is always backed: it credits only
+what the burn actually removed, so the lane cannot mint.
+
+| Requirement | Why |
+|---|---|
+| The transaction must SUCCEED | A reverted tx is skipped by the scan |
+| `data` is at least 64 bytes | Shorter calldata is ignored, silently |
+| `asset_id` is the LOW 4 bytes of word 0 | It is read as a `uint32` |
+| `amount` is the LOW 16 bytes of word 1 | It is read as a `uint128` |
+| The asset must be registered | An unresolvable `asset_id` is ignored |
+
+:::warning
+**A short or malformed calldata is IGNORED, not rejected.** The transaction
+succeeds, gas is spent, and nothing moves. There is no revert to catch, so check
+your balance on Core rather than the EVM receipt.
+:::
+
+:::info
+**The `/exchange` action `core_evm_transfer` with `to_evm: false` is REFUSED, on
+purpose.** Crediting Core without a confirmed EVM burn would create value out of
+nothing, so that path fails closed and points here instead.
+:::
+
 ## EVM → Core (via CoreWriter) {#evm--core-via-corewriter}
 
-A contract pushes value into Core by submitting an L1 action through
+A contract submits an L1 ACTION through
 [CoreWriter](interacting-with-core.md#writing-to-core--corewriter) (`0x3333…3333`).
 The acting account is the calling contract (`msg.sender`):
 
@@ -25,6 +60,18 @@ The acting account is the calling contract (`msg.sender`):
 
 These are subject to CoreWriter's atomicity rule: the call burns gas + emits
 `RawAction`; any L1-side failure afterwards is **silent** (no EVM revert).
+
+:::danger
+**A CONTRACT's CoreWriter call does not reach Core yet.** Today `0x3333…3333`
+holds no code, and only a TOP-LEVEL transaction sent directly to that address
+reaches L1. A call made from inside a contract emits nothing and changes nothing
+on Core — and because the atomicity rule above means no revert, it looks like it
+worked.
+
+The contract lane opens at a published activation height. Until then: send the
+CoreWriter transaction top-level from an EOA, or move value through the
+[withdraw sink](#evm--core-value) above, which is live now.
+:::
 
 ## Core → EVM (system pseudo-transactions) {#core--evm-system-pseudo-transactions}
 
