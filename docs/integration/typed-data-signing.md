@@ -134,8 +134,14 @@ For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
 | `action.type` | `encodeType` |
 |---------------|--------------|
 | `send_asset` | `MetaFluxTransaction:SendAsset(string metafluxChain,uint32 sourceDex,uint32 destinationDex,uint32 asset,address destination,string amount,bool toPerp,uint64 nonce)` |
-| `usd_class_transfer` | `MetaFluxTransaction:UsdClassTransfer(string metafluxChain,string ntl,bool toPerp,uint64 nonce)` |
+| `usd_class_transfer` ⚠️ | `MetaFluxTransaction:UsdClassTransfer(string metafluxChain,string ntl,bool toPerp,uint64 nonce)` |
 | `withdraw` | `MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uint32 destinationChainId,bool useCctp,uint64 nonce)` |
+
+⚠️ **`usd_class_transfer` is REJECTED on this network.** The type string above is
+the frozen truth and your library may still carry it, but the action never
+succeeds: there is one USDC pool, so there is no second class to move to. It
+answers `USDC is unified; no class transfer needed`, and **the nonce is spent
+either way**. See [USDC](../concepts/usdc.md#moving-usdc).
 
 ### Account, staking & vault {#account-staking--vault}
 

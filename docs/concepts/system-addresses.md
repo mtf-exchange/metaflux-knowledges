@@ -23,9 +23,9 @@ MetaFlux reserves a small set of **well-known addresses** with special protocol 
 | `0x3333333333333333333333333333333333333333` | Oracle feeder | The system sender that publishes oracle price updates | Protocol |
 | `0x5555555555555555555555555555555555555555` | Faucet | Testnet / devnet faucet that funds test accounts | Protocol (test networks only) |
 | `0x7777777777777777777777777777777777777777` | Treasury | Protocol treasury — holds the treasury fee share and buyback MTF; the mint / burn point for supply changes | Protocol |
-| `0xafafafafafafafafafafafafafafafafafafafaf` | Assistance fund | Holds collected fee USDC destined for buyback and executes the on-market MTF buy | Protocol |
+| `0x8888888888888888888888888888888888888888` | Assistance fund | Holds collected fee USDC destined for buyback and executes the on-market MTF buy | Protocol |
 | `0x000000000000000000000000000000000000dead` | Burn | Reserved, provably-unspendable sink | Nobody — spends **from** it are always rejected |
-| `0x5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f` | Spot fee sink | Legacy spot-fee holding address, now inert | Protocol (historical) |
+| `0x0000000000000000000000000000000000005b07` | Spot backstop | Custody sink for base bought off a starved book by the forced spot-margin liquidation waterfall | Nobody — a keyless reserved address |
 
 All hex is shown in canonical lowercase, `0x`-prefixed, 40 characters — the exact form an explorer displays.
 
@@ -51,7 +51,7 @@ The **test-network faucet**. On testnet and devnet, the faucet credits test acco
 
 The **protocol treasury**. It holds the treasury's share of collected fees and the MTF accumulated by the [buyback](./tokenomics.md#value-accrual--flywheel). It is also the single point through which **supply changes flow**: when governance changes total supply, MTF is minted into or burned from the treasury balance. Keyless; operated by the protocol under governance. See [Tokenomics](./tokenomics.md) for the economic model and [Fees](./fees.md) for where fees go.
 
-### Assistance fund — `0xafaf…afaf` {#assistance-fund--0xafafafaf}
+### Assistance fund — `0x8888…8888` {#assistance-fund--0xafafafaf}
 
 The **buyback operational fund**. Fee revenue destined for buyback is collected here as a real, explorer-visible USDC balance, and the protocol spends it on the open MTF/USDC market to execute the buyback. It is keyless — there is no key that can move its funds — but it is **protocol-operated**: the buy is a protocol action, not a user transaction. The bought-back MTF then flows to the treasury and the buyback split described in [Tokenomics](./tokenomics.md#value-accrual--flywheel).
 
@@ -61,9 +61,15 @@ The canonical EVM **burn sink**. It is keyless and, uniquely on this page, **pro
 
 It is **reserved, not yet active.** Today, supply is reduced by **decreasing the treasury balance** through a governance vote — not by sending tokens to this address. The burn address is defined and set aside for a possible future explicit "send-to-burn" mechanism; until then you will not see the active burn path route through it.
 
-### Spot fee sink — `0x5f5f…5f5f` {#spot-fee-sink--0x5f5f5f5f}
+### Spot backstop — `0x0000…5b07` {#spot-backstop--0x00005b07}
 
-A **legacy** address that once held collected spot-trading fees as per-token balances. It is now **inert**: spot fees route to the fee-distribution pools instead (see [Fees](./fees.md)). It remains a reserved constant so its historical role is unambiguous, but nothing new accrues to it. Keyless.
+Custody sink for the forced spot-margin liquidation waterfall. When the book is
+too thin to absorb a forced close, the insurance fund buys the base and parks it
+here as an ordinary token balance.
+
+Keyless, and provably so: landing on this fixed image of eighteen zero bytes
+followed by `0x5b07` would take a `2^160` preimage search, so no signer can ever
+act as it.
 
 ## Two categories {#two-categories}
 

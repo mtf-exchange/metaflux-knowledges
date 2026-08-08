@@ -1,18 +1,34 @@
 # Networks
 
-:::info
-**Status.** **devnet stable**. Testnet (`chainId 114514`) and mainnet (`chainId 8964`) chainIds are assigned; their endpoints are published pre-launch.
+:::warning
+**The hosted sandbox signs with `chainId` 114514, not 31337.** `31337` is the
+default a node uses when you run one yourself and set no chain id. It is NOT the
+network behind `api.devnet.mtf.exchange`. Sign for 114514 there, or every
+signature is rejected — the chain id is part of the EIP-712 domain, so a wrong
+one does not "mostly work", it fails on the first write.
+
+Confirm it yourself at any time:
+
+```bash
+curl -s https://api.devnet.mtf.exchange/evm -X POST \
+  -H 'content-type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
+# {"id":1,"jsonrpc":"2.0","result":"0x1bf52"}   0x1bf52 = 114514
+```
 :::
 
 ## Summary {#summary}
 
 | Network | Status | `chainId` | Stable wire? |
 |---------|--------|-----------|:------------:|
-| Devnet | open for integration | `31337` | yes |
-| Testnet | preview before mainnet | `114514` | yes |
+| Hosted sandbox (`api.devnet.mtf.exchange`) | open for integration | `114514` | yes |
+| Your own node, default config | self-hosted | `31337` | yes |
 | Mainnet | not launched | `8964` | yes |
 
-## Devnet {#devnet}
+The hosted sandbox is the only network with a public endpoint today. Mainnet
+endpoints are published pre-launch.
+
+## The hosted sandbox {#devnet}
 
 The integration sandbox. Free USDC via the faucet; ephemeral state (occasional resets).
 
@@ -35,7 +51,7 @@ EVM RPC at `http://localhost:8545`. Those are the self-hosted ports, not public 
 
 | Signing parameters | Value |
 |--------------------|-------|
-| `chainId` | `31337` |
+| `chainId` | `114514` — the hosted sandbox. Use `31337` ONLY against a node you run yourself that sets no chain id. |
 | EIP-712 domain `name` | `"MetaFlux"` |
 | EIP-712 domain `version` | `"1"` |
 | EIP-712 domain `verifyingContract` | `0x0000000000000000000000000000000000000000` |
@@ -66,18 +82,16 @@ curl -X POST https://api.devnet.mtf.exchange/faucet \
 
 Devnet may be reset for protocol upgrades. Cadence: on demand during pre-mainnet development; weekly notice when possible. Watch [status](https://status.mtf.exchange/devnet) for reset announcements.
 
-## Testnet (planned) {#testnet-planned}
+## Testnet {#testnet-planned}
 
 Pre-mainnet rehearsal network with stability guarantees.
 
-| Service | Endpoint |
-|---------|----------|
-| Gateway REST | TBD |
-| Gateway WS | TBD |
-| Faucet | TBD (rate-limited) |
-| Explorer | TBD |
+**This is the SAME chain as the hosted sandbox above.** `chainId` `114514`
+(`0x1bf52`), reached at `https://api.devnet.mtf.exchange`. There is no second
+endpoint to wait for, and no second chain id to switch to. The name "devnet"
+in that host name is historical.
 
-Testnet `chainId`: `114514` (`0x1bf52`). MetaFlux is an independent network with its own chain ids.
+MetaFlux is an independent network with its own chain ids.
 
 Testnet differences from mainnet:
 - USDC is bridged via MetaBridge from a testnet source chain (Base Sepolia test USDC), not real USDC.

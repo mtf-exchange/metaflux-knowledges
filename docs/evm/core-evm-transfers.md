@@ -20,7 +20,7 @@ The acting account is the calling contract (`msg.sender`):
 |--------|--------|
 | `SpotSend` | Transfer a spot token to another account on Core |
 | `SendAsset` | Generic asset transfer (perp / spot / vault classes) |
-| `UsdClassTransfer` | Move USDC between the perp and spot class accounts |
+| `UsdClassTransfer` ⚠️ | **Rejected.** One USDC pool, so there is no second class to move to. The call still burns gas and emits `RawAction`; the L1 rejection is silent, per the atomicity rule below. See [USDC](../concepts/usdc.md#moving-usdc). |
 | `VaultTransfer` | Deposit to / withdraw from a vault |
 
 These are subject to CoreWriter's atomicity rule: the call burns gas + emits
