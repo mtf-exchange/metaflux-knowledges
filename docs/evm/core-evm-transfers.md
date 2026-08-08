@@ -45,6 +45,32 @@ purpose.** Crediting Core without a confirmed EVM burn would create value out of
 nothing, so that path fails closed and points here instead.
 :::
 
+### Which assets can cross {#which-assets-cross}
+
+Not every token you hold can. Ask the chain rather than guessing:
+
+```json
+{ "type": "evm_contract_bindings" }
+```
+
+```json
+{ "bindings": [
+  { "asset": 101, "token": "BTC", "variant": 0,
+    "address": "0x…" },
+  { "asset": 5, "token": "asset:5", "variant": 2, "address": null }
+] }
+```
+
+An `address` is the ERC-20 the asset is bound to, and its presence is the test:
+the read resolves it through the SAME predicate the transfer path uses, so an
+asset with an address can cross and one with `address: null` cannot. Two assets
+cross without appearing here as a bound ERC-20: **USDC**, which is the fixed
+FiatToken predeploy, and the **native gas token**, which is the EVM balance
+itself rather than a contract.
+
+Offer the transfer only for those. An asset the chain cannot resolve is the
+silent-failure case above: the burn transaction succeeds and nothing moves.
+
 ## EVM → Core (via CoreWriter) {#evm--core-via-corewriter}
 
 A contract submits an L1 ACTION through
