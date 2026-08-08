@@ -124,6 +124,20 @@ approval = {
 
 All time fields are consensus-derived block time, not wall clock. Determinism: every validator agrees on agent status at the same block height.
 
+:::tip
+**A vault operator is an agent of the VAULT, not of the leader.** A
+Metaliquidity vault leader registers a strategy key with
+`register_metaliquidity_operator`, and the chain writes that key into the VAULT
+address's own approved-agent set — the same set this page describes. So an
+operator signs an order whose `owner` is the vault address, and the
+authorization check below resolves it with no special case.
+
+The practical consequence: **do not require `owner == signer` in a client.** That
+equality is not the chain's rule, and enforcing it locally makes the vault lane
+unreachable. Read the vault's agents with `{"type":"agents","address":"<vault>"}`
+if you want to check before signing.
+:::
+
 ## Approving an agent {#approving-an-agent}
 
 The master submits an [`approve_agent`](../api/rest/exchange.md#approve_agent)
