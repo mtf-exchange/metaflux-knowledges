@@ -1,11 +1,11 @@
 ---
-description: What changes on devnet chain 114514 at block 7,090,000 — an admission rule that refuses over-levered orders, a delist that cancels resting orders, the contract CoreWriter lane, permissionless spot deployment, and randomized TWAP slices.
+description: What changes on devnet chain 114514 at block 7,400,000 — an admission rule that refuses over-levered orders, a delist that cancels resting orders, the contract CoreWriter lane, permissionless spot deployment, and randomized TWAP slices.
 ---
 
-# Activation notice — block 7,090,000
+# Activation notice — the next behaviour boundary
 
 :::warning
-**Not live yet.** Everything on this page takes effect at **block 7,090,000 on
+**Not live yet.** Everything on this page takes effect at **block 7,400,000 on
 devnet (chain 114514)**. Below that height the chain behaves exactly as the rest
 of this reference describes today. Read the live height with `{"type":"meta"}`
 before you rely on any row here.
@@ -18,7 +18,7 @@ see.
 
 ## Rejections that are NEW {#new-rejections}
 
-| Surface | At and above 7,090,000 |
+| Surface | At and above 7,400,000 |
 |---|---|
 | `submit_order` on a perp | An order whose leverage cannot survive its own MAINTENANCE margin is refused with `InsufficientMargin`. See below. |
 | `activate_pair` (governance) | A spot pair with no price/size grid is refused. A zero tick or zero lot IS "no grid". |
@@ -27,7 +27,7 @@ see.
 
 ### The admission maintenance floor {#admission-maintenance-floor}
 
-**This is the row most likely to change what your client sees.** Below 7,090,000
+**This is the row most likely to change what your client sees.** Below 7,400,000
 admission reserves INITIAL margin while the liquidation engine demands
 MAINTENANCE margin. On a market with high base leverage against a low maintenance
 ratio — BTC and ETH both qualify — an order can be admitted and the position is
@@ -59,7 +59,7 @@ These are new capability, not fixes. Each one is unreachable below the height.
 
 ### A contract may call CoreWriter {#corewriter-contract-lane}
 
-Below 7,090,000 only a TOP-LEVEL transaction to `0x3333…3333` reaches L1; a call
+Below 7,400,000 only a TOP-LEVEL transaction to `0x3333…3333` reaches L1; a call
 from inside a contract emits nothing and, because CoreWriter never reverts on an
 L1-side failure, it looks like it worked. At and above the height the contract
 lane is live. See [Core ↔ EVM transfers](../evm/core-evm-transfers.md).
