@@ -242,7 +242,10 @@ cancel. A cancel of an order that already filled or already cancelled returns
 `{"error":"order not found"}` and is harmless.
 
 A cancel is not an order action: it returns the admission envelope
-(`{"accepted":true, …}`), not a `statuses` array.
+(`{"accepted":true, …}`), not a `statuses` array. `accepted: true` reports
+MEMPOOL admission only — a cancel that fails at commit is reported on no channel,
+so confirm it by the order's absence from `open_orders`. See
+[`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed).
 
 ## One mental model, not twenty-two {#one-mental-model}
 
@@ -342,9 +345,24 @@ One signature buys a behaviour that would otherwise cost a client loop.
 
 | Action | Reach for it when | Availability |
 |--------|-------------------|--------------|
-| [`twap_order`](../api/rest/exchange.md#twap_order) · [`twap_cancel`](../api/rest/exchange.md#twap_cancel) | You spread one large order over time | live |
+| [`twap_order`](../api/rest/exchange.md#twap_order) · [`twap_cancel`](../api/rest/exchange.md#twap_cancel) | You spread one large order over time | live — **one-way accounts only**, see below |
 | [`scale_order`](../api/rest/exchange.md#scale_order) · [`cancel_scale`](../api/rest/exchange.md#cancel_scale) | You want N rungs across a price band from one signature | live |
-| [`chase_order`](../api/rest/exchange.md#chase_order) · [`cancel_chase`](../api/rest/exchange.md#cancel_chase) | You want one post-only leg the node re-prices to the touch | preview — confirm on your network |
+| [`chase_order`](../api/rest/exchange.md#chase_order) · [`cancel_chase`](../api/rest/exchange.md#cancel_chase) | You want one post-only leg the node re-prices to the touch | live |
+
+:::danger
+**A hedge-mode account cannot use `twap_order`.** The parent carries no
+`position_side`, so its slices carry none, and a hedge account must name the leg
+on every order — so the node refuses the parent. The refusal happens **at
+commit**, and a commit-time refusal of a non-order action is reported on no
+channel: the HTTP reply already said `accepted: true`, and the TWAP simply never
+starts. Read `position_mode` from
+[`account_state`](../api/rest/info.md#account_state) once at session start. If it
+is `"hedge"`, slice the order yourself with ordinary `submit_order` legs.
+
+The same commit-time silence applies to every non-order action. See
+[`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed)
+before you build a retry loop on `accepted: true`.
+:::
 
 ### Tier 4 — specialist venues {#tier-4}
 

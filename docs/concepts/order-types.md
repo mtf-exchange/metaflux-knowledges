@@ -162,7 +162,10 @@ braces stay armed as you add to or trim the position.
 ## Scale orders {#scale-orders}
 
 :::info
-**Scale ladders are live .**
+**Live on the hosted sandbox and on mainnet** — active from block 0 on chain
+`114514` and on chain `8964`, with no vote and no activation height. A node you
+run yourself under the default chain id `31337` must arm the feature by validator
+vote first.
 :::
 
 A **scale ladder** is `n` resting limit rungs spread evenly across `[px_low,
@@ -186,6 +189,11 @@ supply, which is the ladder handle.
   }
 }
 ```
+
+The example above is a **one-way** account's body. A [hedge-mode](./hedge-mode.md)
+account must add `position_side` (`"long"` or `"short"`); a one-way account must
+omit it. Get that wrong and the ladder is rejected at commit, where nothing
+reports it — see [`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed).
 
 Rung `0` sits at `px_low` and rung `n − 1` at `px_high` for both sides.
 `total_size` is split across the rungs by the distribution:
@@ -212,9 +220,9 @@ for the full field table and admission rules.
 ## Chase orders {#chase-orders}
 
 :::info
-**Preview.** Chase orders ship in the SDKs with a frozen wire contract, but are
-**not enabled on every network** yet — confirm availability on your target network
-before you depend on them.
+**Live on the hosted sandbox and on mainnet** — same gate as the scale ladder:
+active from block 0 on chain `114514` and on chain `8964`. A node you run yourself
+under the default chain id `31337` must arm the feature by validator vote first.
 :::
 
 A **chase order** is a single resting **post-only** leg that the node automatically
@@ -238,6 +246,11 @@ never takes liquidity and never pays a taker fee.
   }
 }
 ```
+
+The example above is a **one-way** account's body. A [hedge-mode](./hedge-mode.md)
+account must add `position_side`; a one-way account must omit it. A chase carries
+**no** `reduce_only` — its leg always opens or adds, so a chase cannot close a
+position.
 
 The node pegs the leg one tick inside the touch — a buy chase one tick above the
 best bid, a sell chase one tick below the best ask — and re-prices it at most once
@@ -263,22 +276,49 @@ field table and admission rules.
 
 ## TWAP {#twap}
 
-[`twap_order`](../api/rest/exchange.md#twap_order) schedules slices over `duration_ms`.
+:::danger
+**A hedge-mode account cannot use TWAP.** A `twap_order` from a hedge account is
+admitted to the mempool and then rejected at commit. The reason is the wire: the
+parent carries no `position_side`, so its child slices carry none, and a hedge
+account must name the leg on every order. **The rejection is reported on no
+channel** — the HTTP reply already said `accepted: true`. Read `position_mode`
+from [`account_state`](../api/rest/info.md#account_state) before you submit. See
+[`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed).
+:::
+
+A **TWAP** splits one parent order into `slice_count` equal child slices, fired
+`delay_ms` apart. Each slice is an IOC that crosses the book for its share of the
+size. The node fires them; there is nothing for the client to do after the
+parent is accepted.
+
+[`twap_order`](../api/rest/exchange.md#twap_order) carries exactly six fields:
+`market`, `side`, `total_size`, `slice_count`, `delay_ms`, `reduce_only`.
+
+**You choose the schedule, not a duration.** There is no `duration` field, no
+randomization, and no USD-denominated size. Divide the window yourself:
 
 ```
-duration = 1 hour = 3,600,000 ms
-slices   = duration / SLICE_INTERVAL  (default 60s slice; 60 slices per hour)
-sz_per_slice = size / slices
-
-slice  1: send IOC near mid at t = randomize(0, SLICE_INTERVAL * (1 + jitter%))
-slice  2: send IOC at t = slice_1_t + SLICE_INTERVAL * (1 + jitter%)
-...
-slice 60: send last IOC just before t = duration
+window       = 1 hour
+slice every  = 60 seconds
+slice_count  = 3,600 s / 60 s = 60
+delay_ms     = 60000
+total_size   = the full size, in raw lots
 ```
 
-`randomize_pct` ∈ `[0, 50]` jitters slice times by ±`randomize_pct/100 × slice_interval`. Set higher to be harder to detect; set lower for tight time-control.
+Two rules change what you get back:
 
-Slices are submitted by the protocol; nothing for the client to do after submitting `twap_order`. Slice fills ride the dedicated [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) WS channel; parent lifecycle transitions (activated / finished / terminated) ride [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history).
+- `delay_ms` is **clamped UP** to the governed minimum (default `10000` ms), not
+  rejected. A `delay_ms` below the floor is accepted and the TWAP runs slower
+  than you asked — a 60-slice TWAP at `delay_ms: 1000` takes 10 minutes, not 1.
+  The clamp is snapshotted into the parent, so a later retune leaves it alone.
+- `slice_count` has a governed ceiling (default `10000`), and an account may hold
+  a governed number of live parents at once (default `100`). Both reject at
+  commit.
+
+The slice sizes are equal and the timing is fixed — a TWAP on MetaFlux is
+therefore predictable to an observer watching the tape.
+
+Slice fills ride the dedicated [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) WS channel; parent lifecycle transitions (activated / finished / terminated) ride [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history), which is where the `twapId` first appears.
 
 TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange.md#twap_cancel); already-filled slices stay filled, future slices stop.
 

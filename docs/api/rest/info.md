@@ -1138,6 +1138,69 @@ deliberately **not** re-emitted here (they are derivable) — read them from
 
 State source: the committed per-account fill ring (`Exchange.account_fills[addr]`, the same ring behind [`user_fills`](#user_fills)), folded by `oid`.
 
+### Commit-time verdict on a submitted action {#action_outcome}
+
+:::warning
+**Not live yet.** This read ships in the next node release. A network that does
+not serve it answers `400` with `{"error":"unknown info type: action_outcome"}`,
+so one probe tells you which side of the upgrade you are on. Keep the
+confirm-by-effect loop from
+[`accepted` is not `committed`](./exchange.md#accepted-is-not-committed) as your
+fallback until the probe succeeds.
+:::
+
+Read whether a submitted action applied at commit, and if it did not, **why**.
+This is the answer to the gap that `accepted: true` leaves: `POST /exchange` can
+reply before the action commits, and a commit-time rejection has no other channel.
+
+Address the action either way:
+
+```json
+{ "type": "action_outcome", "action_hash": "0x<action_hash>" }
+{ "type": "action_outcome", "user": "0x<addr>", "nonce": 1735689600001 }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `action_hash` | 0x hex | one of the two forms |
+| `user` + `nonce` | hex address + uint64 | the other form; **both** are required together |
+
+Response:
+
+```json
+{ "type": "action_outcome", "data": {
+  "status": "error",
+  "reason": "hedge account cannot use twapOrder: a slice carries no position_side",
+  "round":  81234,
+  "nonce":  1735689600001
+} }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | enum | `"ok"` the action committed and applied · `"error"` it was rejected at commit · `"unknown"` this node retains no verdict |
+| `reason` | string | Present on `"error"` only — the node's own rejection text |
+| `round` | uint64 | The consensus round the verdict came from |
+| `nonce` | uint64 | Echoed when the record carries one |
+
+**`unknown` is not `rejected`.** The verdict comes from a **bounded per-node
+ring** (about 8000 recent actions), not from committed state. `unknown` means
+this node has no record: the action may still be in the mempool, may have
+committed on a node that has since dropped the record, or may never have been
+seen. Poll a few times before you conclude anything, and never treat `unknown`
+as a failure you can safely resubmit past.
+
+**Nodes disagree by design.** The ring is host-side, so two nodes can answer
+differently for the same `action_hash`. It is a diagnostic, not a receipt: the
+authoritative confirmation is still the state the action was meant to change.
+
+**An action dropped before its signature was checked is readable by
+`action_hash` only.** The `(user, nonce)` form deliberately cannot see it —
+otherwise anyone could publish a rejection against another account's nonce.
+
+State source: a bounded per-node outcome ring, populated at commit. Not committed
+state, not replicated, not replayed.
+
 ### TWAP slice-fill history {#user_twap_slice_fills}
 
 **Status: empty (history retention pending).** `fills` is `[]` until TWAP slice

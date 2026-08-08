@@ -881,6 +881,21 @@ approved agent may arm it **as** an `owner` it acts for.
 
 ### Schedule a sliced TWAP order {#twap_order}
 
+:::danger
+**A hedge-mode account cannot use `twap_order`.** The action is admitted to the
+mempool and then **rejected at commit** with `hedge account cannot use twapOrder:
+a slice carries no position_side`. The reason is the wire: a TWAP parent carries
+no `position_side`, so its child slices carry none either, and a hedge account
+must name the leg on every order. Sending the children with no leg would apply
+them to the wrong side of the book, so the parent is refused instead.
+
+**The rejection reaches you through no channel** — see
+[`accepted` is not `committed`](#accepted-is-not-committed). The `202` body still
+says `accepted: true`. Read `position_mode` from
+[`account_state`](./info.md#account_state) BEFORE you submit, and slice the order
+yourself with ordinary [`submit_order`](#submit_order) legs if it is `"hedge"`.
+:::
+
 Schedule a sliced (time-weighted) order. The parent is sliced into `slice_count`
 child orders spaced `delay_ms` apart. **Sender-authorized by default**; an
 approved agent may schedule it **as** an `owner` it acts for.
@@ -905,9 +920,27 @@ approved agent may schedule it **as** an `owner` it acts for.
 | `market` | uint32 | Asset/market id |
 | `side` | enum | `"bid"` / `"ask"` |
 | `total_size` | uint64 | Total size in fixed-point tick units (widened to `u128`) |
-| `slice_count` | uint32 | Number of child slices (`> 0`) |
-| `delay_ms` | uint64 | Inter-slice delay in ms |
+| `slice_count` | uint32 | Number of child slices (`> 0`, and at most the governed slice ceiling — default `10000`) |
+| `delay_ms` | uint64 | Inter-slice delay in ms. **Clamped UP** to the governed minimum, not rejected — see below |
 | `reduce_only` | bool | — |
+
+**There is no `duration`, no `randomize`, and no USD-denominated size.** You
+choose `slice_count` and `delay_ms` yourself; the schedule is exactly
+`slice_count` slices spaced `delay_ms` apart, with no jitter. To place a TWAP
+that runs for a wall-clock window, divide the window yourself — for a one-hour
+TWAP in 60-second slices, send `slice_count: 60`, `delay_ms: 60000`.
+
+**The three governed limits.** All three are governance parameters, so read them
+as defaults, not constants:
+
+| Limit | Default | On breach |
+|-------|---------|-----------|
+| Minimum `delay_ms` | `10000` (hard floor `1000`) | **Clamped up** at registration. A smaller `delay_ms` is accepted and the parent runs at the floor, so the TWAP takes longer than you asked |
+| Maximum `slice_count` | `10000` | Rejected at commit |
+| Concurrent parents per account | `100` | Rejected at commit (throttled) |
+
+The clamp is a **snapshot**: the parent keeps the delay it was clamped to, so a
+later governance retune never rewrites a TWAP already in flight.
 
 **Response.** Non-order action →
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
@@ -916,13 +949,19 @@ approved agent may schedule it **as** an `owner` it acts for.
 { "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
 ```
 
+**`accepted: true` is not a placed TWAP** — it means the action entered the
+mempool. Every check above runs at COMMIT, and a commit-time rejection is
+reported on no channel (see
+[`accepted` is not `committed`](#accepted-is-not-committed)).
+
 The parent `twap_id` (uint64) is assigned **at commit** from a deterministic
-per-chain counter and carried in the commit outcome — it is **not** in the HTTP
-response. Track the commit via the returned `action_hash`. A zero `total_size`
-or a zero `slice_count` errors at commit. Slice fills ride the dedicated
-[`user_twap_slice_fills`](../ws/subscriptions.md#user_twap_slice_fills) WS
-channel; parent lifecycle transitions ride
-[`user_twap_history`](../ws/subscriptions.md#user_twap_history).
+per-chain counter — it is **not** in the HTTP response, and the returned
+`action_hash` cannot be looked up. Confirm the TWAP by its EFFECT: an
+`activated` record on
+[`user_twap_history`](../ws/subscriptions.md#user_twap_history) carries the
+`twapId`, and the parent appears on [`user_twaps`](./info.md#user_twaps). If
+neither shows the parent within a few blocks, the action was rejected. Slice
+fills ride [`user_twap_slice_fills`](../ws/subscriptions.md#user_twap_slice_fills).
 
 ---
 
@@ -949,8 +988,11 @@ it acts for.
 ### Place a scale ladder {#scale_order}
 
 :::info
-**Available .** A submit
-before the upgrade is rejected.
+**Live on the hosted sandbox and on mainnet.** The scale ladder is active from
+block 0 on chain `114514` and on chain `8964` — no vote, no activation height. A
+node you run yourself under the default chain id `31337` starts with the feature
+DORMANT: it must be armed by a validator vote first, and until then a
+`scale_order` is rejected with `scale_order feature not active`.
 :::
 
 Place one **scale ladder** — a compact request that the node expands into `n`
@@ -1045,8 +1087,8 @@ from [`open_orders`](./info.md#open_orders) filtered by the shared `cloid`.
 ### Cancel a scale ladder {#cancel_scale}
 
 :::info
-**Available .** A submit
-before the upgrade is rejected.
+**Live on the hosted sandbox and on mainnet.** Same gate as
+[`scale_order`](#scale_order).
 :::
 
 Cancel a **whole ladder** in one action — every one of your resting orders on
@@ -1084,10 +1126,11 @@ after the ladder is gone. Keep trigger legs on their own `cloid`.
 ### Place a chase order {#chase_order}
 
 :::info
-**Preview — confirm before you depend on it.** The chase order type ships in the
-SDKs and its wire contract is frozen. It is **not enabled on every network** yet.
-Confirm it is active on your target network first. A submit to a network where it
-is not enabled is rejected with `chase_order feature not active`.
+**Live on the hosted sandbox and on mainnet.** The chase order type is active
+from block 0 on chain `114514` and on chain `8964` — no vote, no activation
+height. A node you run yourself under the default chain id `31337` starts with
+the feature DORMANT: it must be armed by a validator vote first, and until then a
+`chase_order` is rejected with `chase_order feature not active`.
 :::
 
 Place one **chase order** — a single resting post-only leg that the node
@@ -1188,7 +1231,8 @@ from this response for [`cancel_chase`](#cancel_chase).
 ### Cancel a chase order {#cancel_chase}
 
 :::info
-**Preview — confirm before you depend on it.** See [`chase_order`](#chase_order).
+**Live on the hosted sandbox and on mainnet.** Same gate as
+[`chase_order`](#chase_order).
 :::
 
 Cancel one chase by its **handle** — the `chase_oid` returned by
@@ -2608,9 +2652,10 @@ Per-order status union (one entry, in order):
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
 
-A `pending` entry means the action was admitted and may still commit later —
-track it via the [WS feed](../ws/subscriptions.md) or by polling `/info` with the
-returned `action_hash`.
+A `pending` entry means the action was admitted and may still commit later. There
+is **no `/info` query that takes an `action_hash`** — track the order on the
+[`order_updates`](../ws/subscriptions.md#order_updates) WS channel, which carries
+the committed outcome including a `rejected` status.
 
 ### `202 Accepted` — non-order admission {#202-accepted--non-order-admission}
 
@@ -2628,7 +2673,58 @@ either way:
 }
 ```
 
-`mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier you can match against commit events. It is `0x` + `keccak256` of the exact signed `action` bytes concatenated with the sender address (20 bytes) and the nonce (8 bytes, big-endian). Because the sender and nonce are bound into the hash, two submissions with byte-identical `action` params produce **different** `action_hash` values, so a resubmit never collides with an earlier one.
+`mempool_depth` is informational at admission time. `action_hash` is the deterministic identifier of the submission. It is `0x` + `keccak256` of the exact signed `action` bytes concatenated with the sender address (20 bytes) and the nonce (8 bytes, big-endian). Because the sender and nonce are bound into the hash, two submissions with byte-identical `action` params produce **different** `action_hash` values, so a resubmit never collides with an earlier one.
+
+### `accepted` is not `committed` {#accepted-is-not-committed}
+
+:::danger
+**`"accepted": true` means the action entered the MEMPOOL. It does not mean the
+action ran.** Admission checks the signature, the agent approval and the nonce
+shape — nothing else. Every business rule (position mode, collateral, feature
+gates, parameter bounds, ownership) runs later, when the block commits.
+
+**A commit-time rejection of a non-order action reaches you on no channel.** The
+HTTP reply already said `accepted: true`, no WS channel carries the failure, and
+no `/info` query takes an `action_hash`. The action simply never happens. This is
+not specific to one action — it is how every non-order action behaves.
+:::
+
+The two classes differ, so treat them differently:
+
+| Action class | Commit-time rejection | How to confirm |
+|--------------|----------------------|----------------|
+| **Order-type** — [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`spot_order`](#spot_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order) | **Reported.** The `200 OK` body carries a per-leg `{"error": "<reason>"}`, and [`order_updates`](../ws/subscriptions.md#order_updates) pushes a `rejected` status | Read the `statuses` array; a `pending` entry means read `order_updates` |
+| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Silent.** No body field, no WS push, no query | Confirm by the EFFECT the action was supposed to have, on the `/info` or WS surface that serves it |
+
+**Confirm by effect.** Each action's own section names the read that proves it
+landed — a TWAP parent on [`user_twaps`](./info.md#user_twaps), a leverage change
+on [`account_state`](./info.md#account_state), a cancel by the order's absence
+from [`open_orders`](./info.md#open_orders). Poll that read for a few blocks. If
+the effect has not appeared, the action was rejected; resubmit with a corrected
+body rather than waiting.
+
+:::warning
+**Coming in the next node release: ask for the verdict directly.** Two additions
+close this gap. **Neither is live yet.** Build the confirm-by-effect loop above
+today. To test whether a network has them, send
+`{"type":"action_outcome","action_hash":"0x00"}` to `/info`: a network without
+them answers `400 unknown info type: action_outcome`.
+
+- **`committed` on this envelope.** The body gains `"committed": true|false`.
+  `true` = the action committed and applied. `false` = admitted only; it may
+  still commit, or be rejected. `accepted` keeps its current meaning, so nothing
+  breaks — but stop reading `accepted: true` as success once `committed` is
+  present.
+- **[`action_outcome`](./info.md#action_outcome) on `/info`.** Quote the
+  `action_hash` this envelope returned and read the commit-time verdict, with
+  the reason text.
+:::
+
+**The most common silent rejection is a position-mode mismatch.** A hedge account
+must name `position_side` on an order and cannot use [`twap_order`](#twap_order)
+at all; a one-way account must omit `position_side`. Read `position_mode` from
+[`account_state`](./info.md#account_state) once at session start and build every
+order body from it.
 
 ### Rejection envelope {#rejection-envelope}
 

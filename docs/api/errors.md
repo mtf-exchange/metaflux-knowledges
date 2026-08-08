@@ -129,6 +129,19 @@ by `cloid`, per [error handling](../integration/error-handling.md#reconciliation
 `reason` is a free-text string, not a fixed enum — treat it as
 human-readable, not a machine-matched code.
 
+:::danger
+**Only ORDER-type actions get that channel.** For every other action — a
+`twap_order`, a cancel, a margin or vault or staking write — a commit-time
+rejection is reported **nowhere**: not in the HTTP body (it already said
+`accepted: true`), not on any WS channel, and not by any `/info` query, because
+none takes an `action_hash`. The action silently never happens.
+
+Confirm those actions by their EFFECT instead — poll the read that serves the
+state the action was meant to change, for a few blocks. The full rule and a
+per-class table are in
+[`accepted` is not `committed`](./rest/exchange.md#accepted-is-not-committed).
+:::
+
 ## Decision tree {#decision-tree}
 
 ```mermaid
