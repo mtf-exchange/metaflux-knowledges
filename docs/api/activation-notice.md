@@ -1,14 +1,16 @@
 ---
-description: What changes on devnet chain 114514 at block 7,400,000 — an admission rule that refuses over-levered orders, a delist that cancels resting orders, the contract CoreWriter lane, permissionless spot deployment, and randomized TWAP slices.
+description: What changed on devnet chain 114514 at block 7,400,000 — an admission rule that refuses over-levered orders, a delist that cancels resting orders, the contract CoreWriter lane, permissionless spot deployment, and randomized TWAP slices.
 ---
 
-# Activation notice — the next behaviour boundary
+# Activation notice — block 7,400,000
 
-:::warning
-**Not live yet.** Everything on this page takes effect at **block 7,400,000 on
-devnet (chain 114514)**. Below that height the chain behaves exactly as the rest
-of this reference describes today. Read the live height with `{"type":"meta"}`
-before you rely on any row here.
+:::info
+**LIVE since block 7,400,000 on devnet (chain 114514).** Everything on this page
+is in force. It is kept as a record of what changed at that boundary, because a
+client written against the older behaviour breaks on the rows below.
+
+`{"type":"web_data","address":"0x…"}` carries the live `height` if you need to
+check where the chain is.
 :::
 
 One release moves twenty behaviours at one height, so the chain gains ONE
@@ -18,7 +20,7 @@ see.
 
 ## Rejections that are NEW {#new-rejections}
 
-| Surface | At and above 7,400,000 |
+| Surface | Behaviour |
 |---|---|
 | `submit_order` on a perp | An order whose leverage cannot survive its own MAINTENANCE margin is refused with `InsufficientMargin`. See below. |
 | `activate_pair` (governance) | A spot pair with no price/size grid is refused. A zero tick or zero lot IS "no grid". |

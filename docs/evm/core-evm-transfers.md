@@ -99,7 +99,8 @@ above that height a contract's CoreWriter call reaches Core. Below it, send the
 CoreWriter transaction top-level from an EOA, or move value through the
 [withdraw sink](#evm--core-value) above, which is live at every height.
 
-Read the live height before you rely on this — `{"type":"meta"}` carries it.
+Read the live height before you rely on this —
+`{"type":"web_data","address":"0x…"}` carries it as `height`.
 :::
 
 ## Core → EVM (system pseudo-transactions) {#core--evm-system-pseudo-transactions}
