@@ -40,7 +40,7 @@ The watcher is a separate logical process even when co-located — its decisions
 | Derived ratio < 1.5 and falling for 5 consecutive samples | Pre-emptive deposit to bring the ratio to 1.8 | Buffer before T0 |
 | `tier transition to T0` | Immediate deposit OR partial close | One block to act before T1 |
 | `tier transition to T1` | Emergency: full close on highest-loss position | Pre-empt the partial close at a worse price |
-| Projected charge from `active_asset_ctx.funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × free_collateral | Pre-pay deposit before settlement | Funding charge can flip you into T0 |
+| Projected charge from `active_asset_ctx.funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × `withdrawable` | Pre-pay deposit before settlement | Funding charge can flip you into T0 |
 | Mark moves > 3× recent-1h sigma in 30s | Snapshot positions + alert operator | Possible regime shift |
 
 Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (ratio 1.3 floor). Conservative books: looser (ratio 1.8 floor).

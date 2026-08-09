@@ -225,7 +225,7 @@ Response:
 | `balances[*].asset` | uint32 | Spot asset id (`104` = MTF) |
 | `balances[*].name` | string | Token / pair name, else `asset:<id>` |
 | `balances[*].total` | decimal string | Full balance, truncated toward zero |
-| `balances[*].hold` | decimal string | Locked behind resting spot orders (escrow); spendable = `total − hold` |
+| `balances[*].hold` | decimal string | Locked behind resting spot orders (escrow). Spot escrow ONLY — it never holds perp margin, so `total − hold` is not the spendable figure for USDC; read `withdrawable` from [`account_state`](../info.md#account_state) |
 | `balances[*].avg_entry_px` | decimal string \| null | Weighted-average acquisition cost, **whole USDC per whole token**. It is a PRICE, not a total. `null` when the account has no recorded basis for this token. See [cost basis](#avg-entry-px) |
 
 #### Cost basis and spot PnL {#avg-entry-px}

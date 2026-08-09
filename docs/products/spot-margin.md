@@ -37,9 +37,9 @@ loss draw on the same collateral.
 ```
 
 The buy is funded 100% by the borrow. Your **account-wide free collateral** backs
-the position — the open subtracts its initial-margin requirement from
-`free_collateral` exactly like a perpetual open, so there is no separate collateral
-to post, and leverage ≈ `notional / free_collateral`. The bought base is held in a
+the position — the open subtracts its initial-margin requirement from free
+collateral exactly like a perpetual open, so there is no separate collateral
+to post, and leverage ≈ `notional /` free collateral. The bought base is held in a
 **segregated** holding on the margin account, never commingled with your spendable
 spot balances, so a close (or a later liquidation) touches exactly that base. The
 first release allows **one open position per `(account, pair)`** (no add-on); the
@@ -71,10 +71,13 @@ init_required    = position_value × spot_margin_initial_bps / 10000
 maint_required   = position_value × spot_margin_maintenance_bps / 10000
 ```
 
-`init_required` is subtracted from your account `free_collateral` while the
+`init_required` is subtracted from your account free collateral while the
 position is open; `position_pnl` and `maint_required` enter the **account-level**
-health decision alongside your perpetual legs. An open is rejected if your
-`free_collateral` cannot cover `init_required`. The position is liquidated when the
+health decision alongside your perpetual legs. An open is rejected if your free
+collateral cannot cover `init_required`. Read free collateral from the account
+read as [`withdrawable`](../api/rest/info.md#account_state), which is the same
+budget **clamped at zero**; the gate itself keeps the raw signed value. The
+position is liquidated when the
 **account** falls through its maintenance floor — see [Liquidation](#liquidation)
 and [margin modes](../concepts/margin-modes.md#spot-margin-cross).
 

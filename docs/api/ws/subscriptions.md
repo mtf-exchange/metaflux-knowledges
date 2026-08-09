@@ -450,14 +450,18 @@ re-emits it only when that context changes.
 ```json
 { "channel": "active_asset_data", "is_snapshot": true, "data": {
   "address": "0x<addr>", "coin": "BTC", "leverage": 50, "margin_mode": "cross",
-  "mark_px": "61742.69625702", "max_trade_size": "0", "max_trade_szs": ["0", "0"],
+  "mark_px": "61742.69625702", "max_trade_size": null, "max_trade_szs": ["0", "0"],
   "available_to_trade": ["0", "0"], "has_position": false } }
 ```
 
 - Keyed by `coin` (symbol). `margin_mode` ∈ `cross` / `isolated` / `strict_iso`;
-  `max_trade_size` is the OI-cap-derived size ceiling, `max_trade_szs` /
-  `available_to_trade` are `[buy, sell]` pairs; fields are identical to the REST
+  `max_trade_szs` / `available_to_trade` are `[buy, sell]` pairs; fields are
+  identical to the REST
   [`active_asset_data`](../rest/info/perpetuals.md#active_asset_data) read.
+- `max_trade_size` is the WHOLE MARKET's remaining open-interest headroom in size
+  units, **not** the caller's limit, and it is `null` when the market is
+  uncapped. Size an order against `max_trade_szs`. See
+  [`max_trade_size` is market-wide](../rest/info/perpetuals.md#max-trade-size).
 
 ### Per-account perp clearinghouse state {#account_state}
 
@@ -477,18 +481,18 @@ with no funds), not an empty array.
   "channel": "account_state",
   "data": {
     "address": "0x<addr>",
-    "account_value": "10000", "free_collateral": "8500",
+    "account_value": "10000", "withdrawable": "8500",
     "init_margin": "1500", "health": "9700", "tier": "Safe",
     "abstraction": "unified",
     "clearinghouse_state": { "": { "positions": [
       { "coin": "BTC", "size": "0.00600", "entry": "62000", "upnl": "441",
-        "isolated": false, "lev": 7, "liq": "0", "roe": "0.35",
+        "isolated": false, "lev": 7, "liq": null, "roe": "0.35",
         "funding": "-0.02", "margin": "53.14", "maint_margin": "11.16",
         "notional": "372.60" }
     ] } },
     "balances": [
-      { "asset": 100, "name": "USDC", "total": "10000", "hold": "0" },
-      { "asset": 3, "name": "MTF", "total": "12.5", "hold": "0" }
+      { "asset": 100, "name": "USDC", "total": "10000", "hold": "0", "avg_entry_px": null },
+      { "asset": 3, "name": "MTF", "total": "12.5", "hold": "0", "avg_entry_px": "1.98" }
     ],
     "pm_maint_margin": "0", "pm_net_value": "0", "pm_concentration_penalty": "0",
     "position_mode": "one_way",
@@ -498,7 +502,7 @@ with no funds), not an empty array.
 }
 ```
 
-- Margin scalars (`account_value` / `free_collateral` / `init_margin`) are
+- Margin scalars (`account_value` / `withdrawable` / `init_margin`) are
   **whole-USDC** decimal strings, identical to the REST account read's
   `MarginScalars`. `health` is `account_value − maint_margin`, a **signed
   whole-USDC dollar figure, not a ratio**. `tier` is the liquidation tier name
@@ -512,8 +516,13 @@ with no funds), not an empty array.
   size, decimal string — negative is short), `entry` / `upnl` / `margin` /
   `maint_margin` / `notional` (whole-USDC), `isolated`, `lev`, `liq`, `roe`,
   `funding`, and `side` (`long` / `short`, present only in hedge mode).
-- `balances` — an array of `{asset, name, total, hold}` rows; row 0 is always
-  USDC (asset id `100`).
+  **`liq` is nullable** — `null` means no non-negative price liquidates the leg,
+  and it is never rendered as `"0"`. See
+  [reading `liq`](../rest/info.md#reading-liq).
+- `balances` — an array of `{asset, name, total, hold, avg_entry_px}` rows; row 0
+  is always USDC (asset id `100`). `total − hold` is **not** the spendable
+  amount: `hold` is spot escrow only and never holds perp margin. Read
+  `withdrawable`.
 - `pm_maint_margin` / `pm_net_value` / `pm_concentration_penalty` — the folded
   portfolio-margin figures (whole-USDC), always present, `"0"` when not
   PM-enrolled. `position_mode` is `"one_way"` or `"hedge"`.

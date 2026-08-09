@@ -29,7 +29,7 @@ any code that names USDC.
 
 | Surface | How USDC is addressed | Number plane |
 |---------|----------------------|--------------|
-| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `free_collateral`. Bridge deposits, [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) and [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
+| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `withdrawable`. Bridge deposits, [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) and [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
 | **Spot token** | Asset id **`100`** — the `quote` of every `*/USDC` pair and the id of the `USDC` row in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `tokens[]` and in `account_state.balances[]` | whole-USDC decimal string |
 | **EVM token** | ERC-20 at the fixed predeploy `0x0000000000000000000000000000000000010000` | **6-decimal integer** |
 | **External chains** | Each chain's own USDC contract, held in [MetaBridge](../bridge/index.md) custody | 6-decimal integer on the MTF wire |
@@ -91,16 +91,26 @@ All of them spend the pool. What differs is the **gate**.
 **Free collateral** is the one budget every debit above is measured against:
 
 ```
-free_collateral = settled USDC balance
+free collateral = settled USDC balance
                 − initial margin held by open CROSS perp positions
                 − initial margin held by open spot-margin positions
                 − any impending funding CHARGE
 ```
 
-Read it from [`account_state.free_collateral`](../api/rest/info.md#account_state)
-or the lighter [`margin_summary`](../api/rest/info.md#margin_summary) — the API
-renders the same figure the pre-trade gate enforces, so the two never disagree.
-Two rules behind the formula are worth stating:
+**The gate figure is signed; the published field is not.** The admission and
+withdrawal checks compare a debit against the raw value above, which goes
+**negative** when open profit funds the held margin. The API publishes the same
+budget as `withdrawable`, clamped:
+
+```
+withdrawable = max(0, free collateral)
+```
+
+Read it from [`account_state.withdrawable`](../api/rest/info.md#account_state)
+or the lighter [`margin_summary`](../api/rest/info.md#margin_summary). A
+`withdrawable` of `"0"` therefore means "nothing to take out", NOT "the account
+is broke" — see [account value](./account-value.md#withdrawable). Two rules
+behind the formula are worth stating:
 
 - **Unrealised gains never count.** Free collateral folds an impending funding
   **debit** but never an unrealised profit — so a paper gain does not fund a new
@@ -154,7 +164,7 @@ client and compare gross against released.
 
 | Surface | Field | Unit | `1 USDC` looks like |
 |---------|-------|------|---------------------|
-| `POST /info` reads | `account_value`, `free_collateral`, `balances[*].total` / `.hold` | whole-USDC **decimal string** | `"1"` |
+| `POST /info` reads | `account_value`, `withdrawable`, `balances[*].total` / `.hold` | whole-USDC **decimal string** | `"1"` |
 | `POST /exchange` `send_asset` | `amount` | whole-USDC **decimal string** | `"1"` |
 | `POST /exchange` `core_evm_transfer` | `amount` | whole-USDC **decimal string** | `"1"` |
 | `POST /exchange` `mb_withdraw` | `amount` | **6-decimal integer** (`uint64`) | `1000000` |
@@ -193,8 +203,8 @@ use.
 | Field | What it is | The rule behind it |
 |-------|-----------|--------------------|
 | `account_value` | Mark-aware **equity**: settled USDC plus unrealised perp PnL, unrealised funding and spot-margin unrealised PnL | This is the figure the liquidation engine judges you on |
-| `balances[0]` (`asset: 100`, `name: "USDC"`) | `total` = **settled** USDC plus escrow; `hold` = USDC escrowed behind resting spot bids | `total` deliberately **excludes unrealised PnL**, so it never moves with the mark. Spendable = `total − hold` |
-| `free_collateral` | What a new order, send, withdrawal or Earn deposit may consume | The [budget above](#which-balance) |
+| `balances[0]` (`asset: 100`, `name: "USDC"`) | `total` = **settled** USDC plus escrow; `hold` = USDC escrowed behind resting spot bids | `total` deliberately **excludes unrealised PnL**, so it never moves with the mark. `total − hold` is **not** spendable: `hold` is spot escrow only and never holds perp margin, so the subtraction leaves the margin in. Use `withdrawable` |
+| `withdrawable` | What a new order, send, withdrawal or Earn deposit may consume | The [budget above](#which-balance), **clamped at zero** |
 
 **Why two numbers.** `account_value` and `balances[0].total` both look like "my
 USDC" and differ by unrealised PnL. Use `account_value` for equity and risk; use

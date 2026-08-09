@@ -145,7 +145,15 @@ Response carries the assigned `vault_id` and derived `vault_address`. See [`crea
 share_price = NAV(vault) / total_shares
 ```
 
-`NAV` includes unrealised PnL on open positions. Pricing updates every commit — a deposit or withdrawal executes at the **post-commit** share price, not the price at request time.
+`NAV` is marked to market: settled cash, plus unrealised PnL on every open position at the latest oracle mark, plus unrealised funding. The Metaliquidity backstop vault also subtracts its pending-loss reserve. Pricing updates every commit — a deposit or withdrawal executes at the **post-commit** share price, not the price at request time.
+
+The reads carry that same NAV. [`vault_state`](../api/rest/info.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info.md#vault_summaries) `tvl`, and [`user_vault_equities`](../api/rest/info.md#user_vault_equities) `equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange.md#vault_withdraw) pays.
+
+#### `high_water_mark` is not NAV {#high-water-mark}
+
+`high_water_mark` is a separate number with one job: performance-fee accounting. It is a ratchet — profit raises it, a deposit bumps it, a withdrawal lowers it, and **a trading loss never does**. A vault in drawdown shows `high_water_mark` above `share_price`, and the gap is the profit the leader must re-earn before the vault charges a performance fee again.
+
+Never price a redemption off `high_water_mark`. It answers "has the leader beaten their previous best", not "what is a share worth".
 
 ### Config update {#config}
 

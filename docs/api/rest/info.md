@@ -13,7 +13,7 @@ description: The POST /info read endpoint — query types, envelope, and convent
 Single endpoint, multi-type. Dispatches on the request body's `type` field. Read-only — never mutates state, never requires a signature.
 
 :::tip
-**Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md); closed-position lifecycle queries are on [position history](./info/position-history.md). This page covers the envelope, conventions, and account/governance/vault/validator reads.
+**Split by product.** Perp-market read queries are on [perpetual queries](./info/perpetuals.md); spot, spot-margin, and Earn read queries are on [spot & margin queries](./info/spot.md); closed-position lifecycle queries are on [position history](./info/position-history.md); governance queries are on [governance queries](./info/governance.md). This page covers the envelope, conventions, and account/vault/validator reads.
 :::
 
 ## URL {#url}
@@ -117,14 +117,14 @@ Response (a faucet-funded account, no positions):
   "data": {
     "address":         "0x00000000000000000000000000000000000ca11e",
     "account_value":   "3000",
-    "free_collateral": "3000",
+    "withdrawable":    "3000",
     "init_margin":     "0",
     "health":          "3000",
     "tier":            "Safe",
     "abstraction":     "unified",
     "clearinghouse_state": { "": { "positions": [] } },
     "balances": [
-      { "asset": 100, "name": "USDC", "total": "3000", "hold": "0" }
+      { "asset": 100, "name": "USDC", "total": "3000", "hold": "0", "avg_entry_px": null }
     ],
     "pm_maint_margin":          "0",
     "pm_net_value":             "0",
@@ -146,11 +146,25 @@ liquidation-health poll does not have to pull the full position/balance walk.
 not PM-enrolled) — see [portfolio margin](../../concepts/portfolio-margin.md).
 `position_mode` is `"one_way"` or `"hedge"` — see [hedge mode](../../concepts/hedge-mode.md).
 
-Each `balances[*]` row is `{asset, name, total, hold}` (HL parity): `hold` is
-the amount locked behind a resting spot order (escrow), `total` is the full
-balance; the spendable amount is `total − hold`. Row 0 is always USDC (asset
-id `100`); a token that is entirely held still appears. For a
-**light** read of just the margin scalars (no position walk, no balance
+Each `balances[*]` row is `{asset, name, total, hold, avg_entry_px}`: `total` is
+the full balance and `hold` is the part locked behind a resting spot order
+(escrow). Row 0 is always USDC (asset id `100`); a token that is entirely held
+still appears.
+
+:::warning
+**`total − hold` is NOT the spendable amount.** `hold` counts spot order escrow
+only. USDC that margins an open PERPETUAL position stays in `total` and never
+enters `hold`, so `total − hold` overstates the budget for every position holder.
+The chain admits a spot buy against **free collateral** (equity minus held
+initial margin), and refuses an order that only `total − hold` allows.
+
+Read `withdrawable` for the spendable USDC figure — it is the same free-collateral
+number the admission gate uses, clamped at zero. See
+[account value](../../concepts/account-value.md#balances-and-hold) for the rule
+and a worked example.
+:::
+
+For a **light** read of just the margin scalars (no position walk, no balance
 scan — the right call for a liquidation-health poll), use
 [`margin_summary`](#margin_summary).
 
@@ -178,7 +192,7 @@ deployer's lowercase `0x` address:
 | Field | Type | Description |
 |-------|------|-------------|
 | `account_value` | Decimal string | Equity incl. settled PnL, **whole-USDC plane** (`"3000"` = 3000 USDC, NOT base units) |
-| `free_collateral` | Decimal string | Equity minus initial margin held by open positions |
+| `withdrawable` | Decimal string | Cash you can take out, **clamped at zero**. Settled cash minus funding you owe minus `init_margin`. It does NOT count unrealised profit, so a healthy account funded by open profit reads `"0"` — see [account value](../../concepts/account-value.md#withdrawable). The admission gate still uses the raw signed figure, which can be negative; the read never is |
 | `init_margin` | Decimal string | Held initial-margin requirement |
 | `health` | Decimal string | `account_value − maint_margin` (signed dollar figure; can be negative) — **not a ratio** |
 | `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / maint_margin`; `"Safe"` when no maint margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
@@ -190,23 +204,43 @@ deployer's lowercase `0x` address:
 | `clearinghouse_state["<dex>"].positions[*].upnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
 | `clearinghouse_state["<dex>"].positions[*].isolated` | bool | `true` unless the position is cross-margined |
 | `clearinghouse_state["<dex>"].positions[*].lev` | uint8 | Position's chosen leverage |
-| `clearinghouse_state["<dex>"].positions[*].liq` | Decimal string | Price (whole-USDC) at which this position alone would bring the account to maintenance — single-position cross approximation; `"0"` when size / leverage is zero (no finite liq price) |
+| `clearinghouse_state["<dex>"].positions[*].liq` | Decimal string \| null | Mark price (whole-USDC) at which this leg reaches maintenance. **Solved on the leg's own margin plane**: a cross leg against the cross account, an isolated leg against its posted `isolated_margin` alone. `null` when no non-negative price breaches maintenance, and when size is zero — see below |
 | `clearinghouse_state["<dex>"].positions[*].roe` | Decimal string | `upnl / initial_margin` as a decimal fraction; `"0"` at zero leverage / notional |
-| `clearinghouse_state["<dex>"].positions[*].funding` | Decimal string | Accrued-but-unsettled funding for the leg, **whole-USDC** (signed) |
+| `clearinghouse_state["<dex>"].positions[*].funding` | Decimal string | Accrued-but-unsettled funding for **this leg**, **whole-USDC** (signed; negative = you owe). Includes the accrual built up since the last funding charge, so it stays non-zero between funding periods — the same accrual `account_value` and `withdrawable` already fold in |
 | `clearinghouse_state["<dex>"].positions[*].margin` | Decimal string | This leg's INITIAL margin, **whole-USDC** |
 | `clearinghouse_state["<dex>"].positions[*].maint_margin` | Decimal string | This leg's maintenance-margin contribution, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
 | `clearinghouse_state["<dex>"].positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
 | `clearinghouse_state["<dex>"].positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
 | `balances[*].asset` | uint32 | Asset id (`100` for USDC) |
 | `balances[*].name` | string | Token symbol (`"USDC"` for row 0) |
-| `balances[*].total` | Decimal string | Full balance (spendable + held) |
-| `balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow) |
+| `balances[*].total` | Decimal string | Full balance. **Not** the spendable amount — perp margin sits inside it. Use `withdrawable` |
+| `balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). Spot escrow only; it never holds perp margin |
+| `balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset) |
 | `pm_maint_margin` | Decimal string | PM engine's maintenance requirement, whole-USDC; `"0"` when not PM-enrolled |
 | `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled |
 | `pm_concentration_penalty` | Decimal string | PM single-asset concentration penalty, whole-USDC; `"0"` when not PM-enrolled |
 | `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) |
 | `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
 | `time` | uint64 | Consensus block time in **milliseconds**. A **bare integer**. Advances on every commit, from the same consensus clock as `height` |
+
+#### Reading `liq` {#reading-liq}
+
+`liq` is solved on the plane that actually liquidates the leg. A **cross** leg
+shares one margin pool with every other cross leg, so its `liq` moves when any
+other cross position moves. An **isolated** leg is backed only by its own posted
+`isolated_margin`; the cross balance never rescues it, and a large cross balance
+never pushes its `liq` away.
+
+`liq` is **`null`, never `"0"`**, when the leg has no liquidation price. Two
+cases produce it: a zero-size leg, and a long whose solved price is negative —
+that long cannot be price-liquidated, because no non-negative mark breaches its
+maintenance requirement. Treat `null` as "no price triggers this leg", and treat
+`"0"` — should you ever see it — as a real price of zero. A client that renders
+`null` as `0` tells the user the position is at the brink when it is the
+opposite.
+
+`liq` answers "what price liquidates THIS leg". It is not a promise about the
+account: a cross account can still be liquidated by a move on a different market.
 
 `height` / `time` are an **as-of stamp**: they tell you which committed block the
 snapshot was rendered against, and they advance on every commit regardless of
@@ -228,7 +262,7 @@ position/balance detail is not needed. Required: `address` (0x hex).
 { "type": "margin_summary", "address": "0x<addr>" }
 ```
 
-Response (`data`): `address`, `account_value`, `free_collateral`,
+Response (`data`): `address`, `account_value`, `withdrawable`,
 `maint_margin`, `init_margin`, `health`, `tier`, `abstraction` — identical
 field semantics to the same-named fields on [`account_state`](#account_state)
 (computed by the shared helper, so the two never disagree). `maint_margin`
@@ -263,6 +297,19 @@ Response:
 
 `strategy` is the vault's `kind` — `"User"` or `"Metaliquidity"` — not a
 free-text strategy label.
+
+`tvl` and `share_price` are **mark-to-market NAV**: settled cash, plus unrealised
+PnL on every open position at the latest oracle mark, plus unrealised funding.
+The Metaliquidity backstop vault also subtracts its pending-loss reserve. This is
+the same NAV that [`vault_withdraw`](exchange.md#vault_withdraw) burns shares
+against, so the read and the payout agree.
+
+`high_water_mark` is **not** NAV. It is a ratchet kept for performance-fee
+accounting: profit raises it, a deposit bumps it, a withdrawal lowers it, and a
+trading loss never does. A vault in drawdown therefore shows
+`high_water_mark` above `share_price`, and the gap is exactly the profit the
+leader must re-earn before the vault charges a performance fee again. Never price
+a redemption off `high_water_mark`.
 
 ### Per-account staking and delegation state {#staking_state}
 
@@ -699,7 +746,7 @@ Response:
   "data": {
     "address":    "0x<parent>",
     "sub_accounts": [
-      { "index": 0, "address": "0x<sub_addr>" }
+      { "index": 0, "address": "0x<sub_addr>", "equity": "2500" }
     ]
   }
 }
@@ -710,6 +757,11 @@ Response:
 | `address` | hex address | Resolved parent address |
 | `sub_accounts[*].index` | uint32 | Sub-account index under the parent |
 | `sub_accounts[*].address` | hex address | Sub-account address |
+| `sub_accounts[*].equity` | Decimal string | The sub-account's mark-to-market equity, whole-USDC — the same figure its own [`account_state.account_value`](#account_state) reports |
+
+`equity` counts unrealised PnL on the sub-account's open positions. A sub-account
+that is deep in loss therefore reads DOWN here, not at its settled cash, so a
+parent scanning this list sees the one that is near liquidation.
 
 ### Protocol-wide counters and accumulators {#protocol_metrics}
 
@@ -1298,198 +1350,58 @@ State source: `c_staking.delegations` (live per-row accrual) + `c_staking.delega
 
 ## Governance query types {#governance-query-types}
 
-The on-chain governance surface: the live vote machinery (`gov_state`), the
-cross-category pending-proposal view with quorum distance (`gov_proposals`), and
-the enacted-parameter audit trail (`gov_history`). All read committed
-`Exchange` state; same `{type, data}` envelope. Stake quorum is ⅔
-(stake-weighted); **jailed** validators are excluded from the active-stake
-denominator and every tally, matching the on-chain enactment check.
+**The governance reads have their own page now:
+[governance queries](./info/governance.md).**
 
-### Live governance state and current parameters {#gov_state}
+One read serves the whole surface —
+[`validator_votes`](./info/governance.md#validator_votes). It reports votes that
+are still open and votes that already enacted, over a time range. It is the ONE
+place a caller learns that a governance action happened, who voted for it, and
+what the parameter was before.
 
-The live governance surface — stake-quorum context, pending parameter-change
-vote rounds, open proposals, and the CURRENT value of every governed parameter.
-No parameters.
+That matters because a governance vote can move a **margin** parameter. A
+two-thirds-stake vote lowered `max_leverage` on BTC and ETH from 100 to 20, and
+no public read reported that it had happened. Stake quorum is ⅔ (stake-weighted);
+**jailed** validators are excluded from the denominator and from every tally.
 
-```json
-{ "type": "gov_state" }
-```
+The three older governance reads are **retired from the public gateway**. Each
+answers `410 Gone` with a body naming `validator_votes`.
 
-Response:
+:::caution
+**Neither half is live yet.** `validator_votes` still answers
+`400 {"error":"unknown info type: validator_votes"}`, and the gateway still
+serves the three retired reads with their old shape. Read the
+[upgrade notices](./info/governance.md#upgrade-notices) before you change a
+client.
+:::
 
-```json
-{
-  "type": "gov_state",
-  "data": {
-    "total_stake":  "150000",
-    "quorum_bps":   6667,
-    "quorum_stake": "100005",
-    "pending_vote_global": [
-      {
-        "kind":          "set_reward_rate_bps",
-        "kind_id":       3,
-        "votes": [
-          { "validator": "0x<val>", "value": "900", "stake": "60000", "submitted_at_ms": 1700000000000 }
-        ],
-        "leading_stake": "60000"
-      }
-    ],
-    "open_proposals": [
-      { "proposal_id": 5, "voters": 2, "aye_stake": "90000", "nay_stake": "30000" }
-    ],
-    "params": {
-      "reward_rate_bps":   800,
-      "default_taker_bps": 5,
-      "default_maker_bps": 2,
-      "burn_bps":          8000
-    },
-    "oracle_weight_overrides": [
-      { "asset_id": 0, "weights": [1000, 1000, 1000] }
-    ]
-  }
-}
-```
+### `gov_state` — retired {#gov_state}
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `total_stake` | decimal string | Σ stake across all validators |
-| `quorum_bps` | uint | ⅔ quorum threshold in bps (`6667`) |
-| `quorum_stake` | decimal string | Stake needed to enact (`total_stake × quorum_bps / 10000`) |
-| `pending_vote_global[*].kind` | string | Governed-parameter name (snake_case), e.g. `"set_reward_rate_bps"` |
-| `pending_vote_global[*].kind_id` | uint | Numeric kind id |
-| `pending_vote_global[*].votes[*].validator` | hex address | Voting validator |
-| `pending_vote_global[*].votes[*].value` | decimal string | Decoded proposed value (hex `0x…` if the payload is opaque) |
-| `pending_vote_global[*].votes[*].stake` | decimal string | The voter's stake |
-| `pending_vote_global[*].votes[*].submitted_at_ms` | uint64 | Vote submission timestamp (consensus ms) |
-| `pending_vote_global[*].leading_stake` | decimal string | Largest stake pooled behind a single payload in this round |
-| `open_proposals[*].proposal_id` | uint64 | Proposal round id |
-| `open_proposals[*].voters` | uint64 | Number of votes cast |
-| `open_proposals[*].aye_stake` / `nay_stake` | decimal string | Stake voting aye / nay |
-| `params` | object | Current value of every governed parameter (each a committed scalar) |
-| `oracle_weight_overrides[*].asset_id` | uint32 | Asset with a per-asset oracle-weight override |
-| `oracle_weight_overrides[*].weights` | uint[] | Committed per-source weights for the asset |
+**REMOVED from the public API.** This read carried the open vote rounds and the
+current value of every governed parameter. Use
+[`validator_votes`](./info/governance.md#validator_votes) with `status: "voting"`
+for the open votes. Current parameter VALUES are on the reads that own them — a
+market's risk parameters on [`market_info`](./info/perpetuals.md#market_info),
+the fee ladder on [`fee_schedule`](#fee_schedule), global trading flags on
+[`exchange_status`](#exchange_status).
 
-The `params` object carries the full governed-parameter set the vote machinery
-can move (fee distribution split, staking knobs, MIP-3 limits, risk caps, per-asset
-funding period / cap, spot / EVM / bridge flags, the set of disabled EVM
-precompiles, …); each is the live committed value.
+### `gov_proposals` — retired {#gov_proposals}
 
-### Active governance proposals and quorum status {#gov_proposals}
+**REMOVED from the public API.** Use
+[`validator_votes`](./info/governance.md#validator_votes) with `status: "voting"`.
+It carries the same rounds and stake tallies, and adds one row per cast plus a
+time range.
 
-Every ACTIVE governance proposal across ALL vote categories (not just
-direct parameter votes), each with its live per-payload stake tally and distance to the ⅔
-quorum. The cross-category "what is being voted on right now, and how close is
-it" view. No parameters.
+### `gov_history` — retired {#gov_history}
 
-```json
-{ "type": "gov_proposals" }
-```
+**REMOVED from the public API.** Use
+[`validator_votes`](./info/governance.md#validator_votes) with
+`status: "enacted"`.
 
-Response:
-
-```json
-{
-  "type": "gov_proposals",
-  "data": {
-    "total_active_stake":  "120000",
-    "quorum_bps":          6667,
-    "quorum_needed_stake": "80004",
-    "proposals": [
-      {
-        "round":         1000003,
-        "category":      "vote_global",
-        "sub_id":        3,
-        "proposer":      "0x<val>",
-        "created_at_ms": 1700000000000,
-        "voter_count":   1,
-        "leading_stake": "60000",
-        "meets_quorum":  false,
-        "payloads": [
-          { "payload_hex": "0392…", "stake": "60000", "meets_quorum": false }
-        ],
-        "proposal": {
-          "kind":         3,
-          "kind_name":    "set_reward_rate_bps",
-          "value":        "900",
-          "title":        "Raise staking rewards",
-          "proposer":     "0x<val>",
-          "opened_at_ms": 1700000000000
-        }
-      }
-    ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `total_active_stake` | decimal string | Σ stake of non-jailed validators (the quorum denominator) |
-| `quorum_bps` | uint | ⅔ quorum threshold in bps (`6667`) |
-| `quorum_needed_stake` | decimal string | Stake a single payload must reach to enact |
-| `proposals[*].round` | uint64 | Synthetic vote round id |
-| `proposals[*].category` | string | Vote category, e.g. `"gov_propose"`, `"vote_global"`, `"dynamic_risk"`, `"treasury"`, `"metaliquidity"`, `"oracle_weights"`, `"funding_formula"`, `"spot_margin"` |
-| `proposals[*].sub_id` | uint64 | Category-relative id (the round minus the category's range base) |
-| `proposals[*].proposer` | hex address \| null | Earliest voter (proposer proxy) |
-| `proposals[*].created_at_ms` | uint64 | Earliest vote timestamp (consensus ms) |
-| `proposals[*].voter_count` | uint64 | Number of votes cast on the round |
-| `proposals[*].leading_stake` | decimal string | Largest stake pooled behind one payload |
-| `proposals[*].meets_quorum` | bool | Whether the leading payload's stake reaches the ⅔ quorum |
-| `proposals[*].payloads[*].payload_hex` | hex string | A distinct voted payload (no `0x` prefix) |
-| `proposals[*].payloads[*].stake` | decimal string | Active stake pooled behind that payload |
-| `proposals[*].payloads[*].meets_quorum` | bool | Whether this payload alone reaches quorum |
-| `proposals[*].proposal` | object \| null | The typed proposal record when the round opened via a proposal, else `null` |
-| `proposals[*].proposal.kind` | uint | Governed-parameter kind id |
-| `proposals[*].proposal.kind_name` | string \| null | Decoded kind name (snake_case), `null` if unknown |
-| `proposals[*].proposal.value` | decimal string | Proposed value |
-| `proposals[*].proposal.title` | string | Human-readable proposal title |
-| `proposals[*].proposal.proposer` | hex address | Account that opened the proposal |
-| `proposals[*].proposal.opened_at_ms` | uint64 | Proposal open timestamp (consensus ms) |
-
-### Enacted governance parameter change history {#gov_history}
-
-The enacted-governance audit trail (bounded ring, oldest-first) — each entry
-proves a parameter MOVED by on-chain governance vs its genesis value. No
-parameters. Complements `gov_proposals` (the PENDING side).
-
-```json
-{ "type": "gov_history" }
-```
-
-Response:
-
-```json
-{
-  "type": "gov_history",
-  "data": {
-    "count": 1,
-    "enacted": [
-      {
-        "round":         1000003,
-        "kind":          3,
-        "kind_name":     "set_reward_rate_bps",
-        "value":         "900",
-        "via":           "vote_global",
-        "enacted_at_ms": 1700000900000,
-        "description":   "reward_rate_bps -> 900"
-      }
-    ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `count` | uint | Number of entries in the ring |
-| `enacted[*].round` | uint64 | Synthetic vote round that enacted |
-| `enacted[*].kind` | uint | Governed-parameter kind id |
-| `enacted[*].kind_name` | string \| null | Decoded kind name (snake_case), `null` if unknown |
-| `enacted[*].value` | decimal string | Enacted value |
-| `enacted[*].via` | `"proposal" \| "vote_global" \| "other"` | Source track — proposal-tracked vs direct parameter vote |
-| `enacted[*].enacted_at_ms` | uint64 | Enactment timestamp (consensus ms) |
-| `enacted[*].description` | string | Human-readable summary of the change |
-
-The ring caps at the on-chain enacted-log bound, so this is a recent window, not
-all history.
+**Do not port a client field-for-field — the old read was incomplete.** It
+carried one value per entry, no asset, no voters and no prior value, and it did
+not record every enactment. A margin-parameter vote could enact and leave no row
+at all, which is the defect the replacement exists to fix.
 
 ## Advanced query types (RFQ / FBA / portfolio margin) {#advanced-query-types-rfq--fba--portfolio-margin}
 
@@ -1853,13 +1765,11 @@ Response:
 |-------|------|-------------|
 | `vaults[*].id` | uint64 | Vault id |
 | `vaults[*].address` / `leader` | hex address | Vault on-chain address / leader |
-| `vaults[*].tvl` | decimal string | NAV proxy (high-water mark, USD cents) |
+| `vaults[*].tvl` | decimal string | Mark-to-market NAV, whole-USDC — same figure as [`vault_state.tvl`](#vault_state) |
 | `vaults[*].follower_count` | uint64 | Number of share holders |
 | `vaults[*].kind` | `"user" \| "metaliquidity"` | Vault kind |
 
 State source: `Exchange.user_vaults`.
-
-> **FLAGGED.** `tvl` uses the high-water mark as the NAV proxy; full NAV needs the match-engine + oracle.
 
 ### Vaults a user has deposited into {#user_vault_equities}
 
@@ -1886,7 +1796,7 @@ Response:
 | `equities[*].vault_id` | uint64 | Vault id |
 | `equities[*].vault_address` | hex address | Vault address |
 | `equities[*].shares` | decimal string | Caller's share count (18-dec) |
-| `equities[*].equity` | decimal string | `shares × share_price(high_water_mark)`, truncated |
+| `equities[*].equity` | decimal string | `shares × share_price`, truncated — whole-USDC. The share price is mark-to-market NAV per share, so this is what a redemption pays right now, not a high-water-mark figure |
 
 State source: `user_vaults[*].follower_shares[addr]` (keyed per vault).
 

@@ -878,7 +878,7 @@ Response:
   "data": {
     "address": "0x<addr>", "coin": "BTC", "leverage": 50,
     "margin_mode": "cross", "mark_px": "61550.29664777",
-    "max_trade_size": "0", "max_trade_szs": ["0", "0"],
+    "max_trade_size": null, "max_trade_szs": ["0", "0"],
     "available_to_trade": ["0", "0"], "has_position": false
   }
 }
@@ -890,10 +890,41 @@ Response:
 | `leverage` | uint32 | Position leverage if open, else account default, else market max |
 | `margin_mode` | `"cross" \| "isolated" \| "strict_iso"` | Effective margin mode |
 | `mark_px` | decimal string | Current mark, human-decimal plane |
-| `max_trade_size` | decimal string | Per-market max-order ceiling (see [`max_market_order_ntls`](#max_market_order_ntls)) |
-| `max_trade_szs` | [decimal string, decimal string] | Max tradable size `[buy, sell]` |
-| `available_to_trade` | [decimal string, decimal string] | Notional available to open `[buy, sell]` |
+| `max_trade_size` | decimal string \| null | Open-interest headroom left on the WHOLE market, in **size** units: `oi_cap − total_open_interest`, floored at `0`. `null` when the market carries no cap. **Not a per-user limit** — see below |
+| `max_trade_szs` | [decimal string, decimal string] | Size the CALLER can still trade `[buy, sell]`, from their own margin |
+| `available_to_trade` | [decimal string, decimal string] | Notional the CALLER can still open `[buy, sell]` |
 | `has_position` | bool | Whether the user has a non-zero position on this market |
+
+#### `max_trade_size` is market-wide, not yours {#max-trade-size}
+
+`max_trade_size` is the open-interest cap minus the market's TOTAL open interest
+— every account's positions summed, not the caller's. The chain refuses an
+OI-increasing order once total open interest reaches the cap, so this field says
+how much fresh exposure the market as a whole can still absorb.
+
+That headroom is **shared and racing**. Any other account can consume it in the
+next block, so the value is a snapshot, never a reservation. Size an order
+against `max_trade_szs` — the caller's own limit — and treat `max_trade_size` as
+the ceiling both of you compete for.
+
+Two values need care:
+
+- **`null` means UNCAPPED** — the market has no OI cap, so no OI ceiling applies.
+  Do not clamp an order to `0` here. A client that reads a missing number as "no
+  size allowed" blocks trading on exactly the markets that are most open.
+- **`"0"` means AT THE CAP** — the market is full and an OI-increasing order is
+  refused right now. A reducing order still works.
+
+The cap is read from the market's committed annotation only. There is **no
+fallback to a configured default**: a read surface must never advertise a ceiling
+the chain does not enforce, so an unannotated market reports `null` rather than
+borrowing a global number.
+
+`available_to_trade` and `max_trade_szs` are budgets from the caller's own free
+collateral, side-aware and never negative. The reducing side is larger because
+closing the open position releases its margin. They are still an estimate against
+a moving mark: both fall when the mark moves against the caller, and neither is a
+guarantee that the order is admitted.
 
 ### Get max market-order notional caps {#max_market_order_ntls}
 
@@ -908,18 +939,30 @@ Response:
 ```json
 {
   "type": "max_market_order_ntls",
-  "data": { "ntls": [ { "asset_id": 0, "max_market_order_ntl": "5000000000" } ] }
+  "data": { "ntls": [ { "coin": "BTC", "max_market_order_ntl": "5000000000" } ] }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `ntls[*].asset_id` | uint32 | Asset id |
-| `ntls[*].max_market_order_ntl` | decimal string | OI-cap-derived size ceiling |
+| `ntls[*].coin` | string | Market symbol, not a numeric asset id |
+| `ntls[*].max_market_order_ntl` | decimal string \| null | The market's enforced open-interest cap, in **size** units. `null` when the market carries no cap |
 
-State source: per-market `PerpAnnotation.oi_cap`, else `default_mip3_limits.max_oi_per_market`.
+Rows cover every perp market the cap can apply to, in ascending asset order.
 
-> **FLAGGED.** No dedicated per-asset "max market-order notional" field exists in committed state; the OI cap is the closest committed risk ceiling, reported in **size** units (the matching layer converts to notional at the live mark).
+The value is the cap the chain ENFORCES, read from the market's committed
+annotation. It does **not** fall back to `default_mip3_limits.max_oi_per_market`
+or to any other configured default — a read surface that borrows a global number
+advertises a ceiling nothing enforces.
+
+The cap bounds TOTAL market open interest, not one order. For the size a market
+can still absorb, subtract current open interest — [`active_asset_data`](#active_asset_data)
+publishes that headroom directly as `max_trade_size`.
+
+> **FLAGGED.** Committed state carries no dedicated per-asset "max market-order
+> notional". The OI cap is the closest committed risk ceiling, so this read
+> reports it in **size** units; the matching layer converts to notional at the
+> live mark.
 
 ### List assets at the open-interest cap {#perps_at_open_interest_cap}
 

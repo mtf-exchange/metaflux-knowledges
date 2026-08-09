@@ -30,11 +30,17 @@ An order opening new exposure must post initial margin:
 notional         = |px × size|                        # raw integer product, scale-0
 effective_lev    = the market's max leverage           # see the ladder below
 required_init    = ceil( notional / effective_lev )    # rounded UP — conservative
-free_collateral  = cross_account_value − Σ held_initial_margin
-reject  iff  required_init > free_collateral
+free collateral  = cross_account_value − Σ held_initial_margin
+reject  iff  required_init > free collateral
 ```
 
 So `init_margin = notional / max_leverage` — the classic `1 / max_leverage` ratio.
+
+Free collateral here is the **raw signed gate value**, which goes negative when
+open profit funds the held margin. The account read publishes it clamped, as
+`withdrawable = max(0, free collateral)` — so a rejected order can sit on an
+account that reads `withdrawable: "0"`. See
+[account value](./account-value.md#withdrawable).
 
 `effective_lev` resolves in this order, and is never below 1:
 
@@ -85,7 +91,7 @@ Implication: a 10% adverse move on BTC reduces account-wide health, even if your
 
 A [spot-margin](../products/spot-margin.md) position is **cross-margined against
 the same unified USDC account**. Its initial-margin requirement is subtracted from
-`free_collateral` (like a perpetual open), and its unrealised PnL and maintenance
+free collateral (like a perpetual open), and its unrealised PnL and maintenance
 requirement enter the account-level health decision. Two consequences follow:
 
 - An open spot-margin position **reduces your perpetual margin headroom**.
@@ -119,6 +125,8 @@ flowchart LR
 ```
 
 If `position_health` falls into a liquidation tier, the **per-position** ladder fires. The rest of the account is untouched.
+
+The `liq` field on an isolated position is solved on this bucket alone. A large cross balance does NOT push it away, because cross never rescues an isolated bucket. See [reading `liq`](../api/rest/info.md#reading-liq).
 
 You can deposit/withdraw to the bucket while the position is open:
 
