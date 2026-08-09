@@ -57,6 +57,7 @@ const sidebars = {
           type: 'category',
           label: 'Margin & risk',
           items: [
+            'concepts/account-value',
             'concepts/margin-modes',
             'concepts/hedge-mode',
             'concepts/portfolio-margin',
