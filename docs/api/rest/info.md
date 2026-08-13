@@ -796,6 +796,16 @@ Response:
       "treasury":       "1000",
       "burned_mtf":     "55"
     },
+    "buyback_status": {
+      "mtf_asset_id":   null,
+      "pool":           "12500",
+      "held_at_hub":    "0",
+      "trigger_usdc":   "10000",
+      "interval_ms":    60000,
+      "slice_usdc":     "250",
+      "drip_active":    false,
+      "blocking_guard": "mtf_asset_unbound"
+    },
     "insurance_fund_total":    "750",
     "treasury_backstop_total": "9000",
     "bole_pool": {
@@ -833,6 +843,14 @@ Response:
 | `fee_pools.validator_pool` | Decimal string | Cumulative validator-pool fee accrual (whole-USDC) |
 | `fee_pools.treasury` | Decimal string | Cumulative treasury fee accrual (whole-USDC) |
 | `fee_pools.burned_mtf` | Decimal string | Cumulative MTF retired by the buyback executor |
+| `buyback_status.mtf_asset_id` | uint32 \| null | The spot asset id the buyback buys. `null` = the executor is UNBOUND and the buyback can never fire — see below |
+| `buyback_status.pool` | Decimal string | USDC accrued to the buyback and not yet realized (whole-USDC) |
+| `buyback_status.held_at_hub` | Decimal string | The [assistance fund](../../concepts/system-addresses.md) address's whole USDC balance (whole-USDC). It is the buyback's realized, unspent carry **plus** any USDC a third party sent to that address — see below |
+| `buyback_status.trigger_usdc` | Decimal string | The next fire needs `pool + held_at_hub` to reach this. Governed, floored at `1` |
+| `buyback_status.interval_ms` | uint64 | Minimum consensus ms between two fires. Governed |
+| `buyback_status.slice_usdc` | Decimal string | USDC one fire may spend once the drip is live. Governed, default `250` |
+| `buyback_status.drip_active` | bool | `true` once the chain is at or above the drip activation height. `false` = one fire still spends everything available |
+| `buyback_status.blocking_guard` | string \| null | Why the next fire cannot happen, or `null` when nothing stops it — see [the guard tokens](#buyback-blocking-guard) |
 | `insurance_fund_total` | Decimal string | Σ per-asset `bole_pool.insurance_fund` reserves (whole-USDC) |
 | `treasury_backstop_total` | Decimal string | Σ per-asset `bole_pool.treasury_backstop` reserves (whole-USDC) |
 | `bole_pool.total_deposits` | Decimal string | BOLE lending-pool total deposits (whole-USDC) |
@@ -847,6 +865,51 @@ Response:
 | `counts.n_spot_pairs` | uint64 | Registered spot pairs (`mip3_spot_pair_specs`) |
 | `counts.n_user_vaults` | uint64 | Registered user vaults |
 | `counts.n_accounts_with_state` | uint64 | Accounts with committed user-state |
+
+#### Why the buyback is or is not firing {#buyback-blocking-guard}
+
+:::caution
+**`buyback_status` is not live yet.** It lands with the next release. A
+`protocol_metrics` reply today carries every other field on this page but no
+`buyback_status` key. Treat an absent key as "this node predates the field", not
+as "the buyback is healthy".
+:::
+
+The buyback stops for five unrelated reasons and reports the same silence for all
+of them, so a stalled buyback and a healthy idle one look identical. `blocking_guard`
+names the reason. The sample above is the founding case: no asset id is bound, so
+the buyback has never fired and the pool only grows.
+
+| `blocking_guard` | Meaning |
+|---|---|
+| `null` | Nothing stops the next fire. The interval throttle may still delay it |
+| `mtf_asset_unbound` | No MTF asset id is bound. **The buyback has never fired and cannot fire.** The pool keeps growing |
+| `pool_below_trigger` | `pool + held_at_hub` is under `trigger_usdc`. Normal — the buyback batches |
+| `no_mtf_usdc_pair` | The bound asset has no MTF/USDC pair to buy on |
+| `no_price_ceiling` | No trustworthy price reference exists, so the protocol defers rather than buy at an unverified price. See [Fees](../../concepts/fees.md#where-fees-go) |
+| `book_unfillable` | The pair and the ceiling both resolve, but **no ask rests at or under the ceiling**, so the next fire would buy nothing. The book is too thin or too expensive right now |
+
+Two rules read the tokens correctly:
+
+- **The checks run in the order the buyback runs them, and the token names the
+  FIRST one that stops it.** A chain reporting `mtf_asset_unbound` may also have
+  no pair; fix the first, then read again.
+- **A throttled fire is never reported.** The interval is progress, not a block,
+  so a buyback waiting out `interval_ms` reports `null`.
+
+`pool` and `held_at_hub` are separate money. `pool` is accrued and unrealized;
+`held_at_hub` is already realized as a real, explorer-visible balance. **The next
+fire may spend their SUM**, and that sum is what `trigger_usdc` is compared
+against. Each fire conserves it exactly: what leaves the pool is either spent to
+the sellers it matched or held at the hub for the next fire. Nothing is minted and
+nothing is lost.
+
+**`held_at_hub` is the hub's whole USDC balance, not only the buyback's own
+carry.** The assistance-fund address accepts an ordinary spot transfer, so anyone
+may send USDC to it, and that USDC lands in this figure and counts toward
+`trigger_usdc`. What a donation **cannot** do is keep a started drain running
+below the trigger: only the schedule the buyback itself started may do that. See
+[The buyback drips, it does not sweep](../../concepts/fees.md#buyback-drip).
 
 :::info
 **No cumulative traded-notional figure.** The engine tracks per-user **30-day fee
@@ -1222,7 +1285,7 @@ Response:
 ```json
 { "type": "action_outcome", "data": {
   "status": "error",
-  "reason": "hedge account cannot use twapOrder: a slice carries no position_side",
+  "reason": "hedge account requires an explicit position_side",
   "round":  81234,
   "nonce":  1735689600001
 } }

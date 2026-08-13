@@ -137,6 +137,120 @@ curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"
 Because the staker dividend is delivered through the validator share, stake more
 MTF (or delegate to a validator) to receive a larger slice — see [Staking](./staking.md).
 
+### The buyback needs a bound MTF asset id {#buyback-asset-binding}
+
+:::caution
+**Both votes on this page land with the next release and are not live yet.**
+`set_mtf_asset_id` and `set_buyback_slice_usdc` are documented here as the
+committed contract. A node today does not know either name and answers a cast for
+one the same way it answers a name that never existed. Build the operating
+procedure against them, but do not cast one until this notice is removed.
+:::
+
+The buyback executor buys ONE asset, and it must be told which one. That binding
+is a single asset id. **Until it is bound the buyback cannot fire at all**, and the
+accrued USDC keeps growing behind it. The read that reports this is
+[`protocol_metrics.buyback_status`](../api/rest/info.md#buyback-blocking-guard):
+`mtf_asset_id: null` with `blocking_guard: "mtf_asset_unbound"`.
+
+Genesis binds the id by name. A chain whose MTF token was registered AFTER genesis
+therefore starts with nothing bound, which is the state of the hosted sandbox
+today. A two-thirds-stake vote, `set_mtf_asset_id`, binds it at runtime.
+
+Four rules govern that vote:
+
+- **The voted value is `asset_id + 1`, not the asset id.** The offset is what keeps
+  `0` meaning "no vote". A vote of `1` binds asset `0`. There is no way to express
+  "unbind".
+- **A bound id is IMMUTABLE.** The staking ledger, the assistance-fund holdings and
+  the native-gas lane are all keyed to it, so re-pointing would strand them under
+  the old id with no migration. Only an idempotent re-vote of the SAME id enacts;
+  a vote for a different id is refused.
+- **The asset must already be registered, and it may not be the USDC quote asset.**
+- **The vote is REFUSED until the drip is live** — see the sequencing rule below.
+
+The enactment appears on
+[`validator_votes`](../api/rest/info/governance.md#validator_votes) as
+`changes[*].field: "mtf_asset_id"`.
+
+:::danger
+**The chain REFUSES this vote until the drip is live. The order is enforced, not
+advised.**
+
+Below the drip activation height ONE fire spends the WHOLE available balance. On a
+chain that has accrued for months, binding the asset id first would make the very
+next fire sweep the entire pool onto the MTF/USDC book as a single aggressive buy —
+exactly what the drip exists to prevent. So the enactment refuses, and the reason
+it gives says so:
+
+```
+… binding mtf_asset_id now would let the next buyback spend the whole pool in one buy
+```
+
+**A quorum reached too early does not bank the result.** The stake tallies, the
+enactment is rejected, and no state is written. The row on
+[`validator_votes`](../api/rest/info/governance.md#validator_votes) never reaches
+`"enacted"` — it reads `"voting"`, then `"expired"` once its lifetime elapses. The
+validator that cast the deciding vote sees the reason on its own action outcome;
+nobody watching the public read sees an error at all, only a vote that never
+enacted.
+
+**Wait for `buyback_status.drip_active` to read `true`, then cast again.**
+:::
+
+### The buyback drips, it does not sweep {#buyback-drip}
+
+:::caution
+**Not live yet.** The drip lands with the next release and then waits for an
+activation height, which is not yet chosen. Until the chain reaches that height
+one fire still spends the whole available balance. Read
+`buyback_status.drip_active` — it is `false` until the boundary is crossed.
+:::
+
+Today a fire spends everything available in one buy. At and above the activation
+height a fire spends **one slice**: `min(available, slice_usdc)`, default 250 USDC.
+The rest is realized at the [assistance fund](./system-addresses.md) and the next
+fire continues from there, so a large pool reaches the book over many blocks
+instead of in one order.
+
+Two rules follow, and both are visible on
+[`protocol_metrics`](../api/rest/info.md#protocol_metrics):
+
+- **A schedule that has started runs to completion.** The first slice drops the
+  pool under `trigger_usdc`, so a drain already in progress SKIPS the trigger test.
+  Without that, a started drain would stall until fees re-accrued.
+- **Conservation is unchanged.** Every fire satisfies `available == spent + held`.
+  The drip changes how fast the USDC reaches the book, never how much of it does.
+
+:::info
+**Only the buyback itself can start a drain.** "In progress" is a marker the
+firing effect writes, **not** the assistance fund's balance. The difference
+matters because the fund address accepts an ordinary spot transfer: a balance test
+would let anyone send it 1 USDC and make every later fire skip the trigger, which
+turns a two-thirds-stake parameter into a suggestion.
+
+So money sent to that address **counts toward** `trigger_usdc` — it is real USDC
+the next fire may spend, and
+[`held_at_hub`](../api/rest/info.md#buyback-blocking-guard) reports it — but it
+**cannot start a drain** below the trigger. Only a slice the buyback already
+fired does that.
+
+A drain that is **already running** is a different case. Its next fire folds in
+whatever the fund holds — donations included — so money sent mid-drain is spent
+by that drain and burned with the rest.
+:::
+
+The slice is governed by a two-thirds-stake vote, `set_buyback_slice_usdc`, bounded
+to `(0, 100000000]` USDC. **The floor is hard: a `0` slice would stop the drip and
+leave the pool undrainable.** To slow the buyback down, raise the interval instead.
+The enactment appears on
+[`validator_votes`](../api/rest/info/governance.md#validator_votes) as
+`changes[*].field: "fee.buyback_slice_usdc"`.
+
+**A slice vote enacts at any height; the buyback only READS it above the
+activation height.** So a slice voted early is recorded and does nothing until the
+boundary is crossed.
+
 ## Spot fees {#spot-fees}
 
 The same maker/taker shape applies to spot fills, but spot fees are charged on a

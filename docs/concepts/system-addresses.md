@@ -55,6 +55,20 @@ The **protocol treasury**. It holds the treasury's share of collected fees and t
 
 The **buyback operational fund**. Fee revenue destined for buyback is collected here as a real, explorer-visible USDC balance, and the protocol spends it on the open MTF/USDC market to execute the buyback. It is keyless — there is no key that can move its funds — but it is **protocol-operated**: the buy is a protocol action, not a user transaction. The bought-back MTF then flows to the treasury and the buyback split described in [Tokenomics](./tokenomics.md#value-accrual--flywheel).
 
+:::warning
+**This address ACCEPTS an ordinary transfer, and nothing comes back.** It is
+guarded as a transfer *source*, not as a destination, so a spot transfer to it
+succeeds. There is no key to return it and the protocol's only spend path is
+buying MTF, so USDC sent here is a permanent donation to the buyback. Check the
+destination before you sign.
+
+USDC sent here does count toward the buyback's next fire, and it appears in
+[`protocol_metrics.buyback_status.held_at_hub`](../api/rest/info.md#buyback-blocking-guard).
+What it cannot do is keep an already-started drain running below the governed
+trigger — only the buyback's own schedule does that. See
+[Fees](./fees.md#buyback-drip).
+:::
+
 ### Burn — `0x0000…dEaD` {#burn--0x0000dead}
 
 The canonical EVM **burn sink**. It is keyless and, uniquely on this page, **provably unspendable**: the protocol rejects every attempted transfer whose source is the burn address, under any path. Nothing can ever move value out of it.
@@ -95,7 +109,7 @@ A: The burn address is reserved but not wired into the active supply path today 
 A: No. The faucet only credits on test networks. On mainnet there is no faucet dispense.
 
 **Q: I see a balance at the assistance fund on the explorer — whose is it?**
-A: It is fee revenue the protocol has collected for buyback and will spend on the open market to buy MTF. No user controls it; the protocol operates it.
+A: Mostly fee revenue the protocol has collected for buyback and will spend on the open market to buy MTF. No user controls it; the protocol operates it. The balance may also include USDC a user sent to the address by mistake — that transfer is accepted and is not reversible, so it becomes part of the buyback budget.
 
 </details>
 

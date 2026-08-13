@@ -143,6 +143,34 @@ flowchart LR
     D --> E[App-hash matches<br/>across all honest nodes]
 ```
 
+## Block cadence {#block-cadence}
+
+:::caution
+**`set_target_block_interval_ms` is not live yet.** It lands with the next
+release. Until then each node reads only its own configured value.
+:::
+
+The chain has a **target** block interval, in milliseconds. It is a target, not a
+guarantee: it paces how often a validator proposes, and the rate you observe
+depends on load and network conditions as well. **Never size a deadline off the
+configured target** — measure the chain instead, from the block height on
+[`block_info`](../api/rest/info.md#block_info) sampled twice with a gap between.
+
+The target is set by a two-thirds-stake validator vote,
+`set_target_block_interval_ms`, bounded to `[50, 2000]` ms. Both ends are hard: a
+floor under the real round time only parks proposals, and the same ticker drives
+the timeout pacemaker, so the ceiling bounds how fast the network recovers from a
+silent proposer.
+
+**This vote needs no activation height.** The period paces one node's own
+proposals and never changes what a committed block does, so each node adopts the
+new value when it commits the enacting block. The enactment appears on
+[`validator_votes`](../api/rest/info/governance.md#validator_votes) as
+`changes[*].field: "bole_pool.target_block_interval_ms"`.
+
+Contract execution keeps its own, slower cadence — see the
+[EVM execution model](../evm/execution-model.md).
+
 ## Accountability {#accountability}
 
 Validators are economically accountable for how they participate. A validator

@@ -174,12 +174,37 @@ short 0.5 BTC:
 |-----------|---------|-------------------|
 | funding cap (per period) | `0.02` (`±2%`) | `dynamic_risk_overrides[asset].funding_rate_cap` (governance vote) |
 | funding period | `1 h` per asset | `set_funding_config` (governance vote) — see below |
-| EMA `decay` | `0.5` | Proposed; calibration may retune to 0.3/0.7 |
+| EMA `decay` | `0.5` | `set_funding_ema_decay` (governance vote) — see below |
 | rate-update cadence | begin-block | protocol-fixed |
 | base interest | `0.0000125/h` (`0.01 %/8h`) | protocol-fixed |
 | `funding_rate_multiplier` | `1.0` | per-asset, auto-driven by dynamic risk |
 
 The per-asset `funding_rate_multiplier` is auto-driven from 30-day realized volatility by the dynamic-risk engine, scaling the premium sample before it enters the EMA.
+
+### The EMA decay is votable {#set-funding-ema-decay}
+
+:::caution
+**Not live yet.** `set_funding_ema_decay` lands with the next release, and its read
+side then waits for an activation height that is not yet chosen. A node today does
+not know the vote. The fold keeps reading `0.5` until BOTH boundaries are crossed,
+so a vote that enacts early changes nothing you can measure.
+:::
+
+The EMA `decay` is one number for the whole chain, moved by a two-thirds-stake
+validator vote, `set_funding_ema_decay`. Bounds are `[0.01, 0.99]`, and **both ends
+are hard**:
+
+- `0` is the unset value, and it would also stop the fold from reading any history.
+- A decay near `1` freezes the rate for hours.
+
+The fold runs every 8 seconds, so the half-life is `ln(0.5) / ln(decay)` folds —
+`0.5` is one fold (8 s) and `0.99` is about 9.2 minutes. Raise the decay to make
+funding steadier and slower to react; lower it to make funding track the premium
+more closely.
+
+The enactment appears on
+[`validator_votes`](../api/rest/info/governance.md#validator_votes) as
+`changes[*].field: "bole_pool.funding_ema_decay"`.
 
 ### Per-asset funding config (governance) {#per-asset-funding-config-governance}
 

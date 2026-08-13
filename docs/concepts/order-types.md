@@ -169,7 +169,8 @@ vote first.
 :::
 
 A **scale ladder** is `n` resting limit rungs spread evenly across `[px_low,
-px_high]` on one perpetual market, placed from **one signature**. You sign a
+px_high]` on one perpetual market, placed from **one signature**. A spot pair is
+refused today — see [The three on a spot pair](#synth-on-spot). You sign a
 compact request — the range, the rung count, the total size, and a distribution —
 and the node expands it into the rungs. Every rung shares the one `cloid` you
 supply, which is the ladder handle.
@@ -230,7 +231,8 @@ re-prices to stay one tick inside the top of the book. You sign one compact requ
 — the market, side, size, a reprice cadence, a time-to-live, and a reprice budget —
 and the node keeps the leg pegged to the best price with **no client round-trip**.
 Because the leg is post-only and always rests strictly inside the spread, a chase
-never takes liquidity and never pays a taker fee.
+never takes liquidity and never pays a taker fee. A spot pair is refused today —
+see [The three on a spot pair](#synth-on-spot).
 
 ```json
 {
@@ -277,25 +279,29 @@ field table and admission rules.
 ## TWAP {#twap}
 
 :::danger
-**A hedge-mode account cannot use TWAP.** A `twap_order` from a hedge account is
-admitted to the mempool and then rejected at commit. The reason is the wire: the
-parent carries no `position_side`, so its child slices carry none, and a hedge
-account must name the leg on every order. **The rejection is reported on no
-channel** — the HTTP reply already said `accepted: true`. Read `position_mode`
-from [`account_state`](../api/rest/info.md#account_state) before you submit. See
+**A hedge account MUST send `position_side`; a one-way account MUST NOT.** Get it
+wrong and the parent is admitted to the mempool and then rejected at commit. **The
+rejection is reported on no channel** — the HTTP reply already said
+`accepted: true`. Read `position_mode` from
+[`account_state`](../api/rest/info.md#account_state) before you submit. See
 [`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed).
+
+A hedge account's child slices inherit the leg the parent names. A one-way account
+has one net leg, so naming it is refused.
 :::
 
 A **TWAP** splits one parent order into `slice_count` equal child slices, fired
 `delay_ms` apart. Each slice is an IOC that crosses the book for its share of the
 size. The node fires them; there is nothing for the client to do after the
-parent is accepted.
+parent is accepted. A spot pair is refused today — see
+[The three on a spot pair](#synth-on-spot).
 
-[`twap_order`](../api/rest/exchange.md#twap_order) carries exactly six fields:
-`market`, `side`, `total_size`, `slice_count`, `delay_ms`, `reduce_only`.
+[`twap_order`](../api/rest/exchange.md#twap_order) carries six required fields —
+`market`, `side`, `total_size`, `slice_count`, `delay_ms`, `reduce_only` — plus
+two optional ones, `position_side` and `randomize`.
 
-**You choose the schedule, not a duration.** There is no `duration` field, no
-randomization, and no USD-denominated size. Divide the window yourself:
+**You choose the schedule, not a duration.** There is no `duration` field and no
+USD-denominated size. Divide the window yourself:
 
 ```
 window       = 1 hour
@@ -315,12 +321,117 @@ Two rules change what you get back:
   a governed number of live parents at once (default `100`). Both reject at
   commit.
 
-The slice sizes are equal and the timing is fixed — a TWAP on MetaFlux is
-therefore predictable to an observer watching the tape.
+By default the slice sizes are equal and the timing is fixed, so the schedule is
+**predictable to an observer watching the tape**. Send `randomize: true` to draw
+each slice size and each inter-slice delay from a digest over committed inputs
+instead. The draw is deterministic — every validator draws the same numbers — and
+the sizes still sum to `total_size`. **`randomize: true` selects its own signing
+string**, so sign the payload you send.
 
 Slice fills ride the dedicated [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) WS channel; parent lifecycle transitions (activated / finished / terminated) ride [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history), which is where the `twapId` first appears.
 
 TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange.md#twap_cancel); already-filled slices stay filled, future slices stop.
+
+## The three on a spot pair {#synth-on-spot}
+
+:::caution
+**Not live yet, and no activation height is chosen.** Today `twap_order`,
+`scale_order` and `chase_order` accept a PERP market only. Sending a spot pair id
+in `market` is refused at commit, on no channel:
+
+| Action | What you get today |
+|---|---|
+| `twap_order` | `no perp market for asset` |
+| `chase_order` | `chase market has no tick/lot grid` |
+| `scale_order` | Every rung is refused. Nothing rests, and the ladder reports a per-rung error |
+
+Build against the rules below, but keep slicing spot orders yourself with
+ordinary [`spot_order`](../api/rest/exchange.md#spot_order) legs until this notice
+is gone.
+:::
+
+At and above the activation height, `market` on all three accepts a **spot pair
+id** and the order runs on the spot book. Perp behaviour is unchanged at every
+height.
+
+**Every leg runs the ordinary spot order path.** The spot kill switch, the pair's
+price and size grid, the resting-order cap, the affordability clamp and the escrow
+reserve all apply exactly as they do to a `spot_order` you send yourself.
+
+### What spot drops {#synth-on-spot-drops}
+
+Spot has no position, no margin and no leverage. It moves balances you already
+custody, so the concepts a perp leg carries do not cross:
+
+| Perp concept | On a spot pair |
+|---|---|
+| `position_side` | **Refused on all three** — `spot has no position side`. There is no position to name |
+| `reduce_only` | **Refused on `twap_order` and `scale_order`** when `true` — `spot has no position to reduce: reduce_only is not supported`. `chase_order` has no such field |
+| `randomize` | **Refused on `twap_order`** when `true` — `spot twap does not support randomize`. A drawn size cannot be re-quoted against the escrow reserve. `scale_order` and `chase_order` have no such field |
+| Margin, leverage, open-interest caps | Do not apply. Your free balance and the escrow reserve are what bound the order |
+| The hedge-account leg rule | Does not apply. It governs perp legs, which carry a leg name; a spot leg carries none |
+
+**Each of the three is a REFUSAL, not a silent drop.** The whole action is
+rejected and nothing is placed. Dropping a field you signed would execute an order
+you did not sign, so the chain refuses instead. Clear the field, then re-sign.
+
+**One live-parent budget covers both homes.** The governed cap on live TWAP
+parents (default `100`) counts your perp parents and your spot parents **together**
+— it is one allowance per account, not one per market class. Nothing changes below
+the activation height, where an account can hold no spot parents at all.
+
+[`twap_cancel`](../api/rest/exchange.md#twap_cancel) takes a spot parent's id with
+no change to the wire: the id is looked up in both homes. So one cancel path
+covers both.
+
+### Per type {#synth-on-spot-per-type}
+
+**A spot TWAP** fires each slice as an IOC on the spot book, under your own
+account. The slice price is **not** taken from the book's touch. It is built from
+a reference mark: the base token's committed oracle index, or — for a pair with no
+fresh index — the book's last trade price. The mark is widened by the governed
+slippage allowance (a buy up, a sell down) and then snapped back onto the pair's
+tick grid **toward the mark**, so the snap can only make the order less aggressive,
+never more. Slice fills carry the parent's `twapId` on
+[`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills).
+
+Three outcomes are worth building for, and they are not the same thing:
+
+- **No reference mark at all** — no oracle index and no trade ever printed on the
+  pair. The slice **PARKS**: it does not fire, and it does not count. The schedule
+  waits for a price rather than burning a slice against one that does not exist.
+- **A mark exists, but nothing rests inside the band.** The slice DOES fire, fills
+  nothing, and the schedule **ADVANCES** — that slice is spent. A spot TWAP
+  under-fills rather than stalls, so read the fills, never the parent status.
+- **The remainder is smaller than one lot.** The parent ENDS there. A remainder the
+  grid cannot express is not carried forever.
+
+A parent that ends having filled nothing at all reports `terminated` on
+[`user_twap_history`](../api/ws/subscriptions.md#user_twap_history); any fill at
+all reports `finished`.
+
+**A slice is a self-trade risk on your own pair.** Each slice runs with
+self-trade prevention set to cancel-oldest, so if it would cross your own resting
+order on that pair, your older order is cancelled. Keep a maker book and a TWAP on
+the same pair apart.
+
+**A spot chase** pegs one post-only leg one tick inside the touch and re-prices it
+on the same cadence a perp chase uses. Two spot-only outcomes:
+
+- A reprice that would need **more quote balance than you have free** is skipped,
+  and the leg is **not** cancelled. It stays at its current price and the chase
+  tries again next interval. Only a buy chase can hit this — a sell chase reserves
+  base, and its reserve does not grow when the price moves.
+- If the re-place fails, the chase **retires**. The escrow is already refunded, so
+  nothing is stranded, but the leg is gone and is not restored.
+
+**A spot scale** floors every rung price onto the pair's tick grid and every rung
+size onto its lot grid. Each rung runs the spot admission on its own, so **a
+rejected rung does not abort the ladder** — the rest still rest.
+[`cancel_scale`](../api/rest/exchange.md#cancel_scale) then sweeps every resting
+spot order on that pair that carries the shared `cloid`. That includes an ordinary
+`spot_order` you happened to send under the same handle, so **use a fresh handle
+per ladder**.
 
 ## Market orders {#market-orders}
 

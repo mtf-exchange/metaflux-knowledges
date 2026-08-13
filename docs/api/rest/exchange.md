@@ -212,7 +212,7 @@ complete.
 
 | Group | Actions |
 |-------|---------|
-| Perp orders | [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order), [`twap_order`](#twap_order) |
+| Perp orders | [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order), [`twap_order`](#twap_order) — the last three take a spot pair too, once the [spot lane](../../concepts/order-types.md#synth-on-spot) activates |
 | Cancels | [`cancel_order`](#cancel_order), [`batch_cancel`](#batch_cancel), [`cancel_by_cloid`](#cancel_by_cloid), [`cancel_all_orders`](#cancel_all_orders), [`cancel_scale`](#cancel_scale), [`cancel_chase`](#cancel_chase), [`twap_cancel`](#twap_cancel), [`schedule_cancel`](#schedule_cancel) |
 | Amends | [`modify`](#modify), [`batch_modify`](#batch_modify) |
 | Spot | [`spot_order`](#spot_order), [`spot_cancel`](#spot_cancel) |
@@ -882,18 +882,25 @@ approved agent may arm it **as** an `owner` it acts for.
 ### Schedule a sliced TWAP order {#twap_order}
 
 :::danger
-**A hedge-mode account cannot use `twap_order`.** The action is admitted to the
-mempool and then **rejected at commit** with `hedge account cannot use twapOrder:
-a slice carries no position_side`. The reason is the wire: a TWAP parent carries
-no `position_side`, so its child slices carry none either, and a hedge account
-must name the leg on every order. Sending the children with no leg would apply
-them to the wrong side of the book, so the parent is refused instead.
+**`position_side` is REQUIRED on a hedge account and REFUSED on a one-way one.**
+Get it wrong and the action is admitted to the mempool and then **rejected at
+commit**:
+
+| Account `position_mode` | `position_side` | Outcome |
+|---|---|---|
+| `"one_way"` | omitted | Accepted |
+| `"one_way"` | sent | `one-way account cannot specify a position_side` |
+| `"hedge"` | sent | Accepted. Every child slice inherits the leg |
+| `"hedge"` | omitted | `hedge account requires an explicit position_side` |
 
 **The rejection reaches you through no channel** — see
 [`accepted` is not `committed`](#accepted-is-not-committed). The `202` body still
 says `accepted: true`. Read `position_mode` from
-[`account_state`](./info.md#account_state) BEFORE you submit, and slice the order
-yourself with ordinary [`submit_order`](#submit_order) legs if it is `"hedge"`.
+[`account_state`](./info.md#account_state) BEFORE you submit.
+
+**The field's PRESENCE also selects the signing string**, so it is not only an
+admission rule — sign the payload you send. See
+[typed-data signing](../../integration/typed-data-signing.md).
 :::
 
 Schedule a sliced (time-weighted) order. The parent is sliced into `slice_count`
@@ -917,18 +924,54 @@ approved agent may schedule it **as** an `owner` it acts for.
 | Field | Type | Description |
 |-------|------|-------------|
 | `owner` | hex address \| omitted | Optional: schedule **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
-| `market` | uint32 | Asset/market id |
+| `market` | uint32 | Perp market id. A spot pair id is **refused today** — see [the spot lane](#twap_order-spot) |
 | `side` | enum | `"bid"` / `"ask"` |
 | `total_size` | uint64 | Total size in fixed-point tick units (widened to `u128`) |
 | `slice_count` | uint32 | Number of child slices (`> 0`, and at most the governed slice ceiling — default `10000`) |
 | `delay_ms` | uint64 | Inter-slice delay in ms. **Clamped UP** to the governed minimum, not rejected — see below |
 | `reduce_only` | bool | — |
+| `position_side` | enum \| omitted | `"long"` / `"short"`. **[Hedge mode](../../concepts/hedge-mode.md) only** — required there, refused on a one-way account. Every child slice inherits it |
+| `randomize` | bool \| omitted | Randomize the slice schedule. Omit or `false` keeps the fixed schedule, byte for byte — see below |
 
-**There is no `duration`, no `randomize`, and no USD-denominated size.** You
-choose `slice_count` and `delay_ms` yourself; the schedule is exactly
-`slice_count` slices spaced `delay_ms` apart, with no jitter. To place a TWAP
-that runs for a wall-clock window, divide the window yourself — for a one-hour
-TWAP in 60-second slices, send `slice_count: 60`, `delay_ms: 60000`.
+#### A spot pair, once the lane activates {#twap_order-spot}
+
+Today `market` must be a perp market. A spot pair id is refused at commit with
+`no perp market for asset`, on no channel. At and above an activation height that
+is **not yet chosen**, a spot pair id runs the TWAP on the spot book: each slice is
+an IOC through the ordinary spot order path, priced off the base token's oracle
+mark rather than off the touch.
+
+**Three fields are REFUSED on a spot pair, not ignored:**
+
+| Field | Refusal |
+|---|---|
+| `reduce_only: true` | `spot has no position to reduce: reduce_only is not supported` |
+| `position_side` (any value) | `spot has no position side` |
+| `randomize: true` | `spot twap does not support randomize` |
+
+The whole action is rejected and no parent is created. The chain refuses rather
+than dropping a field, because a dropped field still carries your signature — you
+would be executing something you did not sign. Clear the field and re-sign.
+
+Two further rules: the concurrent-parent limit below counts your perp and spot
+parents **together**, and [`twap_cancel`](#twap_cancel) takes a spot parent's
+`twap_id` with no wire change. Read
+[The three on a spot pair](../../concepts/order-types.md#synth-on-spot) before you
+build for it.
+
+**There is no `duration` and no USD-denominated size.** You choose `slice_count`
+and `delay_ms` yourself. To place a TWAP that runs for a wall-clock window, divide
+the window yourself — for a one-hour TWAP in 60-second slices, send
+`slice_count: 60`, `delay_ms: 60000`.
+
+**`randomize` trades predictability for jitter.** Omit it and the schedule is
+exactly `slice_count` slices spaced `delay_ms` apart, with equal sizes — which is
+predictable to anyone watching the tape. Send `randomize: true` and the chain
+draws each slice size and each inter-slice delay from a digest over committed
+inputs, so the schedule is harder to front-run. It stays deterministic: every
+validator draws the same numbers, and the sizes still sum to `total_size`.
+**`randomize: true` also selects its own signing string, whatever the leg** — so a
+one-way randomized parent signs an empty `position_side`.
 
 **The three governed limits.** All three are governance parameters, so read them
 as defaults, not constants:
@@ -937,7 +980,7 @@ as defaults, not constants:
 |-------|---------|-----------|
 | Minimum `delay_ms` | `10000` (hard floor `1000`) | **Clamped up** at registration. A smaller `delay_ms` is accepted and the parent runs at the floor, so the TWAP takes longer than you asked |
 | Maximum `slice_count` | `10000` | Rejected at commit |
-| Concurrent parents per account | `100` | Rejected at commit (throttled) |
+| Concurrent parents per account | `100` | Rejected at commit (throttled). ONE allowance: once the [spot lane](#twap_order-spot) is live, perp and spot parents count against the same number |
 
 The clamp is a **snapshot**: the parent keeps the delay it was clamped to, so a
 later governance retune never rewrites a TWAP already in flight.
@@ -983,6 +1026,11 @@ it acts for.
 | `owner` | hex address \| omitted | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 | `twap_id` | uint64 | The TWAP parent id returned by `twap_order` |
 
+**One cancel covers both order homes.** The id is enough: once the
+[spot lane](#twap_order-spot) is live, a spot parent cancels through this same
+action with the same fields. There is no separate spot cancel and no market field
+to get wrong.
+
 ---
 
 ### Place a scale ladder {#scale_order}
@@ -1024,7 +1072,7 @@ Every rung shares the one `cloid` you supply, which is the ladder handle for
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`) |
+| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`). A spot pair id is **refused today** — see [the spot lane](#scale_order-spot) |
 | `side` | enum | `"bid"` / `"ask"` | Ladder side. Rung `0` sits at `px_low` for **both** sides |
 | `n` | uint32 | `2 … 100` | Rung count |
 | `px_low` | uint64 | `> 0`, on-tick, `< px_high` | Low end of the ladder, in the `1e8` price plane |
@@ -1082,6 +1130,18 @@ from [`open_orders`](./info.md#open_orders) filtered by the shared `cloid`.
   net position over-rests: once the position closes, the extra rungs can open the
   opposite side. Size the ladder to your position.
 
+#### A spot pair, once the lane activates {#scale_order-spot}
+
+Today `market` must be a perp market. A spot pair id is refused at commit: every
+rung is refused in its own slot and nothing rests. At and above an activation
+height that is **not yet chosen**, a spot pair id builds the ladder on the spot
+book. Rung prices floor onto the pair's tick grid and rung sizes onto its lot
+grid, each rung runs the ordinary spot admission on its own, and `reduce_only:
+true` and `position_side` are both refused. The shared-`cloid` seam above applies
+on the spot book too, and [`cancel_scale`](#cancel_scale) then sweeps a spot pair.
+Read [The three on a spot pair](../../concepts/order-types.md#synth-on-spot)
+before you build for it.
+
 ---
 
 ### Cancel a scale ladder {#cancel_scale}
@@ -1108,7 +1168,7 @@ Cancel a **whole ladder** in one action — every one of your resting orders on
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | Perpetual market id the ladder rests on |
+| `market` | uint32 | `[0, market_count)` | Perpetual market id the ladder rests on. A spot pair id sweeps a spot ladder only once the [spot lane](#scale_order-spot) activates; below that height a spot pair sweeps nothing |
 | `cloid` | hex string | `0x` + 32 hex chars (16 bytes), **required** | The ladder handle to sweep |
 | `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
@@ -1159,7 +1219,7 @@ approved agent / operator routes for the named account).
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`). Perp markets only in v1 |
+| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`). A spot pair id is **refused today** — see [the spot lane](#chase_order-spot) |
 | `side` | enum | `"bid"` / `"ask"` | `bid` = buy chase, `ask` = sell chase |
 | `size` | uint64 | `> 0`, on-lot | Leg size in raw lots (`10^sz_decimals` per whole unit). A partial fill shrinks the leg; the next reprice re-places the remainder |
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client handle. It is **re-stamped on every reprice** — correlate the leg across reprices by `cloid` |
@@ -1216,6 +1276,18 @@ running on the remaining size.
 
 A rejected chase returns `{ "accepted": false, "error": "<reason>", "mempool_depth": N }`.
 
+#### A spot pair, once the lane activates {#chase_order-spot}
+
+Today `market` must be a perp market. A spot pair id is refused at commit with
+`chase market has no tick/lot grid`. At and above an activation height that is
+**not yet chosen**, a spot pair id runs the chase on the spot book, pegged one tick
+inside the touch the same way, with `position_side` refused. Two outcomes are
+spot-only: a reprice that would need more quote balance than you have free is
+**skipped without cancelling** the current leg, and a failed re-place **retires**
+the chase instead of restoring the old leg. Read
+[The three on a spot pair](../../concepts/order-types.md#synth-on-spot) before you
+build for it.
+
 **Watching the chase.** There is **no chase-specific WS channel**. The initial
 placement and every reprice surface on the existing per-account
 [`order_updates`](../ws/subscriptions.md#order_updates) stream and
@@ -1252,7 +1324,7 @@ optional (agent / operator routing).
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | The perpetual market the chase runs on. Must match the chase's market |
+| `market` | uint32 | `[0, market_count)` | The market the chase runs on — a perp market, or a spot pair once the [spot lane](#chase_order-spot) activates. Must match the chase's market |
 | `chase_oid` | uint64 | a live chase handle | The **handle** from the `chase_order` response (the cancel key) — **not** the leg's `oid` |
 | `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 

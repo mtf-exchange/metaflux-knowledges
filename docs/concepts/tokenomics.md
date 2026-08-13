@@ -343,6 +343,13 @@ The value-accrual path is a clean four-step pipeline:
    recurring buy pressure proportional to exchange volume, and every token it
    acquires leaves the circulating float for good.
 
+Two operating rules sit under step 4, and both are visible on
+[`protocol_metrics.buyback_status`](../api/rest/info.md#buyback-blocking-guard):
+the executor must be told **which** asset id is MTF before it can buy at all, and
+it spends its balance in slices rather than in one order. See
+[Fees](./fees.md#buyback-asset-binding) for both, including the vote that binds the
+asset id and the vote that sizes the slice.
+
 So **~70% of net fee revenue buys MTF that is locked out of circulation forever**,
 ~20% becomes the validator-delivered staker revenue-share, and ~10% funds the
 treasury. Because the ~70% leg is bought MTF, it **creates buy pressure first**,

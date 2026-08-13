@@ -397,14 +397,14 @@ protection until this notice is gone.
 :::
 
 :::danger
-**A hedge-mode account cannot use `twap_order`.** The parent carries no
-`position_side`, so its slices carry none, and a hedge account must name the leg
-on every order — so the node refuses the parent. The refusal happens **at
-commit**, and a commit-time refusal of a non-order action is reported on no
-channel: the HTTP reply already said `accepted: true`, and the TWAP simply never
-starts. Read `position_mode` from
-[`account_state`](../api/rest/info.md#account_state) once at session start. If it
-is `"hedge"`, slice the order yourself with ordinary `submit_order` legs.
+**A hedge-mode account must send `position_side` on `twap_order`; a one-way
+account must omit it.** The slices inherit the leg the parent names, so a hedge
+parent that names none is refused, and a one-way parent that names one is refused
+too. The refusal happens **at commit**, and a commit-time refusal of a non-order
+action is reported on no channel: the HTTP reply already said `accepted: true`,
+and the TWAP simply never starts. Read `position_mode` from
+[`account_state`](../api/rest/info.md#account_state) once at session start and
+set the field from it.
 
 The same commit-time silence applies to every non-order action. See
 [`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed)
