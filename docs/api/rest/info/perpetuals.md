@@ -576,15 +576,18 @@ count, while a trade bar carries real volume and a real trade count.
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol, e.g. `"BTC"` |
 | `interval` | string | yes | Bucket token — one of `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
-| `candle_type` | string | no | Price series — `mark` (default) or `oracle`. Lower-case, exact match |
+| `candle_type` | string | no | Series — `mark` (default), `oracle` or `trade`. Lower-case, exact match |
 | `start_time` | uint64 | no | Window start (ms); filters on bar open. Default `0` |
 | `end_time` | uint64 | no | Window end (ms); filters on bar open. Default unbounded |
 
 Missing `coin` → `400 {"error":"missing field coin"}`; missing `interval` →
-`400 {"error":"missing field interval"}`. An unknown `candle_type` (including the
-retired `trade`) →
-``400 {"error":"invalid candle_type: trade (expected `mark` or `oracle`)"}``. A
-rejected value is never served as the other series.
+`400 {"error":"missing field interval"}`. An unknown `candle_type` →
+``400 {"error":"invalid candle_type: <token> (expected `mark`, `oracle` or `trade`)"}``.
+A rejected value is never served as another series.
+
+**`trade` is accepted.** All three tokens in the table above are live. An earlier
+version of this page said `trade` was retired and quoted a two-value rejection
+message. That was wrong on both counts.
 
 Response:
 
@@ -620,6 +623,28 @@ bars. A window with no sample carries the previous close forward as a flat bar
 An empty `candles` array is the honest-empty answer for a market with no history
 in that series. A spot pair asked for `oracle` always answers empty — a spot pair
 has no oracle price.
+
+#### The bar cap, and how to page past it {#candle_snapshot-max-bars}
+
+> ⬆️ **Upgrade notice — not live yet.** The bar cap below is written and under
+> test. It is **not on the live chain**, where a wide window is still answered in
+> full. Page your queries now so the cap changes nothing for you when it lands.
+
+A response carries at most **5000 bars**. Over that, the answer keeps the **5000
+most recent** and drops the older ones. The cap exists because the window is
+caller-chosen and otherwise unbounded: one request for years of `1m` bars would
+fold and serialize an arbitrarily large series, and a few of those in parallel
+are enough to hurt every other caller on the node.
+
+**The cap trims the OLD end, not the new one.** A default chart load asks for the
+recent window and is unaffected. You only meet the cap when you ask for more
+history than 5000 bars of your chosen `interval` — about 3.5 days at `1m`, or
+about 13 years at `1d`.
+
+**No history is unreachable.** Walk backwards with `start_time` and `end_time`:
+take the oldest `t` you received, ask again with `end_time` set to it, and repeat.
+Each page returns its own 5000 most recent bars within the window you named. A
+wider `interval` reaches further per request.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -752,14 +777,14 @@ Response:
     "auction_round":   2,
     "current_bid":     "12345",
     "current_winner":  "0x<bidder>",
-    "auction_end_ms":  1700086400000,
-    "started_at_ms":   1700000000000,
+    "auction_end":  1700086400000,
+    "started_at":   1700000000000,
     "bids": [
       {
-        "bidder":          "0x<bidder>",
-        "amount":          "12345",
-        "submitted_at_ms": 1700000000500,
-        "tag":             "ETH-PERP"
+        "bidder":       "0x<bidder>",
+        "amount":       "12345",
+        "submitted_at": 1700000000500,
+        "tag":          "ETH-PERP"
       }
     ]
   }
@@ -771,11 +796,11 @@ Response:
 | `auction_round` | uint64 | Current auction round |
 | `current_bid` | decimal string | Leading bid amount |
 | `current_winner` | hex address \| null | Current winning bidder, `null` if none |
-| `auction_end_ms` | uint64 | Auction close timestamp (consensus ms) |
-| `started_at_ms` | uint64 | Auction start timestamp (consensus ms) |
+| `auction_end` | uint64 | Auction close timestamp (consensus ms) |
+| `started_at` | uint64 | Auction start timestamp (consensus ms) |
 | `bids[*].bidder` | hex address | Bidder address |
 | `bids[*].amount` | decimal string | Bid amount |
-| `bids[*].submitted_at_ms` | uint64 | Bid submission timestamp (consensus ms) |
+| `bids[*].submitted_at` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
 
 ### Get perp-deploy and per-market limits {#perp_dex_limits}

@@ -191,24 +191,26 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 {
   "type": "fba_batch_state",
   "data": {
-    "coin":           "BTC",
-    "enabled":        true,
-    "period_ms":      1000,
-    "min_lot":        "1",
-    "last_settle_ms": 1735689600000,
-    "next_settle_ms": 1735689601000,
-    "order_count":    11,
-    "bid_count":      5,
-    "ask_count":      6,
-    "bid_size":       "1000000000",
-    "ask_size":       "900000000",
-    "orders":         [ /* {oid, owner, side, price, size, stp_group, submitted_at_ms} */ ],
-    "indicative":     { "clearing_px": "10050000000", "matched_size": "800000000" }
+    "coin":        "BTC",
+    "enabled":     true,
+    "period_ms":   1000,
+    "min_lot":     "1",
+    "last_settle": 1735689600000,
+    "next_settle": 1735689601000,
+    "order_count": 11,
+    "bid_count":   5,
+    "ask_count":   6,
+    "bid_size":    "10",
+    "ask_size":    "9",
+    "orders":      [ /* {oid, owner, side, price, sz, stp_group, submitted_at} */ ],
+    "indicative":  { "clearing_px": "100.5", "matched_size": "8" }
   }
 }
 ```
 
-Prices / sizes are raw **1e8 fixed-point** integer strings (the book / order plane). `next_settle_ms` is **derived** as `last_settle_ms + period_ms`. The `indicative` block is the volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, not yet settled — and is `null` when there is no cross (one-sided or empty window). This is what p\* would be if the batch closed now, useful for traders deciding whether to add to the batch.
+Prices and sizes are **human decimal strings**, tick- and lot-normalized — this is a read, not the raw order-submission plane. `next_settle` is **derived** as `last_settle + period_ms`. The `indicative` block is the volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, not yet settled — and is `null` when there is no cross (one-sided or empty window). This is what p\* would be if the batch closed now, useful for traders deciding whether to add to the batch.
+
+Timestamp keys carry no `_ms` suffix; only a key naming a DURATION keeps it, which is why `period_ms` does and `last_settle` does not. Full rows on the [`fba_batch_state` read](../api/rest/info.md#fba_batch_state).
 
 ## See also {#see-also}
 

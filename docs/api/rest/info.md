@@ -323,8 +323,9 @@ Response:
 {
   "type": "staking_state",
   "data": {
-    "address":         "0x<addr>",
-    "total_staked": "1000000000",
+    "address":                  "0x<addr>",
+    "total_staked":             "1000000000",
+    "undelegated_pool_balance": "250000000",
     "delegations": [
       {
         "validator":         "0x<val_addr>",
@@ -339,6 +340,32 @@ Response:
   }
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | hex address | Resolved account address |
+| `total_staked` | Decimal string | **Delegated** stake only (whole-MTF) — the sum of `delegations[*].amount` |
+| `undelegated_pool_balance` | Decimal string | Stake deposited but **not delegated** (whole-MTF, the same plane as `total_staked`). See the upgrade notice below |
+| `delegations[*].validator` | hex address | Validator the stake is delegated to |
+| `delegations[*].amount` | Decimal string | Stake delegated to this validator (whole-MTF) |
+| `delegations[*].since_ts` | uint64 | When the delegation began (consensus ms) |
+| `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards (whole-MTF) |
+| `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window (whole-MTF) |
+| `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable (consensus ms) |
+
+> ⬆️ **Upgrade notice — not live yet.** `undelegated_pool_balance` is written and
+> under test. The live node does **not** answer it. Treat a missing key as "this
+> node predates the field", not as a zero balance.
+
+**`total_staked` alone under-reports what an account holds.** It counts
+**delegated** stake. `stakingDeposit` credits a free pool and `stakingWithdraw`
+debits it, and stake can sit in that pool undelegated for as long as the holder
+likes. A front end that shows only `total_staked` shows a user less than they
+have. Add `undelegated_pool_balance` to get the account's full staked balance.
+
+The free pool is also **not** the same thing as `pending_unstakes`. Undelegated
+stake is already free. `pending_unstakes` is stake still inside its unbonding
+window, which is not withdrawable until `matures_at_ts`.
 
 ### Volume-tiered maker and taker fees {#fee_schedule}
 
@@ -611,7 +638,7 @@ The `data.status` discriminates the branch:
       "is_market":        false,
       "limit_px":         "65000",
       "size":             "700",
-      "registered_at_ms": 1700000000000,
+      "registered_at": 1700000000000,
       "fired":            false
     }
   }
@@ -643,7 +670,7 @@ registry and fill ring are keyed by `oid`):
 |-------|------|-------------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | Resolved lifecycle state |
 | `order` | object | Present on `"resting"` — `oid`, `market_id`, `side` (`"bid"`/`"ask"`), `px` / `size` (fixed-point decimal strings), `inserted_at_ms`, `cloid` (hex \| null) |
-| `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (fixed-point decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at_ms`, `fired` (bool) |
+| `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (fixed-point decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool) |
 | `fill` | object | Present on `"filled"` — the matching fill record (see [`user_fills`](#user_fills)) |
 
 ### Latest committed block metadata {#block_info}
@@ -675,7 +702,7 @@ Response:
     "height":       562,
     "round":        562,
     "epoch":        0,
-    "timestamp_ms": 1780475491562,
+    "timestamp": 1780475491562,
     "block_hash":   "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c"
   }
 }
@@ -686,7 +713,7 @@ Response:
 | `height` | uint64 | Latest committed block height |
 | `round` | uint64 | Consensus round of that block |
 | `epoch` | uint64 | Current epoch |
-| `timestamp_ms` | uint64 | Block timestamp (consensus ms) |
+| `timestamp` | uint64 | Block timestamp (consensus ms) |
 | `block_hash` | hex string (32 bytes) | Real committed block hash (now plumbed into the read state — no longer the all-zero placeholder) |
 
 ### Approved agent wallets for an account {#agents}
@@ -790,8 +817,7 @@ Response:
       "total_sub_account_transfers":0
     },
     "fee_pools": {
-      "burned":         "8000",
-      "mflux_vault":    "0",
+      "buyback_pool":   "8000",
       "validator_pool": "1000",
       "treasury":       "1000",
       "burned_mtf":     "55"
@@ -809,10 +835,19 @@ Response:
     "insurance_fund_total":    "750",
     "treasury_backstop_total": "9000",
     "bole_pool": {
-      "total_deposits":  "20000",
-      "shortfall_total": "7"
+      "total_deposits":     "20000",
+      "shortfall_total":    "7",
+      "insurance_fund":     [ { "asset": 0, "amount": "750" } ],
+      "treasury_backstop":  [ { "asset": 0, "amount": "9000" } ],
+      "asset_to_shortfall": [ { "asset": 0, "amount": "7" } ]
     },
-    "open_interest_total_1e8": "1500000",
+    "evm": {
+      "native_balance_wei": "12000000000000000000",
+      "n_nonzero_holders":  3,
+      "n_accounts":         11
+    },
+    "position_size_signed_sum_by_asset": [ { "asset": 0, "sum_signed": "0" } ],
+    "open_interest_by_asset":            [ { "asset": 0, "amount": "0.015" } ],
     "staking": {
       "total_stake":   "100",
       "n_validators":  1,
@@ -838,10 +873,9 @@ Response:
 | `counters.total_deposits` / `total_withdrawals` | uint64 | Lifetime deposit / withdrawal counts |
 | `counters.total_vault_transfers` | uint64 | Lifetime vault deposit/withdraw transfers |
 | `counters.total_sub_account_transfers` | uint64 | Lifetime sub-account transfers |
-| `fee_pools.burned` | Decimal string | Cumulative USDC routed to buyback-and-burn (whole-USDC) |
-| `fee_pools.mflux_vault` | Decimal string | Cumulative MFlux-vault fee accrual (`"0"` — vault share zeroed) |
-| `fee_pools.validator_pool` | Decimal string | Cumulative validator-pool fee accrual (whole-USDC) |
-| `fee_pools.treasury` | Decimal string | Cumulative treasury fee accrual (whole-USDC) |
+| `fee_pools.buyback_pool` | Decimal string | USDC accrued to the buyback and not yet spent (whole-USDC). **Not cumulative** — a fire resets it to `0`. It is the same committed field `buyback_status.pool` serves |
+| `fee_pools.validator_pool` | Decimal string | USDC accrued for validators and not yet paid out (whole-USDC). **Not cumulative** — a payout resets it to the unspent remainder |
+| `fee_pools.treasury` | Decimal string | Cumulative treasury fee accrual (whole-USDC). This one only ever grows |
 | `fee_pools.burned_mtf` | Decimal string | Cumulative MTF retired by the buyback executor |
 | `buyback_status.mtf_asset_id` | uint32 \| null | The spot asset id the buyback buys. `null` = the executor is UNBOUND and the buyback can never fire — see below |
 | `buyback_status.pool` | Decimal string | USDC accrued to the buyback and not yet realized (whole-USDC) |
@@ -855,7 +889,14 @@ Response:
 | `treasury_backstop_total` | Decimal string | Σ per-asset `bole_pool.treasury_backstop` reserves (whole-USDC) |
 | `bole_pool.total_deposits` | Decimal string | BOLE lending-pool total deposits (whole-USDC) |
 | `bole_pool.shortfall_total` | Decimal string | Σ residual bad debt parked after the ADL → insurance → treasury waterfall |
-| `open_interest_total_1e8` | u128 string | Σ per-market open interest, **1e8 book plane** (labelled `_1e8`, NOT whole-USDC) |
+| `bole_pool.insurance_fund` | array&lt;{asset, amount}&gt; | Per-asset insurance reserve (whole-USDC), ascending `asset`. The total alone cannot say WHICH market holds the reserve |
+| `bole_pool.treasury_backstop` | array&lt;{asset, amount}&gt; | Per-asset treasury backstop (whole-USDC), ascending `asset` |
+| `bole_pool.asset_to_shortfall` | array&lt;{asset, amount}&gt; | Per-asset residual bad debt (whole-USDC), ascending `asset`. This names the market that carries the shortfall; `shortfall_total` only sums it |
+| `evm.native_balance_wei` | u128 string | Σ native MTF held on the EVM side, in **wei**. Core-side mirror only — the authoritative EVM state root is separate |
+| `evm.n_nonzero_holders` | uint64 | EVM accounts with a non-zero native balance |
+| `evm.n_accounts` | uint64 | EVM accounts with any committed state |
+| `position_size_signed_sum_by_asset` | array&lt;{asset, sum_signed}&gt; | Per market, Σ `size_signed` over **every** position row, ascending `asset`. `sum_signed` is a signed decimal string in the market's raw committed lot plane (per-asset `sz_decimals`), **not** 1e8. Every long leg has a short leg, so the honest value is `"0"` on every asset — a non-zero entry marks a committed one-sided write to a position row, which the open-interest figure cannot show. No market ⇒ typed empty `[]` |
+| `open_interest_by_asset` | array&lt;{asset, amount}&gt; | Per-market open interest as a **whole-unit size string** on that market's own size plane, ascending `asset`. There is **no cross-market total** — see below. No market ⇒ typed empty `[]`. See the upgrade notice below |
 | `staking.total_stake` | Decimal string | Total staked MTF (whole-MTF) |
 | `staking.n_validators` | uint64 | Validators in the committed set |
 | `staking.n_active` | uint64 | Validators active this epoch |
@@ -865,6 +906,31 @@ Response:
 | `counts.n_spot_pairs` | uint64 | Registered spot pairs (`mip3_spot_pair_specs`) |
 | `counts.n_user_vaults` | uint64 | Registered user vaults |
 | `counts.n_accounts_with_state` | uint64 | Accounts with committed user-state |
+
+#### Why open interest is now per-asset {#open-interest-by-asset}
+
+> ⬆️ **Upgrade notice — not live yet.** `open_interest_by_asset` replaces
+> `open_interest_total_1e8`. The change is written and under test; it is **not on
+> the live chain**. Until it ships, the live node still answers
+> `open_interest_total_1e8` and does **not** answer `open_interest_by_asset`.
+> Read both keys and prefer the new one when it is present.
+
+`open_interest_total_1e8` was **not a usable number**. It summed each market's
+stored open interest as a raw integer, and each market keeps that figure on its
+**own** size plane (per-asset `sz_decimals`). Adding a market with 3 decimals to
+a market with 8 decimals gives a total that means nothing in either plane, and no
+client can un-mix it. The `_1e8` label made this worse by naming a single plane
+the value never actually rode.
+
+The replacement keeps every market separate and converts each one to a
+**whole-unit size string** on its own plane. There is deliberately **no
+cross-market total**, because no honest one exists. To get a protocol-wide
+figure, convert each market to notional first — a size in one market is not
+comparable to a size in another.
+
+`position_size_signed_sum_by_asset` is a **different** quantity and stays.
+Open interest is the stored per-market scalar; that field re-adds the individual
+position rows, and the two disagreeing is the signal it exists to give.
 
 #### Why the buyback is or is not firing {#buyback-blocking-guard}
 
@@ -1469,11 +1535,23 @@ at all, which is the defect the replacement exists to fix.
 
 These read the live state behind the RFQ, FBA, and portfolio-margin engines — they complement
 the `market_info.fba_enabled` flag / `account_state.abstraction` with the engine
-state itself. Same `{type, data}` envelope and MTF-native conventions. **Price
-plane:** RFQ + FBA prices / sizes are raw **1e8 fixed-point** integer strings
-(the book / order **submission** plane — the same 1e8 plane `/exchange` orders
-are priced in), **not** whole-USDC; portfolio-margin magnitudes are **USD
-cents** integer strings.
+state itself. Same `{type, data}` envelope and MTF-native conventions.
+
+**Price plane: every number in these three reads is HUMAN, not raw.** RFQ and FBA
+prices and sizes are **decimal strings**, tick- and lot-normalized exactly as
+[`market_info`](./info/perpetuals.md#market_info) renders them; portfolio-margin
+magnitudes are **whole-USD decimal strings**. None of them is 1e8 fixed-point,
+and none of them is USD cents.
+
+This is a statement about `rfq_open`, `rfq_user`, `fba_batch_state` and
+`pm_summary` — **not** a rule for every read on the site. A few operator-facing
+reads do answer in a raw plane, and each says so on its own row
+([`protocol_metrics`](#protocol_metrics) is the one to watch). Read the row.
+
+The **write** side is the one that is raw. `/exchange` order and RFQ submission
+fields carry raw integers on the 1e8 price plane and the per-asset lot plane. So
+a price you read here is not a price you can post back without converting. Check
+which side of the wire you are on before you compare two numbers.
 
 ### Open RFQ requests and maker quotes {#rfq_open}
 
@@ -1597,26 +1675,26 @@ Response:
 {
   "type": "fba_batch_state",
   "data": {
-    "coin":           "BTC",
-    "enabled":        true,
-    "period_ms":      200,
-    "min_lot":        "1",
-    "last_settle_ms": 500,
-    "next_settle_ms": 700,
-    "order_count":    2,
-    "bid_count":      1,
-    "ask_count":      1,
-    "bid_size":       "10",
-    "ask_size":       "6",
+    "coin":        "BTC",
+    "enabled":     true,
+    "period_ms":   200,
+    "min_lot":     "1",
+    "last_settle": 500,
+    "next_settle": 700,
+    "order_count": 2,
+    "bid_count":   1,
+    "ask_count":   1,
+    "bid_size":    "10",
+    "ask_size":    "6",
     "orders": [
       {
-        "oid":             1,
-        "owner":           "0x<addr>",
-        "side":            "bid",
-        "price":           "105",
-        "size":            "10",
-        "stp_group":       null,
-        "submitted_at_ms": 1
+        "oid":          1,
+        "owner":        "0x<addr>",
+        "side":         "bid",
+        "price":        "105",
+        "sz":           "10",
+        "stp_group":    null,
+        "submitted_at": 1
       }
     ],
     "indicative": { "clearing_px": "100", "matched_size": "6" }
@@ -1629,22 +1707,28 @@ Response:
 | `coin` | string | Echoed market symbol |
 | `enabled` | bool | Whether FBA is on for this market |
 | `period_ms` | uint32 | Batch period |
-| `min_lot` | u128 string | Minimum lot size, 1e8 fixed-point |
-| `last_settle_ms` | uint64 | Last batch-settle timestamp (consensus ms) |
-| `next_settle_ms` | uint64 | **Derived** `last_settle_ms + period_ms` — the next due boundary the begin-block `is_due` check uses (not stored explicitly); `0` when `period_ms == 0` |
+| `min_lot` | decimal string | Minimum lot size, whole units |
+| `last_settle` | uint64 | Last batch-settle timestamp (consensus ms) |
+| `next_settle` | uint64 | **Derived** `last_settle + period_ms` — the next due boundary the begin-block `is_due` check uses (not stored explicitly); `0` when `period_ms == 0` |
 | `order_count` | uint64 | Orders in the current window |
 | `bid_count` / `ask_count` | uint64 | Per-side order counts in the window |
-| `bid_size` / `ask_size` | u128 string | Per-side summed size, 1e8 fixed-point |
+| `bid_size` / `ask_size` | decimal string | Per-side summed size, whole units |
 | `orders[*].oid` | uint64 | Server order id |
 | `orders[*].owner` | hex address | Order owner |
 | `orders[*].side` | `"bid"` / `"ask"` | Order side |
-| `orders[*].price` | i128 string | Order price, 1e8 fixed-point |
-| `orders[*].size` | u128 string | Order size, 1e8 fixed-point |
+| `orders[*].price` | decimal string | Order price, whole units, tick-rounded |
+| `orders[*].sz` | decimal string | Order size, whole units |
 | `orders[*].stp_group` | uint \| null | Self-trade-prevention group; `null` when unset |
-| `orders[*].submitted_at_ms` | uint64 | Order submission timestamp (consensus ms) |
+| `orders[*].submitted_at` | uint64 | Order submission timestamp (consensus ms) |
 | `indicative` | object \| null | The volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, **not yet settled / committed**. `null` when there is no cross (one-sided or empty window) |
-| `indicative.clearing_px` | i128 string | Indicative uniform clearing price, 1e8 fixed-point |
-| `indicative.matched_size` | u128 string | Size that would clear at `clearing_px`, 1e8 fixed-point |
+| `indicative.clearing_px` | decimal string | Indicative uniform clearing price, whole units, tick-rounded |
+| `indicative.matched_size` | decimal string | Size that would clear at `clearing_px`, whole units |
+
+**Timestamp keys carry no `_ms` suffix.** The wire drops a redundant `_ms` on a
+key that names a point in time; only a key that names a DURATION keeps it. So the
+settle timestamps are `last_settle` / `next_settle` and the order stamp is
+`submitted_at`, while the batch period stays `period_ms`. A client that reads
+`last_settle_ms` or `submitted_at_ms` finds nothing.
 
 ### Portfolio margin enrollment and scenario figures {#pm_summary}
 
@@ -1668,13 +1752,13 @@ Response:
 {
   "type": "pm_summary",
   "data": {
-    "address":                     "0x<addr>",
-    "enrolled":                    true,
-    "enrolled_at_ms":              1000,
-    "last_computed_block":         77,
-    "pm_maint_margin_cents":       "250000",
-    "net_value_cents":             "9000000",
-    "concentration_penalty_cents": "1500"
+    "address":                  "0x<addr>",
+    "enrolled":                 true,
+    "enrolled_at":              1000,
+    "last_computed_block":      77,
+    "pm_maint_margin":          "2500",
+    "pm_net_value":             "90000",
+    "pm_concentration_penalty": "15"
   }
 }
 ```
@@ -1683,11 +1767,18 @@ Response:
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
 | `enrolled` | bool | Whether the account is enrolled in portfolio margin |
-| `enrolled_at_ms` | uint64 | Enrollment timestamp (consensus ms); `0` when not enrolled |
+| `enrolled_at` | uint64 | Enrollment timestamp (consensus ms); `0` when not enrolled |
 | `last_computed_block` | uint64 | Block height of the last PM scenario computation |
-| `pm_maint_margin_cents` | u128 string | Last-computed PM maintenance requirement, **USD cents** |
-| `net_value_cents` | i128 string | Last-computed account net value, **USD cents** |
-| `concentration_penalty_cents` | u128 string | Last-computed concentration penalty, **USD cents** |
+| `pm_maint_margin` | decimal string | Last-computed PM maintenance requirement, **whole USD** |
+| `pm_net_value` | decimal string | Last-computed account net value, **whole USD**; may be negative |
+| `pm_concentration_penalty` | decimal string | Last-computed concentration penalty, **whole USD** |
+
+The portfolio-margin engine stores these three figures in **USD cents** as
+integers. This read divides by 100 before it answers, so every one of them is a
+whole-USD decimal string — the same plane as `account_state`. You never have to
+know which read you asked. The key names carry **no** `_cents` suffix, and the
+enrollment stamp carries no `_ms` suffix, for the same reason the FBA rows do
+not: a key names the quantity, not the storage scale.
 
 The worst-case scenario loss is intentionally **omitted**: it is not persisted in
 committed state, and recomputing it would require re-running the scenario sweep,
@@ -1775,7 +1866,7 @@ Response:
         "slices_total":    10,
         "slices_done":     4,
         "delay_ms":        3000,
-        "last_fire_ts_ms": 42000,
+        "last_fire_ts": 42000,
         "reduce_only":     false
       }
     ]
@@ -1793,7 +1884,7 @@ Response:
 | `twaps[*].slices_total` | uint32 | Slice count the parent was scheduled with |
 | `twaps[*].slices_done` | uint32 | Slices fired so far |
 | `twaps[*].delay_ms` | uint64 | Inter-slice delay (ms) |
-| `twaps[*].last_fire_ts_ms` | uint64 | Last slice fire timestamp (consensus ms) |
+| `twaps[*].last_fire_ts` | uint64 | Last slice fire timestamp (consensus ms) |
 | `twaps[*].reduce_only` | bool | Parent is reduce-only |
 
 Rows list in ascending `twap_id` order. There is **no `duration` field** — it is
@@ -1848,7 +1939,7 @@ Response:
   "type": "user_vault_equities",
   "data": {
     "address": "0x<addr>",
-    "equities": [ { "vault_id": 7, "vault_address": "0x<vault>", "shares": "1000000000000000000", "equity": "5000000000" } ]
+    "equities": [ { "vault_id": 7, "vault_address": "0x<vault>", "shares": "1", "equity": "5000000000" } ]
   }
 }
 ```
@@ -1857,10 +1948,25 @@ Response:
 |-------|------|-------------|
 | `equities[*].vault_id` | uint64 | Vault id |
 | `equities[*].vault_address` | hex address | Vault address |
-| `equities[*].shares` | decimal string | Caller's share count (18-dec) |
+| `equities[*].shares` | decimal string | Caller's share count in **WHOLE shares**, not the raw 10¹⁸ integer. Send this exact string back to [`vault_withdraw`](./exchange.md#vault_withdraw) — read and write use one plane. See the note below |
 | `equities[*].equity` | decimal string | `shares × share_price`, truncated — whole-USDC. The share price is mark-to-market NAV per share, so this is what a redemption pays right now, not a high-water-mark figure |
 
 State source: `user_vaults[*].follower_shares[addr]` (keyed per vault).
+
+**Shares are WHOLE shares on both read and write.** Committed state keeps shares
+as a raw integer on a 10¹⁸ scale. This read divides by 10¹⁸ before it answers, so
+`shares` is already a whole-share decimal string. Do **not** multiply it by 10¹⁸.
+`vault_withdraw` reads the same plane, so the string this read gives you is the
+string that action takes — round-tripping needs no conversion at all.
+
+The whole-share plane is **live on both sides**. The write half arrived with the
+`vault_withdraw_share_plane` behaviour at block 6,565,000; the read half needs no
+activation height, because a read cannot change what a committed block did.
+
+The division is exact for ordinary holdings. A holding too large for a decimal
+mantissa drops its lowest fractional digits **toward zero**, so the string a
+holder reads back is never larger than the shares they hold. That direction is
+deliberate: a holder can under-ask, never over-burn.
 
 ### Vaults led by the user {#leading_vaults}
 
@@ -2088,7 +2194,7 @@ Response:
   "type": "validator_l1_votes",
   "data": {
     "latest_round": 5,
-    "votes": [ { "round": 5, "validator": "0x<validator>", "submitted_at_ms": 1700000000000 } ]
+    "votes": [ { "round": 5, "validator": "0x<validator>", "submitted_at": 1700000000000 } ]
   }
 }
 ```
@@ -2098,7 +2204,7 @@ Response:
 | `latest_round` | uint64 | Latest accepted vote round |
 | `votes[*].round` | uint64 | Vote round |
 | `votes[*].validator` | hex address | Casting validator |
-| `votes[*].submitted_at_ms` | uint64 | Submission timestamp (consensus ms) |
+| `votes[*].submitted_at` | uint64 | Submission timestamp (consensus ms) |
 
 State source: `validator_l1_vote_tracker.round_to_votes`. The vote payload is opaque oracle bytes (decoded by Module H) — the read surface reports metadata, not the raw payload.
 
@@ -2123,8 +2229,8 @@ Response:
       {
         "validator": "0x1111…", "signer": "0xa1a1…", "validator_index": 0,
         "stake": "1000", "self_stake": "100", "commission_bps": 500,
-        "is_active": true, "is_jailed": false, "jailed_at_ms": null,
-        "unjail_at_ms": null, "first_active_epoch": 2
+        "is_active": true, "is_jailed": false, "jailed_at": null,
+        "unjail_at": null, "first_active_epoch": 2
       }
     ]
   }
@@ -2144,8 +2250,8 @@ Response:
 | `validators[*].commission_bps` | uint32 | Commission (basis points) |
 | `validators[*].is_active` | bool | In the active set this epoch |
 | `validators[*].is_jailed` | bool | Currently jailed |
-| `validators[*].jailed_at_ms` | uint64 \| null | Jail start ts (null if not jailed) |
-| `validators[*].unjail_at_ms` | uint64 \| null | Earliest unjail ts (null if not jailed) |
+| `validators[*].jailed_at` | uint64 \| null | Jail start ts (null if not jailed) |
+| `validators[*].unjail_at` | uint64 \| null | Earliest unjail ts (null if not jailed) |
 | `validators[*].first_active_epoch` | uint64 | First epoch the validator was active |
 
 State source: `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` are not tracked on-chain — omitted rather than fabricated.

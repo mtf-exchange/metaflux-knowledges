@@ -137,7 +137,7 @@ Frequency: change-driven — a frame is sent only when the top-of-book actually 
 ### Public trade tape for one market {#trades}
 
 Public trade tape for one market. **Requires `coin`.** Each frame's `data` is an
-**array** of trade records; `px`/`sz` are raw **1e8-plane** integer strings; `side`
+**array** of trade records; `px`/`sz` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `side`
 is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms);
 `tid` is a deterministic trade id.
 
@@ -287,7 +287,7 @@ Per-account fill stream. Requires `user` (the 0x address; `address` is also acce
 - the **taker** record — the taker's own `oid`, its `cloid` (or `null`), the taker's side, `crossed: true`;
 - the **maker** record — the maker's own `oid`, `cloid: null` (no cloid is captured for the resting side), the **opposite** side, `crossed: false`.
 
-Both legs of one match share the same `tid` (the same value the public `trades` print carries). `px`/`sz` are 1e8-plane strings. Per-account fill records carry **no `users` array** — counterparty addresses appear only on the public [`trades`](#trades) tape, never on the account-scoped feed.
+Both legs of one match share the same `tid` (the same value the public `trades` print carries). `px`/`sz` are **human decimal strings**, the same plane the public `trades` tape uses — not raw 1e8. Per-account fill records carry **no `users` array** — counterparty addresses appear only on the public [`trades`](#trades) tape, never on the account-scoped feed.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "fills", "user": "0x<address>" } }
@@ -322,7 +322,8 @@ Rolling OHLCV bars for one market, one price series, at one bar size. **Requires
 ```
 
 - `interval` ∈ `1m` / `5m` / `15m` / `1h` / `4h` / `1d`. A missing or unrecognized `interval` is normalized to **`1m`** (the ack echoes the interval actually used).
-- `candle_type` ∈ `mark` (**default**) / `oracle`. `mark` is the [mark price](../../concepts/mark-prices.md) series and serves perp and spot markets; `oracle` is the [oracle index price](../../concepts/oracle-prices.md) series and serves perp markets only. An unknown value — including the **retired** `trade` — is rejected with ``{"channel":"error","data":{"error":"invalid candle_type: trade (expected `mark` or `oracle`)"}}``. It is never served as the other series.
+- `candle_type` ∈ `mark` (**default**) / `oracle` / `trade`. `mark` is the [mark price](../../concepts/mark-prices.md) series and serves perp and spot markets; `oracle` is the [oracle index price](../../concepts/oracle-prices.md) series and serves perp markets only; `trade` is executed-trade OHLCV and serves perp and spot markets. An unknown value is rejected with ``{"channel":"error","data":{"error":"invalid candle_type: <token> (expected `mark`, `oracle` or `trade`)"}}``. It is never served as another series.
+- **`trade` is accepted.** An earlier version of this page said it was retired and quoted a two-value rejection message. That was wrong on both counts. A `trade` series is SPARSE — a window with no fill has **no bar**, never a carried-forward one — and it carries real `v` / `q` / `n`, where a price series reports `v` as `"0"`. See the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
 - The ack echoes `interval` and `candle_type` (including the applied `mark` default) so a client can correlate `(coin, interval, candle_type)` and learn which series it reads.
 
 :::warning
@@ -376,7 +377,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 
 - `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`).
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
-- `limit_px` / `sz` / `orig_sz` / `avg_px` are 1e8-plane decimal strings; `time` is consensus-ms; unknown fields are `null`.
+- `limit_px` / `sz` / `orig_sz` / `avg_px` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `time` is consensus-ms; unknown fields are `null`.
 - **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
 
 ### Per-account resting order snapshot {#open_orders}

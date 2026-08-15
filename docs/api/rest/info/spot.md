@@ -133,7 +133,7 @@ Response:
         "quote":              100,
         "active":             true,
         "deployer":           "0x7777777777777777777777777777777777777777",
-        "registered_at_ms":   1700000000000,
+        "registered_at":   1700000000000,
         "min_notional":       "10",
         "tick_size":          "0.0001",
         "lot_size":           "1",
@@ -170,7 +170,7 @@ row in [`spot_meta`](#spot_meta) `tokens` — the two reads never drift.
 | `pairs[*].base` / `quote` | uint32 | Base / quote token asset ids |
 | `pairs[*].active` | bool | Pair active for trading |
 | `pairs[*].deployer` | hex address | Account that registered the pair (pair-level provenance) |
-| `pairs[*].registered_at_ms` | uint64 | Pair registration timestamp (consensus ms) |
+| `pairs[*].registered_at` | uint64 | Pair registration timestamp (consensus ms) |
 | `pairs[*].min_notional` | Decimal string | Minimum order notional, whole-USDC |
 | `pairs[*].tick_size` | Decimal string | Price tick, human-decimal |
 | `pairs[*].lot_size` | u128 string | Size lot, raw base lots |

@@ -1225,7 +1225,7 @@ approved agent / operator routes for the named account).
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client handle. It is **re-stamped on every reprice** — correlate the leg across reprices by `cloid` |
 | `stp_mode` | enum | `"cancel_oldest"` / `"cancel_newest"` / `"cancel_both"` / `"reject"` | Self-trade prevention, re-applied on every leg. All four values are accepted. The leg always rests strictly inside the spread, so self-trade prevention rarely fires |
 | `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only.** Omit on a one-way account; send it on a hedge account |
-| `interval_blocks` | uint32 | `2 … 28800` | Reprice debounce: reprice at most once per this many committed blocks (roughly 0.5 s to 2 h at the current block cadence) |
+| `interval_blocks` | uint32 | `2 … 28800` | Reprice debounce: reprice at most once per this many **committed blocks**. The unit is blocks, not time — see [the cadence note](#chase_order-cadence) before you convert it to seconds |
 | `ttl_ms` | uint64 | `60000 … 604800000` | Time-to-live in consensus milliseconds (1 min .. 7 days). When it elapses the leg is cancelled and the chase ends |
 | `max_reprices` | uint32 | `1 … 100000` | Maximum reprices. When reached the leg is cancelled and the chase ends |
 | `owner` | hex address \| null | 40 hex chars | Optional: place **as** this account (approved agents only). **Digest-bound** when present. Omit for plain sender-authorized placement |
@@ -1239,11 +1239,43 @@ cancels the old leg and places a new leg at the fresh target — under the same
 re-stamped `cloid` — so a client watching the account sees an ordinary cancel
 followed by a new resting order.
 
-**Reprice cadence.** A reprice happens at most once per `interval_blocks` committed
+#### Reprice cadence {#chase_order-cadence}
+
+A reprice happens at most once per `interval_blocks` committed
 blocks. A reprice that would cross the book, a book too thin to peg against, or a
 market that is halted or has trading disabled **pauses** the leg at its current
 price — the old leg keeps resting and the node retries on a later block. No reprice
 ever takes liquidity.
+
+**`interval_blocks` is blocks, not seconds — do not convert it.** The block
+cadence is a **configured target the chain does not hold to**. It is a node
+setting, it differs between deployments, and the rate the chain actually commits
+at has measured well away from the configured value. So `2` blocks is not a fixed
+number of milliseconds, and `28800` blocks is not a fixed number of hours. If you
+need a wall-clock bound, **measure the chain**: sample the committed height twice
+with a known gap and divide. Do not size a strategy off a number in a config file
+or off any figure quoted in this reference.
+
+`ttl_ms` is the one schedule bound that **is** denominated in time — consensus
+milliseconds, `60000 … 604800000` (1 minute to 7 days). Use it, not
+`interval_blocks`, when what you mean is a duration.
+
+**The node also caps total reprice work per block.** All chases share one
+per-block reprice budget. When a block's budget is spent, the legs still due wait
+for the next block, so a busy chain can stretch your effective interval past
+`interval_blocks`. The leg keeps resting at its old price meanwhile — nothing is
+cancelled and nothing takes liquidity. Treat `interval_blocks` as a **floor** on
+the gap between reprices, never as a guarantee.
+
+> ⬆️ **Upgrade notice — not live yet.** The reprice schedule is moving from a
+> block count to **consensus time**. The floor becomes **500 ms of consensus
+> time** per chase, and the shared per-block work budget is derived from a
+> per-second intent, so the reprice rate a user gets stops moving when the
+> chain's cadence moves. The change is written and gated; it is **not on the live
+> chain**, and the gate has **no activation height yet**. Until it is armed, the
+> block-count rules above are what the chain enforces. `interval_blocks` keeps
+> its name and its `2 … 28800` range across the change — an existing signed
+> request stays valid.
 
 **Termination.** The chase ends and its leg is cancelled when `ttl_ms` elapses or
 `max_reprices` is reached. If the leg fills completely, or is cancelled by any

@@ -68,11 +68,27 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 | `POST /info` `l2_book`, `markets` | 2 |
 | `POST /info` `user_fills`, `user_fills_by_time` | 2 |
 | `POST /exchange` | 5 |
+| `POST /evm` (single request) | 1 |
+| `POST /evm` (batch array) | 1 per element |
 | WS `subscribe` | 1 |
 | WS published message | 0 |
 | WS `unsubscribe` | 0 |
 
 A client making one order per second and polling `account_state` once per second spends `5 + 1 = 6 weight/s = 360 weight/min` — well within budget.
+
+> ⬆️ **Upgrade notice — not live yet.** The two `POST /evm` rows are written and
+> under test. The live gateway does **not** meter per element yet. Budget for
+> per-element weight now, so the change costs you nothing when it lands.
+
+**An EVM batch does not save weight.** Each element is dispatched independently,
+so a 40-element array costs 40 — the same as 40 separate calls. Batching saves
+round trips, not budget. A batch is also capped at **100** elements; a larger one
+is rejected whole with JSON-RPC `-32600`. See [the EVM JSON-RPC page](../evm/index.md#batch-requests).
+
+This is the opposite of `/exchange` order batching, which **does** save weight
+(one request with 10 legs costs 5, not 50). The two rules differ because an
+`/exchange` batch is one action the node admits once, while an EVM batch is N
+independent calls in one envelope.
 
 ## Per-account QPS {#per-account-qps}
 
