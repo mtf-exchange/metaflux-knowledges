@@ -869,10 +869,9 @@ Response:
 #### Why the buyback is or is not firing {#buyback-blocking-guard}
 
 :::caution
-**`buyback_status` is not live yet.** It lands with the next release. A
-`protocol_metrics` reply today carries every other field on this page but no
-`buyback_status` key. Treat an absent key as "this node predates the field", not
-as "the buyback is healthy".
+**`buyback_status` is LIVE** since node 0.8.9. A node that predates it carries
+every other field on this page but no `buyback_status` key — treat an absent key
+as "this node is older", not as "the buyback is healthy".
 :::
 
 The buyback stops for five unrelated reasons and reports the same silence for all

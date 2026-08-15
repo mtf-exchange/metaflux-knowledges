@@ -146,8 +146,8 @@ flowchart LR
 ## Block cadence {#block-cadence}
 
 :::caution
-**`set_target_block_interval_ms` is not live yet.** It lands with the next
-release. Until then each node reads only its own configured value.
+**`set_target_block_interval_ms` is LIVE** since node 0.8.9. Before it, each node
+read only its own configured value.
 :::
 
 The chain has a **target** block interval, in milliseconds. It is a target, not a

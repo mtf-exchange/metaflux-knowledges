@@ -184,10 +184,8 @@ The per-asset `funding_rate_multiplier` is auto-driven from 30-day realized vola
 ### The EMA decay is votable {#set-funding-ema-decay}
 
 :::caution
-**Not live yet.** `set_funding_ema_decay` lands with the next release, and its read
-side then waits for an activation height that is not yet chosen. A node today does
-not know the vote. The fold keeps reading `0.5` until BOTH boundaries are crossed,
-so a vote that enacts early changes nothing you can measure.
+**LIVE since block 13,350,001** (the vote itself since node 0.8.9). Before that
+boundary the fold read the compiled `0.5` whatever the vote said.
 :::
 
 The EMA `decay` is one number for the whole chain, moved by a two-thirds-stake

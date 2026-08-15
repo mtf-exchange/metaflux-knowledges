@@ -140,11 +140,8 @@ MTF (or delegate to a validator) to receive a larger slice — see [Staking](./s
 ### The buyback needs a bound MTF asset id {#buyback-asset-binding}
 
 :::caution
-**Both votes on this page land with the next release and are not live yet.**
-`set_mtf_asset_id` and `set_buyback_slice_usdc` are documented here as the
-committed contract. A node today does not know either name and answers a cast for
-one the same way it answers a name that never existed. Build the operating
-procedure against them, but do not cast one until this notice is removed.
+**Both votes on this page are LIVE** since node 0.8.9. `set_mtf_asset_id` is
+additionally refused below block 13,350,001 — see the sequencing rule below.
 :::
 
 The buyback executor buys ONE asset, and it must be told which one. That binding
@@ -201,10 +198,8 @@ enacted.
 ### The buyback drips, it does not sweep {#buyback-drip}
 
 :::caution
-**Not live yet.** The drip lands with the next release and then waits for an
-activation height, which is not yet chosen. Until the chain reaches that height
-one fire still spends the whole available balance. Read
-`buyback_status.drip_active` — it is `false` until the boundary is crossed.
+**LIVE since block 13,350,001.** Below that height one fire spent the whole
+available balance. Read `buyback_status.drip_active` to confirm on any node.
 :::
 
 Today a fire spends everything available in one buy. At and above the activation
