@@ -1,8 +1,8 @@
 # Bridge
 
 :::info
-**Status.** MetaBridge custody bridge **live on Base Sepolia** (testnet,
-`MetaBridgeAlpha` [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00)),
+**Status.** The custody bridge is **live on Base Sepolia and Arbitrum Sepolia** (testnet,
+`Bridge` [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.basescan.org/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A)),
 and a Solana custody program live on **devnet** under the same model. Both
 directions are verified end-to-end on Base Sepolia: a real deposit
 (watcher → cosign → auto-registered cosigner → ⅔-quorum credit) and a full
@@ -142,10 +142,25 @@ Base (two-phase: request → claim):
 
 | Network | Contract | Address |
 |---------|----------|---------|
-| Base **Sepolia** | `MetaBridgeAlpha` | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.basescan.org/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
-| Arbitrum **Sepolia** | `MetaBridgeAlpha` | [`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00`](https://sepolia.arbiscan.io/address/0xA6c914Cd59F8B3A8551B5f24b047d78542063a00) |
+| Base **Sepolia** | `Bridge` | [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.basescan.org/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A) |
+| Arbitrum **Sepolia** | `Bridge` | [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.arbiscan.io/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A) |
 | Solana **devnet** | `metabridge-solana` | [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet) |
 | Base / Arbitrum / Solana mainnet | — | (pre-audit) |
+
+:::danger Use only the addresses above
+The bridge was redeployed on 2026-08-16. The previous contract at
+`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00` is RETIRED on both chains and can
+no longer pay out: its validator set cannot be changed, so it recognises none of
+the current validators and every withdrawal reverts.
+
+**USDC sent to the old address is unrecoverable.** Read the address from this
+page for each deposit. Do not cache it, and do not reuse an address from an
+older integration.
+
+The two chains share one address because the deploy account created both
+contracts as its first transaction on each chain. Treat that as a coincidence of
+this deployment, not a rule.
+:::
 
 Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
 validator set, no admin** (all privileged ops are validator-cosigned), 300 s +
@@ -157,7 +172,7 @@ not for value-bearing use.
 
 ## Contract methods {#contract-methods}
 
-### Base — `MetaBridgeAlpha` (EVM) {#base--metabridgealpha-evm}
+### Base — `Bridge` (EVM) {#base--metabridgealpha-evm}
 
 | Method | Authorization | Purpose |
 |--------|---------------|---------|
