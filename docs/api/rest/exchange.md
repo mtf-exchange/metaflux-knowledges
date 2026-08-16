@@ -2648,10 +2648,10 @@ effectively master only (consistent with the
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `chain` | enum | `"Base"`, `"Arbitrum"`, `"Solana"` | Destination chain. Must have a registered MetaBridge contract and not be paused, or the action errors at commit |
+| `chain` | enum | `"Base"`, `"Arbitrum"` | Destination chain. Must have a registered MetaBridge contract and not be paused, or the action errors at commit |
 | `asset` | uint32 | `0` | MetaFlux asset id. Only `0` (USDC cross-collateral) is bridgeable today; any other id errors at commit (`only USDC cross-collateral is bridgeable`) |
 | `amount` | uint64 | `> 0` | Amount in 6-decimal USDC base units (`1000000` = 1 USDC); widened to `u128` internally |
-| `dst_addr` | hex string | 40 or 64 hex chars (`0x` optional) | Destination: a 20-byte EVM address for Base / Arbitrum (left-padded internally to 32 bytes), or a full 32-byte recipient for Solana. Any other length is rejected at admission (`400`) |
+| `dst_addr` | hex string | 40 hex chars (`0x` optional) | Destination: a 20-byte EVM address, left-padded internally to 32 bytes. A malformed value is rejected at admission (`400`) |
 
 **Funding check.** The withdrawal is gated on **free collateral** (equity minus
 margin held by open positions), not raw equity — collateral backing open
@@ -2686,11 +2686,7 @@ collateral for withdrawal`.
 **Gotchas.**
 - `dst_addr` is validated for **length only** — there is no checksum or
   ownership check. Funds released to a wrong-but-well-formed address are
-  unrecoverable; double-check the destination, especially the 32-byte Solana
-  form.
-- Send the EVM form (40 hex chars) for Base / Arbitrum and the 32-byte form
-  (64 hex chars) for Solana. The server cannot tell a mistyped 64-char EVM
-  padding from a real Solana key.
+  unrecoverable; double-check the destination.
 - A duplicate submission is a **second withdrawal**, not a retry — idempotency
   is per-nonce, and each committed `mb_withdraw` debits again.
 

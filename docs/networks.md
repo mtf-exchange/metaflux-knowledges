@@ -113,7 +113,7 @@ Production network. Real USDC, real value, real validators.
 Mainnet `chainId`: `8964` (`0x2304`).
 
 Mainnet differences from devnet/testnet:
-- USDC is real, bridged via MetaBridge custody from Base (and later Arbitrum / Solana).
+- USDC is real, bridged via MetaBridge custody from Base (and later Arbitrum).
 - Validator set is permissionless (governance-elected).
 - Real economic value.
 - Rate limits and fees per [rate limits](./api/rate-limits.md) and [fees](./concepts/fees.md).
@@ -126,7 +126,6 @@ USDC (and other assets) bridge via the **MetaBridge custody bridge** — validat
 | Chain | Status |
 |-------|--------|
 | Base | **live on Base Sepolia** (`Bridge` [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.basescan.org/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A)); mainnet pre-audit |
-| Solana | **live on devnet** (`metabridge-solana` program [`8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi`](https://solscan.io/account/8nahcGhCtXpsZ31mHmHinCRf5MX1qWQzruMj6E1KMCwi?cluster=devnet)); mainnet pre-audit |
 | Arbitrum | **live on Arbitrum Sepolia** (`Bridge` [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.arbiscan.io/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A)); mainnet pre-audit |
 
 See [bridge](./bridge/) for the deposit / withdraw flow + the deployment table.

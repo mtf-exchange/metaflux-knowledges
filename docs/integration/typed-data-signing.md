@@ -230,10 +230,10 @@ Notes on specific fields:
 
 - `agent_set_abstraction`: `value` is an EIP-712 **`string`** — sign the verbatim
   string (it is not a number; hashed as `keccak256(utf8)`).
-- `mb_withdraw`: the typed `chain` field is a **`uint8`** — `0` = Solana, `1` =
-  Base, `2` = Arbitrum. But the POST `action.params.chain` is the **string name**
-  (`"Solana"` / `"Base"` / `"Arbitrum"`). So sign the `uint8` in the typed message
-  and send the string name in `params`.
+- `mb_withdraw`: the typed `chain` field is a **`uint8`** — `1` = Base, `2` =
+  Arbitrum. But the POST `action.params.chain` is the **string name** (`"Base"` /
+  `"Arbitrum"`). So sign the `uint8` in the typed message and send the string name
+  in `params`.
 - `mb_withdraw`: `amount` is a `uint64` **integer** (not a decimal string);
   `dstAddr` is the destination-chain address string.
 

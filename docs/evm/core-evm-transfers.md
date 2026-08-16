@@ -128,7 +128,7 @@ Ordering + throughput:
 
 `CrossChainSend` (CoreWriter action 19) does **not** move value to the local EVM —
 it queues a withdrawal into the [MetaBridge custody bridge](../bridge/), which
-releases on the destination chain (Base / Solana) on a ⅔ validator co-signature
+releases on the destination chain (Base / Arbitrum) on a ⅔ validator co-signature
 behind a dispute window.
 
 ## See also {#see-also}

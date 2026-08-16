@@ -9,7 +9,7 @@ Deposit, place an order, cancel, withdraw. By the end of this page your TypeScri
 ## Prerequisites {#prerequisites}
 
 - An EVM private key (any 32-byte hex; for devnet, generate fresh — don't reuse a mainnet key)
-- USDC on a MetaBridge source chain (Base; Solana and Arbitrum rolling out) — devnet allows the faucet route instead
+- USDC on a MetaBridge source chain (Base or Arbitrum) — devnet allows the faucet route instead
 - `curl` or any HTTP client
 
 ## Endpoints {#endpoints}
