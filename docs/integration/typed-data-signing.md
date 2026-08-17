@@ -143,6 +143,38 @@ succeeds: there is one USDC pool, so there is no second class to move to. It
 answers `USDC is unified; no class transfer needed`, and **the nonce is spent
 either way**. See [USDC](../concepts/usdc.md#moving-usdc).
 
+### Core → EVM {#core--evm}
+
+Two actions move value from the Core ledger to MetaFluxEVM. See
+[which one to use](../api/rest/exchange.md#core-evm-which-action).
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `core_evm_transfer` | `MetaFluxTransaction:CoreEvmTransfer(string metafluxChain,string amount,bool toEvm,address destination,uint32 asset,uint64 nonce)` |
+| `core_evm_transfer` (V2) | `MetaFluxTransaction:CoreEvmTransferV2(string metafluxChain,string amount,bool toEvm,address destination,uint32 asset,uint32 destinationChainId,bytes data,uint64 nonce)` |
+| `send_to_evm_with_data` ⚠️ | `MetaFluxTransaction:SendToEvmWithData(string metafluxChain,uint32 token,string amount,uint32 sourceDex,address destinationRecipient,bool toPerp,uint32 destinationChainId,bytes data,uint64 transferNonce,uint64 nonce)` |
+
+Notes on specific fields:
+
+- `core_evm_transfer`: **the envelope you send picks the type string.** Carry
+  neither `data` nor `destination_chain_id` and you sign `CoreEvmTransfer`,
+  byte-identically to before those fields existed. Include **either** key and you
+  sign `CoreEvmTransferV2`. **Presence is the selector, not emptiness** —
+  `"data": []` and `"destination_chain_id": 0` both count as present.
+- `send_to_evm_with_data`: **two different nonces.** `transferNonce` is
+  `params.nonce`, carried with the transfer. The trailing `nonce` is the ordinary
+  envelope nonce. They are separate signed fields, so sending the same value for
+  both is legal but not required.
+- `send_to_evm_with_data`: `data` is a `bytes` field — hashed as
+  `keccak256(raw_bytes)`, so an empty payload hashes the empty byte string. On the
+  POST it is an array of byte integers, not a hex string.
+- ⚠️ **`send_to_evm_with_data` is refused on the live network today** and returns
+  `400 sendToEvmWithData is retired; use coreEvmTransfer`. The type string above is
+  frozen and safe to implement now; the action itself returns at the next network
+  release. See
+  [the action](../api/rest/exchange.md#send_to_evm_with_data) for the rules that
+  turn on with it.
+
 ### Account, staking & vault {#account-staking--vault}
 
 | `action.type` | `encodeType` |

@@ -103,6 +103,42 @@ Read the live height before you rely on this —
 `{"type":"web_data","address":"0x…"}` carries it as `height`.
 :::
 
+## Moving VALUE from Core to EVM {#core--evm-value}
+
+**This is the lane you want if you are moving a balance the other way.** Two
+`/exchange` actions do it, and both reach the same queue and land the same credit:
+
+| Action | Field shape | Debits | Availability |
+|---|---|---|---|
+| [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) | MTF-native | the perp collateral pool for `asset: 0`, else the spot ledger | **live at every height** |
+| [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | next network release — **refused today** |
+
+Use `core_evm_transfer` if you have a choice. It is live, and it is the only one of
+the two that can move USDC out of the perp collateral pool — the balance
+`account_value` / `withdrawable` report. Reach for `send_to_evm_with_data` when you
+are porting a client that already builds the Hyperliquid field shape. The full
+comparison is
+[which Core → EVM action to use](../api/rest/exchange.md#core-evm-which-action).
+
+Both debit the sender's exchange ledger the moment the action commits, and queue
+one EVM credit that the node mints on the next EVM block. Because the debit lands
+first, the queued credit is always backed — the lane cannot mint. Both may carry
+an optional EVM payload of up to **4096 bytes**, which runs against the recipient
+**after** the credit lands. The payload **never unwinds the credit**: a revert
+leaves the credit standing, so read its receipt.
+
+Only assets the chain can resolve may cross — see
+[which assets can cross](#which-assets-cross).
+
+:::warning
+**Amounts are decimal strings, and an amount too small to credit is REFUSED, not
+rounded to nothing.** The lane truncates twice toward zero: to 8 decimal places,
+then to the token's own EVM decimals. So the smallest creditable amount is
+`10 ^ -min(8, the token's EVM decimals)` — `0.000001` for USDC, `0.00000001` for
+native MTF. Below that the action refuses. Above it you are debited exactly what
+is credited, so no sub-quantum remainder is destroyed in transit.
+:::
+
 ## Core → EVM (system pseudo-transactions) {#core--evm-system-pseudo-transactions}
 
 When an L1 begin-block effect needs to land on the EVM side — e.g. a spot send

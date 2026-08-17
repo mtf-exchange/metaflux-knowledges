@@ -377,14 +377,20 @@ planes and the digest-bound `owner` rule.
 
 ### Bridge withdrawals {#bridge-withdrawals}
 
-External withdrawals leave the chain over [MetaBridge](../../bridge/index.md).
-Both actions are **`master only`**: the recovered signer is the account debited.
-An agent signature debits the agent's own account, never the master's.
+Value leaves the Core ledger for MetaFluxEVM, or leaves the chain over
+[MetaBridge](../../bridge/index.md). Every action here is **`master only`**: the
+recovered signer is the account debited. An agent signature debits the agent's
+own account, never the master's.
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
 | [`core_evm_transfer`](#core_evm_transfer) | Move a spot asset from the Core ledger to MetaFluxEVM, optionally with an EVM payload | master only |
+| [`send_to_evm_with_data`](#send_to_evm_with_data) ⚠️ | The same Core → EVM move in the Hyperliquid-compatible field shape. **Refused on the live network today** — see the section | master only |
 | [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
+
+Both Core → EVM rows reach the same lane and land the same credit.
+[Which one to use](#core-evm-which-action) is decided by one thing: the field
+shape your client already has.
 
 ### Not on the public `/exchange` path {#not-on-the-public-exchange-path}
 
@@ -2620,6 +2626,189 @@ for core->evm transfer`.
   wrong-but-well-formed address is unrecoverable.
 - Set `to_evm: true`. The reverse direction is not a `/exchange` action — use an
   EVM burn transaction (see above).
+
+---
+
+### Send a token to MetaFluxEVM with a payload {#send_to_evm_with_data}
+
+:::warning
+**Not live yet. The live network refuses this action today.** Post it now and you
+get `400` with `sendToEvmWithData is retired; use coreEvmTransfer`. The refusal is
+clean — nothing moves, and **the account nonce is not spent**, so your next action
+reuses the same nonce.
+
+The action returns, with every rule below, at the **next network release**. This
+page is written to that target state on purpose, so a client can be built and
+signed against it first. Until the release lands, move the same value with
+[`core_evm_transfer`](#core_evm_transfer), which is live at every height and lands
+the identical credit.
+
+`{"type":"web_data","address":"0x…"}` carries the live `height` if you need to
+check where the chain is.
+:::
+
+Move a token from the **Core ledger** to **MetaFluxEVM**, and optionally run an
+EVM payload against the recipient afterwards. Same lane and same credit as
+[`core_evm_transfer`](#core_evm_transfer) — this is that move in the
+**Hyperliquid-compatible field shape**. **Sender-authorized** — no `owner` field;
+the recovered signer is the account debited. An agent signature therefore acts on
+the **agent's own** account, never the master's, so this is effectively master
+only (consistent with the [signed-by table](#signed-by-semantics)).
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:SendToEvmWithData`.
+
+```json
+{
+  "type": "send_to_evm_with_data",
+  "params": {
+    "token":                 0,
+    "amount":                "250.5",
+    "source_dex":            0,
+    "destination_recipient": "0xabababababababababababababababababababab",
+    "to_perp":               false,
+    "destination_chain_id":  0,
+    "data":                  [],
+    "nonce":                 7
+  }
+}
+```
+
+**All eight fields are required.** No field has a default and no field may be
+omitted — `data` may be an empty array, but the key must be there.
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `token` | uint32 | a registered asset id | Asset to move. For USDC send **`0`**, not `100`: [both ids mean USDC](../../concepts/usdc.md#moving-usdc), but the spot id `100` carries no EVM contract binding and is refused with `asset not linked to an EVM contract` — the same rule `core_evm_transfer` applies to its `asset`. The native MTF gas token always crosses. Any **other** token must be bound to an EVM contract or it is refused the same way — ask the chain with the [`evm_contract_bindings`](../../evm/core-evm-transfers.md#which-assets-cross) read rather than guessing |
+| `amount` | decimal string | `> 0` | Amount in the **whole-token** plane, as a JSON string. Carried verbatim into the signed digest, then parsed. **An amount too small to credit is refused, not rounded down** — see [precision](#send_to_evm_with_data-precision) |
+| `source_dex` | uint32 | `0` only | **Any other value is refused.** ⚠️ **This is the row an existing client hits** — a payload written for Hyperliquid carries `source_dex: 1`. This action debits exactly one ledger, the spot ledger, so no other source exists to name. The field used to be accepted and ignored; it now fails closed rather than quietly debiting a ledger you did not ask for |
+| `destination_recipient` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). The credit is a **mint to this address, with no owner check** — read the [zero-address gotcha](#send_to_evm_with_data-gotchas) before you send |
+| `to_perp` | bool | `false` only | **`true` is refused.** The EVM side has no perp account — the credit is an EVM mint — so `true` selects nothing that exists. The field used to be accepted and ignored |
+| `destination_chain_id` | uint32 | `0` or the local EVM chain id | Delivery chain. **Any other value is refused.** Delivery to a remote chain is not built on this lane. The field used to be signed and then ignored, so a caller who named a remote chain had the value delivered **locally, in silence**. It now refuses instead. To reach another chain use [`mb_withdraw`](#mb_withdraw) |
+| `data` | byte array | up to **4096** bytes | EVM calldata, as an array of byte integers. Send `[]` for none. It runs against `destination_recipient` **after** the credit lands, as a real transaction with its own receipt. Over 4096 bytes is refused — the same bound [`core_evm_transfer`](#core_evm_transfer) carries, because both actions stage onto the one lane |
+| `nonce` | uint64 | — | A transfer nonce carried **with the transfer**, distinct from the envelope `nonce`. It signs as `transferNonce`. The envelope `nonce` is still the value that orders and de-duplicates your actions |
+
+#### The five refusals {#send_to_evm_with_data-refusals}
+
+Each one **refuses** where the action once **accepted and ignored**. That is the
+whole point of the change: an ignored field is a field you signed and did not get.
+
+| What you send | Answer | Why it refuses rather than ignoring |
+|---|---|---|
+| `source_dex` other than `0` | refused | The action debits one ledger, the spot ledger. Ignoring the field debits a ledger the caller did not name. **Historical payloads carry `source_dex: 1`, so this is the refusal real callers meet first.** |
+| `to_perp: true` | refused | There is no perp account on the EVM side to credit. Ignoring the field delivers an EVM mint to someone who asked for a perp credit. |
+| `destination_chain_id` that is neither `0` nor the local EVM chain id | refused | Remote delivery is not built. Ignoring the field delivered the value **on the local chain, silently**, to a caller who signed for a different one. |
+| `data` over 4096 bytes | refused | The payload bound is shared with [`core_evm_transfer`](#core_evm_transfer): both actions stage onto the same lane, so a bound enforced on one door only is a bound the other door walks past. |
+| `amount` that truncates to a zero EVM credit | refused | The lane truncates twice (see below). Such an amount would debit your Core balance and credit **nothing** on the EVM side. |
+
+Every refusal runs **before** anything moves, so a refused action changes no
+balance. The envelope nonce **is** spent, as with any action that reaches commit.
+
+#### Precision — a sub-quantum amount is refused, not silently rounded {#send_to_evm_with_data-precision}
+
+Amounts are decimal strings in the whole-token plane. On the way to the EVM the
+lane truncates **twice**, both times toward zero: first to 8 decimal places, then
+to the token's own EVM decimals. So the smallest amount the EVM can credit is one
+quantum:
+
+```
+quantum = 10 ^ -min(8, the token's EVM decimals)
+```
+
+| Token | EVM decimals | Smallest amount that credits |
+|---|---|---|
+| USDC | 6 | `0.000001` |
+| Native MTF | 18 | `0.00000001` |
+| Any bound ERC-20 | its own `wei_decimals` | `10 ^ -min(8, wei_decimals)` |
+
+Two rules follow, and both exist to protect your balance:
+
+- **Below one quantum is refused** (`amount truncates to a zero EVM credit`).
+  Accepting it would debit Core and credit nothing.
+- **Above one quantum, you are debited the amount that is actually credited** —
+  not the amount you signed. Any sub-quantum remainder **stays in your balance**
+  instead of being destroyed on the way across.
+
+Send an amount that is already a whole number of quanta and the two values are
+equal. That is the shape to prefer: what you sign is then exactly what you are
+debited and exactly what lands.
+
+#### Which Core → EVM action to use {#core-evm-which-action}
+
+Both actions debit the sender's exchange ledger, queue one credit, and the node
+mints it on the next EVM block. Neither can create value: Core is debited the
+moment the action commits, so the queued credit is always backed. A payload, if
+you send one, runs **after** the credit lands and **never unwinds it** — a revert
+leaves the credit standing, so read the payload's receipt to tell a
+delivered-and-executed transfer from a delivered-and-reverted one.
+
+| | [`core_evm_transfer`](#core_evm_transfer) | `send_to_evm_with_data` |
+|---|---|---|
+| Availability | **live at every height** | next network release |
+| Field shape | MTF-native (`asset`, `destination`, `to_evm`) | Hyperliquid-compatible (`token`, `destination_recipient`, `source_dex`, `to_perp`) |
+| **Which ledger it debits** | `asset: 0` debits the **perp collateral pool**, gated on free collateral; a non-zero `asset` debits the spot ledger | **always the spot ledger**, `token: 0` included |
+| Can move USDC held as collateral | **yes** — this is the lane for it | no |
+| Omittable fields | `asset`, `data`, `destination_chain_id` | none — all eight required |
+| Signing type string | one of two, selected by which keys you send | one, always |
+| A zero recipient | refused (`zero destination`) | **not refused** — see the gotcha below |
+
+**Use `core_evm_transfer`** unless you are porting a client that already builds
+the Hyperliquid field shape. It is live today, it refuses a zero recipient, its
+omittable fields keep an existing signature byte-identical, and it is the only one
+of the two that can move USDC out of the perp collateral pool.
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission):
+
+```json
+{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+```
+
+The EVM-side credit is asynchronous: the Core debit is immediate at commit, the
+EVM credit lands on the next EVM block.
+
+**Funding check — this action debits the SPOT balance, and only that.** For every
+token, `token: 0` included, the debit comes out of your **spot balance** of that
+token (`insufficient spot balance`).
+
+:::warning
+**It does not reach the perp collateral pool, and `core_evm_transfer` does.** USDC
+held as perp collateral is the balance
+[`account_value` / `withdrawable`](../../concepts/usdc.md#moving-usdc) report, and
+this action cannot move it. Send that USDC with
+[`core_evm_transfer`](#core_evm_transfer), which addresses the collateral pool as
+`asset: 0` and gates the move on free collateral. Use this action for a token that
+sits on the spot ledger.
+:::
+
+**Common errors** (at commit, once the action is live): `amount must be positive`,
+`sendToEvmWithData debits the spot ledger only; source_dex must be 0`, `the EVM
+side has no perp account; to_perp must be false`, `cross-chain delivery is not
+built; destination_chain_id must be 0 or the local EVM chain id`,
+`sendToEvmWithData data is over the payload bound`, `amount truncates to a zero
+EVM credit`, `asset not linked to an EVM contract`, `core->evm queue is full;
+retry when it drains`, `insufficient spot balance`.
+
+#### Gotchas {#send_to_evm_with_data-gotchas}
+
+:::danger
+**This action does NOT refuse the zero address, and
+[`core_evm_transfer`](#core_evm_transfer) does.** A `destination_recipient` of
+`0x0000…0000` is accepted here: your balance is debited and the credit is minted
+to an address nobody holds. **The value is unrecoverable.** Validate the recipient
+in your own client — do not rely on the chain to catch it on this lane. Send the
+same move through `core_evm_transfer` and a zero `destination` is refused with
+`zero destination`.
+:::
+
+- `destination_recipient` is the **EVM-side** recipient and is **not**
+  owner-checked. Any transfer to a wrong-but-well-formed address is
+  unrecoverable, exactly as on `core_evm_transfer`.
+- `core->evm queue is full; retry when it drains` is the one **retryable** error
+  here. The rest mean the request itself is wrong; resending it unchanged fails
+  the same way and spends another nonce.
+- The payload's success is independent of the transfer's. Do not treat a
+  successful transfer as proof the payload ran.
 
 ---
 

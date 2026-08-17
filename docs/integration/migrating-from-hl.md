@@ -212,10 +212,36 @@ Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are al
 | `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
 | `usdSend` / spot transfers | native spot transfer actions |
 | `withdraw3` | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) |
+| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) (same field names) — or [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer), which is live today. **Read the note below.** |
 | `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
 | `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
 | `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user) |
 | `setReferrer` / `createReferral` | [`set_referrer`](../api/rest/exchange.md#set_referrer) (semantics may differ) |
+
+### `sendToEvmWithData` — a copied payload will be refused {#send-to-evm-with-data-note}
+
+`send_to_evm_with_data` keeps the HL field names, so it is tempting to copy the
+payload across unchanged. **Do not.** Three fields that HL accepts and ignores are
+**refused** here, and the one you will hit is the first:
+
+- **`source_dex` must be `0`.** An HL payload commonly carries `source_dex: 1`.
+  MTF debits one ledger, the spot ledger, so it refuses any other value rather
+  than debiting a ledger you did not name.
+- **`to_perp` must be `false`.** The EVM side has no perp account to credit.
+- **`destination_chain_id` must be `0` or the local EVM chain id.** Any other
+  value is refused. It is **not** a cross-chain lane — use
+  [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) to leave the chain.
+
+Two more things before you port it:
+
+- **The action is refused on the live network today** and returns
+  `400 sendToEvmWithData is retired; use coreEvmTransfer`. It returns at the next
+  network release. The refusal is clean — nothing moves and the nonce is not spent.
+- **It debits the spot ledger only.** It cannot move USDC held as perp collateral.
+  [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) can, and it is
+  live now, so it is the better target for most ports.
+
+Full rules: [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data).
 
 ## Getting help {#getting-help}
 
