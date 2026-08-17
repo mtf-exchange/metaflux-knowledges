@@ -139,6 +139,30 @@ native MTF. Below that the action refuses. Above it you are debited exactly what
 is credited, so no sub-quantum remainder is destroyed in transit.
 :::
 
+### Both lanes charge a fee, and the fee is MTF {#core-to-evm-fee}
+
+**No fee is charged today: the parameter is `0`.** A two-thirds-stake governance
+vote sets it, and charging starts as soon as a vote enacts a value above `0`. Once
+it does, both actions charge the same fee, so neither lane is cheaper.
+
+The fee is a **quantity of MTF**, debited on top of the amount, and it is
+independent of the asset you move: a transfer of USDC debits USDC for the amount
+and MTF for the fee. The chain takes it from your **spot MTF** balance first, then
+from your **USDC** at the MTF reference price, and **refuses the transfer** when
+neither covers it.
+
+:::warning
+**A transfer can be refused for a reason that has nothing to do with the asset you
+are moving.** MTF is priced from its own book, so the USDC step needs that
+reference price. When the price is not usable the chain refuses the transfer rather
+than charge at a guessed price. Hold enough spot MTF to cover the fee and the
+reference price is never read.
+:::
+
+The rule, the rejection strings and the governance parameter are in
+[the fee](../api/rest/exchange.md#core-evm-fee) and
+[Fees](../concepts/fees.md#core-evm-transfer-fee).
+
 ## Core → EVM (system pseudo-transactions) {#core--evm-system-pseudo-transactions}
 
 When an L1 begin-block effect needs to land on the EVM side — e.g. a spot send

@@ -2,7 +2,8 @@
 
 :::info
 **Concepts page.** This page explains how a trading fee is computed per fill, the
-broker and referrer credits, spot and liquidation fees, and where collected fees
+broker and referrer credits, spot and liquidation fees, the
+[Core to EVM transfer fee](#core-evm-transfer-fee), and where collected fees
 go. For the actual rates — volume fee tiers, maker-rebate tiers, and staking
 discount tiers — see the [Fee schedule](./fee-schedule.md). Fee values are network
 parameters and can be updated by governance.
@@ -18,6 +19,8 @@ validators / ~10% treasury**. The buyback share buys MTF on the open market and
 locks it forever in a keyless protocol address — permanently removing it from
 circulation. Fees are deducted from
 your balance at fill time and shown in [`userFills`](../api/rest/info.md#user_fills).
+One fee here is not a trading fee: a transfer from Core to MetaFluxEVM charges a
+[fee in MTF](#core-evm-transfer-fee), which is `0` today.
 
 ## How a fee is computed {#how-a-fee-is-computed}
 
@@ -314,6 +317,54 @@ pay it as part of the loss settled on close, flagged on the liquidation fills in
 [`userFills`](../api/rest/info.md#user_fills). See
 [tiered liquidation](./tiered-liquidation.md) for the close mechanics.
 
+## Core to EVM transfer fee {#core-evm-transfer-fee}
+
+:::info
+**Not charged today. The parameter is `0`.** This is the only fee on this page that
+is not a trading fee, and no transfer pays it yet. Charging starts as soon as a
+governance vote enacts a value above `0` — there is no height to wait for. Watch
+for the enactment on
+[`validator_votes`](../api/rest/info/governance.md#validator_votes): the row
+carries `changes[*].field: "fee.core_evm_fee_mtf"`.
+:::
+
+A transfer from the Core ledger to MetaFluxEVM charges its own fee. Both actions
+that make the move —
+[`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) and
+[`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) — charge
+it under one rule, so neither lane is cheaper.
+
+**The fee is a quantity of MTF, charged on top of the amount you move.** It is a
+separate debit and it is independent of the asset in the transfer: a transfer of
+BTC debits BTC for the amount and MTF for the fee. The chain takes the fee from
+your **spot MTF** balance first; then from your **USDC**, at the MTF reference
+price, when spot MTF cannot cover it; and it **refuses the transfer** when neither
+covers it. All of the proceeds are validator revenue — this fee is not split three
+ways the way a trading fee is — so they reach validators and their stakers through
+the same payout as the validator share in [where fees go](#where-fees-go).
+
+:::warning
+**A transfer can be refused for a reason that has nothing to do with the asset you
+are moving.** MTF is priced from its own book, so the USDC step needs that
+reference price. When that price is not usable the chain refuses the transfer
+instead of charging at a guessed price. Hold enough spot MTF to cover the fee and
+the reference price is never read. The rejection strings are on
+[the fee](../api/rest/exchange.md#core-evm-fee).
+:::
+
+### The governance parameter {#core-evm-fee-parameter}
+
+| | |
+|---|---|
+| Vote | `set_core_evm_fee_mtf`, a two-thirds-stake vote |
+| Value | The fee as a **quantity of MTF**, not a rate and not a USDC amount |
+| Bounds | `0` to `1000` MTF, at most **8 decimal places** |
+| `0` | Clears the fee — no transfer is charged. **This is the value today** |
+| Enactment | Shows on [`validator_votes`](../api/rest/info/governance.md#validator_votes) as `changes[*].field: "fee.core_evm_fee_mtf"` |
+
+The value is a quantity, so the fee does not scale with the amount transferred: a
+`1` USDC transfer and a `100000` USDC transfer pay the same MTF fee.
+
 ## Querying {#querying}
 
 ```bash
@@ -353,6 +404,8 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 - [`POST /info user_fees`](../api/rest/info.md#user_fees) — MTF-native per-user tier / 30-day volume
 - [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — cumulative fee pools (burn / treasury / validator)
 - [Tiered liquidation](./tiered-liquidation.md) — liquidation mechanics
+- [Core ↔ EVM transfers](../evm/core-evm-transfers.md) — the lane the
+  [Core to EVM transfer fee](#core-evm-transfer-fee) applies to
 
 ## FAQ {#faq}
 

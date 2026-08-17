@@ -2599,6 +2599,10 @@ not transferable, mirroring the [`mb_withdraw`](#mb_withdraw) /
 withdrawable-collateral gate. An underfunded transfer errors at commit
 (`insufficient free collateral for core->evm transfer`).
 
+**The move also charges a fee, and the fee is a quantity of MTF.** It is a second
+debit, on top of the amount, and it is `0` today — read [the fee](#core-evm-fee)
+at the end of this section before you size a transfer.
+
 **What commit does.** The debit and the EVM-mint queueing are atomic at commit:
 `amount` leaves the sender's Core cross-collateral balance, and an L1 → EVM
 transfer entry is enqueued so the node mints the scale-converted 6-decimal EVM
@@ -2618,7 +2622,10 @@ EVM credit lands on the next EVM block.
 **Common errors** (at commit): `amount must be positive`, `zero destination`,
 `evm disabled` (the EVM side is not enabled on this chain), `EVM->Core transfer
 must originate as an EVM burn tx, not /exchange`, `insufficient free collateral
-for core->evm transfer`.
+for core->evm transfer`, `insufficient MTF or USDC for the core->evm fee`, `MTF
+price unavailable; the core->evm fee cannot be quoted in USDC`, `the core->evm
+fee does not convert to a positive USDC amount`. The last three are
+[the fee](#core-evm-fee).
 
 **Gotchas.**
 - `destination` is the **EVM-side** recipient and is **not** owner-checked — the
@@ -2626,6 +2633,53 @@ for core->evm transfer`.
   wrong-but-well-formed address is unrecoverable.
 - Set `to_evm: true`. The reverse direction is not a `/exchange` action — use an
   EVM burn transaction (see above).
+
+#### The fee, in MTF {#core-evm-fee}
+
+:::info
+**No fee is charged today. The parameter is `0`.** The fee is a network parameter,
+and a two-thirds-stake governance vote sets it. There is no height to wait for:
+charging starts the moment a vote enacts a value above `0`. Watch for that
+enactment on [`validator_votes`](./info/governance.md#validator_votes) — the row
+carries `changes[*].field: "fee.core_evm_fee_mtf"`. Everything below states what
+happens once the value is above `0`. The parameter itself is documented with
+[the fee concepts](../../concepts/fees.md#core-evm-transfer-fee).
+:::
+
+**The fee is a quantity of MTF, charged on top of the amount you move.** It is a
+separate debit, and it has nothing to do with the asset in the transfer: a
+transfer of BTC debits **BTC** for the amount and **MTF** for the fee. Both
+Core → EVM actions charge the same fee under the same rule, so neither
+[`core_evm_transfer`](#core_evm_transfer) nor
+[`send_to_evm_with_data`](#send_to_evm_with_data) is the cheaper lane.
+
+**Resolution order.** The chain takes the fee from the first source that covers
+it:
+
+| Order | Source | Rule |
+|---|---|---|
+| 1 | your **spot MTF** balance | Charged as the MTF quantity the parameter names. The fee may not re-spend a balance the transfer itself needs, so a transfer **of** MTF needs spot MTF for the amount **and** the fee together |
+| 2 | your **USDC** | Only when spot MTF cannot cover the fee. The MTF quantity is quoted in USDC at the MTF reference price. The debit leaves the USDC cross-collateral balance and is gated on **free collateral**, so USDC held as margin by an open position cannot pay it. It must cover the fee on top of any USDC the transfer itself moves |
+| 3 | — | **The transfer is refused.** `insufficient MTF or USDC for the core->evm fee` — one string for every cause, so it does not report which balance was short |
+
+The fee is quoted before anything moves and charged after the amount leaves your
+balance, so a transfer refused for any reason pays no fee. The proceeds are
+validator revenue.
+
+:::warning
+**A transfer can be refused for a reason that has nothing to do with the asset you
+are moving.** MTF is priced from its own book, so step 2 needs that reference
+price. When the price is not usable, the chain refuses the transfer instead of
+charging at a guessed price:
+
+```
+MTF price unavailable; the core->evm fee cannot be quoted in USDC
+```
+
+Neither the asset in the transfer nor your balance of it is the cause. **Hold
+enough spot MTF to cover the fee and the reference price is never read**, because
+step 1 answers first.
+:::
 
 ---
 
@@ -2682,7 +2736,7 @@ omitted — `data` may be an empty array, but the key must be there.
 | `token` | uint32 | a registered asset id | Asset to move. For USDC send **`0`**, not `100`: [both ids mean USDC](../../concepts/usdc.md#moving-usdc), but the spot id `100` carries no EVM contract binding and is refused with `asset not linked to an EVM contract` — the same rule `core_evm_transfer` applies to its `asset`. The native MTF gas token always crosses. Any **other** token must be bound to an EVM contract or it is refused the same way — ask the chain with the [`evm_contract_bindings`](../../evm/core-evm-transfers.md#which-assets-cross) read rather than guessing |
 | `amount` | decimal string | `> 0` | Amount in the **whole-token** plane, as a JSON string. Carried verbatim into the signed digest, then parsed. **An amount too small to credit is refused, not rounded down** — see [precision](#send_to_evm_with_data-precision) |
 | `source_dex` | uint32 | `0` only | **Any other value is refused.** ⚠️ **This is the row an existing client hits** — a payload written for Hyperliquid carries `source_dex: 1`. This action debits exactly one ledger, the spot ledger, so no other source exists to name. The field used to be accepted and ignored; it now fails closed rather than quietly debiting a ledger you did not ask for |
-| `destination_recipient` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). The credit is a **mint to this address, with no owner check** — read the [zero-address gotcha](#send_to_evm_with_data-gotchas) before you send |
+| `destination_recipient` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). **The zero address is refused** (`zero destination`), as on [`core_evm_transfer`](#core_evm_transfer). Every other well-formed address is accepted: the credit is a **mint to this address, with no owner check** — read the [gotchas](#send_to_evm_with_data-gotchas) before you send |
 | `to_perp` | bool | `false` only | **`true` is refused.** The EVM side has no perp account — the credit is an EVM mint — so `true` selects nothing that exists. The field used to be accepted and ignored |
 | `destination_chain_id` | uint32 | `0` or the local EVM chain id | Delivery chain. **Any other value is refused.** Delivery to a remote chain is not built on this lane. The field used to be signed and then ignored, so a caller who named a remote chain had the value delivered **locally, in silence**. It now refuses instead. To reach another chain use [`mb_withdraw`](#mb_withdraw) |
 | `data` | byte array | up to **4096** bytes | EVM calldata, as an array of byte integers. Send `[]` for none. It runs against `destination_recipient` **after** the credit lands, as a real transaction with its own receipt. Over 4096 bytes is refused — the same bound [`core_evm_transfer`](#core_evm_transfer) carries, because both actions stage onto the one lane |
@@ -2750,12 +2804,13 @@ delivered-and-executed transfer from a delivered-and-reverted one.
 | Can move USDC held as collateral | **yes** — this is the lane for it | no |
 | Omittable fields | `asset`, `data`, `destination_chain_id` | none — all eight required |
 | Signing type string | one of two, selected by which keys you send | one, always |
-| A zero recipient | refused (`zero destination`) | **not refused** — see the gotcha below |
+| A zero recipient | refused (`zero destination`) | refused (`zero destination`) |
+| The MTF fee | [the same fee](#core-evm-fee), `0` today | [the same fee](#core-evm-fee), `0` today |
 
 **Use `core_evm_transfer`** unless you are porting a client that already builds
-the Hyperliquid field shape. It is live today, it refuses a zero recipient, its
-omittable fields keep an existing signature byte-identical, and it is the only one
-of the two that can move USDC out of the perp collateral pool.
+the Hyperliquid field shape. It is live today, its omittable fields keep an
+existing signature byte-identical, and it is the only one of the two that can move
+USDC out of the perp collateral pool.
 
 **Response.** Non-order action →
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
@@ -2781,24 +2836,66 @@ this action cannot move it. Send that USDC with
 sits on the spot ledger.
 :::
 
+#### The MTF fee on this lane {#send_to_evm_with_data-fee}
+
+:::info
+**No fee is charged today. The parameter is `0`.** A two-thirds-stake governance
+vote sets it, and charging starts as soon as a vote enacts a value above `0`. The
+enactment shows on [`validator_votes`](./info/governance.md#validator_votes) as
+`changes[*].field: "fee.core_evm_fee_mtf"`. See
+[the fee concepts](../../concepts/fees.md#core-evm-transfer-fee).
+:::
+
+**This lane charges the same fee [`core_evm_transfer`](#core_evm_transfer)
+charges.** One rule serves both, so neither lane avoids it. The fee is a quantity
+of **MTF**, debited on top of the amount, and it has nothing to do with the token
+you move: a transfer of a bound ERC-20 debits **that token** for the amount and
+**MTF** for the fee.
+
+**Resolution order:** your **spot MTF** balance first; then **USDC** at the MTF
+reference price, when spot MTF cannot cover the fee on top of what the transfer
+itself needs; otherwise the transfer is **refused** with `insufficient MTF or USDC
+for the core->evm fee`. The USDC step debits the USDC cross-collateral balance and
+is gated on free collateral, even though the amount leg debits the spot ledger.
+
+:::warning
+**A transfer can be refused for a reason that has nothing to do with the token you
+are moving.** MTF is priced from its own book, so the USDC step needs that
+reference price. When the price is not usable, the chain refuses the transfer
+instead of charging at a guessed price:
+
+```
+MTF price unavailable; the core->evm fee cannot be quoted in USDC
+```
+
+Neither the token nor your balance of it is the cause. **Hold enough spot MTF to
+cover the fee and the reference price is never read.**
+:::
+
+The fee is quoted before anything moves and charged after the amount leg, so a
+refused transfer pays no fee. The proceeds are validator revenue. The full rule is
+[the fee on `core_evm_transfer`](#core-evm-fee).
+
 **Common errors** (at commit, once the action is live): `amount must be positive`,
-`sendToEvmWithData debits the spot ledger only; source_dex must be 0`, `the EVM
-side has no perp account; to_perp must be false`, `cross-chain delivery is not
-built; destination_chain_id must be 0 or the local EVM chain id`,
-`sendToEvmWithData data is over the payload bound`, `amount truncates to a zero
-EVM credit`, `asset not linked to an EVM contract`, `core->evm queue is full;
-retry when it drains`, `insufficient spot balance`.
+`zero destination`, `sendToEvmWithData debits the spot ledger only; source_dex
+must be 0`, `the EVM side has no perp account; to_perp must be false`,
+`cross-chain delivery is not built; destination_chain_id must be 0 or the local
+EVM chain id`, `sendToEvmWithData data is over the payload bound`, `amount
+truncates to a zero EVM credit`, `asset not linked to an EVM contract`,
+`core->evm queue is full; retry when it drains`, `insufficient spot balance`,
+`insufficient MTF or USDC for the core->evm fee`, `MTF price unavailable; the
+core->evm fee cannot be quoted in USDC`, `the core->evm fee does not convert to a
+positive USDC amount`.
 
 #### Gotchas {#send_to_evm_with_data-gotchas}
 
 :::danger
-**This action does NOT refuse the zero address, and
-[`core_evm_transfer`](#core_evm_transfer) does.** A `destination_recipient` of
-`0x0000…0000` is accepted here: your balance is debited and the credit is minted
-to an address nobody holds. **The value is unrecoverable.** Validate the recipient
-in your own client — do not rely on the chain to catch it on this lane. Send the
-same move through `core_evm_transfer` and a zero `destination` is refused with
-`zero destination`.
+**The chain catches only the ZERO address. Validate the rest yourself.** A
+`destination_recipient` of `0x0000…0000` is refused with `zero destination`, the
+same rule [`core_evm_transfer`](#core_evm_transfer) applies. Every other
+well-formed address is accepted, your balance is debited, and the credit is minted
+to that address with no owner check. **A transfer to a wrong address is
+unrecoverable.**
 :::
 
 - `destination_recipient` is the **EVM-side** recipient and is **not**
