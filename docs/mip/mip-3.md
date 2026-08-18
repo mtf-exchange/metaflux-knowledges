@@ -167,6 +167,17 @@ They decide how a failing account on that market is closed.
 deployer oracle. Read the settings back before you rely on them: a vote that
 records `deficit_cap` does not bound anything today.
 
+:::warning
+**The protocol's Metaliquidity vault does NOT backstop a deployed market.** It
+takes over failing positions on the core markets only. A deployed market is
+refused at both entry points, whether or not it prices from its own oracle, so
+its bad debt can never reach the vault's liquidity providers.
+
+Plan for it. Your market's shortfall is handled by its own backstop settings, its
+own participants and, past those, the deficit waterfall — never by protocol LP
+capital.
+:::
+
 ## After deploy {#after-deploy}
 
 Liquidity is the builder's problem; the protocol provides no seed orders.
