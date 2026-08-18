@@ -346,7 +346,7 @@ Positions are listed in pair-id order. An account with no positions returns an e
 ### Earn lending pools and account stake {#earn_state}
 
 :::info
-**Available on devnet (preview).** Read surface for the [Earn](../../../concepts/earn.md) lending pools; see the concept page for the preview caveats.
+**Live on testnet.** Read surface for the [Earn](../../../concepts/earn.md) lending pools. The pool list is empty until the first deposit creates one.
 :::
 
 Every Earn lending pool, plus one account's stake when `user` is supplied. Optional: `user` (0x hex).

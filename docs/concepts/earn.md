@@ -1,12 +1,15 @@
 # Earn
 
 :::info
-**Available on devnet (preview).** A USDC lending pool that earns yield from
+**Live on testnet, and paying zero.** A USDC lending pool that earns yield from
 [spot-margin](../products/spot-margin.md) borrowers. Supply, share-pricing, idle-bounded
-redemption AND the automatic spot-margin liquidator that protects the pool all
-run end-to-end on **devnet today** (see the
-[action surface](#deposit--withdraw) below). Treat it as a **preview**:
-per-pair maintenance ratios are still being calibrated.
+redemption AND the automatic spot-margin liquidator that protects the pool all run end-to-end
+(see the [action surface](#deposit--withdraw) below).
+
+**Two governance votes stand between a deposit and any yield.** A pool auto-creates with a borrow
+rate of **zero**, so nothing accrues; and no spot pair has its per-pair risk parameters calibrated
+yet, so nobody can borrow. Until both land, share price stays at its deposit value and a
+redemption returns the principal.
 :::
 
 ## TL;DR {#tldr}
@@ -23,7 +26,7 @@ deposit D USDC  →  mint  D / share_price  shares
 withdraw S shares → receive  S × share_price  USDC
 ```
 
-- `pool_value` starts equal to total deposits and **grows every block** as borrow interest accrues into it.
+- `pool_value` starts equal to total deposits and grows as borrow interest accrues into it. It moves **only while the pool carries a nonzero borrow rate and has an outstanding loan** — with either at zero it stays flat, whatever the block rate.
 - `total_shares` only changes on deposits (mint) and withdrawals (burn).
 - The first deposit sets `share_price = 1.0` (1 share = 1 USDC).
 
@@ -37,7 +40,7 @@ Your earnings are the appreciation of your shares between deposit and withdrawal
 your_yield = your_shares × (share_price_now − share_price_at_deposit)
 ```
 
-Per block, the pool grows by the interest the outstanding loans owe:
+Per block, the pool grows by the interest the outstanding loans owe — and by nothing at all when there are no loans:
 
 ```
 interest_this_block = total_borrowed × borrow_rate_per_ms × Δms
@@ -56,7 +59,7 @@ depositor_APY  ≈ borrow_APR × utilisation × (1 − protocol_fee)
 
 | | Value |
 |---|---|
-| `borrow_APR` | the fixed spot-margin borrow rate (per pair) |
+| `borrow_APR` | the fixed spot-margin borrow rate. It is set **per quote asset**, not per pair, so one rate serves every pair that shares that quote |
 | `utilisation` | fraction of the pool currently lent out |
 | `protocol_fee` | optional protocol cut of interest, if configured |
 

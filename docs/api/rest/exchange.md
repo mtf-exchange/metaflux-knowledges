@@ -1478,16 +1478,21 @@ by the spot halt, so you can always exit a resting order and reclaim escrow.
 ## Spot margin & Earn actions {#spot-margin--earn-actions}
 
 Leveraged [spot margin](../../products/spot-margin.md) and its
-[Earn](../../concepts/earn.md) lending supply side. **Available on devnet
-(preview).** All actions here are sender-authorized and return the
+[Earn](../../concepts/earn.md) lending supply side. **Live on testnet.** All actions here are
+sender-authorized and return the
 [`202 Accepted`](#202-accepted--non-order-admission) admission envelope.
+
+**Earn pays no yield yet.** A pool auto-creates with a borrow rate of **zero**, and only a
+governance vote can set a nonzero rate. Share value moves only while a pool carries a nonzero rate
+AND has an outstanding loan, so today a deposit earns exactly 0. Principal stays redeemable up to
+the pool's idle liquidity.
 
 
 
 ### Open a leveraged spot position {#spot_margin_open}
 
 :::info
-**Available .** The position is [cross-collateralized](#spot-margin--earn-actions) against your unified USDC account, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)). A pair enables only once governance calibrates its per-pair risk parameters.
+**Live on testnet.** The position is [cross-collateralized](#spot-margin--earn-actions) against your unified USDC account, including live forced liquidation (see [Liquidation](../../products/spot-margin.md#liquidation)). **A pair enables only once governance calibrates its per-pair risk parameters, and no pair is calibrated yet** — until then this action rejects with `spot margin not enabled for pair`.
 :::
 
 Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC-buy** `size` base at up to `limit_px`. The buy is funded 100% by the borrow; the position's margin requirement is **held against your account-wide free collateral** — the same unified USDC account that backs your perpetual positions — so there is **no separate collateral to post first** (leverage ≈ notional / free collateral). The bought base is held **segregated** on the margin account — it is not credited to your spendable balances. Any **unspent borrow is repaid instantly** after the IOC settles, so the outstanding loan equals only what the buy actually spent. A zero-fill IOC is an accepted no-op (full refund, nothing borrowed). v1 allows **one open position per `(account, pair)`** — no add-on. Sender-authorized; body under `action.params`.
@@ -1517,7 +1522,7 @@ Open a leveraged long: borrow `borrow` quote from the pair's Earn pool and **IOC
 ### Close a leveraged spot position {#spot_margin_close}
 
 :::info
-**Available .** See the [Spot margin & Earn](#spot-margin--earn-actions) overview for the cross-collateralized model.
+**Live on testnet.** See the [Spot margin & Earn](#spot-margin--earn-actions) overview for the cross-collateralized model.
 :::
 
 Close the position: **IOC-sell** the held base at no less than `limit_px`, repay the accrued debt (principal + interest) to the Earn pool, and return the remainder to your unified USDC account. On a **full unwind** the sale proceeds repay the debt, any leftover credits your account, the held margin requirement is released, and the position closes. A **partial fill keeps the position open**: unsold base goes back into the segregated holding, only the realized proceeds repay, and the outstanding principal drops accordingly. v1 is full-close intent only (no `size` argument — the whole holding is offered). Sender-authorized; body under `action.params`.
@@ -1545,7 +1550,7 @@ Close the position: **IOC-sell** the held base at no less than `limit_px`, repay
 ### Supply quote into the Earn pool {#earn_deposit}
 
 :::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+**Live on testnet.** Yield is zero until governance votes a nonzero borrow rate — see the [Spot margin & Earn](#spot-margin--earn-actions) overview.
 :::
 
 Supply quote into a lending pool and receive **pool shares** priced off the pool's net asset value. The first supplier into a pool mints shares **1:1**; later deposits price off NAV, so once borrower interest has lifted the pool a same-size deposit mints proportionally **fewer** shares. The pool **auto-creates on first deposit** for any asset that is the quote of a registered spot pair. Sender-authorized; body under `action.params`. `asset` is the **lendable quote asset id** (the pool key), not a pair id.
@@ -1571,10 +1576,10 @@ Supply quote into a lending pool and receive **pool shares** priced off the pool
 ### Redeem Earn pool shares {#earn_withdraw}
 
 :::info
-**Available on devnet (preview).** See the [Spot margin & Earn](#spot-margin--earn) overview for the preview caveats.
+**Live on testnet.** Yield is zero until governance votes a nonzero borrow rate — see the [Spot margin & Earn](#spot-margin--earn-actions) overview.
 :::
 
-Redeem pool shares back to quote, paid to your spendable balance. The payout is **clamped to the pool's idle liquidity** (`total_supplied − total_borrowed`): a redemption larger than idle pays exactly idle and burns proportionally fewer shares, so a supplier can always exit up to what is not lent out and never strands the borrow ledger. There is **no claim step** — yield compounds into share value as borrower interest lifts NAV, and you realize it on withdrawal. Sender-authorized; body under `action.params`.
+Redeem pool shares back to quote, paid to your spendable balance. The payout is **clamped to the pool's idle liquidity** (`total_supplied − total_borrowed`): a redemption larger than idle pays exactly idle and burns proportionally fewer shares, so a supplier can always exit up to what is not lent out and never strands the borrow ledger. There is **no claim step** — yield compounds into share value as borrower interest lifts NAV, and you realize it on withdrawal. **With no borrow rate voted, NAV does not move and the payout equals the deposit.** Sender-authorized; body under `action.params`.
 
 ```json
 {
@@ -2528,7 +2533,7 @@ Follower share redemption.
 | Field | Type | Description |
 |-------|------|-------------|
 | `vault_id` | uint64 | Vault id |
-| `shares` | decimal (string or number) | Share amount to redeem (integer share count = `shares.trunc()`) |
+| `shares` | decimal (string or number) | Share amount to redeem, as a **whole-share decimal**. A fractional share is honored, not truncated — send the share string through untouched, and do not pre-scale it. |
 
 Returns USD-cents paid out and shares burnt.
 
