@@ -19,6 +19,11 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 
 `account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
 
+**A [deployed market](../mip/mip-3.md#liquidation) can move these edges.** Its backstop settings
+raise the escalation level above the global one, and a market set to `Disabled` never escalates to
+T3 at all — it closes on the book and its deficit goes straight to the T4 waterfall. The table above
+is the default that every core market uses.
+
 ## How tiers are computed {#how-tiers-are-computed}
 
 The bands below are the **literal code constants**, not approximations.
