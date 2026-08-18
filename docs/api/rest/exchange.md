@@ -297,7 +297,7 @@ so an approved agent can act for the account it is approved for. See
 ### Spot margin & Earn {#spot-margin--earn}
 
 :::info
-**Spot margin is cross-collateralized.** Leveraged spot ([spot margin](../../products/spot-margin.md)) draws its margin from your **one unified USDC account** — the same collateral that backs your perpetual positions — and its lending supply side is [Earn](../../concepts/earn.md). The cross-collateralized model is A pair enables only once governance calibrates its per-pair risk parameters, so treat it as a **preview**: forced liquidation settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are still being calibrated. Do not assume production safety at scale.
+**Spot margin is cross-collateralized.** Leveraged spot ([spot margin](../../products/spot-margin.md)) draws its margin from your **one unified USDC account** — the same collateral that backs your perpetual positions — and its lending supply side is [Earn](../../concepts/earn.md). A pair enables only once governance calibrates its per-pair risk parameters. No pair is calibrated yet, so treat the lane as a **preview**: forced liquidation settles through the same path as a voluntary close (see [Liquidation](../../products/spot-margin.md#liquidation)), but per-pair maintenance ratios are still being calibrated. Do not assume production safety at scale.
 :::
 
 A leveraged spot position is **cross-margined against your one unified USDC account** — its initial-margin requirement is held against your account-wide free collateral, exactly like a perpetual open, so there is **no separate collateral deposit**. The buy is funded 100% by a quote borrow drawn from the pair's Earn pool, and the bought base is held **segregated** on the margin account (never in your spendable balances). Because collateral is shared, an open spot-margin position reduces your perpetual margin headroom, and a perpetual loss reduces the collateral that backs the spot-margin position (see [margin modes](../../concepts/margin-modes.md)). Earn is the other side — suppliers deposit the lendable quote for pool shares, and the borrow interest spot-margin traders pay lifts each share's value. All actions here are **sender-authorized** (the signer is the actor; there is no `owner`). `amount` / `shares` / `borrow` are decimals sent as JSON strings; `size` / `limit_px` are `u64` on the `1e8` / raw-lot planes like a [`spot_order`](#spot_order). Each returns the [`202 Accepted`](#202-accepted--non-order-admission) admission envelope (not a synchronous `oid`); observe the committed outcome via [`/info` `spot_margin_state`](./info/spot.md#spot_margin_state) and [`earn_state`](./info/spot.md#earn_state).
@@ -308,6 +308,45 @@ A leveraged spot position is **cross-margined against your one unified USDC acco
 | [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | master only | no |
 | [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | master only | no |
 | [`earn_withdraw`](#earn_withdraw) | Redeem pool shares (idle-bounded) | master only | no |
+
+**Why a pool pays nothing yet.** A pool auto-creates on the first
+[`earn_deposit`](#earn_deposit) with a borrow rate of **zero**. Nothing on the
+public path can change that rate. Only the validator action **`createEarnPool`
+(201)** sets it, and that action is a ⅔-stake governance vote — it is
+[not on `/exchange`](#non-bridged-actions). Until that vote passes, share value
+never moves and a deposit earns exactly 0. The same vote also blesses the asset
+as lendable and sets the pool's `reserve_factor_bps`. A later vote on an existing
+pool reconfigures only those two numbers; supply, shares and the borrow index are
+untouched. The rate is capped at 20000 bps per year (200%).
+
+### Spot deployment (MIP-1) {#spot-deployment}
+
+Six **sender-authorized** actions let any account register a spot token, list a
+pair for it, price it, open it, and mint its genesis supply. The signer *is* the
+deployer — there is no `owner` field, and every later call on a token or pair is
+refused unless the signer is the deployer of record. See
+[MIP-1](../../mip/mip-1.md) for the conceptual model.
+
+Registering a token or a pair **charges a deploy fee at the moment it commits**.
+The fee is the current Dutch-clock ask on that stream, and it is paid from your
+**free collateral**, not from a pre-posted bid. You bound it with
+`max_deploy_fee`: if the ask is above the value you signed, the call is rejected
+and nothing is charged. There is no bid, no escrow and no refund step anywhere in
+this lane.
+
+| `type` | Purpose | Signed-by | Charges a deploy fee |
+|--------|---------|-----------|----------------------|
+| [`spot_register_token`](#spot_register_token) | Register a new spot token | deployer (sender) | yes — `TokenRegister` stream |
+| [`spot_register_pair`](#spot_register_pair) | List a `(base, quote)` trading pair | deployer (sender) | yes — `SpotPairDeploy` stream |
+| [`spot_set_pair_params`](#spot_set_pair_params) | Set the pair's fee tier + min notional | pair deployer | no |
+| [`spot_set_pair_active`](#spot_set_pair_active) | Open or close the pair to new orders | pair deployer | no |
+| [`spot_seed_holders`](#spot_seed_holders) | Stage genesis holder rows (repeatable) | token deployer | no |
+| [`spot_finalize_supply`](#spot_finalize_supply) | Check the staged total, then mint once | token deployer | no |
+
+Every action here returns the
+[`202 Accepted`](#202-accepted--non-order-admission) admission envelope. Confirm
+the allocated ids and the committed spec through
+[`/info` `spot_meta`](./info/spot.md).
 
 ### Margin & risk {#margin--risk}
 
@@ -374,6 +413,7 @@ planes and the digest-bound `owner` rule.
 | [`vault_transfer`](#vault_transfer) | Leader seed transfer | master only |
 | [`vault_modify`](#vault_modify) | Leader-only vault config update | master only |
 | [`vault_withdraw`](#vault_withdraw) | Follower share redemption | master only |
+| [`register_metaliquidity_operator`](#register_metaliquidity_operator) | Leader grants or revokes an operator key on a Metaliquidity vault | vault leader only |
 
 ### Bridge withdrawals {#bridge-withdrawals}
 
@@ -1599,6 +1639,412 @@ Redeem pool shares back to quote, paid to your spendable balance. The payout is 
 
 ---
 
+## Spot deployment actions (MIP-1) {#spot-deployment-actions}
+
+The permissionless spot deployer lane. **Live on testnet.** See the
+[catalog entry](#spot-deployment) for the fee model, and
+[MIP-1](../../mip/mip-1.md) for the concepts.
+
+All six are **sender-authorized**: the recovered signer is the deployer, no
+action carries an `owner`, and an agent signature acts for the agent's own
+account. The body goes under `action.params`.
+
+**Governance off-switch.** `mip1_enabled` closes the whole lane. When governance
+sets it `false`, every action here rejects with
+`MIP-1 spot deployment disabled by governance`.
+
+:::info
+**Two new rejection rules ship in the next release.** They are written here
+ahead of activation and are **not live yet** — the network accepts the current
+behaviour until the release activates. (1) `wei_decimals` of `0` becomes
+invalid; see [`spot_register_token`](#spot_register_token). (2) A per-epoch cap
+on new registrations begins to bind; see [Deploy rate limits](#deploy-rate-limits).
+:::
+
+### Deploy rate limits {#deploy-rate-limits}
+
+Two governance-set numbers bound this lane. Both are voted through
+[validator governance](./info/governance.md):
+
+| Param | Unit | Binds |
+|-------|------|-------|
+| `mip3_max_deploys_per_epoch` | count | New registrations per **deploy epoch** — a fixed window of 100,000 committed rounds, about 3 hours at the current cadence, NOT the staking epoch. Counted across [`spot_register_token`](#spot_register_token), [`spot_register_pair`](#spot_register_pair) and perp registration. `0` means uncapped, never blocked |
+| `mip3_fee_ceiling_bps` | **bps** | The highest market fee a deployer may set |
+
+:::warning
+**`0` means uncapped, not blocked.** Both params are `0` on the live network
+today, and `0` leaves the lane fully open. These are **rate** controls; the
+**off-switches** are `mip1_enabled` and `mip3_enabled`. Never read a `0` cap as
+"deployment is closed".
+:::
+
+**Unit trap.** `mip3_fee_ceiling_bps` is in **basis points**, while
+`taker_fee_dbps` / `maker_fee_dbps` on the wire are in **deci-bps** (tenths of a
+basis point). They differ by a factor of 10. A fee is rejected if it exceeds
+either the deci-bps per-market cap of `500` (50 bps) or the bps ceiling, whenever
+that ceiling is non-zero.
+
+**Enforcement of both params activates in the next release.** Today they are
+served on `/info` and bind nothing.
+
+---
+
+### Register a spot token {#spot_register_token}
+
+Register a fresh spot token and allocate its asset id. This creates the token
+record only — it has no trading pair and no supply yet. Charges the
+`TokenRegister` Dutch-clock ask at commit.
+
+```json
+{
+  "type": "spot_register_token",
+  "params": {
+    "symbol": "ACME",
+    "sz_decimals": 2,
+    "wei_decimals": 8,
+    "max_deploy_fee": "500"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `symbol` | string | non-empty, ≤ 32 chars, not already in use | Token symbol. Checked against every existing spot **and** perp symbol |
+| `sz_decimals` | uint8 | `0`–`6` | Display / size precision. A value above `6` is rejected |
+| `wei_decimals` | uint8 | `0`–`18` today; **`1`–`18` from the next release** | Native token decimals. See the warning below |
+| `max_deploy_fee` | decimal string | `≥ 0` | Highest deploy fee you accept, in whole USDC. Sent as a JSON string |
+
+:::warning
+**Set `wei_decimals` to at least 1.** A token registered with `wei_decimals = 0`
+is accepted today, and it becomes lossy the moment governance binds an EVM
+contract to it: the Core-to-EVM path then divides by `10^8` and **destroys any
+balance below one whole token**. The next release rejects `0` at admission, but
+that reject cannot repair a token already registered with `0`. Treat `0` as
+invalid now.
+:::
+
+**Gating.** Rejected if `symbol` is empty, longer than 32 characters, or already
+used by a spot token, spot pair or perp market; if `sz_decimals` exceeds `6`; if
+`wei_decimals` exceeds `18`; if `max_deploy_fee` is negative; if the current ask
+exceeds `max_deploy_fee`; if your free collateral is below the ask; or if
+governance has closed the lane. The fee comes out of **free** collateral, so an
+account whose value is committed to open positions is refused even when its total
+value covers the ask.
+
+**You cannot self-declare a canonical token.** The wire carries no
+`is_canonical`, no `evm_contract` and no `evm_extra_wei_decimals` field. A
+deployer never binds its own EVM contract; that binding is a governance action.
+
+**Response.** The [`202 Accepted`](#202-accepted--non-order-admission) admission
+envelope. The allocated asset id appears on
+[`/info` `spot_meta`](./info/spot.md); ids for this lane start at `1000`.
+
+---
+
+### List a spot trading pair {#spot_register_pair}
+
+List a `(base, quote)` pair over two registered tokens and allocate its pair id.
+The pair starts **inactive** and unconfigured. Charges the `SpotPairDeploy`
+Dutch-clock ask at commit.
+
+```json
+{
+  "type": "spot_register_pair",
+  "params": {
+    "base": 1000,
+    "quote": 100,
+    "name": "ACME/USDC",
+    "max_deploy_fee": "500"
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `base` | uint32 | a registered token, `≠ quote` | Base token id |
+| `quote` | uint32 | **must be USDC** | Quote token id |
+| `name` | string | not already in use by another pair | Pair display name |
+| `max_deploy_fee` | decimal string | `≥ 0` | Highest deploy fee you accept, in whole USDC |
+
+:::info
+**The quote must be USDC.** Spot fees are collected in the quote asset and drain
+into shared pools that the buyback settles **as USDC**. A non-USDC quote would
+let a destroyed non-USDC fee mint USDC one-for-one, so it is refused at listing
+and refused again at activation.
+:::
+
+**Gating.** Rejected if `base` or `quote` is not registered, if `base == quote`,
+if `quote` is not USDC, if `name` collides with an existing pair, if
+`max_deploy_fee` is negative, if the ask exceeds `max_deploy_fee`, if your free
+collateral is below the ask, or if governance has closed the lane.
+
+**Response.** The `202 Accepted` admission envelope. An empty order book is
+created with the pair, so trading paths see it as soon as it is configured and
+activated.
+
+---
+
+### Set a pair's fee tier and min notional {#spot_set_pair_params}
+
+Set the pair's maker/taker fees **and** its minimum order notional in one signed
+intent. A pair needs both before it can be activated. Deployer-only; charges no
+fee.
+
+```json
+{
+  "type": "spot_set_pair_params",
+  "params": {
+    "pair": 1001,
+    "taker_fee_dbps": 30,
+    "maker_fee_dbps": 10,
+    "min_notional_cents": 1000
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | a pair you deployed | Spot pair id |
+| `taker_fee_dbps` | uint32 | `< 1000`, and `≤ 500` | Taker fee in **deci-bps** (tenths of a bp) |
+| `maker_fee_dbps` | uint32 | `< 1000`, and `≤ 500` | Maker fee in **deci-bps** |
+| `min_notional_cents` | uint64 | `1`–`100000000` | Minimum order notional, in USDC cents |
+
+**Fees are deci-bps.** `taker_fee_dbps: 30` is 3 basis points, not 30. Values of
+`1000` or more are refused at admission; the committed cap is `500` (50 bps) on
+each leg.
+
+**Gating.** Rejected if you are not the pair's deployer, if the target is a token
+registration rather than a trading pair, if either fee is at or above `1000`
+deci-bps or above the `500` cap, if `min_notional_cents` is `0`, or if it exceeds
+`100000000` cents. A `0` floor is refused because it would let the pair activate
+with no dust floor; the upper cap stops one mis-signed intent from making a live
+pair untradeable. From the next release a non-zero `mip3_fee_ceiling_bps` also
+binds here — see [Deploy rate limits](#deploy-rate-limits).
+
+---
+
+### Open or close a pair {#spot_set_pair_active}
+
+Flip the pair between accepting and refusing new orders. Deployer-only; charges
+no fee.
+
+```json
+{
+  "type": "spot_set_pair_active",
+  "params": { "pair": 1001, "active": true }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | a pair you deployed | Spot pair id |
+| `active` | bool | — | `true` opens the pair, `false` closes it |
+
+**Opening** requires the pair to be fully configured — a fee tier **and** a min
+notional must already be set by
+[`spot_set_pair_params`](#spot_set_pair_params) — and the quote must be USDC.
+Where a trading grid is required, the pair also needs a non-zero tick size and
+lot size.
+
+**Closing refunds every resting order.** Deactivation drains the pair's book and
+returns each resting order's locked escrow to its owner. Nothing is stranded in a
+reserved balance. Existing **balances** are untouched; only resting orders are
+cleared.
+
+**Gating.** Rejected if you are not the pair's deployer, if an open is attempted
+on a pair that is not fully configured, if the quote is not USDC, or if a
+required trading grid is missing.
+
+---
+
+### Stage genesis holder rows {#spot_seed_holders}
+
+Stage a genesis distribution for a token you deployed. This writes **no balances
+and no supply** — it only records the intended rows. It is **repeatable**, so a
+large distribution splits across several signed calls.
+
+```json
+{
+  "type": "spot_seed_holders",
+  "params": {
+    "asset": 1000,
+    "holders": ["0x1111...", "0x2222..."],
+    "amounts": ["1000000", "250000.5"]
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a token you deployed, `≥ 1000` | Spot token being staged |
+| `holders` | array of address strings | 1–128 per call, ≤ 4096 per token | Recipient addresses, parallel with `amounts` |
+| `amounts` | array of decimal strings | each `> 0` | Whole-unit amounts, parallel with `holders`. Sent verbatim as JSON strings |
+
+**A holder may be staged once only.** A repeat address — inside one call or
+across calls — is rejected. Silent accumulation would let the
+[checksum](#spot_finalize_supply) be satisfied by a distribution you did not
+intend.
+
+**Gating.** Rejected if `holders` and `amounts` differ in length; if `holders` is
+empty or longer than 128 rows; if the token already has final supply; if you are
+not the token's deployer; if any amount is zero or negative; if any amount is
+**finer than the token's `wei_decimals`**; if a holder repeats; if more than 64
+tokens hold a staged genesis at once; if the token would exceed 4096 staged rows;
+or if the running total would pass the supply ceiling of `1000000000000` whole
+units. USDC and every reserved core asset id are refused outright — this lane can
+only mint tokens registered through it.
+
+**Response.** The `202 Accepted` admission envelope. The committed outcome
+reports how many holders are staged for the token in total.
+
+---
+
+### Mint the genesis supply {#spot_finalize_supply}
+
+Seal the token: sum every staged row, compare that total against your
+`max_supply` checksum, then credit all holders and set total supply in **one**
+step. This is the only action in the lane that creates supply, and it succeeds
+**once** per token.
+
+```json
+{
+  "type": "spot_finalize_supply",
+  "params": { "asset": 1000, "max_supply": "1250000.5" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a token you deployed with staged rows | Spot token being sealed |
+| `max_supply` | decimal string | must equal the staged total exactly | Checksum over every staged row, in whole units. Sent verbatim as a JSON string |
+
+:::warning
+**`max_supply` is a checksum, never a target.** It does not define the
+distribution — the staged rows do. It proves your `spot_seed_holders` sequence
+arrived whole. Every staged amount is positive, so a dropped or truncated staging
+call lowers the total, the comparison fails, and the mint refuses. Never derive
+your seeds from `max_supply`; derive `max_supply` by summing your seeds.
+:::
+
+**Gating.** Rejected if the token has no staged genesis, if you are not the
+deployer of record, if supply is already final, if `max_supply` does not equal
+the staged total, or if that total is non-positive or above `1000000000000` whole
+units.
+
+**Response.** The `202 Accepted` admission envelope; the committed outcome
+reports the minted total. Total supply is recorded from the **derived** sum, not
+from the string you sent, so two numerically equal strings commit identical
+bytes. After this succeeds the token's staged rows are cleared and no further
+mint is possible.
+
+---
+
+## Perp deployment actions (MIP-3) {#perp-deployment-actions}
+
+:::warning
+**Not live yet.** These nine actions are built and frozen in the node. They land
+with the next release, and the chain answers `unknown variant` until then. Build
+against them now; do not expect a call to succeed before the release.
+:::
+
+Permissionless perp market deployment. Each action is sender-authorized: the
+recovered signer is the deployer. After `perp_register_asset`, only that market's
+deployer or one of its sub-deployers may call the rest.
+
+**What a deploy requires.** The deployer must hold at least the staked-MTF floor
+(50,000 by default, governance-tunable), and pays the Dutch-clock ask at
+registration from free collateral. **No action carries a bid** — a non-zero bid is
+refused. A registered market lands in the deployer's own dex with an asset id at
+or above 1000, never in the primary dex.
+
+**Rate limit.** Registrations are counted against `mip3_max_deploys_per_epoch`
+per deploy epoch — see [Limits](../../mip/mip-3.md#limits). `0` means uncapped.
+
+### Register a perp asset {#perp_register_asset}
+
+```json
+{ "type": "perp_register_asset", "params": { "symbol": "WIF", "decimals": 8 } }
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `symbol` | string | non-empty | Market symbol |
+| `decimals` | uint8 | `0` keeps the default of 8 | Token decimals |
+
+### Set the market oracle {#perp_set_oracle}
+
+```json
+{ "type": "perp_set_oracle", "params": { "asset": 1000, "oracle_source_mask": 3 } }
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `oracle_source_mask` | uint16 | bounded to the ten defined sources | Bitmask of enabled sources |
+
+### Set max leverage {#perp_set_leverage}
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `max_leverage` | uint8 | `1`-`50` | Max leverage |
+
+### Set the fee tier {#perp_set_fee_tier}
+
+**The units differ inside one call.** `taker_fee_dbps` and `maker_fee_dbps` are
+DECI-bps (tenths of a bp); `deployer_fee_bps` is whole bps. A value moved between
+them is off by ten. Every fee is bounded by the governance ceilings
+`mip3_fee_ceiling_bps` and the deployer fee cap.
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `taker_fee_dbps` | uint32 | at or below the ceiling | Taker fee, DECI-bps |
+| `maker_fee_dbps` | uint32 | at or below the ceiling | Maker fee, DECI-bps |
+| `deployer_fee_bps` | uint32 | at or below the deployer cap | Your cut, whole bps |
+
+### Set the maker rebate {#perp_set_maker_rebate}
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `rebate_bps` | uint16 | `0`-`2` | Maker rebate, whole bps |
+
+### Set the minimum order size {#perp_set_min_size}
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `min_order_size` | uint64 | `> 0` | Minimum size, in the market's size plane |
+
+### Activate and deactivate a market {#perp_activate_market}
+
+`perp_activate_market` opens the market for trading; `perp_deactivate_market`
+closes it. Both take one field.
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+
+### Delegate to a sub-deployer {#perp_set_sub_deployers}
+
+```json
+{
+  "type": "perp_set_sub_deployers",
+  "params": { "asset": 1000, "sub_deployer": "0x…", "add": true }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `sub_deployer` | address | `0x`-hex | The delegate |
+| `add` | bool | | `true` adds, `false` removes |
+
+**Liquidation on a deployed market follows the market's own backstop settings** —
+see [MIP-3 liquidation](../../mip/mip-3.md#liquidation). A market that prices from
+its own oracle defaults to `Disabled`.
+
 ## Perpetual margin & risk actions {#perpetual-margin--risk-actions}
 
 Leverage, isolated-margin, and portfolio-margin controls for **perpetual**
@@ -2539,6 +2985,58 @@ Returns USD-cents paid out and shares burnt.
 
 ---
 
+### Register a Metaliquidity vault operator {#register_metaliquidity_operator}
+
+Grant or revoke an **operator key** on a Metaliquidity vault. The operator is an
+off-chain market-making key that then signs orders with `owner` set to the
+**vault address**. Leader-only; the recovered signer must be the vault's leader.
+See [MIP-2](../../mip/mip-2.md) and
+[agent wallets](../../concepts/agent-wallets.md).
+
+```json
+{
+  "type": "register_metaliquidity_operator",
+  "params": {
+    "vault_id": 7,
+    "operator": "0x1111111111111111111111111111111111111111",
+    "allowed": true,
+    "expires_at_ms": 1767225600000
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `vault_id` | uint64 | an existing Metaliquidity vault | Vault to grant on |
+| `operator` | address string | non-zero; **must be in the Metaliquidity set** on a grant | Operator key |
+| `allowed` | bool | — | `true` grants, `false` revokes |
+| `expires_at_ms` | uint64 \| null | optional | Expiry in consensus milliseconds. Omit for no expiry |
+
+:::warning
+**A grant only works for a key governance already recognizes.** On
+`allowed: true` the `operator` must already be a member of the governance-voted
+Metaliquidity set. A leader cannot delegate vault-trading authority to an
+arbitrary key: a non-member is rejected here and never recorded, so a key signing
+as the vault address that was not both set-member and leader-registered is
+refused at `/exchange`. The set itself is changed only by a governance vote.
+:::
+
+**A grant writes an ordinary agent approval** on the vault address — the same
+structure [`approve_agent`](#approve_agent) writes and the same one `/exchange`
+reads. A revoke removes it. A revoke is accepted even for a key that is not in
+the Metaliquidity set, so a leader can always withdraw authority from a key that
+governance has since dropped.
+
+**Gating.** Rejected if the vault does not exist, if it is not a Metaliquidity
+vault, if the signer is not the vault leader, if `operator` is the zero address,
+or — on a grant only — if `operator` is not in the Metaliquidity set.
+
+**Signing.** `expires_at_ms` is **always** part of the digest. Omitting it signs
+as `0`; encode `expiresAtMs = 0` in the typed struct when you leave it out. See
+[typed-data signing](../../integration/typed-data-signing.md#metaliquidity).
+
+---
+
 ### Transfer USDC from Core to EVM {#core_evm_transfer}
 
 Move USDC from the **Core clearing ledger** to the **MetaFluxEVM** side: debits
@@ -3000,6 +3498,7 @@ here only to redirect integrators to the supported path.
 | `WithdrawUsdc` | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use mb_withdraw"`) | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
 | (BOLE pool) | `borrow_lend` | **Bridged and live.** `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` open to any account; `"Borrow"` refused unless the sender is an approved liquidator | — |
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit | [vaults](../../concepts/vaults.md#depositing) |
+| (Earn pool config) | `create_earn_pool` | **Validator governance, never a user action.** `createEarnPool` (201) is a ⅔-stake vote submitted through node governance. It is the **only** way an Earn pool gets a non-zero borrow rate — see [why that matters](#spot-margin--earn) | [`earn_deposit`](#earn_deposit) auto-creates a pool at rate `0` |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` **is** a bridged alias (no params) for the canonical action's `enroll:false` form; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` | — |
 | (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |

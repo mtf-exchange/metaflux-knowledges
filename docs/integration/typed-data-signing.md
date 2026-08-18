@@ -233,6 +233,22 @@ Notes on specific fields:
 `vault_transfer.deposit` = `true` deposits, `false` withdraws; `amount` is a
 canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
 
+### Metaliquidity {#metaliquidity}
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `register_metaliquidity_operator` | `MetaFluxTransaction:RegisterMetaliquidityOperator(string metafluxChain,uint64 vaultId,address operator,bool allowed,uint64 expiresAtMs,uint64 nonce)` |
+
+**`expiresAtMs` is a sentinel.** For an operator that never expires, OMIT
+`expires_at_ms` from the POST params and sign `expiresAtMs = 0`. **Sending an
+explicit `expires_at_ms: 0` is rejected**, because absent and explicit zero
+flatten to the same digest and the node refuses the ambiguity.
+
+`expiresAtMs` is **always** in the digest, even though `expires_at_ms` is
+optional on the wire. **Omitting it signs as `0`** — encode `expiresAtMs = 0`.
+Sign a non-zero value and the approval carries that expiry. See
+[`register_metaliquidity_operator`](../api/rest/exchange.md#register_metaliquidity_operator).
+
 ### Spot margin {#spot-margin}
 
 | `action.type` | `encodeType` |
@@ -250,6 +266,72 @@ integers.
 | `earn_withdraw` | `MetaFluxTransaction:EarnWithdraw(string metafluxChain,uint32 asset,string shares,uint64 nonce)` |
 
 `amount` and `shares` are canonical decimal strings.
+
+There is **no typed struct for `createEarnPool`**. It is a validator governance
+vote, not a user action, and it is
+[not on `/exchange`](../api/rest/exchange.md#non-bridged-actions).
+
+### Spot deployment (MIP-1) {#spot-deployment}
+
+The six [spot deployer](../api/rest/exchange.md#spot-deployment-actions) actions.
+Each is sender-authorized, so **no struct carries an `owner`** — the recovered
+signer is the deployer.
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `spot_register_token` | `MetaFluxTransaction:SpotRegisterToken(string metafluxChain,string symbol,uint8 szDecimals,uint8 weiDecimals,string maxDeployFee,uint64 nonce)` |
+| `spot_register_pair` | `MetaFluxTransaction:SpotRegisterPair(string metafluxChain,uint32 base,uint32 quote,string name,string maxDeployFee,uint64 nonce)` |
+| `spot_set_pair_params` | `MetaFluxTransaction:SpotSetPairParams(string metafluxChain,uint32 pair,uint32 takerFeeDbps,uint32 makerFeeDbps,uint64 minNotionalCents,uint64 nonce)` |
+| `spot_set_pair_active` | `MetaFluxTransaction:SpotSetPairActive(string metafluxChain,uint32 pair,bool active,uint64 nonce)` |
+| `spot_seed_holders` | `MetaFluxTransaction:SpotSeedHolders(string metafluxChain,uint32 asset,address[] holders,string[] amounts,uint64 nonce)` |
+| `spot_finalize_supply` | `MetaFluxTransaction:SpotFinalizeSupply(string metafluxChain,uint32 asset,string maxSupply,uint64 nonce)` |
+
+### Perp deployer actions {#perp-deployer-actions}
+
+:::warning
+**Not live yet.** These nine types are frozen in the node and land with the next
+release. The chain refuses them until that release fires. Build against them, but
+expect `unknown variant` until then.
+:::
+
+The nine [perp deployer](../api/rest/exchange.md#perp-deployment-actions) actions.
+Each is sender-authorized: the recovered signer is the deployer, and per-market
+authority is checked against the market's deployer and its sub-deployers.
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `perp_register_asset` | `MetaFluxTransaction:PerpRegisterAsset(string metafluxChain,string symbol,uint8 decimals,uint64 nonce)` |
+| `perp_set_oracle` | `MetaFluxTransaction:PerpSetOracle(string metafluxChain,uint32 asset,uint16 oracleSourceMask,uint64 nonce)` |
+| `perp_set_leverage` | `MetaFluxTransaction:PerpSetLeverage(string metafluxChain,uint32 asset,uint8 maxLeverage,uint64 nonce)` |
+| `perp_set_fee_tier` | `MetaFluxTransaction:PerpSetFeeTier(string metafluxChain,uint32 asset,uint32 takerFeeDbps,uint32 makerFeeDbps,uint32 deployerFeeBps,uint64 nonce)` |
+| `perp_set_maker_rebate` | `MetaFluxTransaction:PerpSetMakerRebate(string metafluxChain,uint32 asset,uint16 rebateBps,uint64 nonce)` |
+| `perp_set_min_size` | `MetaFluxTransaction:PerpSetMinSize(string metafluxChain,uint32 asset,uint64 minOrderSize,uint64 nonce)` |
+| `perp_activate_market` | `MetaFluxTransaction:PerpActivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
+| `perp_deactivate_market` | `MetaFluxTransaction:PerpDeactivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
+| `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
+
+**Fee units differ inside one struct.** `takerFeeDbps` and `makerFeeDbps` are
+DECI-bps; `deployerFeeBps` is bps. A value moved between the two fields is off by
+ten.
+
+**No struct carries a bid.** A perp market is priced by the Dutch clock and paid
+at registration, so a non-zero bid is refused.
+
+`maxDeployFee` and `maxSupply` are canonical decimal strings under the
+[hash-then-parse rule](#decimals-are-canonical-strings--hash-then-parse) — hash
+the exact characters you send.
+
+**`spot_seed_holders` carries two arrays**, and both are in the digest.
+`holders` is `address[]`; `amounts` is `string[]`, one canonical decimal string
+per holder, in the **same order**. Encode each array as
+`keccak256(` concat of the elements' 32-byte words `)`, where a `string[]`
+element's word is `keccak256(utf8_bytes)` of that string. The two arrays are
+parallel: reordering one alone changes the digest and produces a different
+distribution.
+
+**None of these six carries a bid field.** The deploy fee is paid at commit and
+bounded by the signed `maxDeployFee`; there is nothing to escrow and nothing to
+refund.
 
 ### Agent abstraction & bridge {#agent-abstraction--bridge}
 
