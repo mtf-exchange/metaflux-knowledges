@@ -3188,20 +3188,14 @@ step 1 answers first.
 
 ### Send a token to MetaFluxEVM with a payload {#send_to_evm_with_data}
 
-:::warning
-**Not live yet. The live network refuses this action today.** Post it now and you
-get `400` with `sendToEvmWithData is retired; use coreEvmTransfer`. The refusal is
-clean — nothing moves, and **the account nonce is not spent**, so your next action
-reuses the same nonce.
+:::info
+**Live.** Corrected 2026-08-19: this box used to say the network refused the action
+and told you to use [`core_evm_transfer`](#core_evm_transfer) instead. That
+stopped being true when the lane was restored and released, so the box was telling
+callers a live action was refused.
 
-The action returns, with every rule below, at the **next network release**. This
-page is written to that target state on purpose, so a client can be built and
-signed against it first. Until the release lands, move the same value with
-[`core_evm_transfer`](#core_evm_transfer), which is live at every height and lands
-the identical credit.
-
-`{"type":"web_data","address":"0x…"}` carries the live `height` if you need to
-check where the chain is.
+Writing a page ahead of the code is deliberate here. The reverse is not, and this is
+what it looks like. Everything below describes what runs today.
 :::
 
 Move a token from the **Core ledger** to **MetaFluxEVM**, and optionally run an
