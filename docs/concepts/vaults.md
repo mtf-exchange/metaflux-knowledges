@@ -15,7 +15,7 @@ Two vault kinds share one action set: the protocol-operated **Metaliquidity vaul
 
 A vault created with `kind: "Metaliquidity"` (gated to an MLP-whitelisted leader). It plays three roles:
 
-1. **Backstop counter-party**: when a T3 liquidation hands the position to the protocol, the Metaliquidity vault absorbs the position and any residual loss. This path is governance-armed, not on by default — check the live [T3 backstop](./tiered-liquidation.md#t3-backstop--netting-at-mark) state before relying on it.
+1. **Backstop counter-party**: the vault takes over a failing position, and any residual loss, before the rest of the ladder runs. **This is live on the core markets since 2026-08-18.** Each absorption is bounded — 40% of live NAV per takeover and 100,000 USDC per block today, both governance-set — but those bound an EPISODE, not the vault's lifetime exposure. It is refused on a [builder-deployed market](../mip/mip-3.md#liquidation). Read [T3 backstop](./tiered-liquidation.md#mlp-first-bite) for what a depositor now carries.
 2. **Market making (planned)**: idle capital can be deployed into market-making strategies on selected markets.
 3. **Insurance**: holds reserves to socialise small losses without firing T4 ADL.
 
@@ -176,6 +176,8 @@ Leader-only. `new_lock_period_secs` is **always rejected** if it is non-null and
 
 A vault can lose money like any account. If NAV falls to or below its liabilities, withdrawals against it reflect that loss at the prevailing share price — there is no separate insolvency backstop for a `User` vault.
 
+A **Metaliquidity** vault carries one risk a user vault does not: it is the **first-loss taker** on the core markets. It inherits failing positions and absorbs deficit before ADL and before the insurance fund. It is paid for that — it keeps 70% of the liquidation fee on the notional it takes, by default — but the exposure is real and it lands on share price. See [the first bite](./tiered-liquidation.md#mlp-first-bite).
+
 A vault that goes T3 (its own liquidation tier) follows the [tiered liquidation](./tiered-liquidation.md) ladder. T4 ADL on a vault claws back from depositors via share-price markdown.
 
 The vault address is on-chain forever; even an empty vault sticks around (gas-paid storage isn't reclaimable in V1).
@@ -212,7 +214,7 @@ per-caller `your_*` fields — query [`user_vault_equities`](../api/rest/info.md
 
 ## Insurance pool {#insurance-pool}
 
-A subset of the Metaliquidity vault is the **insurance pool** — a designated reserve that draws down during T3 backstop events. See [tiered liquidation: T3 backstop](./tiered-liquidation.md#t3-backstop--netting-at-mark) for the armed/inert state before relying on this path.
+A subset of the Metaliquidity vault is the **insurance pool** — a designated reserve that draws down during T3 backstop events. The vault now bites **before** the insurance pool: see [the first bite](./tiered-liquidation.md#mlp-first-bite) and the [deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall) for the order.
 
 ## Edge cases {#edge-cases}
 
@@ -255,7 +257,7 @@ sequenceDiagram
 <summary>Show FAQ</summary>
 
 **Q: Are Metaliquidity vault deposits insured?**
-A: No. They earn from T1/T2 backstop activity and absorb T3 losses. Net returns are positive in normal conditions, can be negative during severe stress.
+A: No. They earn from backstop activity — 70% of the liquidation fee on taken notional, by default — and they absorb the losses first. Net returns are positive in normal conditions, and can be negative during severe stress.
 
 **Q: Can a vault hold non-USDC assets?**
 A: V1 vaults are USDC-denominated only.

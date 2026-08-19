@@ -168,10 +168,12 @@ deployer oracle. Read the settings back before you rely on them: a vote that
 records `deficit_cap` does not bound anything today.
 
 :::warning
-**The protocol's Metaliquidity vault does NOT backstop a deployed market.** It
-takes over failing positions on the core markets only. A deployed market is
-refused at both entry points, whether or not it prices from its own oracle, so
-its bad debt can never reach the vault's liquidity providers.
+**The protocol's Metaliquidity vault does NOT backstop a deployed market.** The
+vault backstop is **live on the core markets since 2026-08-18** — there it takes
+over a failing position ahead of the netting, and pays deficit ahead of ADL. A
+deployed market is refused at **both** entry points, whether or not it prices
+from its own oracle, so its bad debt can never reach the vault's liquidity
+providers.
 
 Plan for it. Your market's shortfall is handled by its own backstop settings, its
 own participants and, past those, the deficit waterfall — never by protocol LP

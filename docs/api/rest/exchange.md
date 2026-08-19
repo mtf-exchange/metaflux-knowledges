@@ -425,7 +425,7 @@ own account, never the master's.
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
 | [`core_evm_transfer`](#core_evm_transfer) | Move a spot asset from the Core ledger to MetaFluxEVM, optionally with an EVM payload | master only |
-| [`send_to_evm_with_data`](#send_to_evm_with_data) ⚠️ | The same Core → EVM move in the Hyperliquid-compatible field shape. **Refused on the live network today** — see the section | master only |
+| [`send_to_evm_with_data`](#send_to_evm_with_data) ⚠️ | The same Core → EVM move in the Hyperliquid-compatible field shape. **Live.** It refuses five things Hyperliquid accepts and ignores — see the section | master only |
 | [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
 
 Both Core → EVM rows reach the same lane and land the same credit.
@@ -3295,7 +3295,7 @@ delivered-and-executed transfer from a delivered-and-reverted one.
 
 | | [`core_evm_transfer`](#core_evm_transfer) | `send_to_evm_with_data` |
 |---|---|---|
-| Availability | **live at every height** | next network release |
+| Availability | **live at every height** | **live** |
 | Field shape | MTF-native (`asset`, `destination`, `to_evm`) | Hyperliquid-compatible (`token`, `destination_recipient`, `source_dex`, `to_perp`) |
 | **Which ledger it debits** | `asset: 0` debits the **perp collateral pool**, gated on free collateral; a non-zero `asset` debits the spot ledger | **always the spot ledger**, `token: 0` included |
 | Can move USDC held as collateral | **yes** — this is the lane for it | no |
@@ -3305,9 +3305,9 @@ delivered-and-executed transfer from a delivered-and-reverted one.
 | The MTF fee | [the same fee](#core-evm-fee), `0` today | [the same fee](#core-evm-fee), `0` today |
 
 **Use `core_evm_transfer`** unless you are porting a client that already builds
-the Hyperliquid field shape. It is live today, its omittable fields keep an
-existing signature byte-identical, and it is the only one of the two that can move
-USDC out of the perp collateral pool.
+the Hyperliquid field shape. Both are live. `core_evm_transfer` keeps an existing
+signature byte-identical through its omittable fields, and it is the only one of
+the two that can move USDC out of the perp collateral pool.
 
 **Response.** Non-order action →
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):

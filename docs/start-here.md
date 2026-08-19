@@ -38,8 +38,10 @@ no account application, no gatekeeper.
 
 Also live in devnet preview:
 
-- **Earn yield on idle USDC** through [Earn](concepts/earn.md), a lending pool
-  that pays interest.
+- **Supply idle USDC** to [Earn](concepts/earn.md), a lending pool that pays the
+  interest spot-margin borrowers owe. **It pays zero today** — the borrow rate is
+  `0` and no pair is calibrated for borrowing, so a redemption returns the
+  principal. Two governance votes change that.
 - **Leveraged spot trading** (spot margin), funded by Earn. See
   [spot margin](products/spot-margin.md).
 

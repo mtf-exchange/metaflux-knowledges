@@ -168,12 +168,13 @@ Notes on specific fields:
 - `send_to_evm_with_data`: `data` is a `bytes` field — hashed as
   `keccak256(raw_bytes)`, so an empty payload hashes the empty byte string. On the
   POST it is an array of byte integers, not a hex string.
-- ⚠️ **`send_to_evm_with_data` is refused on the live network today** and returns
-  `400 sendToEvmWithData is retired; use coreEvmTransfer`. The type string above is
-  frozen and safe to implement now; the action itself returns at the next network
-  release. See
-  [the action](../api/rest/exchange.md#send_to_evm_with_data) for the rules that
-  turn on with it.
+- **`send_to_evm_with_data` is live.** An earlier version of this note said the
+  network refused the action. That stopped being true when the lane was restored
+  and released. The type string above is frozen. The action does refuse five
+  things: a `source_dex` other than `0`, `to_perp: true`, a
+  `destination_chain_id` that is neither `0` nor the local EVM chain id, `data`
+  over 4096 bytes, and an amount that truncates to a zero EVM credit. See
+  [the action](../api/rest/exchange.md#send_to_evm_with_data) for each rule.
 
 ### Account, staking & vault {#account-staking--vault}
 
@@ -192,12 +193,17 @@ Notes on specific fields:
 | `create_vault` | `MetaFluxTransaction:CreateVault(string metafluxChain,string name,uint64 lockPeriodSecs,uint8 kind,uint64 nonce)` |
 | `vault_modify` | `MetaFluxTransaction:VaultModify(string metafluxChain,uint64 vaultId,string newName,uint64 nonce)` |
 | `spot_margin_close` | `MetaFluxTransaction:SpotMarginClose(string metafluxChain,uint32 pair,uint64 limitPx,uint64 nonce)` |
+| `noop` | `MetaFluxTransaction:Noop(string metafluxChain,uint64 nonce)` |
 
 Notes on specific fields:
 
 - `claim_rewards`: `validator` = the zero address means **claim across all
   delegations**.
 - `create_vault`: `kind` is `0` = User, `1` = Metaliquidity.
+- [`noop`](../api/rest/exchange.md#noop): the chain tag and the envelope nonce are
+  the **only** signed fields, because the action carries no params. It touches no
+  state; it burns the nonce. Use it to invalidate an in-flight action signed with
+  the same nonce.
 - `approve_broker_fee`: the row above is **not** a typographic error. The action
   type says `broker`; the `encodeType` says `ApproveBuilderFee`. Sign the string
   exactly as printed. The type string is hashed into every signature ever made
@@ -270,6 +276,21 @@ integers.
 There is **no typed struct for `createEarnPool`**. It is a validator governance
 vote, not a user action, and it is
 [not on `/exchange`](../api/rest/exchange.md#non-bridged-actions).
+
+### BOLE pool {#bole-pool}
+
+| `action.type` | `encodeType` |
+|---------------|--------------|
+| `borrow_lend` | `MetaFluxTransaction:BorrowLend(string metafluxChain,uint8 kind,string amount,uint64 nonce)` |
+
+**`kind` signs as a `uint8`, not as the string you POST.** The wire carries
+`"Lend"` / `"UnLend"` / `"Borrow"` / `"Repay"`; the digest carries `0` / `1` / `2`
+/ `3` in that order. Sign the number, post the string. `amount` is a canonical
+decimal string.
+
+`"Borrow"` is refused unless the sender is an approved liquidator. The other three
+kinds are open to any account. See
+[`borrow_lend`](../api/rest/exchange.md#non-bridged-actions).
 
 ### Spot deployment (MIP-1) {#spot-deployment}
 

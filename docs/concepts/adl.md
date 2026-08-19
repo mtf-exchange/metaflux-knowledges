@@ -1,12 +1,12 @@
 # Auto-deleverage (ADL)
 
 :::info
-**Preview.** T4 fires only when the insurance pool can't fully cover a T3 shortfall — rare in normal operations but designed to be deterministic when it does.
+**Preview.** T4 fires only when a T3 close leaves the account flat and still negative — rare in normal operations, and deterministic when it happens.
 :::
 
 ## TL;DR {#tldr}
 
-When the insurance pool can't absorb a residual liquidation loss, the protocol claws back from profitable counter-parties on the same instrument, pro-rata to their unrealised PnL. MetaFlux's allocation uses an online-learning ranking that aims to minimise **excess haircut** (haircut beyond what the deficit requires).
+When a liquidation leaves bad debt, the protocol claws back from profitable counter-parties on the same instrument, pro-rata to their unrealised PnL. ADL runs **before** the insurance fund, and after the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) has taken what it can. MetaFlux's allocation uses an online-learning ranking that aims to minimise **excess haircut** (haircut beyond what the deficit requires).
 
 ## When ADL fires {#when-adl-fires}
 
@@ -16,15 +16,18 @@ The [tiered ladder](./tiered-liquidation.md):
 T0 yellow card  →  T1 partial  →  T2 full  →  T3 backstop  →  T4 ADL
 ```
 
-T3 hands the dying account's position to a backstop multisig and pays out of the insurance pool. If `insurance_pool < shortfall`, the protocol moves to T4: the remaining unfunded loss is allocated as a position haircut to profitable counter-parties.
+T3 closes the dying position at the committed mark. On a core market the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) takes the first bite; what it declines is netted against profitable counter-parties. If the account is then flat and its equity is still negative, T4 runs.
+
+**Read the order carefully — ADL comes BEFORE the insurance fund.** The deleveraged winners' realized gains absorb first, which keeps the fund for genuine tail events. An earlier version of this page had the two the other way round.
 
 ```
-shortfall  =  liquidation_loss - insurance_pool_drawn
-if shortfall > 0:
-    fire_adl(asset, shortfall)
+deficit  =  |account_value|  after the account is flat
+deficit -=  metaliquidity_vault_absorb(deficit)   # core markets only
+if deficit > 0:
+    fire_adl(asset, deficit)                      # then insurance, then treasury
 ```
 
-Insurance pool drawdown is itself rate-limited — see [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark).
+For the whole order — vault, ADL, insurance fund, treasury queue — see [the deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall).
 
 ## How ADL is computed {#how-adl-is-computed}
 

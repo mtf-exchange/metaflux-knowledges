@@ -111,10 +111,10 @@ Read the live height before you rely on this —
 | Action | Field shape | Debits | Availability |
 |---|---|---|---|
 | [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) | MTF-native | the perp collateral pool for `asset: 0`, else the spot ledger | **live at every height** |
-| [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | next network release — **refused today** |
+| [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | **live** |
 
-Use `core_evm_transfer` if you have a choice. It is live, and it is the only one of
-the two that can move USDC out of the perp collateral pool — the balance
+Use `core_evm_transfer` if you have a choice. Both are live, and it is the only one
+of the two that can move USDC out of the perp collateral pool — the balance
 `account_value` / `withdrawable` report. Reach for `send_to_evm_with_data` when you
 are porting a client that already builds the Hyperliquid field shape. The full
 comparison is

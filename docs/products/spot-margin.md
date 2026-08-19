@@ -101,6 +101,11 @@ annualised, accrued every block). Interest flows to the [Earn](../concepts/earn.
 pool, lifting its per-share value — that is the lenders' yield. In the first
 release the rate is **fixed**; a utilisation-based curve is a later upgrade.
 
+**The rate is `0` today, so nothing accrues.** The accrual step stamps the time
+and leaves the index where it was. A governance vote sets a non-zero rate, and
+another calibrates a pair so a borrow is possible at all. Until both land there
+is no interest to pay and no yield to earn — see [Earn](../concepts/earn.md).
+
 ### Liquidation {#liquidation}
 
 Every block the chain prices your **whole account** — perpetual legs and any

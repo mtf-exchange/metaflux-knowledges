@@ -42,8 +42,14 @@ market: the interest borrowers pay **is** the yield lenders earn.
 
 ## Status {#status}
 
-Planned. Depends on spot trading and spot margin landing first; not yet part of
-the V1 finished feature set.
+**Live on testnet, and paying zero.** Deposit and redeem run today. Two
+two-thirds-stake governance votes stand between a deposit and any yield: one sets
+a non-zero borrow rate on the quote asset, and one calibrates a spot pair for
+borrowing. Until both land, share price stays at its deposit value and a
+redemption returns the principal. The utilisation curve above is the shape this
+lane moves to later, not what runs today.
+
+See [Earn](../concepts/earn.md) for the live action surface and the risk model.
 
 ## Governing reference {#governing-reference}
 

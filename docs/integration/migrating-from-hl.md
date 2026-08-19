@@ -212,7 +212,7 @@ Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are al
 | `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
 | `usdSend` / spot transfers | native spot transfer actions |
 | `withdraw3` | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) |
-| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) (same field names) — or [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer), which is live today. **Read the note below.** |
+| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) (same field names) — or [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer). Both are live. **Read the note below.** |
 | `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
 | `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
 | `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user) |
@@ -234,9 +234,8 @@ payload across unchanged. **Do not.** Three fields that HL accepts and ignores a
 
 Two more things before you port it:
 
-- **The action is refused on the live network today** and returns
-  `400 sendToEvmWithData is retired; use coreEvmTransfer`. It returns at the next
-  network release. The refusal is clean — nothing moves and the nonce is not spent.
+- **The action is live.** An earlier version of this page said the network refused
+  it and told you to port to `core_evm_transfer` instead. That is no longer true.
 - **It debits the spot ledger only.** It cannot move USDC held as perp collateral.
   [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) can, and it is
   live now, so it is the better target for most ports.

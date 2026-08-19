@@ -14,8 +14,8 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 | **T0** | `1.0 ≤ health < 1.1` | **Yellow card**: ALO orders force-cancelled, wallet notified | No |
 | **T1** | `0.8 ≤ health < 1.0` | Partial [floored-limit close](#how-a-forced-close-executes-the-price-floor) (50%) — full close if T1 fired within `cooldown_ms` | Yes (50%) or Yes (100%) |
 | **T2** | `0.667 ≤ health < 0.8` | Full [floored-limit close](#how-a-forced-close-executes-the-price-floor) | Yes (100%) |
-| **T3** | `health < 0.667` | [Netting at mark](#t3-backstop--netting-at-mark) against profitable counter-parties (un-fillable T1/T2 remainders escalate here too) | Yes — netted at mark |
-| **T4** | negative equity after T3 | [Deficit waterfall](#t4--the-deficit-waterfall): ADL haircut → insurance fund → treasury queue | Winners' realized gains haircut |
+| **T3** | `health < 0.667` | [Metaliquidity vault first](#mlp-first-bite) on a core market, then [netting at mark](#t3-backstop--netting-at-mark) against profitable counter-parties (un-fillable T1/T2 remainders escalate here too) | Yes — taken over or netted, both at mark |
+| **T4** | negative equity after T3 | [Deficit waterfall](#t4--the-deficit-waterfall): Metaliquidity vault → ADL haircut → insurance fund → treasury queue | Winners' realized gains haircut |
 
 `account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
 
@@ -225,6 +225,42 @@ at mark) — they only lose the open position. No fee is charged on either side.
 A netting without a usable mark price, or without any profitable opposite
 side, simply waits — the chain never force-sells into an empty book.
 
+### The Metaliquidity vault takes the first bite {#mlp-first-bite}
+
+**Live on the core markets since 2026-08-18.** Before the netting runs, the
+protocol's [Metaliquidity vault](./vaults.md#metaliquidity-vault) takes over as
+much of the dying position as its bounded capacity allows. The takeover strikes
+at the **same committed mark** the netting uses, so the dying account realizes at
+that mark either way. Only what the vault declines reaches the netting.
+
+Two bounds cap what the vault takes. Governance sets both and can move either, so
+treat the values below as today's, not as constants. Neither is served on a public
+read:
+
+| Bound | Value today | What it limits |
+|-------|-------------|----------------|
+| Equity fraction | **40%** of the vault's live NAV | ONE takeover. Inventory the vault already holds is subtracted, so the ceiling shrinks as it absorbs — but a deficit it merely covers records nothing, so a sequence of those is NOT bounded by this row |
+| Per-block cap | **100,000 USDC** | Everything the vault absorbs in ONE block, across every failing account. It bounds a correlated cascade; it does not bound a drain spread over many blocks |
+
+**Read the two rows together.** Each bounds an episode, not a lifetime. Neither is
+served on a public read, so treat both as governance values that can move.
+
+**Core markets only.** A [builder-deployed market](../mip/mip-3.md#liquidation)
+is refused at both entry points, whether or not it prices from its own deployer
+oracle. Its bad debt can never reach vault depositors; it is handled by that
+market's own backstop settings and then by the waterfall.
+
+What this changes for you:
+
+- **A profitable counter-party** is drafted into the netting less often, because
+  the vault absorbs first and there is less left to net.
+- **A [Metaliquidity](./vaults.md#metaliquidity-vault) depositor** is now the
+  first-loss taker on the core markets. The vault is paid for it: by default it
+  keeps **70%** of the liquidation fee on the notional it takes, and the
+  insurance fund keeps the rest.
+- **Nothing changes for a trader on a deployed market.** The vault is not in
+  that path at all.
+
 ## T4 — the deficit waterfall {#t4--the-deficit-waterfall}
 
 If the account is flat everywhere and its equity is **negative**, that bad
@@ -232,12 +268,16 @@ debt is socialized in a fixed order (ADL **before** the insurance fund — the
 deleveraged winners' realized gains absorb first, which keeps the fund for
 genuine tail events):
 
-1. **ADL haircut** — an adaptive severity controller claws back up to the
+1. **Metaliquidity vault** — on a **core** market only, the vault pays the
+   deficit first, inside the same bounds as [the first
+   bite](#mlp-first-bite). Live since 2026-08-18. A
+   [builder-deployed market](../mip/mip-3.md#liquidation) skips this step.
+2. **ADL haircut** — an adaptive severity controller claws back up to the
    gains the netting counterparties **just realized** (never more than they
    received, and never unrealized paper PnL).
-2. **Insurance fund** — auto-absorbs the remainder (this is the pool the
+3. **Insurance fund** — auto-absorbs the remainder (this is the pool the
    [liquidation fee](#how-a-forced-close-executes-the-price-floor) feeds).
-3. **Treasury reserve** — whatever is left queues for a multisig-authorized
+4. **Treasury reserve** — whatever is left queues for a multisig-authorized
    treasury draw (human-in-the-loop, last resort).
 
 The account's negative balance is then zeroed — the debt lives in the

@@ -391,12 +391,18 @@ Response:
 | `pools[*].share_value` | decimal string | `total_supplied / shares_total` (`0` when no shares) |
 | `pools[*].borrow_index` | decimal string | Cumulative borrow index (debt-accrual basis) |
 | `pools[*].reserve_factor_bps` | uint16 | Protocol cut of borrow interest (bps) |
-| `pools[*].borrow_rate_bps_annual` | uint32 | Annualised borrow rate (bps) |
+| `pools[*].borrow_rate_bps_annual` | uint32 | Annualised borrow rate (bps). **`0` on every live pool today** — see below |
 | `pools[*].reserve_accrued` | decimal string | Protocol reserve accumulated from interest |
 | `pools[*].user_shares` | decimal string | **Only with `user`** — shares the account holds in the pool |
 | `pools[*].user_value` | decimal string | **Only with `user`** — `user_shares × share_value` |
 
 Pools are listed in asset-id order. Omitting `user` drops the `user_shares` / `user_value` fields.
+
+**A `borrow_rate_bps_annual` of `0` means the pool pays nothing, and `share_value`
+will not move.** A pool auto-creates at rate `0`, and the per-block accrual stamps
+the time without stepping `borrow_index`. Do not compute an APY from a rising
+`share_value` that is not rising. A governance vote sets a non-zero rate — see
+[Earn](../../../concepts/earn.md).
 
 ### Spot-pair-deploy gas-auction state {#spot_deploy_state}
 
