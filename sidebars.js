@@ -110,6 +110,7 @@ const sidebars = {
                 'api/rest/info/spot',
                 'api/rest/info/position-history',
                 'api/rest/info/governance',
+                'api/rest/info/bridge',
               ],
             },
             'api/rest/faucet',
