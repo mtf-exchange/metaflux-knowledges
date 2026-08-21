@@ -131,8 +131,8 @@ Each `perp[]` element carries a market's **dynamic** fields only — the same dy
   and `order.orig_sz` the **original** order size.
 - **Active channels**: `account_state`, `spot_margin_state`, `order_updates`, `fills`,
   `user_events`, `user_fundings`, `ledger_updates`, `l2_book`, `bbo`, `trades`,
-  `candles`, `all_mids`, `active_asset_ctx`, `active_asset_data`,
-  `explorer_block`, `explorer_txs`.
+  `candles` (gateway only — the node does not serve it), `all_mids`,
+  `active_asset_ctx`, `active_asset_data`, `explorer_block`, `explorer_txs`.
 
 ## 8. `predicted_fundings` semantics {#8-predicted_fundings-semantics}
 

@@ -5,7 +5,7 @@ The node `/ws` surface pushes real committed data, change-driven: a channel emit
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `candles`, `user_events`. The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`.
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `user_events`. The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`, and adds `candles` on top of it.
 :::
 
 ## TL;DR {#tldr}
@@ -19,6 +19,18 @@ wss://api.<net>.mtf.exchange/ws
 ```
 
 MTF-native WS (snake_case channels) is served by the gateway at `/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
+
+:::warning
+**`candles` is a serving-layer channel. The node does not serve it.** The node does not aggregate OHLCV. The serving layer (the gateway) builds the bars from the node's `trades` firehose and its price-sample tape. Every other channel on this page is served by both.
+
+A node-direct `candles` subscribe is refused as an unknown channel, and gets no `subscriptionResponse` ack:
+
+```json
+{"channel":"error","data":{"error":"unknown channel: candles"}}
+```
+
+An `unsubscribe` gets the same frame. Subscribe to `candles` through the gateway (`wss://api.<net>.mtf.exchange/ws`).
+:::
 
 ## Connection lifecycle {#connection-lifecycle}
 

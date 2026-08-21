@@ -12,7 +12,7 @@ Channels are **change-driven**: a channel emits a frame only when its state actu
 ::::
 
 :::info
-**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`.
+**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`. One channel, [`candles`](#candles), is served by the gateway ONLY.
 :::
 
 The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**. You subscribe with:
@@ -35,7 +35,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `markets` | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
 | `fills` | `user`/`address` (required) | committed-block fills for that account |
 | `user_events` | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
-| `candles` | `coin` + `interval` (both required), `candle_type` (optional) | mark or oracle price samples folded into OHLCV bars, on change |
+| `candles` | `coin` + `interval` (both required), `candle_type` (optional) | **gateway only** — price samples or trades folded into OHLCV bars, on change |
 | `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
 | `open_orders` | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
 | `notifications` | `user`/`address` (required) | per-account margin / liquidation notices, on change |
@@ -315,42 +315,52 @@ The native channel name is `user_events` (snake_case).
 
 ### Rolling price bars for one market {#candles}
 
+:::info
+**`candles` is served by the GATEWAY only.** The node does not aggregate OHLCV. The gateway builds every bar itself, from the node's `trades` firehose and its price-sample tape. Subscribe on `wss://api.<net>.mtf.exchange/ws`. A node-direct subscribe (`ws://localhost:8080/ws`) is refused with `{"channel":"error","data":{"error":"unknown channel: candles"}}` and gets no ack.
+:::
+
 Rolling OHLCV bars for one market, one price series, at one bar size. **Requires both `coin` and `interval`**, and takes an optional `candle_type`. The three form the routing key together, so `1m` and `5m` on the same market — or `mark` and `oracle` at the same interval — are independent subscriptions, each with its own snapshot and pushes.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "candles", "coin": "BTC", "interval": "1m", "candle_type": "mark" } }
 ```
 
-- `interval` ∈ `1m` / `5m` / `15m` / `1h` / `4h` / `1d`. A missing or unrecognized `interval` is normalized to **`1m`** (the ack echoes the interval actually used).
+- `interval` ∈ `1m` / `5m` / `15m` / `1h` / `4h` / `1d`. `interval` is REQUIRED: a subscribe without it is rejected with `` {"channel":"error","data":{"error":"`candles` requires `interval`"}} ``. It is never normalized to a default.
 - `candle_type` ∈ `mark` (**default**) / `oracle` / `trade`. `mark` is the [mark price](../../concepts/mark-prices.md) series and serves perp and spot markets; `oracle` is the [oracle index price](../../concepts/oracle-prices.md) series and serves perp markets only; `trade` is executed-trade OHLCV and serves perp and spot markets. An unknown value is rejected with ``{"channel":"error","data":{"error":"invalid candle_type: <token> (expected `mark`, `oracle` or `trade`)"}}``. It is never served as another series.
-- **`trade` is accepted.** An earlier version of this page said it was retired and quoted a two-value rejection message. That was wrong on both counts. A `trade` series is SPARSE — a window with no fill has **no bar**, never a carried-forward one — and it carries real `v` / `q` / `n`, where a price series reports `v` as `"0"`. See the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
+- **`trade` is accepted.** An earlier version of this page said it was retired and quoted a two-value rejection message. That was wrong on both counts. A `trade` series is SPARSE — a window with no fill has **no bar**, never a carried-forward one. A `mark` or `oracle` bar also carries real `v` / `q` / `n`, joined from the trade tape for the same bucket, whenever the coverage rule above is met. See the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
 - The ack echoes `interval` and `candle_type` (including the applied `mark` default) so a client can correlate `(coin, interval, candle_type)` and learn which series it reads.
 
-:::warning
-**The executed-trade candle is RETIRED.** These bars carry a **price** series, never executions. Read executions from the [`trades`](#trades) channel.
-:::
+Both legs use the SAME envelope: `data` is an object `{ snapshot, candles }` — never a bare array, never a bare bar. Read `data.snapshot` to tell them apart; the frame-level `is_snapshot` is always `false` on this channel.
 
-The **initial snapshot** is an **array** of the recent bars (closed + the open bar), oldest first — `[]` until the market has its first price sample in that series:
+The **subscribe snapshot** (`"snapshot": true`) carries the recent bars, oldest first. `candles` is `[]` until the market has its first sample in that series:
 
 ```json
-{ "channel": "candles", "data": [
-  { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "0", "q": "0", "n": 12 }
-] }
+{ "channel": "candles",
+  "data": { "snapshot": true, "candles": [
+    { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "f": false, "v": "3.5", "q": "234500.00", "n": 4 }
+  ] },
+  "is_snapshot": false }
 ```
 
-Each **push** is a **single bar object** (not the array) — the current open bar for that `(coin, interval, candle_type)`, re-emitted on every price sample that folds into this series:
+Each **push** (`"snapshot": false`) carries exactly ONE bar in the same array — the bar that just changed:
 
 ```json
-{ "channel": "candles", "data": { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "v": "0", "q": "0", "n": 12 } }
+{ "channel": "candles",
+  "data": { "snapshot": false, "candles": [
+    { "t": 1735689600000, "T": 1735689659999, "s": "BTC", "i": "1m", "o": "67000.00", "c": "67002.50", "h": "67005.00", "l": "66990.00", "f": false }
+  ] },
+  "is_snapshot": false }
 ```
+
+REPLACE your history on a snapshot. UPDATE or APPEND the last bar on a push.
 
 - `t` / `T` — bar open / close epoch-ms; the bar covers `[t, T]` and a sample rolls into a new bar when its timestamp crosses `T`.
 - `s` — coin / market symbol; `i` — interval bucket token.
 - `o` / `c` / `h` / `l` — open / close / high / low, **decimal USDC** strings (human dollars, e.g. `"67002.50"`).
-- `v` and `q` — always `"0"`. A price bar folds no trades, so it carries neither base-asset volume nor quote volume.
-- `n` — the **sample count**: how many price samples the bar folded. It is **not** a trade count. `0` on a carry-forward bar.
+- `f` — **filled bar**. `true` marks a bar the gateway invented: a carry-forward bar for an empty bucket, or a seed bar. `false` marks a bar built from real samples. Test `f`, not `n == 0`.
+- `v` / `q` / `n` — base volume, quote volume, trade count. **All three are OPTIONAL.** They are present only when the gateway has proven trade coverage for that bucket. **An absent field states "no volume data".** A `"0"` would state "no trades" and put a false step in your series, so the field is omitted instead. Do not default an absent `v` to zero.
 
-The series is **gapless**: an interval with no sample emits a flat bar carrying the prior close forward (`o = h = l = c = previous close`, `v = q = 0`, `n = 0`). A bar needs **no trade**. A price exists at all times, so the series covers every window from the first price sample on — a market that has never traded still streams bars.
+The series is **gapless**: an interval with no sample emits a flat bar carrying the prior close forward (`o = h = l = c = previous close`, and `f: true`). A bar needs **no trade**. A price exists at all times, so the series covers every window from the first price sample on — a market that has never traded still streams bars.
 
 :::warning
 **These bars come from a SAMPLED price series, not from the continuous price path.** `o` and `c` are the **first and last sample** of the window. `h` and `l` are the **highest and lowest sample** — the extremes of the samples, not the true extremes of the price. A spike that starts and ends between two samples leaves no trace in the bar.
@@ -358,7 +368,7 @@ The series is **gapless**: an interval with no sample emits a flat bar carrying 
 Do not build wick analysis, liquidation-trigger reconstruction, or any "did the price touch X?" test on these bars. For the live price of one market, subscribe to [`active_asset_ctx`](#active_asset_ctx) or [`all_mids`](#all_mids) instead. The same warning and the sample grid are on the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
 :::
 
-A store keeps up to **1000 bars per `(coin, interval, candle_type)`** series; cold series (no subscriber) are evicted, so an unwatched market/interval costs nothing.
+The gateway ring holds **1000 bars** per `(coin, interval, candle_type)` series by default, and a deeper ring for sub-minute intervals. A subscribe snapshot serves at most the newest **5000** bars of that ring.
 
 ### Per-account order lifecycle events {#order_updates}
 
