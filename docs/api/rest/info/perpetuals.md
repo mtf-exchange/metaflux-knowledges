@@ -160,8 +160,11 @@ registry. It mirrors the corresponding `markets_meta` spot-token row field-for-f
 - `wei_decimals` — the token's native wei precision (`u8`).
 - `token_id` — the 32-byte token id, `0x`-hex.
 - `system_address` — the token's system address, `0x`-hex.
-- `evm_contract` — `{ address, evm_extra_wei_decimals }` when the token has a bound
-  EVM contract, else `null`.
+- `evm_contract` — `{ address, evm_extra_wei_decimals }` when the token has a BOUND
+  EVM contract, else `null`. The address comes from the binding registry the transfer
+  path reads, never from the unvalidated `evm_contract` a deployer may pass to
+  `register_token`. `evm_extra_wei_decimals` is that declared value and does not change
+  a credit: a credit lands in `wei_decimals`.
 - `is_canonical` — whether this is the canonical token for the symbol (`bool`).
 - `circulating_supply` — committed issuance, a decimal string (`"0"` when none).
 

@@ -78,7 +78,7 @@ Real pairs carry the live market-context fields (`mark_px`, `mid_px`,
 | `tokens[*].wei_decimals` | uint8 | Native (ERC-20-style) token decimals |
 | `tokens[*].token_id` | hex string (32 bytes) | Canonical token id, `0x`-hex |
 | `tokens[*].system_address` | hex address | Core-side anchor address |
-| `tokens[*].evm_contract` | object \| null | EVM binding `{address, evm_extra_wei_decimals}`; `null` when unbound |
+| `tokens[*].evm_contract` | object \| null | EVM binding `{address, evm_extra_wei_decimals}`; `null` when the token binds nothing. The address is the BOUND contract, never the deployer's declaration — see the rule below |
 | `tokens[*].is_canonical` | bool | Canonical (genesis / governance-listed) token |
 | `tokens[*].total_supply` | decimal string | Committed token issuance (whole units); `"0"` when none |
 
@@ -164,7 +164,7 @@ row in [`spot_meta`](#spot_meta) `tokens` — the two reads never drift.
 | `token.total_supply` | Decimal string | Committed Core-side total supply (whole units) |
 | `token.evm_contract` | object \| null | The token's EVM (ERC-20) binding — `null` when unbound, never a fabricated object |
 | `token.evm_contract.address` | hex address | Bound ERC-20 contract address on MetaFluxEVM |
-| `token.evm_contract.evm_extra_wei_decimals` | int (signed) | The EVM contract's decimals minus the Core token's `wei_decimals` |
+| `token.evm_contract.evm_extra_wei_decimals` | int (signed) | Deployer-declared, and NOT what a credit uses. A credit lands in the sibling `wei_decimals` |
 | `pairs[*].pair_id` | uint32 | Spot pair id (`SpotPairSpec.pair_id`) |
 | `pairs[*].name` | string | `BASE/QUOTE` display name |
 | `pairs[*].base` / `quote` | uint32 | Base / quote token asset ids |
@@ -441,3 +441,15 @@ State source: `Exchange.spot_pair_deploy_gas_auction`.
 - [`POST /info`](../info.md) — the base read endpoint (envelope, conventions, account & infra queries)
 - [Perpetual queries](./perpetuals.md) — perp-market reads
 - [Spot](../../../products/spot.md) / [Spot margin](../../../products/spot-margin.md) — the products
+
+:::warning
+**`evm_contract` reports the BINDING, never a declaration.** `register_token` accepts an
+`evm_contract` field from the caller and stores it unvalidated, but no transfer path reads
+it. The address served here comes from the [`evm_contract_bindings`](../../../evm/core-evm-transfers.md#which-assets-cross)
+registry — the same source the Core-to-EVM transfer asks — so this read can never offer a
+contract the chain would refuse. A token whose deployer declared a contract that was never
+bound reports `null`.
+
+`evm_extra_wei_decimals` is that declared value and has no effect on a credit. **A credit
+lands in the token's `wei_decimals`**, the sibling field.
+:::
