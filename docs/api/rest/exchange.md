@@ -1976,14 +1976,18 @@ mint is possible.
 ## Perp deployment actions (MIP-3) {#perp-deployment-actions}
 
 :::warning
-**Not live yet.** These nine actions are built and frozen in the node. They land
-with the next release, and the chain answers `unknown variant` until then. Build
-against them now; do not expect a call to succeed before the release.
+**Confirm the lane against the network you target.** The nine deploy actions and
+[`mip3_set_oracle_px`](#mip3_set_oracle_px) are built and frozen. Their wire
+shapes and signing types on this page will not change. What varies by network is
+whether the running build carries them and whether the governance off-switch
+`mip3_enabled` is open, so a call can still be refused. Build against these
+shapes now; probe one call on your target network before you depend on it.
 :::
 
-Permissionless perp market deployment. Each action is sender-authorized: the
-recovered signer is the deployer. After `perp_register_asset`, only that market's
-deployer or one of its sub-deployers may call the rest.
+Permissionless perp market deployment, plus the deployer price push the deployed
+market runs on. Each action is sender-authorized: the recovered signer is the
+deployer. After `perp_register_asset`, only that market's deployer or one of its
+sub-deployers may call the rest.
 
 **What a deploy requires.** The deployer must hold at least the staked-MTF floor
 (50,000 by default, governance-tunable), and pays the Dutch-clock ask at
@@ -2074,6 +2078,83 @@ closes it. Both take one field.
 | `asset` | uint32 | a market you deployed | Target market |
 | `sub_deployer` | address | `0x`-hex | The delegate |
 | `add` | bool | | `true` adds, `false` removes |
+
+### Push the deployer oracle price {#mip3_set_oracle_px}
+
+A MIP-3 market prices from **its own deployer**, not from the validator oracle
+median. This action is that push. Only the market `deployer` or a registered
+sub-deployer may call it, and the market **must already exist** as a MIP-3
+market.
+
+```json
+{ "type": "mip3_set_oracle_px", "params": { "asset": 1000, "px": "1250.500001" } }
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a MIP-3 market | Target market |
+| `px` | string | `> 0`, at most `1000000000000` | Index price, **whole-USDC decimal string** |
+
+**`px` is a string, and the exact bytes you send are the bytes you sign.** The
+node reads the raw string from your payload and puts it inside the signature
+digest without re-formatting it. Send `"1250.500001"` and sign `"1250.500001"` —
+a client that parses the value to a number and re-prints it as `"1250.5000010"`
+produces a different digest, and the node rejects the signature. `px` is on the
+whole-USDC plane, never the `1e8` book plane.
+
+EIP-712 type string, frozen:
+
+```text
+MetaFluxTransaction:Mip3SetOraclePx(string metafluxChain,uint32 asset,string px,uint64 nonce)
+```
+
+Both `asset` and `px` sit **inside** the digest on purpose. The signature
+therefore binds one exact (market, price) pair, so a replayed signature cannot be
+re-aimed at another market or spliced onto another price.
+
+**Validation, in the order the node applies it.** The reason text is exact.
+
+| Check | Reason text on rejection |
+|-------|--------------------------|
+| Protocol feature active on this chain | `precondition failed: mip3_deployer_oracle feature not active` |
+| Target is a MIP-3 market | `precondition failed: asset <id> is not a MIP-3 perp market` |
+| Signer is the deployer or a registered sub-deployer | `unauthorized` |
+| `px` is positive | `invalid parameters: oracle px must be positive` |
+| `px` is at or below the ceiling | `invalid parameters: oracle px exceeds ceiling 1000000000000` |
+| `px` is within **±10 %** of the committed anchor | `invalid parameters: oracle px <px> outside the ±10% move band around committed anchor <anchor>` |
+
+Every rejection returns **before** any state is written, so a refused push
+changes nothing. The push is applied at commit, so read the outcome with
+[`action_outcome`](./info.md#action_outcome).
+
+**The ±10 % band, and the one push that escapes it.** The anchor is the last
+**committed** oracle price for the market, or the market's committed mark price
+when no oracle price exists. Because the anchor is the committed value, several
+pushes inside one block cannot compound: they all measure against the same
+anchor. When the market has neither — the **first push on a new market** — there
+is no anchor to compare against, so any price in `(0, ceiling]` is accepted once.
+Choose that first price carefully; every later push is chained to it.
+
+**The first push changes the market's margin regime.** It is the moment the
+market becomes deployer-priced. Existing cross-margin positions on the market are
+migrated into their own strict-isolated buckets, value-conserving per account,
+and every position opened afterwards is strict-isolated. See
+[MIP-3 — oracle](../../mip/mip-3.md#oracle).
+
+**Keep pushing.** If the feed ages past the staleness window (default
+**60,000 ms**, governance-tunable), the market turns **reduce-only for opens**
+until a fresh push lands. Closing orders always pass. Monitor the window with
+[`mip3_deployer_oracle`](./info.md#mip3_deployer_oracle).
+
+:::info
+**`mip3_deployer_oracle` is a per-chain feature — check before you rely on it.**
+It is active from genesis on a chain that started fresh, and dormant on any other
+chain until a two-thirds stake `ArmFeatures` vote arms it. While it is dormant
+this action is refused with `mip3_deployer_oracle feature not active`, which is a
+**precondition** error, not an unknown-action error. Read `feature_active` from
+[`mip3_deployer_oracle`](./info.md#mip3_deployer_oracle) on the network you
+target.
+:::
 
 **Liquidation on a deployed market follows the market's own backstop settings** —
 see [MIP-3 liquidation](../../mip/mip-3.md#liquidation). A market that prices from

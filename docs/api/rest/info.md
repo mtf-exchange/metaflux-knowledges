@@ -1148,7 +1148,7 @@ Response:
 | `source_count` | uint64 | Number of enabled sources (popcount of the mask) |
 | `num_sources` | uint8 | Total source slots (`NUM_ORACLE_SOURCES = 10`) |
 | `enabled_sources` | uint8[] | Set bit indices of the subset mask (the enabled source slots) |
-| `subset_mask` | uint16 | Committed 10-bit `oracle_source_subset_mask` (bit `i` set ⇒ source `i` feeds the median) |
+| `subset_mask` | uint16 | Committed 10-bit `oracle_source_subset_mask`. Bit `i` names source slot `i`. **Recorded and served, not yet enforced** — see the note below |
 | `weights_committed` | bool | Always `false` — per-source weights are NOT committed (see flag) |
 
 :::warning
@@ -1160,7 +1160,134 @@ surfaces `enabled_sources` as **bit indices**, not named venues, and emits no
 per-venue weight list rather than fabricating one.
 :::
 
+:::warning
+**The subset mask is recorded, not enforced.** An earlier version of this page
+said that bit `i` decides whether source `i` feeds the weighted median. It does
+not, yet. `perp_set_oracle` validates the mask and commits it, and this read
+serves it back — but the price aggregator does not filter its inputs by the mask.
+Every market therefore composes its oracle price from the same source set today.
+
+Treat the mask as a **declared intent** you can read back, never as a live
+filter. Do not size risk on it. Source filtering is a change to price formation,
+so it needs a hard-fork boundary and its own feature gate; it is not scheduled
+here. This note goes away when the aggregator honours the mask.
+:::
+
 State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
+
+### MIP-3 deployer-oracle liveness {#mip3_deployer_oracle}
+
+:::warning
+**This read is not served yet.** It is documented ahead of the release that
+carries it. Until then the node answers
+`{"error":"unknown info type: mip3_deployer_oracle"}`. The push action it
+reports on IS live — only this read is pending.
+:::
+
+One [MIP-3](../../mip/mip-3.md) market's **deployer-operated oracle**: who may
+push its index price, when the last push landed, and whether the feed is stale.
+A MIP-3 market prices from its own deployer, so this read is the market's
+health check. Resolves the market by `coin` (symbol), exactly like
+[`oracle_sources`](#oracle_sources).
+
+Use it to monitor a market you deploy. A push cadence that misses the staleness
+window flips the market **reduce-only for opens**, and this read is how you see
+that coming before it happens.
+
+```json
+{ "type": "mip3_deployer_oracle", "coin": "WIF" }
+```
+
+| Arg | Type | Required |
+|-----|------|----------|
+| `coin` | symbol | yes |
+
+Missing `coin` → `400 {"error":"missing field coin"}`; a coin that names no
+MIP-3 market → `404 {"error":"market not found"}`. Those are the only two
+rejections.
+
+Response:
+
+```json
+{
+  "type": "mip3_deployer_oracle",
+  "data": {
+    "coin":                "WIF",
+    "asset":               1000,
+    "feature_active":      true,
+    "deployer_oracle_live": true,
+    "deployer":            "0x0101010101010101010101010101010101010101",
+    "sub_deployers":       ["0x0202020202020202020202020202020202020202"],
+    "last_px":             "1250.500001",
+    "last_push_ts":        70000,
+    "source_ts":           70000,
+    "stale_threshold_ms":  60000,
+    "as_of_ts":            100000,
+    "stale":               false,
+    "until_stale_ms":      30000
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `coin` | string | Resolved market symbol |
+| `asset` | uint32 | Asset id. A MIP-3 market is always at or above `1000` |
+| `feature_active` | bool | Whether the `mip3_deployer_oracle` protocol feature is active on **this** chain. See the note below |
+| `deployer_oracle_live` | bool | Whether the market prices from its deployer **now**. `true` only when `feature_active` is `true` AND the market has taken at least one push |
+| `deployer` | address | The market deployer. May always push |
+| `sub_deployers` | address[] | Delegates the deployer authorized to push. Sorted, may be empty |
+| `last_px` | string \| null | Last pushed index price, whole-USDC decimal. `null` before the first push |
+| `last_push_ts` | uint64 \| null | Consensus ms of the block that recorded the last push. `null` before the first push |
+| `source_ts` | uint64 | The **staleness reference**: the later of `last_push_ts` and the canonical per-asset price-source stamp. `0` when neither exists |
+| `stale_threshold_ms` | uint64 | The staleness window in ms. Default `60000`, governance-tunable |
+| `as_of_ts` | uint64 | The committed block time this answer is evaluated against. Consensus-derived, never the server's clock |
+| `stale` | bool | Whether the feed is stale **and** the market prices from it. See the rules below |
+| `until_stale_ms` | uint \| null | Milliseconds until the feed goes stale. **`null` when no countdown exists** — the market has had no push, or is not a deployer-oracle market. Never `0` for "no data": a `0` beside `"stale": false` would read as "about to expire". |
+
+**Why `source_ts` is not just `last_push_ts`.** A push lands in one block; the
+canonical price-source stamp for that asset is written one block later, when the
+begin-block aggregation folds the push in. Reading either stamp alone leaves a
+one-block hole, so the protocol takes the later of the two — and this read
+reports the same reference the gate uses.
+
+**What `stale` means, and what it does not.**
+
+- `stale` is `stale_threshold_ms` measured against `source_ts` at `as_of_ts`,
+  under the same guard the order-admission gate applies. The read calls the
+  gate's own predicate, so the two cannot disagree.
+- `stale` reports **one** condition: the staleness-driven, **market-wide**
+  reduce-only state. While it is `true`, an order that opens or increases a
+  position on this market is refused, and a closing order still passes.
+- `stale` does **not** model the margin-isolation rejects. Those are decided
+  **per sender and per order** from that account's own positions, so they are not
+  market state and no market-wide read can predict them.
+- `stale` is always `false` when `deployer_oracle_live` is `false`, because the
+  gate itself does nothing on a market that does not price from a deployer. Read
+  the two fields together; `stale: false` alone does not mean "feed healthy".
+- The comparison is strict. An age exactly equal to `stale_threshold_ms` is not
+  yet stale, so `until_stale_ms: 0` means "stale now, or stale on the next
+  millisecond".
+
+**Never-pushed markets answer `200`, not an error.** A registered MIP-3 market
+that has taken no push returns the **full shape** with `last_px` and
+`last_push_ts` set to `null`, `source_ts: 0` and `deployer_oracle_live: false`.
+This is the house typed-empty rule: the shape is stable, so a client parses one
+layout. Only market resolution rejects.
+
+:::info
+**`feature_active` is per chain — read it, do not assume it.** The
+`mip3_deployer_oracle` feature is active from genesis on a chain that started
+fresh, and dormant on any other chain until a two-thirds stake `ArmFeatures` vote
+arms it. So the same node build answers differently on different networks. While
+it is `false`, [`mip3_set_oracle_px`](../rest/exchange.md#mip3_set_oracle_px) is
+refused with `mip3_deployer_oracle feature not active`, and a market cannot
+become deployer-priced. Query this field against the network you target instead
+of assuming a posture.
+:::
+
+State source: `mip3_market_specs[asset]` + `oracle_history.deployer_oracle` +
+the governed staleness window.
 
 ## Account history query types {#account-history-query-types}
 
