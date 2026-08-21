@@ -45,21 +45,24 @@ print('agent address:', agent_addr)
 The master must sign this — it's the **only time** the master signs (per session).
 
 ```typescript
-import { MetaFluxClient } from '@metaflux/sdk';
+import { Client } from '@metaflux-dex/client';
 
-const master = new MetaFluxClient({
-  privateKey: process.env.MASTER_KEY!,
+const master = new Client({
   baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
-  chainId:    31337,
+  privateKey: Buffer.from(process.env.MASTER_KEY!.replace(/^0x/, ''), 'hex'),
+});
+// `Client` has no `.address` getter — the master's own address comes from
+// wherever you derived MASTER_KEY (the same `publicKeyToEvmAddress` step as
+// Step 1), not from the client instance.
+const masterAddress = '0x<MASTER_ADDRESS>';
+
+const result = await master.approveAgent({
+  agent:         agentAddress,
+  expires_at_ms: Date.now() + 30 * 24 * 60 * 60 * 1000,  // 30 days
+  name:          'mm-host-3',
 });
 
-const result = await master.exchange.approveAgent({
-  agent:        agentAddress,
-  expiresAtMs:  Date.now() + 30 * 24 * 60 * 60 * 1000,  // 30 days
-  name:         'mm-host-3',
-});
-
-console.log('approved at action hash:', result.actionHash);
+console.log('approved, action hash:', result.action_hash);
 ```
 
 In raw curl, the action body is:
@@ -81,52 +84,43 @@ Agent approvals are effective **one block after commit**. Submit your first agen
 
 ```typescript
 // confirm the approval is on-chain
-async function waitForApproval(c: MetaFluxClient, masterAddr: string, agentAddr: string) {
+async function waitForApproval(c: Client, masterAddr: string, agentAddr: string) {
   for (let i = 0; i < 20; i++) {
-    const agents = await c.info.agents(masterAddr);
+    const { agents } = await c.info.agents(masterAddr);
     if (agents.find(a => a.agent.toLowerCase() === agentAddr.toLowerCase())) return;
     await sleep(200);
   }
   throw new Error('approval not visible after 4s');
 }
 
-await waitForApproval(master, master.address, agentAddress);
+await waitForApproval(master, masterAddress, agentAddress);
 ```
 
 There is no live push event for an agent approval landing — polling `/info agents` (above) is the only way to observe it today.
 
 ## Step 4 — trade from the agent {#step-4--trade-from-the-agent}
 
+There is no `signerAddress` / `senderAddress` constructor option. A **separate `Client`** signs with the agent's own key; the action's `owner` field (not a client option) routes it to the master's account:
+
 ```typescript
-// initialise an SDK client with the agent's key, but the master's address
-const agent = new MetaFluxClient({
-  privateKey:     agentPrivateKey.toString('hex'),  // agent signs
-  signerAddress:  agentAddress,
-  senderAddress:  master.address,                   // sender = master
-  baseUrl:        'https://api.devnet.mtf.exchange',
-  chainId:        31337,
+// A separate Client, signing with the agent's key.
+const agent = new Client({
+  baseUrl:    'https://api.devnet.mtf.exchange',
+  privateKey: agentPrivateKey,
 });
 
-// every subsequent call uses agent.sign + master.address as sender
-await agent.exchange.order({
-  asset: 0, isBuy: true, price: '50000', size: '0.1', tif: 'Gtc',
+// `owner` names the master account this order rests under. The client
+// recovers its own signer (the agent) and, before the request leaves the
+// process, confirms it against the owner's approved-agent set from `/info`.
+await agent.submitOrderNative({
+  owner: masterAddress,
+  market: 0, side: 'bid', kind: 'limit',
+  size: 1_000, limit_px: 5_000_000_000_000,
+  tif: 'gtc', stp_mode: 'cancel_newest', reduce_only: false,
 });
 ```
 
-The SDK's `signerAddress / senderAddress` distinction is how it knows to fill `sender = master` while signing with the agent's key. Manual variant:
-
-```typescript
-const sig = signEip712(action, agentPrivateKey, chainId);
-await fetch('https://api.devnet.mtf.exchange/exchange', {
-  method:  'POST',
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({
-    sender:    master.address,   // ← master's address
-    signature: sig,              // ← agent's signature
-    action,
-  }),
-});
-```
+For manual, SDK-free signing — build the EIP-712 digest yourself and POST the raw envelope — see [typed-data signing](./typed-data-signing.md).
 
 ## Step 5 — rotation {#step-5--rotation}
 
@@ -134,27 +128,27 @@ Before the old agent expires, stage a new one:
 
 ```typescript
 async function rotateAgent(
-  master: MetaFluxClient,
+  master: Client,
+  masterAddress: string,
   oldAgentAddr: string,
-  newAgentPrivKey: Uint8Array,
   newAgentAddr: string,
 ) {
   // 1. Approve the new agent with full TTL
-  await master.exchange.approveAgent({
-    agent:       newAgentAddr,
-    expiresAtMs: Date.now() + 30 * 24 * 60 * 60 * 1000,
-    name:        `mm-host-3-${Date.now()}`,
+  await master.approveAgent({
+    agent:         newAgentAddr,
+    expires_at_ms: Date.now() + 30 * 24 * 60 * 60 * 1000,
+    name:          `mm-host-3-${Date.now()}`,
   });
-  await waitForApproval(master, master.address, newAgentAddr);
+  await waitForApproval(master, masterAddress, newAgentAddr);
 
-  // 2. Flip traffic in your bot from oldKey to newKey
-  // (deployment-specific — flag swap, config reload, etc.)
+  // 2. Flip traffic in your bot from the old agent's Client to a new one
+  // built with newAgentPrivKey (deployment-specific — flag swap, config reload, etc.)
 
   // 3. Tighten the old agent's expiry to ~1h from now so it dies
-  await master.exchange.approveAgent({
-    agent:       oldAgentAddr,
-    expiresAtMs: Date.now() + 60 * 60 * 1000,
-    name:        `mm-host-3-retiring`,
+  await master.approveAgent({
+    agent:         oldAgentAddr,
+    expires_at_ms: Date.now() + 60 * 60 * 1000,
+    name:          `mm-host-3-retiring`,
   });
 
   // 4. Within an hour, every old-agent-signed request will return 401
@@ -176,7 +170,8 @@ master account (0xMASTER)
      0xAGENT_HOST_3   (mm-host-3, expires +30d)
 
 each host runs:
-   const agent_n = MetaFluxClient({ key: HOST_AGENT_KEY, sender: 0xMASTER });
+   const agentN = new Client({ baseUrl, privateKey: HOST_AGENT_KEY });
+   // every order sets `owner: '0xMASTER'` — routing is per-action, not per-client
    ... places orders concurrently ...
 ```
 
@@ -194,22 +189,18 @@ The chain stores every approval, every expiry, every action's recovered signer. 
 
 ## Sub-account agents {#sub-account-agents}
 
-A sub-account can have its own agent set (separate from master's):
+:::warning
+**Not available today.** A sub-account has no private key — its address is a
+hash of the master address and its index — and its approved-agent set is
+always empty: `approve_agent` authorizes an agent of the **signer's** account,
+only the sub could approve an agent of itself, and the sub cannot sign. There
+is no SDK method for this pattern (no `asSubAccount()` helper) because the
+protocol has no signing path for it yet. See the
+[sub-accounts warning](../concepts/sub-accounts.md#tldr) for the current state.
+:::
 
-```typescript
-// master signs approve_agent AS the sub
-const subClient = master.asSubAccount(0);  // helper that flips signing context
-
-await subClient.exchange.approveAgent({
-  agent:       subAgentAddr,
-  expiresAtMs: Date.now() + 30 * 24 * 60 * 60 * 1000,
-  name:        'sub-0-mm-host',
-});
-```
-
-The master signs; `sender = sub_addr`; the chain admits because master holds delegation authority over its subs. From then on, `subAgentKey` signs all actions for the sub.
-
-This is the institutional pattern: master in cold storage; one agent per (sub × host) combination; clean revocation surface.
+Until sub-account signing ships, run one master account per trading strategy
+instead of per-sub agents.
 
 ## Sequence — full setup {#sequence--full-setup}
 

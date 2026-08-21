@@ -52,8 +52,8 @@ later, so wait a moment before confirming the balance:
 > custody address). See [bridge → deposit](../bridge/index.md#deposit-source-chain--metaflux).
 
 The raw curls below speak **MTF-native** on the gateway (snake_case types like
-`account_state` / `open_orders`). The `@metaflux/sdk` examples speak the same
-native surface — the SDK just builds the signed envelope for you.
+`account_state` / `open_orders`). The `@metaflux-dex/client` examples speak the
+same native surface — the SDK just builds the signed envelope for you.
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -71,30 +71,39 @@ the canonical order guide — the raw wire request and response, the two number
 planes, and a tiered map of every order action.
 :::
 
-The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux/sdk` — ships before mainnet; see [TypeScript SDK](./typescript-sdk.md)).
+The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux-dex/client` — ships before mainnet; see [TypeScript SDK](./typescript-sdk.md)).
 
 ```typescript
-import { MetaFluxClient } from '@metaflux/sdk';
+import { Client } from '@metaflux-dex/client';
 
-const client = new MetaFluxClient({
-  privateKey: process.env.PRIVATE_KEY!,
+const client = new Client({
   baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
-  chainId:    31337,
+  privateKey: Buffer.from(process.env.PRIVATE_KEY!.replace(/^0x/, ''), 'hex'), // 32 bytes
 });
 
-const meta = await client.info.meta();
-const btcId = meta.universe.findIndex(m => m.name === 'BTC');
+const owner = '0x<YOUR_ADDRESS>';
 
-const result = await client.exchange.order({
-  asset:    btcId,
-  isBuy:    true,
-  price:    '50000',
-  size:     '0.1',
-  tif:      'Gtc',
-  reduceOnly: false,
+// `markets()` keys by `coin` (the symbol); the numeric id a signed action
+// needs is `asset_id` on the STATIC read.
+const meta = await client.info.marketsMeta();
+const btc = meta.perp.find((m) => m.coin === 'BTC')!;
+
+const result = await client.placeOrder({
+  venue: 'perp',
+  owner,
+  market: btc.asset_id,
+  side: 'bid',      // 'bid' = buy, 'ask' = sell
+  kind: 'limit',
+  size: 1_000,       // raw lots, scaled by the market's sz_decimals
+  limit_px: 5_000_000_000_000, // 1e8 fixed-point plane
+  tif: 'gtc',
+  stp_mode: 'cancel_newest',
+  reduce_only: false,
 });
 
-console.log('order id:', result.oid);
+if (result.route === 'batch_order') {
+  console.log('order status:', result.legs[0]?.status);
+}
 ```
 
 Raw curl (MTF-native shape — you build the signature yourself; see [signing](./signing.md)):
@@ -148,16 +157,21 @@ You should see your order with the `oid` from step 2.
 Or, subscribe to live updates (preferred for any non-trivial usage):
 
 ```typescript
-const ws = client.ws();
-ws.subscribe('order_updates', { user: client.address }, (event) => {
-  console.log('event:', event);
+const ws = await client.connectWs();
+ws.onMessage((f) => {
+  if (f.channel === 'order_updates') console.log('event:', f.data);
 });
+await ws.subscribe({ type: 'order_updates', user: owner });
 ```
 
 ## Step 4 — Cancel {#step-4--cancel}
 
 ```typescript
-await client.exchange.cancel({ asset: btcId, oid: result.oid });
+if (result.route === 'batch_order') {
+  const status = result.legs[0]?.status;
+  const oid = status && 'resting' in status ? status.resting.oid : undefined;
+  if (oid !== undefined) await client.cancelOrderNative({ owner, market: btc.asset_id, oid });
+}
 ```
 
 ```bash
@@ -169,10 +183,11 @@ curl -X POST https://api.devnet.mtf.exchange/exchange \
 ## Step 5 — Withdraw {#step-5--withdraw}
 
 ```typescript
-await client.exchange.withdrawUsdc({
-  amount:           '100',
-  destinationChain: 'Arbitrum',
-  destinationAddr:  '0x<DESTINATION>',
+await client.mbWithdraw({
+  chain: 'Arbitrum',
+  asset: 0, // 0 = USDC cross-collateral
+  amount: 100_000_000, // 100 USDC, base units
+  dst_addr: '0x<DESTINATION>',
 });
 ```
 
@@ -225,7 +240,7 @@ sequenceDiagram
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `401 signer is not the sender` | Wrong `chainId` | Use `31337` for devnet |
+| `401 signer is not the sender` | Wrong EIP-712 domain chain id | The SDK signs against `MTF_CHAIN_ID` (testnet/devnet `114514`, mainnet `8964`) by default — don't override `chainId` on a call unless you mean to target a different network |
 | `400 action: <parse error>` | Wrong field name, wrong type, or a missing required field | Check the action's entry in the catalog |
 | `404 unknown user` on info | Address has no on-chain state yet | Deposit first (faucet) |
 | `429 rate limit` | Too many requests | See [rate limits](../api/rate-limits.md); back off |

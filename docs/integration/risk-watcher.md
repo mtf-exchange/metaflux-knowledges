@@ -48,71 +48,89 @@ Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (rat
 ## Implementation sketch (TypeScript) {#implementation-sketch-typescript}
 
 ```typescript
-import { MetaFluxClient } from '@metaflux/sdk';
+import { Client, isChannelFrame } from '@metaflux-dex/client';
 
-const trader = new MetaFluxClient({ /* trading agent */ });
-const watcher = new MetaFluxClient({ /* dedicated watcher agent */ });
+const trader = new Client({ baseUrl, privateKey: traderAgentKey /* trading agent */ });
+const watcher = new Client({ baseUrl, privateKey: watcherAgentKey /* dedicated watcher agent */ });
+const traderAddr = '0x<MASTER_ADDRESS>';
 
 const TARGET_RATIO = 1.8;
 const T0_DEPOSIT_USDC = 1000;  // tune to position size
 
+interface MarginSummary {
+  account_value: string;
+  maint_margin: string;
+}
+
 let recentSamples: number[] = [];
 
-// account_state carries account_value / maint_margin as separate fields, not
-// a ratio — its own `health` field is a signed dollar figure. Compute the
-// ratio locally for the pre-emptive trigger.
-watcher.ws().subscribe('account_state', { user: trader.address }, async (event) => {
-  const { account_value, maint_margin } = event.data;
-  const ratio = Number(maint_margin) === 0 ? Infinity : Number(account_value) / Number(maint_margin);
+// `account_state` does NOT carry an account-level `maint_margin` — only the
+// signed-dollar `health` field. The account-level `maint_margin` needed for
+// the ratio lives ONLY on the lightweight `margin_summary` read, which has no
+// dedicated SDK wrapper — use the typed `raw` escape hatch and poll it.
+async function pollMarginSummary() {
+  const summary = await watcher.info.raw<MarginSummary>({
+    type: 'margin_summary',
+    address: traderAddr,
+  });
+  const accountValue = Number(summary.account_value);
+  const maintMargin = Number(summary.maint_margin);
+  const ratio = maintMargin === 0 ? Infinity : accountValue / maintMargin;
 
   recentSamples.push(ratio);
   if (recentSamples.length > 5) recentSamples.shift();
 
   const allFalling = recentSamples.length === 5
-    && recentSamples.every((h, i) => i === 0 || h < recentSamples[i-1]);
+    && recentSamples.every((h, i) => i === 0 || h < recentSamples[i - 1]!);
   if (allFalling && ratio < 1.5) {
     console.log('[INFO] pre-emptive top-up');
-    const needed = Math.ceil((TARGET_RATIO * Number(maint_margin) - Number(account_value)) / 1e6);
+    const needed = (TARGET_RATIO * maintMargin - accountValue).toFixed(2);
     await deposit(watcher, needed);
   }
-});
+}
 
 // notifications fires exactly on tier transitions — react to `kind` directly
 // instead of polling a threshold.
-watcher.ws().subscribe('notifications', { user: trader.address }, async (event) => {
-  for (const record of event.data) {
-    if (record.kind === 'forced_close_tier') {
-      console.log(`[ALERT] ${record.tier} — emergency unwind`);
-      await emergencyUnwind(trader);
+async function watchNotifications() {
+  const ws = await watcher.connectWs();
+  ws.onMessage(async (f) => {
+    if (!isChannelFrame(f, 'notifications')) return;
+    for (const record of f.data) {
+      if (record.kind === 'forced_close_tier') {
+        console.log(`[ALERT] ${record.tier ?? 'unknown'} — emergency unwind`);
+        await emergencyUnwind(trader);
+      }
+      if (record.kind === 'yellow_card') {
+        console.log('[WARN] T0 — top up');
+        await deposit(watcher, T0_DEPOSIT_USDC.toString());
+      }
     }
-    if (record.kind === 'yellow_card') {
-      console.log('[WARN] T0 — top up');
-      await deposit(watcher, T0_DEPOSIT_USDC);
-    }
-  }
-});
-
-async function deposit(c: MetaFluxClient, usdc: number) {
-  // For Cross: assume USDC already in the master's free balance
-  // For Isolated: use UpdateIsolatedMargin to add to the bucket
-  await c.exchange.updateIsolatedMargin({
-    asset: 0,
-    isIsolated: true,
-    isolatedAmount: (usdc * 1e6).toString(),
   });
+  await ws.subscribe({ type: 'notifications', user: traderAddr });
 }
 
-async function emergencyUnwind(c: MetaFluxClient) {
-  const state = await c.info.clearinghouseState();
-  for (const pos of state.assetPositions) {
-    // close the largest-loss position first
-    await c.exchange.order({
-      asset: pos.coin,
-      isBuy: pos.szi < 0,    // opposite side closes
-      price: '0',            // market (extreme price)
-      size:  Math.abs(pos.szi).toString(),
-      tif:   'Ioc',
-      reduceOnly: true,
+async function deposit(c: Client, usdcDelta: string) {
+  // Isolated: add to the bucket. For Cross, deposit via the bridge instead —
+  // Cross collateral is the account's one unified USDC balance.
+  await c.updateIsolatedMargin({ asset: 0, delta: usdcDelta });
+}
+
+async function emergencyUnwind(c: Client) {
+  const state = await c.info.accountState(traderAddr);
+  const positions = state.clearinghouse_state['']?.positions ?? [];
+  for (const pos of positions) {
+    // close the largest-loss position first — pick pos by unrealised PnL yourself
+    const size = Number(pos.size);
+    await c.submitOrderNative({
+      owner: traderAddr,
+      market: 0, // look up the market id for `pos.coin` via marketsMeta()
+      side: size < 0 ? 'bid' : 'ask', // opposite side closes
+      kind: 'market',
+      size: Math.round(Math.abs(size) * 1e6),
+      limit_px: 0,
+      tif: 'ioc',
+      stp_mode: 'cancel_newest',
+      reduce_only: true,
     });
   }
 }

@@ -49,11 +49,13 @@ The rule: **a request gets a server response → the nonce decision is made**. A
 For order placement, the client order id is the strongest dedup primitive.
 
 ```typescript
-const cloid = crypto.randomBytes(16);  // 16 bytes
+const cloid = '0x' + crypto.randomBytes(16).toString('hex');
 
-await client.order({
-  asset: 0, side: 'Buy', priceE8: '...', sizeE8: '...',
-  tif: 'Gtc', cloid: '0x' + cloid.toString('hex'),
+await client.submitOrderNative({
+  owner, market: 0, side: 'bid', kind: 'limit',
+  size: 1_000, limit_px: 5_000_000_000_000,
+  tif: 'gtc', stp_mode: 'cancel_newest', reduce_only: false,
+  cloid,
 });
 ```
 

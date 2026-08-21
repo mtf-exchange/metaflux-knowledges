@@ -114,21 +114,24 @@ These are MTF-native actions on `POST /exchange`; see the [API overview](../api/
 ### 1. Simple limit-order MM (the canonical pattern) {#1-simple-limit-order-mm-the-canonical-pattern}
 
 ```typescript
-import { MetaFluxClient } from '@metaflux/sdk';
+import { Client } from '@metaflux-dex/client';
 
-const client = new MetaFluxClient({
-  privateKey: process.env.PRIVATE_KEY!,
+const client = new Client({
   baseUrl:    'https://api.devnet.mtf.exchange',
-  chainId:    114514,   // testnet (mainnet 8964, devnet 31337)
+  privateKey: Buffer.from(process.env.PRIVATE_KEY!.replace(/^0x/, ''), 'hex'),
 });
+const owner = '0x<YOUR_ADDRESS>';
 
-// asset lookup: HL `meta.universe` → MTF `markets`
-const markets = await client.info.markets();
-const BTC = markets.findIndex(m => m.name === 'BTC');   // may not be 0
+// asset lookup: HL `meta.universe` → MTF `marketsMeta` (`asset_id` is the
+// numeric id a signed action needs; may not be 0)
+const meta = await client.info.marketsMeta();
+const BTC = meta.perp.find((m) => m.coin === 'BTC')!.asset_id;
 
 // order / cancel — your strategy logic, native action names
-await client.exchange.order({
-  asset: BTC, isBuy: true, price: '100', size: '0.1', tif: 'Gtc', reduceOnly: false,
+await client.submitOrderNative({
+  owner, market: BTC, side: 'bid', kind: 'limit',
+  size: 1_000, limit_px: 1_000_000_000_000,
+  tif: 'gtc', stp_mode: 'cancel_newest', reduce_only: false,
 });
 ```
 
@@ -139,9 +142,12 @@ The strategy stays; the client layer becomes the SDK call.
 HL emits `liquidation` events at the partial / market tier. MTF adds a **`yellow_card`** notification as the earliest signal, on the dedicated [`notifications`](../api/ws/subscriptions.md#notifications) channel — not `user_events` (which only tags fills today).
 
 ```typescript
-const ws = client.ws();
-ws.subscribe('notifications', { user: client.address }, (event) => {
-  for (const record of event.data) {
+import { isChannelFrame } from '@metaflux-dex/client';
+
+const ws = await client.connectWs();
+ws.onMessage((f) => {
+  if (!isChannelFrame(f, 'notifications')) return;
+  for (const record of f.data) {
     switch (record.kind) {
       case 'yellow_card':
         // T0 — one block to act; ALO orders already cancelled
@@ -149,11 +155,12 @@ ws.subscribe('notifications', { user: client.address }, (event) => {
         break;
       case 'forced_close_tier':
         // T1 partial OR T2 full — too late for prevention
-        emergency_unwind();
+        emergencyUnwind();
         break;
     }
   }
 });
+await ws.subscribe({ type: 'notifications', user: owner });
 ```
 
 See [risk-watcher](./risk-watcher.md) for the full pattern.
@@ -163,9 +170,9 @@ See [risk-watcher](./risk-watcher.md) for the full pattern.
 Funding cadence is similar (hourly by default, configurable per market on MTF). Formula structure is identical; the read is the native `funding` query.
 
 ```typescript
-const funding = await client.info.fundingHistory({ coin: 'BTC' });
+const funding = await client.info.fundingHistory('BTC');
 // values may differ from HL because oracle composition differs
-const rate = funding[0].rate_per_hr;
+const rate = funding.samples.at(-1)?.funding_rate;
 ```
 
 MTF's oracle composition is governed per-market (committed `SetOracleWeights`) — if your arb depends on specific oracle providers, verify the weighted source list. See [mark prices](../concepts/mark-prices.md).
@@ -175,9 +182,10 @@ MTF's oracle composition is governed per-market (committed `SetOracleWeights`) �
 HL: master + agents per host. MTF: same, plus first-class **multi-sig accounts**.
 
 ```typescript
-// existing: master + agents
-await master.approveAgent(host1_agent);
-await master.approveAgent(host2_agent);
+// existing: master + agents (each host is its own Client with its own key;
+// `owner` on each action routes it to the master, not a client option)
+await master.approveAgent({ agent: host1AgentAddr });
+await master.approveAgent({ agent: host2AgentAddr });
 
 // new on MTF: convert master to multi-sig for cold custody
 await master.convertToMultiSigUser({
@@ -196,8 +204,8 @@ HL sub-accounts: up to 8. MTF: up to 32.
 
 ```typescript
 // MTF: create one of up to 32 subs
-await master.createSubAccount({ name: 'desk-A' });
-await master.subAccountTransfer({ subIndex: 0, deposit: true, amount: '10000' });
+await master.createSubAccount({ name: 'desk-A', shared_stp_group: false });
+await master.subAccountTransfer({ sub_index: 0, deposit: true, amount: '10000' });
 ```
 
 Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are all supported.

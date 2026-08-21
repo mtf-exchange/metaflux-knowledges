@@ -54,6 +54,11 @@ The request was parsed, but rejected at admission. Status `400`, `401`, `404`, `
 | **Auth state** | `401 agent_not_yet_effective` | Wait one block; retry |
 | **Not found** | `404 order_not_found`, `404 account_not_found` | Don't retry; check the resource |
 
+The classes below (`ClientBugError`, `AuthError`, …) are an example taxonomy for
+a hand-rolled client working directly against `fetch`. The TypeScript SDK does
+not export them — it throws one class, `MetaFluxApiError`, and you branch on
+its `.status` yourself (see [TypeScript SDK](./typescript-sdk.md#error-handling)).
+
 ```typescript
 async function handleAdmissionResponse(r: Response) {
   if (r.status === 202) return { admitted: true };
@@ -106,8 +111,11 @@ The action was admitted (`202`) but failed at commit. You learn about it only vi
 Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates) — the live, per-account order-lifecycle channel — and dispatch on `status`:
 
 ```typescript
-ws.subscribe('order_updates', { user: address }, (event) => {
-  for (const rec of event.data) {
+import { isChannelFrame } from '@metaflux-dex/client';
+
+ws.onMessage((f) => {
+  if (!isChannelFrame(f, 'order_updates')) return;
+  for (const rec of f.data) {
     switch (rec.status) {
       case 'open':             /* resting on the book; track oid */             break;
       case 'filled':           /* fully filled; remove from open-order set */   break;
@@ -121,6 +129,7 @@ ws.subscribe('order_updates', { user: address }, (event) => {
     }
   }
 });
+await ws.subscribe({ type: 'order_updates', user: address });
 ```
 
 A partial fill does not get its own `status`: a maker leg reports its per-match
@@ -192,30 +201,33 @@ same hash (as `hash`) for every transaction in the latest block.
 ### Order placement with retry {#order-placement-with-retry}
 
 ```typescript
-async function placeOrderSafely(client: Client, order: Order, maxAttempts = 3) {
+import { Client, MetaFluxApiError, type NativeOrder } from '@metaflux-dex/client';
+
+async function placeOrderSafely(
+  client: Client,
+  address: string,
+  order: Omit<NativeOrder, 'cloid'>,
+  maxAttempts = 3,
+) {
   const cloid = '0x' + randomBytes(16).toString('hex');
-  let lastNonce = Date.now();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await client.exchange.order({ ...order, cloid }, { nonce: lastNonce });
-      return res;
+      return await client.submitOrderNative({ ...order, cloid });
     } catch (e) {
-      if (e instanceof NetworkError) {
-        // reconcile via cloid
-        const placed = await client.info.findOpenOrderByCloid(client.address, cloid);
-        if (placed) return placed;
-
-        // bump nonce and retry
-        lastNonce = Date.now();
-        continue;
+      if (e instanceof MetaFluxApiError) {
+        if (e.status === 429) {
+          const retryAfterMs = Number(JSON.parse(e.bodyText).retry_after_ms ?? 1000);
+          await sleep(retryAfterMs);
+          continue;
+        }
+        throw e; // client / signing / logical bug — propagate
       }
-      if (e instanceof RateLimitError) {
-        await sleep(e.retryAfterMs);
-        lastNonce = Date.now();
-        continue;
-      }
-      throw e;  // client / signing / logical bug — propagate
+      // fetch threw before any response — unknown outcome, reconcile via cloid
+      const { orders } = await client.info.openOrders(address);
+      const placed = orders.find((o) => o.cloid === cloid);
+      if (placed) return placed;
+      continue; // bump: submitOrderNative assigns a fresh nonce each call
     }
   }
   throw new Error('order failed after retries');
@@ -225,19 +237,19 @@ async function placeOrderSafely(client: Client, order: Order, maxAttempts = 3) {
 ### Cancel with idempotent safety {#cancel-with-idempotent-safety}
 
 ```typescript
-async function cancelSafely(client: Client, asset: number, oid: number) {
+async function cancelSafely(client: Client, address: string, market: number, oid: number) {
   try {
-    return await client.exchange.cancel({ asset, oid });
+    return await client.cancelOrderNative({ owner: address, market, oid });
   } catch (e) {
-    if (e.body?.error === 'order not found') return { alreadyDone: true };
-    if (e instanceof NetworkError) {
-      // re-query the order
-      const orders = await client.info.openOrders(client.address);
-      if (!orders.find(o => o.oid === oid)) return { alreadyDone: true };
-      // it's still there — actually retry
-      return cancelSafely(client, asset, oid);
+    if (e instanceof MetaFluxApiError) {
+      if (e.status === 404) return { alreadyDone: true };
+      throw e;
     }
-    throw e;
+    // network drop — re-query the order
+    const { orders } = await client.info.openOrders(address);
+    if (!orders.find((o) => o.oid === oid)) return { alreadyDone: true };
+    // it's still there — actually retry
+    return cancelSafely(client, address, market, oid);
   }
 }
 ```
@@ -248,27 +260,31 @@ async function cancelSafely(client: Client, asset: number, oid: number) {
 (set one on every order you place):
 
 ```typescript
+import { isChannelFrame, type NativeOrder } from '@metaflux-dex/client';
+
 const pendingByCloid = new Map<string, PendingAction>();
 
-ws.subscribe('order_updates', { user: address }, (event) => {
-  for (const rec of event.data) {
-    const cloid = rec.order?.cloid;
-    const pending = cloid && pendingByCloid.get(cloid);
+ws.onMessage((f) => {
+  if (!isChannelFrame(f, 'order_updates')) return;
+  for (const rec of f.data) {
+    const cloid = rec.order.cloid;
+    const pending = cloid ? pendingByCloid.get(cloid) : undefined;
     if (!pending) continue;
 
     if (rec.status === 'rejected' || rec.status === 'cancel_rejected') {
-      pending.reject(new CommitError(rec));
+      pending.reject(new Error(rec.reason ?? 'rejected'));
     } else {
       pending.resolve(rec);
     }
-    pendingByCloid.delete(cloid);
+    pendingByCloid.delete(cloid!);
   }
 });
+await ws.subscribe({ type: 'order_updates', user: address });
 
-async function submit(order: Order) {
-  const cloid = order.cloid;
+async function submit(order: NativeOrder) {
+  const cloid = order.cloid!;
   const p = new Promise((resolve, reject) => pendingByCloid.set(cloid, { resolve, reject }));
-  await client.exchange.order(order);
+  await client.submitOrderNative(order);
   return Promise.race([p, timeout(5000)]);
 }
 ```
