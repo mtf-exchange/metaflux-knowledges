@@ -1177,13 +1177,6 @@ State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`
 
 ### MIP-3 deployer-oracle liveness {#mip3_deployer_oracle}
 
-:::warning
-**This read is not served yet.** It is documented ahead of the release that
-carries it. Until then the node answers
-`{"error":"unknown info type: mip3_deployer_oracle"}`. The push action it
-reports on IS live — only this read is pending.
-:::
-
 One [MIP-3](../../mip/mip-3.md) market's **deployer-operated oracle**: who may
 push its index price, when the last push landed, and whether the feed is stale.
 A MIP-3 market prices from its own deployer, so this read is the market's
