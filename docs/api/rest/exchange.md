@@ -999,6 +999,24 @@ The whole action is rejected and no parent is created. The chain refuses rather
 than dropping a field, because a dropped field still carries your signature — you
 would be executing something you did not sign. Clear the field and re-sign.
 
+**Two more refusals size the parent, and both judge ONE SLICE.** The WHY is the
+same for both: the fire path floors each slice to the pair's lot grid and checks
+it against the pair's min-notional floor, and a slice it cannot place still spends
+its turn in the schedule. A parent whose every slice fails would therefore burn
+its whole schedule and fill nothing, so it is refused at admission.
+
+| Refusal | When |
+|---|---|
+| `slice below one lot` | `total_size / slice_count` floors to zero lots |
+| `below min notional` | The pair carries `min_notional_cents` and ONE slice, priced at the reference mark, is worth less. **A total that clears the floor does not help** |
+| `no mark price for spot twap admission` | The pair carries `min_notional_cents` but has no oracle index and no last trade, so the slice cannot be priced |
+
+**A halt pauses a parent, it does not cancel it.** While the pair is delisted or
+the global spot switch is on, `twap_order` is REFUSED (`spot trading disabled` or
+`spot pair inactive`) and an EXISTING parent freezes: no slice fires and no
+counter moves. It resumes where it stopped when the halt lifts. See
+[A halted spot pair PAUSES](../../concepts/order-types.md#synth-on-spot-halt).
+
 Two further rules: the concurrent-parent limit below counts your perp and spot
 parents **together**, and [`twap_cancel`](#twap_cancel) takes a spot parent's
 `twap_id` with no wire change. Read
@@ -1188,6 +1206,12 @@ on the spot book too, and [`cancel_scale`](#cancel_scale) then sweeps a spot pai
 Read [The three on a spot pair](../../concepts/order-types.md#synth-on-spot)
 before you build for it.
 
+**A halt refuses the action.** While the pair is delisted or the global spot
+switch is on, `scale_order` is REFUSED (`spot trading disabled` or `spot pair
+inactive`). A scale keeps no parent, so rungs already resting are cancelled and
+refunded like any other resting order. See
+[A halted spot pair PAUSES](../../concepts/order-types.md#synth-on-spot-halt).
+
 ---
 
 ### Cancel a scale ladder {#cancel_scale}
@@ -1365,6 +1389,16 @@ spot-only: a reprice that would need more quote balance than you have free is
 the chase instead of restoring the old leg. Read
 [The three on a spot pair](../../concepts/order-types.md#synth-on-spot) before you
 build for it.
+
+**A halt pauses a chase and KEEPS its escrow.** While the pair is delisted or the
+global spot switch is on, `chase_order` is REFUSED (`spot trading disabled` or
+`spot pair inactive`). An EXISTING chase is retained: the leg stays on the book
+with its escrow still reserved, no reprice runs, and the reprice count does not
+move. This is the one case where a halt does NOT refund a resting order — third
+parties' orders on the pair ARE refunded. The escrow is never trapped:
+[`cancel_chase`](#cancel_chase) works through the halt, and a `ttl_ms` or
+`max_reprices` expiry during it still retires and refunds. See
+[A halted spot pair PAUSES](../../concepts/order-types.md#synth-on-spot-halt).
 
 **Watching the chase.** There is **no chase-specific WS channel**. The initial
 placement and every reprice surface on the existing per-account

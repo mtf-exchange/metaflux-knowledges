@@ -395,6 +395,24 @@ tick grid **toward the mark**, so the snap can only make the order less aggressi
 never more. Slice fills carry the parent's `twapId` on
 [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills).
 
+**Two admission refusals size your parent, and both look at ONE SLICE, not the
+total.** The rule behind them is the same: a slice the fire path cannot place
+still spends its turn, so a parent whose EVERY slice is unplaceable burns its
+whole schedule and fills nothing. The chain refuses that parent up front instead.
+
+| Refusal | When |
+|---|---|
+| `slice below one lot` | `total_size / slice_count` floors to zero lots on the pair's lot grid. The executor floors every slice to that grid, so each one would be a no-op |
+| `below min notional` | The pair carries a `min_notional_cents` floor and ONE slice, priced at the reference mark, is worth less than it. **A total that clears the floor does not help** — the fire path checks each slice, not the parent |
+
+A pair that carries a min-notional floor and has **no reference mark at all** is
+also refused, with `no mark price for spot twap admission`: the check is required
+and nothing can price it. Raise `total_size`, or lower `slice_count`, and re-sign.
+
+One residual stays after admission: governance can retune `min_notional_cents`,
+and the price can drift, AFTER your parent is accepted. A slice that then falls
+under the floor is refused at fire time and the schedule still advances.
+
 Three outcomes are worth building for, and they are not the same thing:
 
 - **No reference mark at all** — no oracle index and no trade ever printed on the
@@ -424,6 +442,33 @@ on the same cadence a perp chase uses. Two spot-only outcomes:
   base, and its reserve does not grow when the price moves.
 - If the re-place fails, the chase **retires**. The escrow is already refunded, so
   nothing is stranded, but the leg is gone and is not restored.
+
+### A halted spot pair PAUSES, it does not cancel {#synth-on-spot-halt}
+
+A spot pair stops trading in two ways: the pair itself is delisted or deactivated,
+or governance throws the global spot kill switch. **Both do the same thing to an
+in-flight TWAP or chase, starting the next release.**
+
+| What | Behaviour during the halt |
+|---|---|
+| A TWAP parent | **PAUSED.** No slice fires. `slices_done`, the filled size and the schedule clock all FREEZE |
+| A chase entry and its resting leg | **RETAINED.** No reprice runs, the reprice count does not move, and the leg stays on the book |
+| The chase leg's escrow | **STAYS LOCKED.** A halt does NOT refund it. Third parties' resting orders on the pair ARE cancelled and refunded; a chase leg is exempt |
+| Scale rungs | Cancelled and refunded like any other resting order. A scale keeps no parent, so there is nothing to pause |
+| A NEW `twap_order` / `scale_order` / `chase_order` on the pair | **REFUSED** — `spot trading disabled` for the global switch, `spot pair inactive` for the pair |
+
+**Resume is automatic.** When the halt lifts, the frozen schedule clock makes the
+next TWAP slice due at once, and the chase reprices on its next pass. The parent
+picks up exactly where it stopped.
+
+**Your escrow is never trapped.** Spot cancels are ungated at every halt, and
+[`cancel_chase`](../api/rest/exchange.md#cancel_chase) and
+[`twap_cancel`](../api/rest/exchange.md#twap_cancel) both work through it. A
+chase whose `ttl_ms` or `max_reprices` runs out DURING a halt still retires and
+refunds normally — that is ordinary expiry, not a halt refund.
+
+**A permanently delisted pair leaves its parents paused indefinitely.** They are
+retained, not cancelled, so cancel them yourself if you do not want them.
 
 **A spot scale** floors every rung price onto the pair's tick grid and every rung
 size onto its lot grid. Each rung runs the spot admission on its own, so **a

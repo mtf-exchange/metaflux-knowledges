@@ -161,11 +161,21 @@ They decide how a failing account on that market is closed.
 |---------|--------------|----------------|
 | `mode` | `Disabled` closes on the book and never escalates to the backstop tier. `Enabled` uses the normal ladder. `Capped` is meant to bound the treasury's exposure | **`Disabled` and `Enabled` only** |
 | `band_floor` | Raises the health level at which the market escalates, ahead of the global band | **Yes** |
-| `deficit_cap` | The bound `Capped` is meant to apply | **No. The value is stored and ignored, so `Capped` behaves exactly like `Enabled`** |
+| `deficit_cap` | The bound `Capped` was meant to apply | **No. `0` is the only accepted value, and `0` means no cap** |
 
 **A market with no settings defaults to `Disabled`** when it prices from its own
-deployer oracle. Read the settings back before you rely on them: a vote that
-records `deficit_cap` does not bound anything today.
+deployer oracle.
+
+:::caution
+**Starting the next release, a vote that sets `deficit_cap` to any non-zero value
+is REFUSED.** This is not live yet; the current node still accepts the value and
+ignores it. The refusal is deliberate. A capped deficit leaves the remainder with
+no owner: the shortfall above the cap is neither paid by the treasury nor
+assigned to anyone, so the books do not balance. `0` means "no cap", which is the
+only sound setting. `Capped` and `Enabled` therefore stay behaviourally
+identical, and the mode name is kept only because the wire encoding is
+name-based.
+:::
 
 :::warning
 **The protocol's Metaliquidity vault does NOT backstop a deployed market.** The

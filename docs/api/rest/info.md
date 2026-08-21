@@ -940,7 +940,7 @@ every other field on this page but no `buyback_status` key — treat an absent k
 as "this node is older", not as "the buyback is healthy".
 :::
 
-The buyback stops for five unrelated reasons and reports the same silence for all
+The buyback stops for six unrelated reasons and reports the same silence for all
 of them, so a stalled buyback and a healthy idle one look identical. `blocking_guard`
 names the reason. The sample above is the founding case: no asset id is bound, so
 the buyback has never fired and the pool only grows.
@@ -953,6 +953,7 @@ the buyback has never fired and the pool only grows.
 | `no_mtf_usdc_pair` | The bound asset has no MTF/USDC pair to buy on |
 | `no_price_ceiling` | No trustworthy price reference exists, so the protocol defers rather than buy at an unverified price. See [Fees](../../concepts/fees.md#where-fees-go) |
 | `book_unfillable` | The pair and the ceiling both resolve, but **no ask rests at or under the ceiling**, so the next fire would buy nothing. The book is too thin or too expensive right now |
+| `slice_below_one_lot` | An ask DOES rest at or under the ceiling, but the whole accrued pool cannot afford **one lot** of it, so the next fire would buy nothing. The buyback waits and fires as soon as accrual passes one lot's cost. **Added in the next release; an older node never reports it** |
 
 Two rules read the tokens correctly:
 
@@ -961,6 +962,11 @@ Two rules read the tokens correctly:
   no pair; fix the first, then read again.
 - **A throttled fire is never reported.** The interval is progress, not a block,
   so a buyback waiting out `interval_ms` reports `null`.
+- **`book_unfillable` and `slice_below_one_lot` are different states.** The first
+  says no ask is cheap enough. The second says an ask is cheap enough but the
+  money is not there yet. Starting the next release the per-fire slice is floored
+  at one lot's cost, so a fire buys nothing ONLY when the whole pool cannot
+  afford a lot.
 
 `pool` and `held_at_hub` are separate money. `pool` is accrued and unrealized;
 `held_at_hub` is already realized as a real, explorer-visible balance. **The next
@@ -2256,9 +2262,17 @@ Response:
 
 State source: `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` are not tracked on-chain — omitted rather than fabricated.
 
-### Configured gossip seed peer endpoints {#gossip_root_ips}
+### Advertised peer roster {#gossip_root_ips}
 
-Configured gossip root/seed peer endpoints (HL `gossipRootIps`). No parameters. Network topology, **not** committed state: the runtime publishes this node's `network.peers[].gossip` endpoints to the read layer at startup. A solo node has no peers → honest-empty.
+The nodes this deployment advertises for peer discovery. No parameters. Network
+topology, **not** committed state.
+
+:::warning Not live yet
+The `peers` shape below is the target state. The release that carries it has not
+fired. Until it does, a live node answers this query with the previous shape,
+`{ "root_ips": ["host:port", ...] }`. Do not ship a client against `peers`
+before the release.
+:::
 
 ```json
 { "type": "gossip_root_ips" }
@@ -2267,14 +2281,47 @@ Configured gossip root/seed peer endpoints (HL `gossipRootIps`). No parameters. 
 Response:
 
 ```json
-{ "type": "gossip_root_ips", "data": { "root_ips": ["seed-a.example:4001", "seed-b.example:4001"] } }
+{
+  "type": "gossip_root_ips",
+  "data": {
+    "peers": [
+      {
+        "id": 3,
+        "gossip": "203.0.113.7:4001",
+        "peer_rpc": "203.0.113.7:4002",
+        "auth": "203.0.113.7:4003",
+        "pubkey_hex": "02ab..."
+      }
+    ]
+  }
+}
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `root_ips` | string[] | Configured gossip peer endpoints (`host:port`); empty on a solo node |
+| `peers` | object[] | One row per advertised node. Empty when the deployment advertises nothing. |
+| `peers[*].id` | uint16 | The node's numeric id |
+| `peers[*].gossip` | string | Public gossip endpoint, `host:port` |
+| `peers[*].peer_rpc` | string | Public peer-RPC endpoint, `host:port` |
+| `peers[*].auth` | string | Public auth endpoint, `host:port` |
+| `peers[*].pubkey_hex` | string (optional) | Compressed secp256k1 public key for the peer's TCP auth. The key is **absent** when the operator did not publish it. |
 
-State source: node config `network.peers[].gossip` (published to `NodeReadState` at startup; NOT committed state, NOT folded into AppHash).
+**Why the rows look like this.** A row is a copy-shaped peer config: the five
+fields map one-to-one onto a joining node's own peer entry, so you paste a row
+and dial it. That is why all three ports and the public key ship together.
+
+**Where the rows come from.** Each node serves an operator-curated roster from
+its own config. The roster states public reachability. It is **not** the node's
+internal dial list, and no address from that dial list can appear here.
+
+**A node that advertises nothing is absent from the rows.** There is no
+fallback. A validator can run, vote and serve while publishing no address — it
+simply does not appear. An empty `peers` array is therefore the honest answer
+for a deployment that advertises nothing, not an error and not a sign of an
+unhealthy node.
+
+State source: node config `network.advertised` (published to the read layer at
+startup; NOT committed state, NOT folded into AppHash).
 
 ### `web_data2` — removed {#web_data2--removed}
 
@@ -2361,6 +2408,6 @@ that field is consensus-frozen and unrelated to these read args.)
 A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md).
 
 **Q: Is the response deterministic across nodes?**
-A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. Use [`block_info`](#block_info) to see the height a node has committed to.
+A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. `gossip_root_ips` reads each node's own config, so nodes that carry the same roster answer identically, and nodes that do not may differ. Use [`block_info`](#block_info) to see the height a node has committed to.
 
 </details>
