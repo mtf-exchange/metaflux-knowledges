@@ -14,10 +14,11 @@ directly into the L1 it settles against.
 
 ## What's different from a vanilla EVM {#whats-different-from-a-vanilla-evm}
 
-- **Unified block, parallel strata** — one block per consensus round (sub-second);
-  its transactions are partitioned into parallel conflict-strata, so throughput
-  scales with cores and even contract deployments confirm in the next block (no
-  60-second heavy-block lane). See [Execution model](execution-model.md).
+- **Unified block, parallel strata** — one block per fixed period (1000 ms by
+  default, decoupled from the faster consensus round rate); its transactions
+  are partitioned into parallel conflict-strata, so throughput scales with
+  cores and even contract deployments confirm through the same lane as trading
+  (no 60-second heavy-block lane). See [Execution model](execution-model.md).
 - **Core access built in** — contracts read Core via **system precompiles** and
   write to Core via the **CoreWriter** system contract. See
   [Interacting with Core](interacting-with-core.md).

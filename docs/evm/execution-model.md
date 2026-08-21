@@ -1,22 +1,28 @@
 # Execution model
 
 :::tip
-**Live on devnet.** The unified block model — one block per consensus round and
-parallel conflict-strata execution — is operational and tested. Cadence and gas
-values may still be tuned before launch. The [bridge](../bridge/) is live.
+**Live on devnet.** The unified block model — one EVM block per fixed period,
+with parallel conflict-strata execution inside each block — is operational and
+tested. Cadence and gas values may still be tuned before launch. The
+[bridge](../bridge/) is live.
 :::
 
-The MetaFlux EVM produces **one unified block per consensus round** — there are no
-separate "small" and "large" block sizes. Within each block, execution is
-partitioned into **parallel conflict-strata**, so throughput scales with cores and
-**every transaction class — including contract deployments — confirms in the same
-sub-second round**.
+The MetaFlux EVM produces **one unified block per fixed period** (1000 ms by
+default) — there are no separate "small" and "large" block sizes. That period
+is decoupled from the consensus round rate, which usually runs faster: a round
+that lands before the period elapses mints no new EVM block, and its EVM
+transactions carry forward to the next round that does mint one. Within each
+EVM block, execution is partitioned into **parallel conflict-strata**, so
+throughput scales with cores, and **every transaction class — including
+contract deployments — confirms through the same lane, with no separate slow
+path**.
 
 ## One block, parallel strata {#one-block-parallel-strata}
 
-- **One block per consensus round** at a sub-second cadence. There is no 60-second
-  heavy-block lane: a contract deployment or a fat settlement lands in the very
-  next block, alongside trading flow — not after a minute-long wait.
+- **One block per fixed period** (1000 ms by default), not one per consensus
+  round. There is no 60-second heavy-block lane: a contract deployment or a fat
+  settlement lands in the same lane as trading flow — not after a minute-long
+  wait.
 - The block's transactions are grouped into **strata** by their read/write access
   sets. Independent transactions execute **concurrently**; conflicting ones execute
   in order. Aggregate throughput is `per-lane budget × parallel width`, so it
@@ -49,8 +55,8 @@ sub-second round**.
   budget is **elastic** — it widens under sustained load and shrinks when idle —
   with a hard **minimum floor**, so worst-case capacity never drops below a fixed
   baseline.
-- Cadence is paced by consensus rounds; `block.timestamp` is consensus-derived
-  (deterministic — no wall clock).
+- Cadence is paced by the fixed EVM period, not the consensus round rate;
+  `block.timestamp` is consensus-derived (deterministic — no wall clock).
 
 ## MEV-resistant trading (opt-in, per market) {#mev-resistant-trading-opt-in-per-market}
 
@@ -75,8 +81,8 @@ a duplicate inside the EVM.
 
 ## Confirmation tiers {#confirmation-tiers}
 
-- **Final** (consensus) confirmation each round — the only tier that enters
-  committed state.
+- **Final** (consensus) confirmation at the EVM block that includes the
+  transaction — the only tier that enters committed state.
 - An optional **soft acknowledgement** may be exposed for latency-sensitive UX; it
   is **not** part of consensus. Risk-bearing actions — bridge mints, withdrawals —
   rely on **final** confirmation only.

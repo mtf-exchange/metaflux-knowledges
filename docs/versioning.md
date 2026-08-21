@@ -129,7 +129,7 @@ Clients that compute against current parameter values (e.g. computing PM margin 
 
 ## Client SDK versioning {#client-sdk-versioning}
 
-SDKs (`@metaflux/sdk`, `metaflux-client` for Rust, `metaflux-client` for Python) follow semver independently of the protocol:
+SDKs (`@metaflux-dex/client` for TypeScript, `metaflux-client` for Rust — the only two supported client SDKs) follow semver independently of the protocol:
 
 - `0.x.y` — pre-mainnet; breaking changes allowed each minor bump
 - `1.x.y` — post-mainnet; semver-strict on the API surface

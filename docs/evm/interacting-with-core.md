@@ -37,7 +37,7 @@ interface ICoreWriter {
 ```
 data = abi.encodePacked(
     uint8(1),            // version (currently 1)
-    uint24(actionId),    // action id, big-endian (1..=20)
+    uint24(actionId),    // action id, big-endian (1..=22)
     abi.encode(params)   // the action's ABI-encoded parameters
 );
 ```
@@ -54,7 +54,7 @@ the EVM call and the L1 outcome.
 
 ### Actions {#actions}
 
-CoreWriter exposes 20 L1 actions (id, big-endian, in the `uint24` slot above):
+CoreWriter exposes 22 L1 actions (id, big-endian, in the `uint24` slot above):
 
 | id | Action | Purpose |
 |---:|--------|---------|
@@ -78,6 +78,8 @@ CoreWriter exposes 20 L1 actions (id, big-endian, in the `uint24` slot above):
 | 18 | `FbaConfigure` | Per-market frequent-batch-auction config |
 | 19 | `CrossChainSend` | Chain-agnostic cross-chain transfer (queues into [MetaBridge](../bridge/)) |
 | 20 | `EncryptedOrderSubmit` | Threshold-encrypted order (commitment + ciphertext) |
+| 21 | `RfqQuote` | Maker quotes against an open RFQ request |
+| 22 | `RfqAccept` | Taker accepts a quote, settling the RFQ off-book |
 
 The typed parameter structs and a ready-to-use Solidity caller live in the public
 [`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo;

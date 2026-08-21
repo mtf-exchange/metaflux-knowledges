@@ -96,12 +96,14 @@ not revenue to the exchange. See [Fees](../concepts/fees.md) for the full mechan
 
 ## Listing new perp markets {#listing-new-perp-markets}
 
-Perp markets are **permissionless** to deploy: any builder can list a new perpetual
-by winning an on-chain gas auction and supplying seed risk parameters (initial
-maintenance ratio, max leverage, funding cap), bounded by governance-set ranges. No
-review committee, no allow-list. See [MIP-3](../mip/mip-3.md) for the deploy flow,
-and [MIP-4](../mip/mip-4.md) for the planned liquidity aggregator that carries
-retail flow on top.
+Perp markets are **permissionless** to deploy: any builder can register a new
+perpetual by paying the current Dutch-clock deploy fee and posting a slashable
+staking bond, then configuring leverage, fee tier, and oracle before activating
+it. No review committee, no allow-list — but a builder-deployed market is
+isolated in the deployer's own dex, not the shared market set every trader sees
+by default. See [MIP-3](../mip/mip-3.md) for the deploy flow and the isolation
+rule, and [MIP-4](../mip/mip-4.md) for the planned liquidity aggregator that
+carries retail flow on top.
 
 ## See also {#see-also}
 

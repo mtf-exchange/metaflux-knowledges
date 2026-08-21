@@ -35,7 +35,7 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 
 | Language | Status | Package |
 |----------|--------|---------|
-| TypeScript / JavaScript | preview | [`@metaflux/sdk`](./typescript-sdk.md) |
+| TypeScript / JavaScript | preview | [`@metaflux-dex/client`](./typescript-sdk.md) |
 | Rust | preview | [`metaflux-client`](./rust-sdk.md) |
 
 For other languages (Python, Go, Java, C++ …), implement the EIP-712 typed-data signature per [typed-data signing](./typed-data-signing.md) — every step is documented with worked examples. The wire is small enough that a hand-rolled client is the right call for niche stacks.

@@ -11,10 +11,11 @@ windows.
 
 ## Block cadence {#block-cadence}
 
-One unified block per consensus round, at a **sub-second** cadence — there is no
-separate slow lane, so trading, transfers, CoreWriter calls, precompile reads, AND
-contract deployments all confirm in the same round. `block.timestamp` is
-consensus-derived (see [Execution model](execution-model.md)).
+One unified EVM block per **fixed period** (1000 ms by default) — slower than,
+and decoupled from, the consensus round rate. There is no separate slow lane,
+so trading, transfers, CoreWriter calls, precompile reads, AND contract
+deployments all confirm through the same lane, at that same cadence.
+`block.timestamp` is consensus-derived (see [Execution model](execution-model.md)).
 
 ## EVM → Core (CoreWriter) {#evm--core-corewriter}
 
