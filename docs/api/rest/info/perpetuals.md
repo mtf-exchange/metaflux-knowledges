@@ -426,8 +426,8 @@ Response:
   "type": "l2_book",
   "data": {
     "coin": "BTC",
-    "bids": [ { "px": "61663.1", "size": "0.04862", "n_orders": 1 } ],
-    "asks": [ { "px": "61675.7", "size": "0.04862", "n_orders": 1 } ]
+    "bids": [ { "px": "61663.1", "sz": "0.04862", "n_orders": 1 } ],
+    "asks": [ { "px": "61675.7", "sz": "0.04862", "n_orders": 1 } ]
   }
 }
 ```
@@ -464,7 +464,7 @@ Response:
   "type": "recent_trades",
   "data": {
     "coin":           "BTC",
-    "last_trade_ms":  1783001424768,
+    "last_trade":  1783001424768,
     "trades": [
       {
         "coin":  "BTC",
@@ -481,14 +481,14 @@ Response:
 }
 ```
 
-Records are ordered oldest-first (newest last). The ring is bounded, so this is
+Records are ordered NEWEST-FIRST (the newest trade is element 0). The ring is bounded, so this is
 a recent window, not all history. An unknown / never-traded market returns
-`"trades": []` and `last_trade_ms: 0`.
+`"trades": []` and `last_trade: 0`.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `coin` | string | Echoed market symbol |
-| `last_trade_ms` | uint64 | Timestamp of the last trade (`0` if none) |
+| `last_trade` | uint64 | Timestamp of the newest trade (`0` if none). The key is `last_trade`, NOT `last_trade_ms` |
 | `trades[*].coin` | string | Market symbol the trade executed on |
 | `trades[*].side` | `"B"` / `"A"` | Taker (aggressor) side token — `"B"` = buy, `"A"` = sell |
 | `trades[*].px` | Decimal string | Execution price, **decimal USDC** (human-readable) |
@@ -741,8 +741,8 @@ Response:
 {
   "type": "predicted_fundings",
   "data": [
-    { "coin": "BTC", "predicted_rate": "0.0020702132945825193491902456", "next_funding_time": 1783011600000 },
-    { "coin": "ETH", "predicted_rate": "0.0091563951859402408793685995", "next_funding_time": 1783011600000 }
+    { "coin": "BTC", "predicted_rate": "0.0020702132945825193491902456", "next_funding_ts": 1783011600000 },
+    { "coin": "ETH", "predicted_rate": "0.0091563951859402408793685995", "next_funding_ts": 1783011600000 }
   ]
 }
 ```
@@ -751,13 +751,13 @@ Response:
 |-------|------|-------------|
 | `coin` | string | Market symbol |
 | `predicted_rate` | decimal string | The **clamped** rate that would actually be charged at the upcoming boundary — the premium passed through the per-asset `±cap`, signed (`"0"` before the first sample) |
-| `next_funding_time` | uint64 | The **next aligned per-asset settlement boundary** (epoch-ms); `0` before the first sample |
+| `next_funding_ts` | uint64 | The **next aligned per-asset settlement boundary** (epoch-ms); `0` before the first sample |
 
 :::info
 **`predicted_rate` is the charged rate, not the raw premium.** It reflects the
 per-asset funding cap applied — the number a position would be debited/credited if
 funding settled now. Funding settles **discretely** at the per-asset boundary
-(`next_funding_time`), on a per-asset `interval_ms` cadence (1h default). For the
+(`next_funding_ts`), on a per-asset `interval_ms` cadence (1h default). For the
 raw pre-clamp premium series see [`funding_history`](#funding_history); for the
 cadence / boundary see [`market_info`](#market_info) `funding.interval_ms` /
 `funding.next_payment_ts`.
@@ -1003,14 +1003,16 @@ Assets whose open interest is at/over the cap. No parameters.
 Response:
 
 ```json
-{ "type": "perps_at_open_interest_cap", "data": { "assets": [0] } }
+{ "type": "perps_at_open_interest_cap", "data": { "assets": ["BTC", "ETH"] } }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `assets` | uint32[] | Asset ids at/over their `oi_cap`, ascending |
+| `assets` | string[] | Coin SYMBOLS at or over their cap, ascending by asset id. Symbols, not ids — the field name says `assets` for historical reasons |
 
-State source: per-book `open_interest` vs `PerpAnnotation.oi_cap` (books with no positive cap are skipped).
+State source: the market's enforced OI cap against the clearinghouse's true position
+open interest. A market with no positive cap is skipped. The scan covers every market,
+including one deployed into its own dex.
 
 ### `margin_table` — removed {#margin_table--removed}
 
