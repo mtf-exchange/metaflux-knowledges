@@ -157,11 +157,18 @@ empty only if the market has never traded). Snapshot rows carry **`users: null`*
 ```
 
 **Live pushes** (`is_snapshot: false`) — the new prints from the just-committed
-block; each row's `users` is `[taker, maker]` (taker first, the aggressor):
+block; each row's `users` carries the AGGRESSOR ONLY:
+
+> ⬆️ **Upgrade notice — `users` drops to ONE element at the next node
+> release.** It carried `[taker, maker]`; it will carry `[taker]`. The taker
+> chose to cross and is named; the resting maker did not choose to be hit and
+> is not. `users[0]` is unchanged, so a caller that reads only the aggressor
+> needs no change. A caller that reads `users[1]` must stop.
+
 
 ```json
 { "channel": "trades", "is_snapshot": false, "data": [
-  { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker", "0x..maker"] }
+  { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker"] }
 ] }
 ```
 
@@ -287,7 +294,7 @@ Per-account fill stream. Requires `user` (the 0x address; `address` is also acce
 - the **taker** record — the taker's own `oid`, its `cloid` (or `null`), the taker's side, `crossed: true`;
 - the **maker** record — the maker's own `oid`, `cloid: null` (no cloid is captured for the resting side), the **opposite** side, `crossed: false`.
 
-Both legs of one match share the same `tid` (the same value the public `trades` print carries). `px`/`sz` are **human decimal strings**, the same plane the public `trades` tape uses — not raw 1e8. Per-account fill records carry **no `users` array** — counterparty addresses appear only on the public [`trades`](#trades) tape, never on the account-scoped feed.
+Both legs of one match share the same `tid` (the same value the public `trades` print carries). `px`/`sz` are **human decimal strings**, the same plane the public `trades` tape uses — not raw 1e8. Per-account fill records carry **no `users` array**. The public [`trades`](#trades) tape names the AGGRESSOR only; no surface discloses the resting maker of a print.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "fills", "user": "0x<address>" } }
