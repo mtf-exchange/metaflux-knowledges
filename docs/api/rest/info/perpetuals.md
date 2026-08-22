@@ -500,31 +500,47 @@ a recent window, not all history. An unknown / never-traded market returns
 
 #### Deep history, past the ring {#recent_trades-archive}
 
-> ⬆️ **Upgrade notice — not live yet.** Archive service for `recent_trades` and
-> `trades_by_time` is written but **not deployed**. Until the archive deploys,
-> both reads answer from the node ring alone, so a window older than the ring
-> returns `"trades": []`. It goes live when the historical archive deploys.
+> ⬆️ **Upgrade notice — `trades_by_time` routes to the archive from the next
+> gateway release. `recent_trades` does NOT and will not.** The split is the
+> rule, not a stage: a RANGED ask reaches the archive, an UN-RANGED ask is the
+> live ring's job. So `recent_trades` always answers from the ring, and a
+> `trades_by_time` window older than the ring returns `"trades": []` until that
+> release.
 
 The node ring is bounded and holds only the newest prints. The archive keeps
 every print, and the gateway answers the same two reads from it when the ring
 falls short.
 
 **Your request and your parser do not change.** The gateway relabels the archive
-record to the shape above, so one parser reads both sources. Two fields read
+record to the shape above, so one parser reads both sources. Three fields read
 differently on an archive-served print:
 
 | Field | On an archive-served print |
 |-------|----------------------------|
-| `hash` | Always `""`. The node stream writes the trace hash, but the archive's trade table does not yet store it, so an archive print cannot be traced to its signed action until that column lands |
+| `hash` | **ABSENT — the key is omitted, and that is deliberate.** On a node print `""` is a real value: it says there was no signed taker action. The archive's trade table stores no trace hash at all, which is a different fact. Emitting `""` would report an unknown as a known. Treat a missing `hash` as "not recorded" and a `""` as "recorded, and there was none" |
 | `last_trade` | The newest print **in this answer**, not the market's all-time newest. A `start_time` / `end_time` window bounds it |
+| `time` at the live edge | The archive consumes the node stream on a poll interval (**default 5 s**), so the newest prints reach it late. A window that runs up to now can stop a few seconds short of the tape's true end |
 
 ### Get trades in a time window {#trades_by_time}
 
 Like [`recent_trades`](#recent_trades), but filtered to a `[start_time, end_time]`
-window over the per-market trade ring — the bounded recent window. A window that
-reaches past the ring is answered from the archive; see
-[Deep history, past the ring](#recent_trades-archive) for what that changes and
-when it goes live.
+window.
+
+**A ranged ask goes to the archive.** A request that carries `start_time` or
+`end_time` asks for a window, and a window can reach past the node's bounded
+ring, so the archive answers it. See
+[Deep history, past the ring](#recent_trades-archive) for what an archive-served
+print changes, and when routing goes live.
+
+**Two rules follow from that, and both are visible in the reply:**
+
+- **The tail lags.** The archive consumes the node stream on a poll interval
+  (**default 5 s**). A window that runs up to the present can therefore stop a
+  few seconds short of the newest print. Re-ask, or read the live
+  [`trades` WS channel](../../ws/subscriptions.md#trades) for a sub-block tape.
+- **No archive, no change.** On a deployment with no archive wired, the node's
+  live ring answers this read exactly as it always did — the same records, the
+  same window filter, and `"trades": []` once the window falls past the ring.
 
 ```json
 { "type": "trades_by_time", "coin": "BTC", "start_time": 1783000000000, "end_time": 1783011600000 }
@@ -533,8 +549,8 @@ when it goes live.
 | Arg | Type | Required | Description |
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol |
-| `start_time` | uint64 | no | Window start (ms, inclusive); filters on trade `time`. Absent ⇒ open lower bound |
-| `end_time` | uint64 | no | Window end (ms, inclusive). Absent ⇒ open upper bound |
+| `start_time` | uint64 | no | Window start (ms, inclusive); filters on trade `time`. Absent ⇒ open lower bound. Present ⇒ the archive answers, where one is wired |
+| `end_time` | uint64 | no | Window end (ms, inclusive). Absent ⇒ open upper bound. Present ⇒ the archive answers, where one is wired |
 
 Response:
 
@@ -850,7 +866,7 @@ Response:
     "min_deploy_stake_mtf":    "500000",
     "gas_auction_min_bid":     "100",
     "auction_duration_blocks": 1000,
-    "deployer_fee_cap_bps":    300,
+    "deployer_fee_cap_bps":    "300",
     "dutch_start_multiplier":  "2",
     "per_market_limits": {
       "max_oi":            "1000000000000",
@@ -869,7 +885,7 @@ Response:
 | `min_deploy_stake_mtf` | Decimal string | Permissionless-deploy **staking bond**, whole-MTF. An independent governance knob from `min_deploy_stake_base` — two thresholds, not one value on two planes |
 | `gas_auction_min_bid` | Decimal string | Deploy gas-auction minimum bid, whole-USDC |
 | `auction_duration_blocks` | uint64 | Gas-auction window length, in blocks |
-| `deployer_fee_cap_bps` | uint | Ceiling on the per-market deployer fee share (bps) |
+| `deployer_fee_cap_bps` | string | Ceiling on the per-market deployer fee share, a decimal string of whole basis points |
 | `dutch_start_multiplier` | Decimal string | Dutch-auction start-price multiplier over the minimum bid |
 | `per_market_limits.max_oi` | u128 string | Per-market open-interest cap, size base units |
 | `per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |

@@ -199,7 +199,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
     "share_price":        "11500000",
     "depositor_count":    142,
     "high_water_mark":    "11500000",
-    "performance_fee_bps":100,
+    "performance_fee_bps":"100",
     "lock_period_ms":     345600000,
     "strategy":           "User"
   }

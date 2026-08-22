@@ -370,7 +370,7 @@ Response:
         "shares_total": "1000",
         "share_value": "1",
         "borrow_index": "1",
-        "reserve_factor_bps": 1000,
+        "reserve_factor_bps": "1000",
         "borrow_rate_bps_annual": 0,
         "reserve_accrued": "0",
         "user_shares": "100",

@@ -174,7 +174,7 @@ each entry carries:
   "validator_index":    3,
   "stake":              "10000000000000",
   "self_stake":         "100000000000",
-  "commission_bps":     500,
+  "commission_bps":     "500",
   "is_active":          true,
   "is_jailed":          false,
   "first_active_epoch": 12
@@ -201,39 +201,32 @@ curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
 {
   "type": "staking_apr",
   "data": {
-    "total_stake":             "1000000",
-    "effective_apr":           "0.08",
-    "effective_apr_bps":       "800",
-    "governance_rate_bps":     800,
-    "emission_floor_stake":    "50000000",
-    "n_active_validators":     1,
-    "current_epoch":           2,
-    "is_gross_pre_commission": true
+    "total_stake":                 "1000000",
+    "pending_validator_pool_usdc": "25.75",
+    "n_active_validators":         1,
+    "current_epoch":               2,
+    "reward_source":               "fee_funded_on_book_buy"
   }
 }
 ```
 
-`effective_apr` is derived from the **stake curve**, not from the governance rate:
+> ⚠️ **The emission era is over, and this read no longer publishes an APR.**
+> The fields `effective_apr`, `effective_apr_bps`, `governance_rate_bps`,
+> `emission_floor_stake` and `is_gross_pre_commission` used to be documented
+> here and **are not on the wire**. The stake curve
+> (`0.08 × √(50M / max(total_stake, 50M))`) described the emission the chain no
+> longer runs.
 
-```text
-effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
-```
+Rewards are FEE-FUNDED. The 20% validator share of the
+[fee buyback](./fees.md) accrues into `pending_validator_pool_usdc`, and the
+epoch distribution pays it out. So the reward is whatever fees the period
+earned, divided by stake — it is not a rate the chain can publish in advance.
 
-i.e. a flat **8%** at/below 50M MTF staked, decaying ∝ 1/√stake above it (more
-stake = lower per-staker share). `governance_rate_bps` is committed but **NOT
-consumed** by the reward effect — both are surfaced so the divergence is
-observable. APR is **gross**, pre per-validator commission (`is_gross_pre_commission: true`).
-
-This begin-block reward effect is funded from the treasury bootstrap budget
-(see [tokenomics](./tokenomics.md)) — staking rewards never rely on new
-issuance. As fee revenue grows, the 20% validator share of the
-[fee buyback](./fees.md) becomes the dominant reward source.
-
-Net APR for a delegator:
-
-```
-net_apr  =  effective_apr  ×  (1 - validator_commission_bps/10_000)
-```
+**There is no APR field, and do not compute one from these values.** The pending
+pool is accrued fees at an instant, not an annualised rate: projecting it forward
+assumes trading volume that has not happened. A delegator's realised return is
+their stake share of each distribution, less their validator's commission
+(`commission_bps`, in whole basis points as a decimal string).
 
 ## Edge cases {#edge-cases}
 

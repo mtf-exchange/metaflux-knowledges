@@ -288,7 +288,7 @@ Response:
     "share_price":     "10500000",
     "depositor_count":    142,
     "high_water_mark": "10500000",
-    "performance_fee_bps":1000,
+    "performance_fee_bps":"1000",
     "lock_period_ms":     86400000,
     "strategy":           "User"
   }
@@ -1029,8 +1029,8 @@ Response:
     "mm_tier":          1,
     "referrer":         "0x<referrer>",
     "referrer_credit":  "420",
-    "maker_bps":        1,
-    "taker_bps":        3
+    "maker_bps":        "0.1",
+    "taker_bps":        "0.3"
   }
 }
 ```
@@ -1045,8 +1045,8 @@ Response:
 | `mm_tier` | uint | Committed per-user market-maker tier index; `0` when untracked |
 | `referrer` | hex address \| null | This account's referrer if set, else `null` |
 | `referrer_credit` | Decimal string | Σ rebate accrued *to* this address acting as a referrer (whole-USDC) |
-| `maker_bps` | uint | **Effective** maker fee bps, resolved from the committed [`fee_schedule`](#fee_schedule) volume-tier ladder at this account's 30-day maker volume |
-| `taker_bps` | uint | **Effective** taker fee bps, resolved from the committed ladder at this account's 30-day taker volume |
+| `maker_bps` | string | **Effective** maker fee in basis points, resolved from the committed [`fee_schedule`](#fee_schedule) volume-tier ladder at this account's 30-day maker volume. A decimal string with ONE fraction digit (`"8.0"`) — the ladder is stored in deci-bps, so a tier can sit on a tenth of a bp |
+| `taker_bps` | string | **Effective** taker fee in basis points, resolved from the committed ladder at this account's 30-day taker volume. Same one-fraction-digit decimal string as `maker_bps` |
 
 The effective `maker_bps` / `taker_bps` are resolved per side from the committed
 volume-tier ladder ([`fee_schedule`](#fee_schedule)) — the maker rate at the
@@ -1059,9 +1059,17 @@ bps.
 
 State source: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + the committed volume-tier ladder.
 
-### Effective staking APR and its inputs {#staking_apr}
+### Staking reward inputs {#staking_apr}
 
-Effective annual staking emission rate + its committed inputs. No parameters.
+The committed inputs to the staking reward. No parameters.
+
+> ⚠️ **This read serves NO APR, and that is deliberate.** The emission era is
+> over. Rewards are funded from fees, not minted on a curve, so there is no
+> annual rate to publish. The fields `effective_apr`, `effective_apr_bps`,
+> `governance_rate_bps`, `emission_floor_stake` and `is_gross_pre_commission`
+> were documented here and **no longer exist on the wire**. If your client reads
+> any of them, it is reading a field the node does not send. Compute nothing from
+> a missing value: a documented-wrong APR costs more than no APR.
 
 ```json
 { "type": "staking_apr" }
@@ -1073,14 +1081,11 @@ Response:
 {
   "type": "staking_apr",
   "data": {
-    "total_stake":             "1000000",
-    "effective_apr":           "0.08",
-    "effective_apr_bps":       "800",
-    "governance_rate_bps":     800,
-    "emission_floor_stake":    "50000000",
-    "n_active_validators":     1,
-    "current_epoch":           2,
-    "is_gross_pre_commission": true
+    "total_stake":                "1000000",
+    "pending_validator_pool_usdc": "25.75",
+    "n_active_validators":         1,
+    "current_epoch":               2,
+    "reward_source":               "fee_funded_on_book_buy"
   }
 }
 ```
@@ -1088,33 +1093,18 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `total_stake` | Decimal string | Total staked MTF (whole-MTF) |
-| `effective_apr` | Decimal string | Annual emission rate the begin-block reward effect actually applies (fraction) |
-| `effective_apr_bps` | Decimal string | `effective_apr × 10_000`, truncated |
-| `governance_rate_bps` | uint | Governance-set `reward_rate_bps` (committed) — see flag |
-| `emission_floor_stake` | uint string | Floor stake (`50M` MTF) below which the rate is flat |
-| `n_active_validators` | uint64 | Validators active this epoch |
+| `pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool and not yet distributed, in whole USDC. This is the reward the next distribution draws from |
+| `n_active_validators` | uint64 | Validators marked active this epoch |
 | `current_epoch` | uint64 | Current staking epoch |
-| `is_gross_pre_commission` | bool | Always `true` — APR is gross, pre per-validator commission |
+| `reward_source` | string | Always `"fee_funded_on_book_buy"`. A constant, present so a client can tell a fee-funded chain from an emission-funded one without inferring it |
 
-`effective_apr` is the curve the begin-block reward effect derives:
+**There is no APR to derive from these fields, and do not fabricate one.** The
+pending pool is a snapshot of accrued fees, not a rate: it depends on trading
+volume that has not happened yet. An APR needs a formula nobody has defined, and
+a plausible-looking wrong number is worse than an honest absence.
 
-```text
-effective_apr = 0.08 × √( 50M / max(total_stake, 50M) )
-```
-
-i.e. a **flat 8%** at/below 50M MTF staked, decaying ∝ 1/√stake above it (e.g.
-total stake = 200M ⇒ 4× floor ⇒ ratio 1/4 ⇒ √ = 1/2 ⇒ 4% / 400 bps).
-
-:::warning
-**`governance_rate_bps` is committed but NOT consumed by the reward effect.** The
-reward effect derives the payout rate from the **stake curve** above, not from
-`reward_rate_bps`. Both are surfaced so the divergence is observable rather than
-hidden — the effective payout APR is `effective_apr`, not `governance_rate_bps`.
-And `effective_apr` is a **gross emission** rate (`is_gross_pre_commission: true`):
-an individual delegator's net APR is `effective_apr × (1 − commission)`.
-:::
-
-State source: `c_staking.{total_stake, reward_rate_bps, current_epoch, validators}` + the emission curve.
+State source: `c_staking.{total_stake, current_epoch, validators}` +
+`locus.fee_tracker.fee_distribution.validator_pool`.
 
 ### Per-market oracle source subset {#oracle_sources}
 
@@ -1298,13 +1288,17 @@ conventions as the reads above (decimal-string money, `0x`-hex addresses, coin
 `400`); an **unknown address is never an error** — it answers **200** with the
 empty shape (the established zeroed idiom).
 
-Four of the six types ship the locked wire contract with an **honest-empty**
+Three of the six types ship the locked wire contract with an **honest-empty**
 array today (marked **Status: empty (history retention pending)** below): their
 backing events currently stream on the live
 [WS channels](../ws/subscriptions.md) only and are not yet retained for REST.
 The retention backfill fills them **without a wire change** — the
 request/response envelopes below are final, and the documented record shapes are
 the locked forms the arrays will carry.
+
+[`user_ledger_updates`](#user_ledger_updates) is the fourth empty one, for a
+different reason: its records live in the archive, not on the node. Read its own
+notice below.
 
 ### Realized funding-payment history {#user_funding}
 
@@ -1351,10 +1345,24 @@ State source: the transient `user_fundings` WS sink (streamed, not yet retained 
 
 ### Balance ledger update history {#user_ledger_updates}
 
-**Status: empty (history retention pending).** `updates` is `[]` until ledger
-events (deposits / withdrawals / transfers / system credits) are retained for
-REST. For live per-account ledger deltas today, subscribe to the
-[`ledger_updates` WS channel](../ws/subscriptions.md#ledger_updates).
+> ⚠️ **This read answers `[]` today, and it is not scheduled.** The node holds
+> no per-account ledger history for REST. The archive DOES retain the deltas,
+> but it stores them in the node stream's own dialect — a SIGNED `delta` and a
+> numeric token id — while the record shape below is locked to the
+> [`ledger_updates` WS record](../ws/subscriptions.md#ledger_updates), which
+> carries an UNSIGNED `amount` and a fine-grained `kind`. Routing the archive
+> here would serve a shape this page forbids, so the gateway does not route it.
+> It opens when the archive stores the record shape, not before.
+
+**Neither side can answer this read today.** The node emits each balance delta
+once on the [`ledger_updates` WS channel](../ws/subscriptions.md#ledger_updates)
+and keeps nothing. The archive keeps the deltas in a lossier dialect. Use the WS
+channel for live movement; there is no REST history for it yet.
+
+**A deployment with no archive answers typed-empty**: `updates` is `[]`, never an
+error. So `[]` carries two readings — "no archive here" and "no delta in this
+window" — and the reply does not separate them. For a live per-account feed,
+subscribe to the WS channel instead.
 
 ```json
 { "type": "user_ledger_updates", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
@@ -1379,13 +1387,16 @@ Response:
 }
 ```
 
-Future record shape (locked): the
+Record shape (locked): the
 [`ledger_updates` WS record](../ws/subscriptions.md#ledger_updates) verbatim —
 `{kind, amount, time}` plus the kind-specific fields
 (`destination`, `token`, `asset`, `to_perp`, `via`). Every `amount` is a
 whole-token decimal string; no record carries raw base units.
 
-State source: the transient `ledger_updates` WS sink (streamed, not yet retained for REST).
+State source: the archive's retained
+[`node_ledger`](../../nodes/data-streams.md#node_ledger) stream. The node's own
+`ledger_updates` WS sink is transient and feeds that stream; it is not a source
+this read can query.
 
 ### Past executed orders {#historical_orders}
 
@@ -2185,13 +2196,22 @@ Response:
 ```json
 {
   "type": "max_builder_fee",
-  "data": { "address": "0x<addr>", "builder": "0x<builder>", "max_fee_bps": 8, "approved": true }
+  "data": { "address": "0x<addr>", "builder": "0x<builder>", "max_fee_bps": "8", "approved": true }
 }
 ```
 
+> ⬆️ **Upgrade notice — the last seven `*_bps` fields that were JSON numbers
+> become STRINGS at the next node release.** The VALUE does not change; only the
+> JSON type does. Most of the surface already served strings; these seven were
+> the stragglers. Parse every `*_bps` field as a decimal string. **Most carry
+> whole basis points; `maker_bps` and `taker_bps` carry ONE fraction digit**
+> because the fee ladder is stored in deci-bps. A client that reads any of them
+> as a number breaks on the day of that release, so accept a string now.
+
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `max_fee_bps` | uint32 | Approved bps ceiling; `0` if not approved |
+| `max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points; `"0"` if not approved |
 | `approved` | bool | Whether `(address, builder)` is an approved pair |
 
 State source: `locus.fee_tracker.approved_builders[addr][builder]` (keyed).
@@ -2215,8 +2235,8 @@ Response:
   "data": {
     "address": "0x<addr>",
     "builders": [
-      { "builder": "0x<builder_a>", "max_fee_bps": 25 },
-      { "builder": "0x<builder_b>", "max_fee_bps": 50 }
+      { "builder": "0x<builder_a>", "max_fee_bps": "25" },
+      { "builder": "0x<builder_b>", "max_fee_bps": "50" }
     ]
   }
 }
@@ -2225,7 +2245,7 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `builders[*].builder` | hex address | Approved builder address |
-| `builders[*].max_fee_bps` | uint32 | Approved bps ceiling — an **integer**, the same committed value [`max_builder_fee`](#max_builder_fee) reports |
+| `builders[*].max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points — the same committed value [`max_builder_fee`](#max_builder_fee) reports, in the same type |
 
 Builders list in ascending address order; an account with no approvals returns
 an empty array.
@@ -2362,7 +2382,7 @@ Response:
     "validators": [
       {
         "validator": "0x1111…", "signer": "0xa1a1…", "validator_index": 0,
-        "stake": "1000", "self_stake": "100", "commission_bps": 500,
+        "stake": "1000", "self_stake": "100", "commission_bps": "500",
         "is_active": true, "is_jailed": false, "jailed_at": null,
         "unjail_at": null, "first_active_epoch": 2
       }
@@ -2381,7 +2401,7 @@ Response:
 | `validators[*].validator_index` | uint32 | Consensus index |
 | `validators[*].stake` | decimal string | Total delegated stake |
 | `validators[*].self_stake` | decimal string | Validator's own contribution |
-| `validators[*].commission_bps` | uint32 | Commission (basis points) |
+| `validators[*].commission_bps` | string | Commission in whole basis points, as a decimal string |
 | `validators[*].is_active` | bool | In the active set this epoch |
 | `validators[*].is_jailed` | bool | Currently jailed |
 | `validators[*].jailed_at` | uint64 \| null | Jail start ts (null if not jailed) |
@@ -2533,7 +2553,7 @@ everywhere. (The signed `/exchange` write path still uses the numeric `asset` �
 that field is consensus-frozen and unrelated to these read args.)
 
 **Q: Do `user_fills` / `recent_trades` need an external indexer?**
-A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md). History PAST the ring is a different question: the archive holds it, and archive service for the trade tape is written but not deployed — see [Deep history, past the ring](./info/perpetuals.md#recent_trades-archive).
+A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md). History PAST the ring is a different question: the archive holds it, and from the next gateway release a RANGED `trades_by_time` ask reaches it. An un-ranged `recent_trades` always answers from the ring — see [Deep history, past the ring](./info/perpetuals.md#recent_trades-archive).
 
 **Q: Is the response deterministic across nodes?**
 A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. `gossip_root_ips` reads each node's own config, so nodes that carry the same roster answer identically, and nodes that do not may differ. Use [`block_info`](#block_info) to see the height a node has committed to.

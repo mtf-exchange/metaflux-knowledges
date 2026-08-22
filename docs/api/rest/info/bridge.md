@@ -155,7 +155,7 @@ Response `data`:
     {
       "chain": 1,
       "contract_address": "0x00000000000000000000000010f1a0f6153b8b77a355098e5f19c659a9a0965a",
-      "validator_quorum_threshold_bps": 6700,
+      "validator_quorum_threshold_bps": "6700",
       "replay_nonce": 12,
       "paused": false,
       "evm_chain_id": 8453,
@@ -180,7 +180,7 @@ Response `data`:
 |---|---|
 | `withdrawals_halted` | Chain-wide refusal of new withdrawals, all chains. Governance clears it. A bridge can be unable to PAY while still able to ACCEPT; this flag stops the accept. |
 | `contract_address` | The 32-byte deployment id — the EVM address left-padded. |
-| `validator_quorum_threshold_bps` | Stake share required to co-sign, in basis points. `6700` = 67%. |
+| `validator_quorum_threshold_bps` | Stake share required to co-sign, a decimal string of whole basis points. `"6700"` = 67%. |
 | `replay_nonce` | Per-chain replay counter. Shared by both directions. Preserved across a rotation. |
 | `paused` | Per-chain kill switch. Blocks withdrawals AND deposit attestation on this chain. |
 | `evm_chain_id`, `evm_contract_address`, `validator_set_epoch` | The deployment triple folded into `message_id`. Rotating any of the three moves the id of every in-flight withdrawal. |
