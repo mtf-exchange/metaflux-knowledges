@@ -443,8 +443,32 @@ Per-account money movement, attributed to its **cause** (read from the committed
 { "channel": "ledger_updates", "data": [ { "kind": "usd_send", "destination": "0x..", "amount": "25.5", "time": 1735689600123 } ] }
 ```
 
-- `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `deposit` (`amount` may be `null` for an inbound CCTP credit), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver).
-- Amounts are whole-token decimal strings except `withdraw` via MetaBridge, which carries `amount_units` (raw base units). Inbound bridge credit amounts and CoreWriter-delayed actions (which dispatch in a later block) are not yet attributed.
+- `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver). Two more kinds arrive next release — see [Two record sources arrive next release](#ledger_updates-incoming).
+- **Every `amount` is a whole-token decimal string**, `withdraw` included — there is no raw base-unit field on any record. `amount` is UNSIGNED on every kind listed above; read the direction from the `kind` (the incoming `liquidation` kind below is the one signed exception). Inbound bridge credit amounts and CoreWriter-delayed actions (which dispatch in a later block) are not yet attributed.
+
+#### Two record sources arrive next release {#ledger_updates-incoming}
+
+> ⬆️ **Upgrade notice — not live yet.** The two records below are written but
+> **not on the live chain**. They start with the next node release. Accept them
+> now: a client that rejects an unknown `kind` breaks on the day of that release.
+
+Both close a gap the bullet above names. Neither renames or removes an existing
+`kind`, and neither changes the shape of a record you already receive.
+
+| `kind` | Emitted for | Fields |
+|--------|-------------|--------|
+| `deposit` | A **bridge inbound credit**, at the block the cosigner quorum credits it. This channel emits no `deposit` record today | `kind`, `coin`, `amount`, `chain`, `via`, `time` |
+| `liquidation` | A **liquidation settlement** — the signed balance change a forced close leaves on the account. New `kind` | `kind`, `coin`, `amount`, `market`, `cause`, `time`, optional `mark_px` |
+
+Field rules for the two new kinds:
+
+- `deposit.amount` is a positive whole-token decimal string — the quorum-credited amount. `chain` ∈ `base` / `arbitrum` names the source chain; `via` is always `"metabridge"`.
+- `liquidation.amount` is **SIGNED** — negative on a loss. This is the one signed `amount` on the channel; every existing kind stays unsigned with direction read from `kind`.
+- `liquidation.coin` is the settlement token (USDC); `market` names the perp the forced close ran on.
+- `liquidation.cause` uses the same vocabulary as `user_fills` causes: `forced_close_partial` / `forced_close_full` / `forced_close_isolated`.
+- `liquidation.mark_px` is the whole-USDC mark the slice was priced from; the key is ABSENT when the market had no usable mark at the slice.
+- ADL, backstop takeovers, and the governance force-close lane settle outside the measured slice and emit no `liquidation` record.
+- **Treat an unknown `kind` as data, not an error.** Show the `amount` and the `time`, and label the cause from the `kind` string. That rule keeps a client working across every later addition too.
 
 ### Trading context for one account and market {#active_asset_data}
 

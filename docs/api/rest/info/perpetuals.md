@@ -498,11 +498,33 @@ a recent window, not all history. An unknown / never-traded market returns
 | `trades[*].block` | uint64 | Committed block height the trade settled in (on-chain locator) |
 | `trades[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets a print be traced on-chain. **Empty string (`""`) when there is no signed taker action** behind the print (a system / begin-block print, or a maker leg whose submit hash is not carried) |
 
+#### Deep history, past the ring {#recent_trades-archive}
+
+> ⬆️ **Upgrade notice — not live yet.** Archive service for `recent_trades` and
+> `trades_by_time` is written but **not deployed**. Until the archive deploys,
+> both reads answer from the node ring alone, so a window older than the ring
+> returns `"trades": []`. It goes live when the historical archive deploys.
+
+The node ring is bounded and holds only the newest prints. The archive keeps
+every print, and the gateway answers the same two reads from it when the ring
+falls short.
+
+**Your request and your parser do not change.** The gateway relabels the archive
+record to the shape above, so one parser reads both sources. Two fields read
+differently on an archive-served print:
+
+| Field | On an archive-served print |
+|-------|----------------------------|
+| `hash` | Always `""`. The node stream writes the trace hash, but the archive's trade table does not yet store it, so an archive print cannot be traced to its signed action until that column lands |
+| `last_trade` | The newest print **in this answer**, not the market's all-time newest. A `start_time` / `end_time` window bounds it |
+
 ### Get trades in a time window {#trades_by_time}
 
 Like [`recent_trades`](#recent_trades), but filtered to a `[start_time, end_time]`
-window over the per-market trade ring — the bounded recent window. For deep
-history beyond the ring, use the gateway archive types.
+window over the per-market trade ring — the bounded recent window. A window that
+reaches past the ring is answered from the archive; see
+[Deep history, past the ring](#recent_trades-archive) for what that changes and
+when it goes live.
 
 ```json
 { "type": "trades_by_time", "coin": "BTC", "start_time": 1783000000000, "end_time": 1783011600000 }
@@ -629,9 +651,10 @@ has no oracle price.
 
 #### The bar cap, and how to page past it {#candle_snapshot-max-bars}
 
-> ⬆️ **Upgrade notice — not live yet.** The bar cap below is written and under
-> test. It is **not on the live chain**, where a wide window is still answered in
-> full. Page your queries now so the cap changes nothing for you when it lands.
+> ⬆️ **Upgrade notice — landed, not yet released.** The bar cap below is
+> written, tested and merged. It is **not on the live chain**: a wide window is
+> still answered in full there. The cap goes live with the next node release.
+> Page your queries now, and that release changes nothing for you.
 
 A response carries at most **5000 bars**. Over that, the answer keeps the **5000
 most recent** and drops the older ones. The cap exists because the window is

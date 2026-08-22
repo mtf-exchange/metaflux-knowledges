@@ -539,6 +539,13 @@ a recent window, not all history. An account with no fills returns
 | `fills[*].twap_id` | uint64 | Present on a TWAP slice (`cause` is `"twap"`). The parent order this slice belongs to. Taker leg only |
 | `fills[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets the fill be traced on-chain. A taker leg carries its order's hash; a **maker leg carries the hash of the maker's own resting order** (its original `submit_order`), so both legs of a match are traceable to the action that placed them. **Empty string (`""`)** when there is no signed user order behind the leg — a system / begin-block / liquidation print — and, for maker legs, on fills recorded before the network upgrade |
 
+**Archive-served fills carry no `cause`.** A window older than the node's fill
+ring is answered from the archive, which stores the attribution fields
+(`liquidated_user`, `mark_px`, `broker`, `broker_fee`, `twap_id`, `hash`) but
+not the `cause` string. Classify a forced close by `liquidated_user` and a TWAP
+slice by `twap_id` — both work on every row; a `cause` test silently misses
+archive-era rows.
+
 ### Fill history filtered by time window {#user_fills_by_time}
 
 Like [`user_fills`](#user_fills), but filtered to a time window over each
@@ -1374,8 +1381,9 @@ Response:
 
 Future record shape (locked): the
 [`ledger_updates` WS record](../ws/subscriptions.md#ledger_updates) verbatim —
-`{kind, amount | amount_units, time}` plus the kind-specific fields
-(`destination`, `token`, `asset`, `to_perp`, `via`).
+`{kind, amount, time}` plus the kind-specific fields
+(`destination`, `token`, `asset`, `to_perp`, `via`). Every `amount` is a
+whole-token decimal string; no record carries raw base units.
 
 State source: the transient `ledger_updates` WS sink (streamed, not yet retained for REST).
 
@@ -2525,7 +2533,7 @@ everywhere. (The signed `/exchange` write path still uses the numeric `asset` �
 that field is consensus-frozen and unrelated to these read args.)
 
 **Q: Do `user_fills` / `recent_trades` need an external indexer?**
-A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md).
+A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md). History PAST the ring is a different question: the archive holds it, and archive service for the trade tape is written but not deployed — see [Deep history, past the ring](./info/perpetuals.md#recent_trades-archive).
 
 **Q: Is the response deterministic across nodes?**
 A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. `gossip_root_ips` reads each node's own config, so nodes that carry the same roster answer identically, and nodes that do not may differ. Use [`block_info`](#block_info) to see the height a node has committed to.
