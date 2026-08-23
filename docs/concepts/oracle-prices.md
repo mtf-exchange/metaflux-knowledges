@@ -46,19 +46,23 @@ The committed per-market source set is queryable — see [`oracle_sources`](#que
 
 So "deployers cannot choose their own price" is true of this lane only. On a MIP-3 market the deployer **is** the price source. That is why such a market is isolated from the shared collateral pool and why its deploy bond is slashable. The push is bounded (±10 % per push against the committed anchor, an absolute ceiling, and a staleness window that flips the market reduce-only), but the party choosing the number is the deployer.
 
-**The deployer owns price CONTINUITY, and the protocol will not fill a gap for it.** MetaFlux
-runs no price-discovery mechanism on a deployer market: there is no band that widens when the
-underlying goes quiet, and no re-anchoring. If the underlying instrument closes — an equity index
-over a weekend, a currency fix overnight — the deployer must KEEP PUSHING through the closed hours,
-at whatever price its own discovery produces. A push must land at least once per staleness window
-(`stale_threshold_ms`, read it from
-[`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle); **60 s** on the live devnet), for
-every market, forever.
+**The deployer owns price continuity, and the protocol will not fill a gap for it.** MetaFlux runs
+no price-discovery mechanism on a deployer market: there is no band that widens when the underlying
+goes quiet, and no re-anchoring. Whether the market trades while its underlying is closed is
+therefore the deployer's decision, not the protocol's, and BOTH answers are supported.
 
-Stop pushing and the market does not break — it FREEZES, by design. Past the window the market is
-reduce-only, so no one may open, and liquidation defers rather than run at a price nobody trusts.
-Open positions sit until a fresh push arrives. That is a fail-safe, not an outage, but it is a
-market nobody can trade, and it is entirely the deployer's to avoid.
+- **Keep pushing through the closed hours**, at whatever price your own discovery produces, and the
+  market trades continuously. A push must land at least once per staleness window
+  (`stale_threshold_ms`, read it from
+  [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle); **60 s** on the live devnet),
+  for every market you operate.
+- **Or stop, and let the market FREEZE.** Past the window it goes reduce-only, so no one may open,
+  and liquidation defers rather than run at a price nobody trusts. Open positions sit untouched
+  until a fresh push arrives. For an instrument that genuinely has no price overnight — an equity
+  index over a weekend — this is an honest state, not an outage, and several live markets use it.
+
+What you may not do is push a price you do not believe. The push is bounded, but inside those bounds
+the number is yours, and the deploy bond is slashable.
 
 That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. Read `feature_active` from [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle) on the network you target. See [MIP-3 — oracle](../mip/mip-3.md#oracle) for the operator rules.
 :::
