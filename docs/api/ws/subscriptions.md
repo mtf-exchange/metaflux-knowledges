@@ -9,6 +9,23 @@ Channels are **change-driven**: a channel emits a frame only when its state actu
 (or the REST focused reads). Subscribing to `web_data2` now returns
 `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
 :::
+
+:::warning
+**The WS `web_data` channel goes away at the next node release.** The push
+channel is retired. Subscribing to `web_data` then returns
+`{"channel":"error","data":{"error":"unknown channel: web_data"}}`.
+
+**The REST `web_data` read keeps serving, unchanged.** Send
+`{"type":"web_data","address":"0x<address>"}` to `POST /info` and poll it. The
+body is identical to the one the channel pushed, so no data goes away — only
+the push does. Every facet it carries also has its own focused `/info` read:
+`user_vault_equities`, `staking_state`, `delegator_summary`, `sub_accounts`,
+`user_to_multi_sig_signers` and `agents`.
+
+This channel was never listed in this reference, so a client that follows this
+page is not affected. A client that subscribed to it after finding it in a
+client SDK is.
+:::
 ::::
 
 :::info
