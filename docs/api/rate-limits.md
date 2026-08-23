@@ -69,7 +69,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 | `POST /info` `user_fills`, `user_fills_by_time` | 2 |
 | `POST /exchange` | 5 |
 | `POST /evm` (single request) | 1 |
-| `POST /evm` (batch array) | 1 per element |
+| `POST /evm` (batch array) | 1 per element, minimum 1 |
 | WS `subscribe` | 1 |
 | WS published message | 0 |
 | WS `unsubscribe` | 0 |
