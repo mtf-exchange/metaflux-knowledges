@@ -38,8 +38,8 @@ flowchart TD
 | `400 action: <parse error>` / other parse errors | NO | YES — fix and resubmit at same nonce |
 | `401 signer_*` | NO | NO until the signing issue is fixed; the nonce is unconsumed |
 | `422 reduce_only_violation` and other admit-time logical errors | NO | YES once the logical issue is fixed |
-| `429 rate_limit` | NO | YES after `retry_after_ms` |
-| `503 mempool_full` | NO | YES after `retry_after_ms` |
+| `429 rate limit exceeded` | NO | YES after a client-side backoff — the body carries no retry hint |
+| `503 gateway overloaded` | NO | YES after a client-side backoff |
 | Network drop (no response) | UNKNOWN | RECONCILE — see [reconcile after drop](#reconcile-after-network-drop) below |
 
 The rule: **a request gets a server response → the nonce decision is made**. A network drop is the only ambiguous case.

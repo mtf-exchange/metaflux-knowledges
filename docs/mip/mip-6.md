@@ -11,11 +11,9 @@ on-chain venues). It is a future capability, deferred to **V3**.
 
 ## Why this exists as a separate number {#why-this-exists-as-a-separate-number}
 
-Outcomes was **originally numbered MIP-4**. When the project repurposed MIP-4 into
-the [Perps Liquidity Aggregator / Internalizer](./mip-4.md), the
-Outcomes concept was renumbered to **MIP-6** and pushed from V2 to the V3 backlog.
-Giving it a fresh number avoids the confusion of reusing MIP-4 for two unrelated
-mechanisms. Do not refer to Outcomes as "MIP-4".
+Outcomes was **originally numbered MIP-4**. It was renumbered to **MIP-6** and
+pushed from V2 to the V3 backlog when MIP-4 was reassigned. MIP-4 now names
+[Options](./mip-4.md). Do not refer to Outcomes as "MIP-4".
 
 ## Why deferred {#why-deferred}
 
@@ -32,5 +30,4 @@ design — none of which is reserved eagerly today.
 
 ## See also {#see-also}
 
-- [MIP-4 — perps liquidity aggregator / internalizer](./mip-4.md) — the proposal
-  that took over the MIP-4 number.
+- [MIP-4 — Options](./mip-4.md) — the proposal that now holds the MIP-4 number.

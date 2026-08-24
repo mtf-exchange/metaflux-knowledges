@@ -64,8 +64,9 @@ Subscribe to the per-account channels and react to deltas instead of polling `/i
 - `fills` / `user_fills` — your executions.
 - `account_state` — perp margin, balances, positions. `spot_margin_state` — spot-margin positions (there is no live WS channel for plain spot-token balances; poll `spot_clearinghouse_state`).
 
-Subscriptions are cheap (1 weight at subscribe, 0 per message); `/exchange` is weight 5 per
-request and `/info` polling burns your rate budget. See [Rate limits](../api/rate-limits.md).
+Subscriptions are free — a subscribe costs 0 weight and so does every pushed message. `/exchange`
+is weight 5 per request and `/info` polling burns your rate budget. See
+[Rate limits](../api/rate-limits.md).
 
 ## Putting it together — the quote loop
 

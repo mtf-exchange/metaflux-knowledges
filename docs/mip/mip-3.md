@@ -1,16 +1,12 @@
 # MIP-3 — Permissionless perp market deploy
 
-:::warning
-**Confirm the lane before you build a business on it.** The market-deploy logic,
-the nine deploy action tags and the deployer price push are all built and frozen.
-Their shapes on this page will not change. What varies by network is whether the
-running build carries them and whether the governance off-switch `mip3_enabled`
-is open, so a call can still be refused. Probe one call on your target network
-before you depend on it. Everything on this page about **fees, bonds and limits**
-describes behaviour already in the node.
+:::info
+**The lane is live and in use.** Markets are deployed through it today. A
+deployed market carries the deployer's dex prefix in its `coin`, so a market
+named `GRAD:USDCNY` belongs to the `GRAD` dex and not to the primary market set.
 
-Nothing has ever been deployed through this lane. Every perpetual market live
-today was listed by governance.
+One governance off-switch still applies per network: `mip3_enabled`. Read it
+before you build on the lane, because a closed switch refuses a deploy call.
 :::
 
 Any builder can deploy a new perpetual market on MetaFlux by paying a deploy fee
@@ -282,8 +278,8 @@ drawn in by builder-fee rebates, or a user-created vault.
 
 ## MIP-4 {#mip-4}
 
-See [MIP-4 — perps liquidity aggregator / internalizer](mip-4.md) for the
-MetaFlux-operated aggregator that complements permissionless deploy.
+A market deployed here shares its margin account with the planned options
+product. See [MIP-4 — Options](mip-4.md).
 
 ## See also {#see-also}
 

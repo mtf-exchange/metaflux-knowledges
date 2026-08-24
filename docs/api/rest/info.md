@@ -353,9 +353,11 @@ Response:
 | `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window (whole-MTF) |
 | `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable (consensus ms) |
 
-> ⬆️ **Upgrade notice — not live yet.** `undelegated_pool_balance` is written and
-> under test. The live node does **not** answer it. Treat a missing key as "this
-> node predates the field", not as a zero balance.
+> ⬆️ **Upgrade notice — not live yet.** `undelegated_pool_balance` is not served
+> here. Treat a missing key as "this node predates the field", not as a zero
+> balance. **The same figure IS live on another read**: take
+> [`delegator_summary.undelegated`](#delegator_summary), which the node answers
+> today.
 
 **`total_staked` alone under-reports what an account holds.** It counts
 **delegated** stake. `stakingDeposit` credits a free pool and `stakingWithdraw`
@@ -531,7 +533,7 @@ a recent window, not all history. An account with no fills returns
 | `fills[*].dir` | string | Direction label, e.g. `"Open Long"`, `"Close Short"`, `"Open Short"`, `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Signed leg size BEFORE the fill, **base units** (whole-unit, signed) |
 | `fills[*].block` | uint64 | Committed block height the fill settled in (on-chain locator) |
-| `fills[*].cause` | string | **Present only when this leg did NOT execute by its own order crossing.** `"forced_close_partial"` / `"forced_close_full"` — the liquidation ladder; `"forced_close_isolated"` — an isolated leg breached its own bucket; `"trigger"` — a TP/SL fired; `"twap"` — a TWAP slice. **Absent on an ordinary fill and on EVERY maker leg** — a counterparty that was merely hit is not itself forced |
+| `fills[*].cause` | string | **Present only when this leg did NOT execute by its own order crossing.** `"forced_close_partial"` / `"forced_close_full"` — the liquidation ladder; `"forced_close_isolated"` — an isolated leg breached its own bucket; `"forced_close_governance"` — a validator-quorum `force_close_position` settled against the book; `"trigger"` — a TP/SL fired; `"twap"` — a TWAP slice. **Absent on an ordinary fill and on EVERY maker leg** — a counterparty that was merely hit is not itself forced. **`forced_close_governance` is a forced close that is NOT a liquidation**: it charges no liquidation fee and does not bump the liquidation counters, so do not fold it into a liquidation total |
 | `fills[*].liquidated_user` | hex address | **Present on a forced-close leg only, on BOTH sides of the print.** The account whose position was closed — so a taker can see whose liquidation it absorbed |
 | `fills[*].mark_px` | Decimal string | Present with `liquidated_user`. The mark the LADDER priced from when it classified — **not** the fill price, and not a later mark |
 | `fills[*].broker` | hex address | Present when a [broker code](../../concepts/broker-codes.md) routed the order. Taker leg only |
@@ -2129,9 +2131,14 @@ Response:
 
 State source: `Exchange.user_vaults` filtered by `leader == addr`.
 
-### A user's action stats and rate-limit budget {#user_rate_limit}
+### A user's action stats {#user_rate_limit}
 
-A user's action stats / rate-limit budget. Required: `address` (0x hex).
+A user's action counters. Required: `address` (0x hex).
+
+**The name is historical: this read does NOT report a rate-limit budget.** It
+returns nonce and action counters and nothing about bucket state. No read
+publishes remaining budget — track your own spend against
+[rate limits](../rate-limits.md).
 
 ```json
 { "type": "user_rate_limit", "address": "0x<addr>" }
@@ -2168,20 +2175,32 @@ Response:
 {
   "type": "delegator_summary",
   "data": {
-    "address": "0x<addr>", "total_delegated": "500", "pending_withdrawal": "50",
-    "claimable_rewards": "7", "n_delegations": 2
+    "address": "0x<addr>", "undelegated": "250", "total_delegated": "500",
+    "pending_withdrawal": "50", "claimable_rewards": "7", "n_delegations": 2
   }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `undelegated` | decimal string | The free staking pool: MTF moved in with `staking_deposit` and **not yet delegated** (whole-MTF) |
 | `total_delegated` | decimal string | Sum of active delegations |
 | `pending_withdrawal` | decimal string | Sum of pending undelegations |
 | `claimable_rewards` | decimal string | Accumulated delegator rewards |
 | `n_delegations` | uint64 | Number of active delegations |
 
-State source: `c_staking.{delegations, pending_undelegations, delegator_rewards}`.
+**The three balances are disjoint — add them for the whole staked holding.**
+`staking_deposit` credits `undelegated`; `token_delegate` moves stake out of
+`undelegated` into `total_delegated`; undelegating moves it out of
+`total_delegated` into `pending_withdrawal` for the unbonding window. A screen
+that shows `total_delegated` alone shows the user less than they hold.
+
+**`undelegated` is the spendable figure a delegate form needs.** It is what
+`token_delegate` draws from, so an amount above it is refused. It is also the
+only one of the three that `staking_withdraw` can return to spot immediately —
+no unbonding window applies to the free pool.
+
+State source: `c_staking.{staking_balance, delegations, pending_undelegations, delegator_rewards}`.
 
 ### Approved builder fee ceiling {#max_builder_fee}
 
@@ -2364,10 +2383,12 @@ State source: `validator_l1_vote_tracker.round_to_votes`. The vote payload is op
 
 ### Per-validator stake and status snapshot {#validator_summaries}
 
-Per-validator snapshot (HL `validatorSummaries`). No parameters. Lists every validator in committed `c_staking.validators` (a small, bounded set) in committed `BTreeMap` order.
+Per-validator snapshot (HL `validatorSummaries`). Lists every validator in committed `c_staking.validators` (a small, bounded set) in committed `BTreeMap` order.
+
+Optional: `address` (0x hex). Naming an address adds that caller's own stake to every row; it changes nothing else.
 
 ```json
-{ "type": "validator_summaries" }
+{ "type": "validator_summaries", "address": "0x<addr>" }
 ```
 
 Response:
@@ -2376,13 +2397,14 @@ Response:
 {
   "type": "validator_summaries",
   "data": {
-    "epoch": 3,
     "total_stake": "1400",
     "n_active": 1,
     "validators": [
       {
         "validator": "0x1111…", "signer": "0xa1a1…", "validator_index": 0,
-        "stake": "1000", "self_stake": "100", "commission_bps": "500",
+        "display_name": "alice.mtf",
+        "stake": "1000", "self_stake": "100", "delegated_stake": "900",
+        "your_stake": "7", "commission_bps": "500",
         "is_active": true, "is_jailed": false, "jailed_at": null,
         "unjail_at": null, "first_active_epoch": 2
       }
@@ -2393,14 +2415,16 @@ Response:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `epoch` | uint64 | Current staking epoch (`c_staking.current_epoch`) |
 | `total_stake` | decimal string | Σ stake across all validators |
 | `n_active` | uint64 | Size of the active set |
 | `validators[*].validator` | 0x address | Validator primary address |
 | `validators[*].signer` | 0x address | Operational signer (hot key) |
 | `validators[*].validator_index` | uint32 | Consensus index |
-| `validators[*].stake` | decimal string | Total delegated stake |
+| `validators[*].display_name` | string \| null | The operator's chosen handle (`set_display_name`), or `null` when it set none |
+| `validators[*].stake` | decimal string | Total stake: self plus everyone else's |
 | `validators[*].self_stake` | decimal string | Validator's own contribution |
+| `validators[*].delegated_stake` | decimal string | `stake − self_stake`: everything staked by someone OTHER than the validator |
+| `validators[*].your_stake` | decimal string \| null | The stake the REQUESTING address has delegated to this validator |
 | `validators[*].commission_bps` | string | Commission in whole basis points, as a decimal string |
 | `validators[*].is_active` | bool | In the active set this epoch |
 | `validators[*].is_jailed` | bool | Currently jailed |
@@ -2408,7 +2432,24 @@ Response:
 | `validators[*].unjail_at` | uint64 \| null | Earliest unjail ts (null if not jailed) |
 | `validators[*].first_active_epoch` | uint64 | First epoch the validator was active |
 
-State source: `c_staking.{validators, jailed, validator_index, active_set, current_epoch, total_stake}`. `name` / `n_recent_blocks` are not tracked on-chain — omitted rather than fabricated.
+**`display_name` of `null` means UNSET, never "unknown".** Fall back to the
+address. Do not invent a name, and do not treat `null` as a node that predates
+the field.
+
+**`your_stake` distinguishes two different blanks.** `"0"` means the request
+named an address and that address has delegated nothing to THIS validator.
+`null` means the request named **no** address, so the field is about nobody —
+render the column as empty, not as a zero balance.
+
+**`delegated_stake` is derived, not stored.** It is exactly `stake − self_stake`,
+so it can never drift from the two figures beside it. Do not sum it across rows
+to get `total_stake`: that sum excludes every validator's self-stake.
+
+**There is no `epoch` key**, and there was never a live one. `c_staking.current_epoch`
+has no production writer, so any value served would be a constant rather than the
+chain's epoch. Read `first_active_epoch` per validator instead.
+
+State source: `c_staking.{validators, jailed, validator_index, active_set, delegations, total_stake}` plus `display_name` off the validator's own account record. `n_recent_blocks` is not tracked on-chain — omitted rather than fabricated.
 
 ### Advertised peer roster {#gossip_root_ips}
 
@@ -2502,7 +2543,7 @@ data with stable, independently-versioned shapes:
 | 404 | `{"error":"market not found"}` | `coin` symbol unknown (`market_info` etc.) |
 | 404 | `{"error":"vault not found"}` | Vault address unknown (`vault_state` only) |
 | 405 | (no body) | Not POST |
-| 429 | `{"error":"rate limit exceeded","retry_after_ms":N}` | See [rate limits](../rate-limits.md) |
+| 429 | `{"status":"err","response":"rate limit exceeded"}` | No retry hint is sent — see [rate limits](../rate-limits.md) |
 
 :::warning
 There is **no `account not found`** error: account-keyed readers (`account_state`,

@@ -489,9 +489,10 @@ Field rules for the two new kinds:
 - `deposit.amount` is a positive whole-token decimal string — the quorum-credited amount. `chain` ∈ `base` / `arbitrum` names the source chain; `via` is always `"metabridge"`.
 - `liquidation.amount` is **SIGNED** — negative on a loss. This is the one signed `amount` on the channel; every existing kind stays unsigned with direction read from `kind`.
 - `liquidation.coin` is the settlement token (USDC); `market` names the perp the forced close ran on.
-- `liquidation.cause` uses the same vocabulary as `user_fills` causes: `forced_close_partial` / `forced_close_full` / `forced_close_isolated`.
+- `liquidation.cause` uses the same vocabulary as `user_fills` causes: `forced_close_partial` / `forced_close_full` / `forced_close_isolated` / `forced_close_governance`.
+- **`forced_close_governance` is a forced close that is NOT a liquidation.** A validator-quorum `force_close_position` settles against the book like the ladder does, and it writes the same record — but it charges no liquidation fee and bumps no liquidation counter. Read the `cause` before you fold the record into a liquidation total.
 - `liquidation.mark_px` is the whole-USDC mark the slice was priced from; the key is ABSENT when the market had no usable mark at the slice.
-- ADL, backstop takeovers, and the governance force-close lane settle outside the measured slice and emit no `liquidation` record.
+- ADL and backstop takeovers settle outside the measured slice and emit no `liquidation` record.
 - **Treat an unknown `kind` as data, not an error.** Show the `amount` and the `time`, and label the cause from the `kind` string. That rule keeps a client working across every later addition too.
 
 ### Trading context for one account and market {#active_asset_data}

@@ -102,8 +102,8 @@ staking bond, then configuring leverage, fee tier, and oracle before activating
 it. No review committee, no allow-list — but a builder-deployed market is
 isolated in the deployer's own dex, not the shared market set every trader sees
 by default. See [MIP-3](../mip/mip-3.md) for the deploy flow and the isolation
-rule, and [MIP-4](../mip/mip-4.md) for the planned liquidity aggregator that
-carries retail flow on top.
+rule. Perpetuals also share their margin account with the planned options product
+— see [MIP-4](../mip/mip-4.md).
 
 ## See also {#see-also}
 

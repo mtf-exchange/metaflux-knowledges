@@ -58,14 +58,11 @@ order**, so element `i` of the response answers element `i` of the request. A
 failing element yields its own JSON-RPC error object; it does not fail the other
 elements and it does not fail the request.
 
-> ⬆️ **Upgrade notice — not live yet.** The batch cap and its rate-limit weight
-> below are written and under test. The live gateway does **not** enforce the cap
-> yet and does not meter per element. Size your batches to 100 now; nothing
-> changes for you when the cap lands.
-
 A batch carries at most **100** elements. A larger array is rejected whole with
 JSON-RPC error **`-32600`** (invalid request) — the elements are not partially
-served, so you never have to work out which prefix ran.
+served, so you never have to work out which prefix ran. The refusal itself is
+charged at the full cap of 100 weight, and so is an array whose element count the
+gateway cannot parse. Malformed is never the cheap lane.
 
 A batch costs **rate-limit weight equal to its element count**: 40 elements cost
 40, the same as 40 separate calls. Batching saves round trips and connections; it

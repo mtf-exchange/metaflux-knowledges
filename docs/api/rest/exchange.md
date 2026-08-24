@@ -3766,18 +3766,25 @@ HTTP edge and dropped at commit, so there is no synchronous `nonce` rejection he
 ### `429 Too Many Requests` — rate-limited {#429-too-many-requests--rate-limited}
 
 ```json
-{ "error": "rate limit exceeded", "retry_after_ms": 1200 }
+{ "status": "err", "response": "rate limit exceeded" }
 ```
 
-See [rate limits](../rate-limits.md).
+**No retry hint is sent.** Derive the wait from the refill rate — `/exchange`
+costs 5 weight and the per-IP bucket refills at 20 weight per second, so 250 ms
+buys back one request. See [rate limits](../rate-limits.md).
 
-### `503 Service Unavailable` — mempool full {#503-service-unavailable--mempool-full}
+### `503 Service Unavailable` — gateway overloaded {#503-service-unavailable--mempool-full}
 
 ```json
-{ "error": "mempool at capacity", "retry_after_ms": 200 }
+{ "error": "gateway overloaded" }
 ```
 
-Back off and retry. Sustained 503 indicates network congestion; bidirectional WS keep-alive will reflect this.
+The gateway's in-flight request pool is full. Back off and retry. Sustained 503
+indicates network congestion; bidirectional WS keep-alive will reflect this.
+
+**A full mempool is never a 503.** The node's pending-action queue does not
+refuse a new action — it drops the OLDEST pending one. See
+[Admission ≠ commit](#admission--commit) below.
 
 ---
 
@@ -3861,7 +3868,7 @@ A: No. Each request is one `action`. For multi-order batching use `batch_order` 
 A: A cancel of a single oid: ~250 bytes including the 65-byte signature and 40-char sender. Most orders are 350–500 bytes.
 
 **Q: How do I deal with `429`?**
-A: Linear backoff with `retry_after_ms`. Order-flow bots should pre-emptively rate-limit on the client side to stay below `per_account_qps` — see [rate limits](../rate-limits.md).
+A: Back off on a fixed schedule of your own — the response carries no `retry_after_ms`. Order-flow bots should pre-emptively rate-limit on the client side: `/exchange` costs 5 weight against a per-IP budget that refills at 20 weight per second, so one IP sustains 4 orders per second. See [rate limits](../rate-limits.md).
 
 **Q: Does `nonce` need to be a timestamp?**
 A: No. It needs to be strictly increasing per `sender`. Convention is `Date.now()` because that's monotonic and human-readable in logs, but any monotonic uint64 works.

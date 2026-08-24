@@ -76,7 +76,7 @@
     * [MIP-1 — Spot token standard + market deployment](docs/mip/mip-1.md)
     * [MIP-2 — Metaliquidity](docs/mip/mip-2.md)
     * [MIP-3 — Permissionless perp market deploy](docs/mip/mip-3.md)
-    * [MIP-4 — Perps Liquidity Aggregator / Internalizer](docs/mip/mip-4.md)
+    * [MIP-4 — Options](docs/mip/mip-4.md)
     * [MIP-5 — Earn](docs/mip/mip-5.md)
     * [MIP-6 — Outcomes / prediction markets](docs/mip/mip-6.md)
   * [products](docs/products/README.md)

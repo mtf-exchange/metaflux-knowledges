@@ -14,7 +14,7 @@ A complete enumeration of HTTP status codes, error-string conventions, root caus
 - **404** — resource doesn't exist. Common on `/info` when the queried account / market / vault has never been seen.
 - **405** — wrong HTTP method (most endpoints are POST).
 - **422** — request well-formed but logically invalid (e.g. zero size, leverage above cap). Do not retry; correct and resubmit.
-- **429** — rate limited. Back off and retry per `retry_after_ms`.
+- **429** — rate limited. There is **no** retry hint on the response; derive the wait from the refill rate (see [rate limits](./rate-limits.md)).
 - **5xx** — server-side. Retry with exponential backoff; persistent failures indicate operator-side incident.
 
 ## Body shape {#body-shape}
@@ -23,13 +23,17 @@ All non-2xx responses on MTF-native endpoints use:
 
 ```json
 {
-  "error":          "<short_string>",
-  "detail":         "<optional human-readable elaboration>",
-  "retry_after_ms": 1200
+  "error":  "<short_string>",
+  "detail": "<optional human-readable elaboration>"
 }
 ```
 
-`detail` and `retry_after_ms` are present only when applicable. The `error` field is the stable identifier — keep your error handler keyed off it.
+`detail` is present only when applicable. The `error` field is the stable identifier — keep your error handler keyed off it.
+
+**No error body carries a retry hint.** There is no `retry_after_ms` field and no
+`Retry-After` header on any status, `429` included. A handler that sleeps on a
+value read from the body sleeps on `undefined`. Compute every backoff from the
+published refill rate instead.
 
 ## Catalog {#catalog}
 
@@ -97,24 +101,29 @@ Request was well-formed and the signature was valid, but the action itself is lo
 ### 429 — rate limited {#429--rate-limited}
 
 ```json
-{ "error": "rate limit exceeded", "scope": "per_ip"|"per_account", "retry_after_ms": 1200 }
+{ "status": "err", "response": "rate limit exceeded" }
 ```
 
-| `scope` | Meaning |
-|---------|---------|
-| `per_ip` | Per-IP weight budget exhausted at the gateway |
-| `per_account` | Per-account QPS exhausted at the gateway |
-| `mempool_per_account` | Too many pending actions in the mempool from one account |
+The `429` body is the one that does not use the `error` envelope, and it carries
+**nothing else**: no retry hint, and no field naming which of the two budgets ran
+out. Treat any `429` as "back off on both".
 
-See [rate limits](./rate-limits.md) for budgets and burst handling.
+Derive the wait from the refill rate: 20 weight per second, so a weight-1 request
+is affordable again after 50 ms and a weight-5 `/exchange` after 250 ms. See
+[rate limits](./rate-limits.md) for budgets and burst handling.
 
 ### 503 — service unavailable {#503--service-unavailable}
 
 | `error` | Cause | Remediation |
 |---------|-------|-------------|
-| `mempool at capacity` | Network congestion; back of the queue refused | Exponential backoff (`retry_after_ms` starts at 200) |
+| `gateway overloaded` | The gateway's in-flight request pool is full | Exponential backoff from 200 ms |
 | `gateway not ready` | Gateway is starting up / failing health checks | Retry with backoff; check [status](../networks.md#status) |
 | `node downstream unreachable` | Gateway lost the node connection | Operator-side; backoff and watch status |
+
+**A full mempool is not a 503.** The node's pending-action queue never refuses a
+new action: when it is full it drops the OLDEST pending one. That drop is silent,
+because the caller already holds a `202`. See
+[mempool bound](./rate-limits.md#mempool-cap).
 
 ### Commit-time errors (not HTTP, in event stream) {#commit-time-errors-not-http-in-event-stream}
 

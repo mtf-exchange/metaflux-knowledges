@@ -37,7 +37,7 @@ flowchart TD
     S -->|2xx| R2xx["admitted — track via WS"]
     S -->|4xx| R4xx["check parse error for cause"]
     S -->|5xx| R5xx["retry with expo backoff"]
-    S -->|429| R429["backoff per retry_after_ms"]
+    S -->|429| R429["backoff on the refill rate<br/>no retry hint is sent"]
 ```
 
 ## Layer 1 — admission errors {#layer-1--admission-errors}
@@ -83,11 +83,13 @@ async function handleAdmissionResponse(r: Response) {
       throw new LogicalError(body.error);
 
     case 429:
-      await sleep(body.retry_after_ms);
+      // No retry hint on the response. 20 weight/s refill, so 250 ms buys back
+      // one weight-5 `/exchange`.
+      await sleep(250);
       return { admitted: false, retry: true };
 
     case 503:
-      await sleep(body.retry_after_ms);
+      await sleep(200);
       return { admitted: false, retry: true };
 
     default:
@@ -217,8 +219,8 @@ async function placeOrderSafely(
     } catch (e) {
       if (e instanceof MetaFluxApiError) {
         if (e.status === 429) {
-          const retryAfterMs = Number(JSON.parse(e.bodyText).retry_after_ms ?? 1000);
-          await sleep(retryAfterMs);
+          // The 429 body carries no retry hint; back off on the refill rate.
+          await sleep(250 * attempt);
           continue;
         }
         throw e; // client / signing / logical bug — propagate
