@@ -15,12 +15,10 @@ Channels are **change-driven**: a channel emits a frame only when its state actu
 channel is retired. Subscribing to `web_data` then returns
 `{"channel":"error","data":{"error":"unknown channel: web_data"}}`.
 
-**The REST `web_data` read keeps serving, unchanged.** Send
-`{"type":"web_data","address":"0x<address>"}` to `POST /info` and poll it. The
-body is identical to the one the channel pushed, so no data goes away — only
-the push does. Every facet it carries also has its own focused `/info` read:
-`user_vault_equities`, `staking_state`, `delegator_summary`, `sub_accounts`,
-`user_to_multi_sig_signers` and `agents`.
+**The REST read keeps serving as a depth on the account read.** Poll
+[`account_state`](../rest/info.md#account_state-overview) with
+`detail: "overview"` — the same body the channel pushed. Only the push goes
+away.
 
 This channel was never listed in this reference, so a client that follows this
 page is not affected. A client that subscribed to it after finding it in a
@@ -29,7 +27,7 @@ client SDK is.
 ::::
 
 :::info
-**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `user_events`, …). The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`. One channel, [`candles`](#candles), is served by the gateway ONLY.
+**Channel names are snake_case (MTF-native).** This is the node `/ws` native surface, so channel wire names are snake_case (`l2_book`, `order_updates`, …). The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`. One channel, [`candles`](#candles), is served by the gateway ONLY.
 :::
 
 The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**. You subscribe with:
@@ -47,11 +45,8 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `l2_book` | `coin` (required) | committed book, on change |
 | `bbo` | `coin` (required) | committed book, on change |
 | `trades` | `coin` (required) | committed-block fills, on new fills |
-| `active_asset_ctx` | `coin` (required) | per-market mark / oracle / funding / OI, on change |
-| `all_mids` | none | per-market mark, on change |
 | `markets` | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
 | `fills` | `user`/`address` (required) | committed-block fills for that account |
-| `user_events` | `user`/`address` (required) | committed-block fills for that account (more event kinds to come) |
 | `candles` | `coin` + `interval` (both required), `candle_type` (optional) | **gateway only** — price samples or trades folded into OHLCV bars, on change |
 | `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
 | `open_orders` | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
@@ -67,6 +62,21 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `explorer_txs` | none | transactions in the latest committed block, on each new block |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
+
+:::warning
+**`all_mids`, `active_asset_ctx` and `user_events` are RETIRED.** Each one
+duplicated a channel above, so a client had to pick, and a wrong pick was
+silent.
+
+| Retired channel | Subscribe to instead |
+|---|---|
+| `all_mids` | [`markets`](#markets) — every row carries `mid_px`, and the same frame carries mark, oracle, funding and OI |
+| `active_asset_ctx` | [`markets`](#markets) — the same per-market row, for every market in one subscription |
+| `user_events` | [`fills`](#fills) for executions, [`order_updates`](#order_updates) for order lifecycle, [`ledger_updates`](#ledger_updates) for money movement, [`notifications`](#notifications) for margin notices. Every event `user_events` carried has exactly one typed home among those four |
+
+Subscribing to a retired name returns
+`{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
+:::
 
 ---
 
@@ -191,67 +201,9 @@ block; each row's `users` carries the AGGRESSOR ONLY:
 
 - `tid` may exceed 2⁵³ — parse it as a 64-bit / big integer, not a JS number.
 
-### Per-market mark, oracle, and funding context {#active_asset_ctx}
-
-Per-market context for one market — mark / oracle price, funding, and open
-interest — pushed when it changes. **Requires `coin`.** The body carries the same
-fields and units as the REST [`market_info`](../rest/info/perpetuals.md#market_info) read:
-`mark_px` / `oracle_px` are **whole-USDC**, tick-snapped (truncated to the market's
-price tick), and the `funding` block mirrors `market_info.funding`. Built from the
-same per-market record builder as the REST read, so a WS ctx push never drifts
-from `market_info`.
-
-```json
-{ "method": "subscribe", "subscription": { "type": "active_asset_ctx", "coin": "BTC" } }
-```
-
-```json
-{
-  "channel": "active_asset_ctx",
-  "data": {
-    "coin": "BTC",
-    "mark_px": "66735.25",
-    "oracle_px": "66700",
-    "funding": {
-      "rate_per_hr": "0",
-      "cap_per_hr": "400",
-      "interval_ms": 3600000,
-      "next_payment_ts": 0
-    },
-    "open_interest": "5000000000"
-  }
-}
-```
-
-- `mark_px` / `oracle_px` — whole-USDC, tick-snapped (`"0"` when unset). Same plane as `market_info`, NOT the 1e8 book plane.
-- `funding` — `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block (`null` for an unknown market — see below). `rate_per_hr` is the latest hourly funding-rate sample (pre-cap) and `cap_per_hr` the per-market rate cap, both **bps strings** truncated toward zero (e.g. `"400"` = 0.04/hr); `interval_ms` is the funding cadence (`3600000` = 1h); `next_payment_ts` is epoch-ms, `0` until the market has its first funding sample.
-- `open_interest` — current open interest, fixed-point string (`"0"` when no book).
-
-Frequency: change-driven — a frame is sent only when this market's ctx actually changed since the last commit; an unchanged ctx emits nothing this commit.
-
-If the coin maps to no known market you still get the ack, but the snapshot is the
-**honest-empty** body — zeroed prices / OI and a `null` funding block — and no
-pushes follow (so a client deserializing a fixed ctx struct never breaks):
-
-```json
-{ "channel": "active_asset_ctx", "data": { "coin": "DOGE", "mark_px": "0", "oracle_px": "0", "funding": null, "open_interest": "0" } }
-```
-
-### Global mid-price map for all markets {#all_mids}
-
-Global mid map — every market's mark price, pushed when the mids change. Keyed by coin; values are the tick-snapped whole-USDC mark the REST [`markets`](../rest/info/perpetuals.md#markets) read reports. No `coin` parameter.
-
-```json
-{ "method": "subscribe", "subscription": { "type": "all_mids" } }
-```
-
-```json
-{ "channel": "all_mids", "data": { "mids": { "BTC": "66703.35", "ETH": "1856.49", "SOL": "73.95", "MTF": "5" } } }
-```
-
 ### Global dynamic state for all markets {#markets}
 
-Global per-market **dynamic** state tape — every market's live mark / oracle / mid price, funding premium, open interest, 24h ticker, and halted flag, one row per market. GLOBAL: takes **no `coin` and no `user`** (like [`all_mids`](#all_mids)). The rows share the REST [`markets`](../rest/info/perpetuals.md#markets) dynamic builder, so the WS feed and the REST read never drift.
+Global per-market **dynamic** state tape — every market's live mark / oracle / mid price, funding premium, open interest, 24h ticker, and halted flag, one row per market. GLOBAL: takes **no `coin` and no `user`**. The rows share the REST [`markets`](../rest/info/perpetuals.md#markets) dynamic builder, so the WS feed and the REST read never drift.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "markets" } }
@@ -293,7 +245,7 @@ So the **snapshot is all rows** and a **delta is the changed rows only** — dem
 | `oracle_px` | Decimal string | Index price, **whole-USDC**, tick-snapped (`"0"` when unset) |
 | `mid_px` | Decimal string | Real order-book mid, **whole-USDC**, tick-snapped — **omitted** when the book is one-sided (never sent as `null`) |
 | `premium` | Decimal string \| null | Latest funding premium sample, an **8-decimal** string (truncated toward zero); `null` when no sample exists |
-| `funding` | object | `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `market_info.funding` block |
+| `funding` | object | `{rate_per_hr, cap_per_hr, interval_ms, next_payment_ts}`, identical to the REST `markets` row's `funding` block |
 | `open_interest` | Decimal string | Current open interest, whole-unit size |
 | `day_ntl_vlm` | Decimal string | Rolling-24h notional volume (whole-USDC) |
 | `prev_day_px` | Decimal string \| null | Mark ~24h ago (whole-USDC); `null` when no 24h-ago sample |
@@ -322,20 +274,6 @@ The initial snapshot is the empty array `[]`; each push is an array holding one 
 ```json
 { "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] }
 ```
-
-### Per-account event feed {#userevents}
-
-Per-account event feed. Requires `user` (the 0x address) — NOT a `coin`. Today it tags `fills`; liquidation / funding event kinds will land as sibling keys.
-
-```json
-{ "channel": "user_events", "data": { "fills": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] } }
-```
-
-The native channel name is `user_events` (snake_case).
-
-:::warning
-`user_events` is per-account data but currently has **no authentication** — any connection can subscribe to any address's feed. Do not treat it as a private channel until the auth-at-subscribe gate lands; for authenticated reads/writes use `post` with a signed action.
-:::
 
 ### Rolling price bars for one market {#candles}
 
@@ -389,7 +327,7 @@ The series is **gapless**: an interval with no sample emits a flat bar carrying 
 :::warning
 **These bars come from a SAMPLED price series, not from the continuous price path.** `o` and `c` are the **first and last sample** of the window. `h` and `l` are the **highest and lowest sample** — the extremes of the samples, not the true extremes of the price. A spike that starts and ends between two samples leaves no trace in the bar.
 
-Do not build wick analysis, liquidation-trigger reconstruction, or any "did the price touch X?" test on these bars. For the live price of one market, subscribe to [`active_asset_ctx`](#active_asset_ctx) or [`all_mids`](#all_mids) instead. The same warning and the sample grid are on the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
+Do not build wick analysis, liquidation-trigger reconstruction, or any "did the price touch X?" test on these bars. For the live price of one market, subscribe to [`markets`](#markets) and read that market's row instead. The same warning and the sample grid are on the REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read.
 :::
 
 The gateway ring holds **1000 bars** per `(coin, interval, candle_type)` series by default, and a deeper ring for sub-minute intervals. A subscribe snapshot serves at most the newest **5000** bars of that ring.
@@ -568,7 +506,7 @@ with no funds), not an empty array.
   whole-USDC dollar figure, not a ratio**. `tier` is the liquidation tier name
   (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`). `abstraction` is `"unified"`
   or `"portfolio"` (PM-enrolled) — there is no account-level `maint_margin` or
-  `mode`/`pm_enabled` field; poll [`margin_summary`](../rest/info.md#margin_summary)
+  `mode`/`pm_enabled` field; poll [`account_state` with `detail: "margin"`](../rest/info.md#account_state)
   for the account-level `maint_margin`.
 - `clearinghouse_state` — keyed by dex (`""` = core dex, else a MIP-3
   deployer's `0x` address); each value is `{positions: [...]}`. A position row
@@ -617,7 +555,7 @@ account (see [spot margin](../../products/spot-margin.md)) — pushed when it
 changes. Requires `user`. The initial snapshot is the live position set (`[]`
 for an account with no spot-margin positions). This is **not** a plain
 spot-token-balance feed — there is no live WS channel for that today; poll
-the REST [`spot_clearinghouse_state`](../rest/info/spot.md#spot_clearinghouse_state)
+the REST [`account_state`](../rest/info.md#account_state) `balances` array
 read for plain per-token spot balances instead.
 
 ```json

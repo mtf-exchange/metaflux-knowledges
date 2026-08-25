@@ -130,6 +130,13 @@ The assembled `signatures` array is collected off-chain (a coordinator gathers
 each member's signature over the identical `inner_action_blob`) and submitted by
 any account.
 
+**Ask the chain for the blob — do not build it.** The canonical inner-action
+JSON is not the `{type, params}` wire form, and its variant names move when
+actions move. Call
+[`encode_action`](../api/rest/info.md#encode_action) once per bundle, then send
+the string it returns to every member. A client-side encoder that drifts from
+the node produces bytes the roster signs and the node then refuses.
+
 ### User-bound inner signatures {#user-bound-inner-signatures}
 
 :::info
@@ -230,23 +237,27 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
-  -d '{"type":"user_to_multi_sig_signers","user":"0x<multisig>"}'
+  -d '{"type":"account_state","address":"0x<multisig>","detail":"overview"}'
 ```
 
 ```json
 {
-  "type": "user_to_multi_sig_signers",
+  "type": "account_state",
   "data": {
-    "address":      "0x<multisig>",
-    "is_multi_sig": true,
-    "threshold":    2,
-    "signers":      ["0x...", "0x...", "0x..."]
+    "address":  "0x<multisig>",
+    "multisig": {
+      "is_multi_sig": true,
+      "threshold":    2,
+      "signers":      ["0x...", "0x...", "0x..."]
+    }
   }
 }
 ```
 
-`is_multi_sig` is `false` (and `signers` empty) for a plain account. The signer
-set + threshold come straight from the committed `multi_sig_tracker` config.
+`multisig.is_multi_sig` is `false` (and `signers` empty) for a plain account. The
+signer set + threshold come straight from the committed `multi_sig_tracker`
+config. See
+[`detail: "overview"`](../api/rest/info.md#account_state-overview).
 
 ## Sequence — multi-sig order {#sequence--multi-sig-order}
 
@@ -269,6 +280,7 @@ sequenceDiagram
 
 ## See also {#see-also}
 
+- [`POST /info encode_action`](../api/rest/info.md#encode_action) — the canonical `inner_action_blob` bytes every member signs
 - [`POST /exchange convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)
 - [`/exchange` signed-by semantics](../api/rest/exchange.md#signed-by-semantics) — multi-sig wrapper envelope
 - [Agent wallets](./agent-wallets.md) — combine multi-sig with agent delegation

@@ -1,5 +1,5 @@
 ---
-description: POST /info read queries for the MetaFlux custody bridge — the committed per-chain deployment row, and the per-entry status of every pending withdrawal in the outbox.
+description: POST /info read queries for the MetaFlux custody bridge — the per-entry status of a user's pending withdrawals, and the committed per-chain deployment row that defines their message ids.
 ---
 
 # `POST /info` — bridge
@@ -10,12 +10,11 @@ bridge-specific `type`s.
 
 ## TL;DR {#tldr}
 
-Two public queries:
+One public query:
 
-- [`bridge_chain_configs`](#bridge_chain_configs) — the committed deployment row
-  for each chain.
 - [`bridge_user_outbox`](#bridge_user_outbox) — your own pending withdrawals,
-  each with a status.
+  each with a status, plus the committed [deployment row](#chain-configs) for
+  each chain.
 
 Two operator queries, listed here for completeness. **The public API refuses
 both**, exactly as it refuses `node_info`:
@@ -25,13 +24,13 @@ both**, exactly as it refuses `node_info`:
 - [`bridge_finalized_cosignatures`](#bridge_finalized_cosignatures) — the
   validator multisig retained for one message id.
 
-## Upgrade notices {#upgrade-notices}
-
-:::caution
-**These four queries are not live yet.** A request today returns
-`400 {"error":"unknown info type: bridge_user_outbox"}`. The shapes below are
-the committed contract. Build against them, but do not ship a client that
-depends on them until the node release that serves them is deployed.
+:::warning
+**`bridge_chain_configs` is REMOVED.** It answered a strict subset of the read
+above, so a caller had to pick, and picking the config read alone hid the
+entries whose ids that config defines. A request now returns
+`400 {"error":"unknown info type: bridge_chain_configs"}`. Read
+[`bridge_user_outbox`](#bridge_user_outbox) — `withdrawals_halted` and `configs`
+are on it, unchanged.
 :::
 
 ## Why this read exists {#why}
@@ -133,17 +132,26 @@ release timestamp; it is `null` for every other status.
 - Timestamps and nonces are JSON numbers.
 - Entries keep queue order, oldest first.
 
-## `bridge_chain_configs` {#bridge_chain_configs}
+## `bridge_user_outbox` {#bridge_user_outbox}
 
-The committed deployment row for every configured chain. No parameters.
+One user's pending bridge withdrawals, plus the committed deployment row for
+every chain.
 
-This is the row a deployment-rotation vote must restate in full. Each field is
-independently verifiable against the deployed contract on Base or Arbitrum.
+**The two halves belong together.** An entry's `message_id` is computed FROM the
+deployment row — `evm_chain_id`, `evm_contract_address` and
+`validator_set_epoch`, as [above](#message-id). Serving the id without the
+domain that defines it made a caller join two reads to know whether the id they
+held was still the current one. One read answers it.
 
 Request:
 
+| Param | Type | Required | Meaning |
+|---|---|---|---|
+| `address` | string | yes | The withdrawing account. `400` if missing or malformed. |
+| `chain` | number | no | Restrict `entries` to `1` or `2`. `400` on any other value. |
+
 ```json
-{ "type": "bridge_chain_configs" }
+{ "type": "bridge_user_outbox", "address": "0x6629…0611", "chain": 1 }
 ```
 
 Response `data`:
@@ -172,9 +180,42 @@ Response `data`:
         "raw_transfer_credit": true
       }
     }
-  ]
+  ],
+  "entries": [
+    {
+      "chain": 1,
+      "asset": 0,
+      "token": "USDC",
+      "amount_units": "1000000",
+      "dst_addr": "0x000000000000000000000000662971350e886a0a5631d3e9133d33f767f80611",
+      "nonce": 1,
+      "ts_ms": 1753576000000,
+      "message_id": "0x8565…",
+      "status": "stranded_on_retired_domain",
+      "pending_cosigner_count": 0,
+      "released_at_ms": null
+    }
+  ],
+  "truncated": false
 }
 ```
+
+`configs` and `withdrawals_halted` do not depend on `address`, and the `chain`
+filter does not narrow them. A caller who wants only the deployment rows passes
+their own address and reads an empty `entries` — one round trip either way.
+
+`entries` is capped at 256, which is also the per-user admission cap, so
+`truncated` is `false` in practice.
+
+An empty `entries` array means this account has no pending withdrawal. It does
+**not** mean a past withdrawal failed — a completed withdrawal leaves the outbox
+once its retention window elapses.
+
+### The deployment row {#chain-configs}
+
+One row per configured chain. This is the row a deployment-rotation vote must
+restate in full. Each field is independently verifiable against the deployed
+contract on Base or Arbitrum.
 
 | Field | Meaning |
 |---|---|
@@ -185,7 +226,22 @@ Response `data`:
 | `paused` | Per-chain kill switch. Blocks withdrawals AND deposit attestation on this chain. |
 | `evm_chain_id`, `evm_contract_address`, `validator_set_epoch` | The deployment triple folded into `message_id`. Rotating any of the three moves the id of every in-flight withdrawal. |
 
-### The `effective_*` fields carry the rule {#effective-fields}
+:::danger
+**Every value in this row ROTATES. Read it; never freeze it.** A governance
+`mbConfigureChain` vote replaces the **whole** row, including the custody
+contract address. Two things break in a client that cached one:
+
+- A stale `evm_chain_id` / `evm_contract_address` / `validator_set_epoch`
+  computes a **wrong `message_id`**. You then track, or relay against, an id no
+  validator is signing.
+- A stale `evm_contract_address` points a deposit at a **retired custody
+  contract**. Funds sent there are not credited by the current deployment.
+
+Do not copy any of these values into config, into source, or into your own
+documentation. Read them from this response on each use.
+:::
+
+#### The `effective_*` fields carry the rule {#effective-fields}
 
 `release_retention_ms` and `confirmations` are **0-as-unset sentinels**. A raw
 `0` does not mean "no retention" or "no confirmations" — it means the field was
@@ -206,51 +262,6 @@ which is not a configuration a real-funds chain uses.
 Two config fields are **not served here**: the backfill-acknowledgement pair is
 internal node-instance identity with no caller value, and it appears on the
 operator read instead. A retired always-zero field is omitted entirely.
-
-## `bridge_user_outbox` {#bridge_user_outbox}
-
-One user's pending bridge withdrawals.
-
-Request:
-
-| Param | Type | Required | Meaning |
-|---|---|---|---|
-| `address` | string | yes | The withdrawing account. `400` if missing or malformed. |
-| `chain` | number | no | Restrict to `1` or `2`. `400` on any other value. |
-
-```json
-{ "type": "bridge_user_outbox", "address": "0x6629…0611", "chain": 1 }
-```
-
-Response `data`:
-
-```json
-{
-  "entries": [
-    {
-      "chain": 1,
-      "asset": 0,
-      "token": "USDC",
-      "amount_units": "1000000",
-      "dst_addr": "0x000000000000000000000000662971350e886a0a5631d3e9133d33f767f80611",
-      "nonce": 1,
-      "ts_ms": 1753576000000,
-      "message_id": "0x8565…",
-      "status": "stranded_on_retired_domain",
-      "pending_cosigner_count": 0,
-      "released_at_ms": null
-    }
-  ],
-  "truncated": false
-}
-```
-
-The read is capped at 256 entries, which is also the per-user admission cap, so
-`truncated` is `false` in practice.
-
-An empty `entries` array means this account has no pending withdrawal. It does
-**not** mean a past withdrawal failed — a completed withdrawal leaves the outbox
-once its retention window elapses.
 
 ## `bridge_outbox` {#bridge_outbox}
 
@@ -286,7 +297,7 @@ Response `data`:
       "released_retained": 0, "stranded_on_retired_domain": 0,
       "safe_to_rotate": true }
   ],
-  "configs": [ /* bridge_chain_configs rows, plus the backfill-ack pair */ ],
+  "configs": [ /* the public config rows, plus the backfill-ack pair */ ],
   "entries": [ /* bridge_user_outbox rows, plus user / economic_id / pending_cosigners */ ],
   "start": 0, "limit": 256, "returned": 3, "truncated": false
 }
@@ -305,7 +316,7 @@ Each entry adds three operator fields to the public shape:
 | `economic_id` | The rotation-invariant **dedup key**. Not a signing digest — never relay against it. Useful only for forensics against the replay guard. |
 | `pending_cosigners` | Validator **addresses** that have signed so far, in canonical order — which validator is lagging. Signature bytes are never served. |
 
-`configs` rows carry two fields the public config read omits:
+`configs` rows carry two fields the public read omits:
 `scan_policy.backfill_ack_l1` and `scan_policy.backfill_ack_start_block`. A
 deployment-rotation vote **replaces the whole scan policy**, so a rotation must
 restate them; this read is where they are readable.

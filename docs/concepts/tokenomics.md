@@ -289,7 +289,7 @@ grows, so the reward budget is not drained prematurely. The shape is a flat
 ceiling at/below a floor stake, decaying proportional to `1/√stake` above it —
 i.e. more total stake means a lower per-staker share. The current effective APR
 and its committed inputs are observable on the live
-[`staking_apr`](./staking.md#apr-estimation) read path.
+[`staking_state`](./staking.md#apr-estimation) read path.
 
 **The trade-off this choice accepts.** The bootstrap reward budget is finite. If
 fee revenue does not grow to carry the yield before the budget is meaningfully
@@ -343,8 +343,8 @@ The value-accrual path is a clean four-step pipeline:
    recurring buy pressure proportional to exchange volume, and every token it
    acquires leaves the circulating float for good.
 
-Two operating rules sit under step 4, and both are visible on
-[`protocol_metrics.buyback_status`](../api/rest/info.md#buyback-blocking-guard):
+Two operating rules sit under step 4, and both are visible on the
+operator-lane [`protocol_metrics`](../api/rest/info.md#operator-reads) read as `buyback_status`:
 the executor must be told **which** asset id is MTF before it can buy at all, and
 it spends its balance in slices rather than in one order. See
 [Fees](./fees.md#buyback-asset-binding) for both, including the vote that binds the

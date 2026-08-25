@@ -48,7 +48,7 @@ account that reads `withdrawable: "0"`. See
 2. tightened by the market's dynamic-risk override when governance has set one — with a margin-tier ladder, the rung your notional falls into decides the cap, so a larger position gets less leverage;
 3. bounded by the market's own maximum.
 
-`update_leverage` rejects any request above **100×**. A market listed through [MIP-3](../mip/mip-3.md) is separately capped at **50×** when it is deployed, so most markets sit well under the 100× ceiling. Read the live value from a market's fields on [`market_info`](../api/rest/info/perpetuals.md#market_info) rather than assuming either number.
+`update_leverage` rejects any request above **100×**. A market listed through [MIP-3](../mip/mip-3.md) is separately capped at **50×** when it is deployed, so most markets sit well under the 100× ceiling. Read the live value from a market's fields on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) rather than assuming either number.
 
 Rounding is **up** so a remainder always tightens the gate. `reduce_only` orders bypass the gate — they only shrink exposure.
 
@@ -68,7 +68,7 @@ health = account_value / maint_margin
 - `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed `i128`.
 - `maint_margin` = the sum over every held position leg of `|entry_notional| × maint_margin_ratio` (derived live from positions) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`).
 
-The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol's baseline maintenance ratio — a governed parameter (`set_risk_base_maint_ratio`). Read the live value from a market's `maint_margin_ratio` field on [`market_info`](../api/rest/info/perpetuals.md#market_info) or [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta); never assume a fixed percentage. The derived forced-close slippage floor is half the effective ratio unless explicitly overridden.
+The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol's baseline maintenance ratio — a governed parameter (`set_risk_base_maint_ratio`). Read the live value from a market's `maint_margin_ratio` field on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), and its `risk_override` when governance has set one; never assume a fixed percentage. The derived forced-close slippage floor is half the effective ratio unless explicitly overridden.
 
 Maintenance sits below the initial requirement (`notional / max_leverage`), so a position can be opened and then ride down to the maintenance floor before liquidation. Health < 1.0 enters the [liquidation ladder](./tiered-liquidation.md) at the tier bands (1.1 / 1.0 / 0.8 / 0.667).
 

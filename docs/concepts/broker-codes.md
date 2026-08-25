@@ -57,7 +57,7 @@ recognized broker who charges nothing, which is different from not being approve
 at all.
 
 Read a trader's approvals with the `approved_builders` query, or one specific
-grant with `max_builder_fee`.
+grant on `approved_builders`.
 
 :::warning
 **The action type is `approve_broker_fee`. Some older `builder` names stay, on
@@ -74,7 +74,7 @@ withdrawn.
 | Name | Where you meet it |
 |------|-------------------|
 | `builder` | the parameter of `approve_broker_fee`, and the broker block on an order |
-| `max_builder_fee` | the single-grant query |
+| `approved_builders` | every grant this account approved, and the bps ceiling on each |
 | `approved_builders` | the enumerated-grant query |
 
 **The EIP-712 type string still reads `ApproveBuilderFee`.** You send

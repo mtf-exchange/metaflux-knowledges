@@ -35,15 +35,15 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Initial margin fraction** | `1 / max_leverage` | `init_margin_ratio` (bps) |
 | **Maintenance margin fraction** | per-market; **3% (300 bps)** baseline, or the dynamic-risk override | `maint_margin_ratio` (bps) |
 | **Max leverage** | per-market, `1..=50` at listing; per-account `updateLeverage` hard ceiling **100×** | `max_leverage` |
-| **Margin tiers** | per-market notional-banded ladder (leverage ↓ / maint ↑ as notional grows) | `margin_tiers` (inline on [`market_info`](../api/rest/info/perpetuals.md#market_info) / [`markets`](../api/rest/info/perpetuals.md#markets)) |
+| **Margin tiers** | per-market notional-banded ladder (leverage ↓ / maint ↑ as notional grows) | `margin_tiers` (inline on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta)) |
 | **Mark price** | oracle-anchored median, clamped into the oracle band | `mark_px`, `mark_source` |
 | **Funding** | **per-asset discrete** settlement at the asset's period boundary; per-asset **±cap (default 2%)**; settled vs oracle | `funding{...}` |
 | **Funding impact notional** | depth to fill for the impact-price premium (default **$10,000**) | (Binance-formula markets) |
 | **Tick size** | per-market min price increment | `tick_size` |
 | **Size decimals / step** | per-market size precision + lot step | `sz_decimals`, `step_size` |
 | **Min order size** | per-market minimum order | `min_order` |
-| **Max order value** | OI-cap-derived size ceiling + margin gate (no fixed per-order $ cap) | [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) |
-| **Open-interest cap** | per-market OI ceiling + per-second OI velocity limit | [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap) |
+| **Max order value** | OI-cap-derived size ceiling + margin gate (no fixed per-order $ cap) | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` |
+| **Open-interest cap** | per-market OI ceiling + per-second OI velocity limit | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` vs [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest` |
 | **Margin modes** | Cross / Isolated / Strict-Iso (Strict-Iso also imposable at **market** level) | `strict_isolated` |
 | **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info.md#account_state) `abstraction` |
 | **FBA eligible** | whether [frequent batch auction](../concepts/fba.md) is enabled | `fba_enabled` |
@@ -52,7 +52,7 @@ from**. For the mechanics behind a field, follow the link in its row.
 
 One read returns the full universe: `markets` responds with `{ "perp": [ … ],
 "spot": { "pairs": […], "tokens": […] } }`. Each `perp[]` element is one
-per-market record — the same shape [`market_info`](../api/rest/info/perpetuals.md#market_info)
+per-market record — the same shape [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta)
 returns for a single market by `coin`. One such record:
 
 ```bash
@@ -161,7 +161,7 @@ realized volatility), not a static table. A market's dynamic-risk override carri
   steps **down** and maintenance steps **up**, so large books are margined harder.
 
 The ladder ships **inline** as `margin_tiers` on the
-[`market_info`](../api/rest/info/perpetuals.md#market_info) /
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) /
 [`markets`](../api/rest/info/perpetuals.md#markets) record — each tier
 `{max_open_interest: string|null, max_leverage, maint_margin_ratio: bps-string}`.
 (The standalone `margin_table` read has been removed.) See
@@ -211,7 +211,7 @@ How a settlement works:
   period and formula are set by on-chain governance.
 
 Query the live rate + next boundary per market with
-[`predicted_fundings`](../api/rest/info/perpetuals.md#predicted_fundings); the
+the [`markets`](../api/rest/info/perpetuals.md#markets) `funding` block; the
 premium-sample history with [`funding_history`](../api/rest/info/perpetuals.md#funding_history).
 
 ### Funding impact notional {#funding-impact-notional}
@@ -240,13 +240,13 @@ as a multiple of `step_size`, at or above `min_order`.
 MetaFlux bounds risk by **open interest and the margin gate**, rather than a fixed
 per-order dollar cap:
 
-- **Max order value** — [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls)
+- **Max order value** — [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap`
   returns the per-asset OI-cap-derived size ceiling (the matching layer converts to
   notional at the live mark). An order's notional is additionally bounded by your
   free collateral × `max_leverage` (the initial-margin gate).
 - **Open-interest cap** — each market carries an OI ceiling plus a per-second OI
   **velocity** limit (an OI-increasing order is rejected once the 1-second window
-  hits the ceiling). [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap)
+  hits the ceiling). [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest`
   lists assets currently at/over their cap. `open_interest` on the market record is
   true position OI (positions outstanding), not the book's resting depth.
 
@@ -305,8 +305,8 @@ deployment.
 
 ## See also {#see-also}
 
-- [`markets`](../api/rest/info/perpetuals.md#markets) / [`market_info`](../api/rest/info/perpetuals.md#market_info) — the live per-market spec record
-- `margin_tiers` (inline on [`market_info`](../api/rest/info/perpetuals.md#market_info)) · [`max_market_order_ntls`](../api/rest/info/perpetuals.md#max_market_order_ntls) · [`perps_at_open_interest_cap`](../api/rest/info/perpetuals.md#perps_at_open_interest_cap)
+- [`markets`](../api/rest/info/perpetuals.md#markets) / [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) — the live and static halves of the per-market spec record
+- `margin_tiers` and `oi_cap` (inline on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta))
 - [Perpetuals](../products/perpetuals.md) — the product overview
 - [Margin modes](../concepts/margin-modes.md) · [Portfolio margin](../concepts/portfolio-margin.md) · [Tiered liquidation](../concepts/tiered-liquidation.md)
 - [Mark prices](../concepts/mark-prices.md) · [Oracle prices](../concepts/oracle-prices.md) · [Funding rates](../concepts/funding-rates.md)

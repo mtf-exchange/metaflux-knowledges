@@ -1406,7 +1406,7 @@ placement and every reprice surface on the existing per-account
 [`open_orders`](../ws/subscriptions.md#open_orders) snapshots as an ordinary cancel
 plus a new resting order; leg fills surface on
 [`fills`](../ws/subscriptions.md#fills) and
-[`user_events`](../ws/subscriptions.md#userevents). Correlate reprices by `cloid`
+[`order_updates`](../ws/subscriptions.md#order_updates). Correlate reprices by `cloid`
 (each reprice carries a new `leg_oid` under the same `cloid`); keep the `chase_oid`
 from this response for [`cancel_chase`](#cancel_chase).
 
@@ -2144,7 +2144,7 @@ and every position opened afterwards is strict-isolated. See
 **Keep pushing.** If the feed ages past the staleness window (default
 **60,000 ms**, governance-tunable), the market turns **reduce-only for opens**
 until a fresh push lands. Closing orders always pass. Monitor the window with
-[`mip3_deployer_oracle`](./info.md#mip3_deployer_oracle).
+the operator-lane [`mip3_deployer_oracle`](./info.md#operator-reads) read.
 
 :::info
 **`mip3_deployer_oracle` is a per-chain feature — check before you rely on it.**
@@ -2152,7 +2152,7 @@ It is active from genesis on a chain that started fresh, and dormant on any othe
 chain until a two-thirds stake `ArmFeatures` vote arms it. While it is dormant
 this action is refused with `mip3_deployer_oracle feature not active`, which is a
 **precondition** error, not an unknown-action error. Read `feature_active` from
-[`mip3_deployer_oracle`](./info.md#mip3_deployer_oracle) on the network you
+the operator-lane [`mip3_deployer_oracle`](./info.md#operator-reads) read on the network you
 target.
 :::
 
@@ -2257,9 +2257,9 @@ Requires account equity ≥ `pm_min_equity` (governance parameter). See [portfol
 [FBA](../../concepts/fba.md) frequent-batch-auction entry, and the deliberate
 no-op. All five return the
 [`202 Accepted`](#202-accepted--non-order-admission) admission envelope; the
-committed outcome is observable via the [`rfq_open`](./info.md#rfq_open) /
-[`rfq_user`](./info.md#rfq_user) /
-[`fba_batch_state`](./info.md#fba_batch_state) reads and the
+committed outcome is observable via the operator-lane `rfq_open` /
+`rfq_user` / `fba_batch_state` reads (see
+[operator lane](./info.md#operator-reads)) and the
 [WS feed](../ws/subscriptions.md).
 
 **Wire planes.** The RFQ / FBA numeric fields (`size`, `price`, `max_size`,
@@ -2321,7 +2321,7 @@ In the digest, `side` encodes as a `uint8` (`0` = bid, `1` = ask) and each
 optional flattens to a presence `bool` + value (`0` when absent).
 
 The assigned `rfq_id` is a committed effect — read it back from
-[`rfq_user`](./info.md#rfq_user) or the WS feed. The session is
+the operator-lane `rfq_user` read or the WS feed. The session is
 **requester-gated**: only the account that opened it can
 [`rfq_accept`](#rfq_accept) on it.
 
@@ -2348,7 +2348,7 @@ maker will fill, valid until `valid_until_ms`.
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional: quote **as** this master / vault (approved agents only). **Digest-bound** — see above |
-| `rfq_id` | uint64 | an open session | The RFQ session id ([`rfq_open`](./info.md#rfq_open) / the WS feed) |
+| `rfq_id` | uint64 | an open session | The RFQ session id (the operator-lane `rfq_open` read / the WS feed) |
 | `price` | uint64 | `> 0` | Quote price, 1e8 plane (widened to `i128`) |
 | `max_size` | uint64 | `> 0` | Maximum size the maker will fill, fixed-point size plane (widened to `u128`) |
 | `valid_until_ms` | uint64 | — | Quote validity deadline (consensus ms) |
@@ -2364,8 +2364,7 @@ MetaFluxTransaction:RfqQuote(string metafluxChain,address owner,uint64 rfqId,uin
 The optional `stp_group` flattens to a presence `bool` + value in the digest.
 The quote is recorded under the acting account as its maker — the digest-bound
 `owner` when quoting as a vault, else the signer — and the taker sees it on the
-session (`quotes[*]` in [`rfq_open`](./info.md#rfq_open) /
-[`rfq_user`](./info.md#rfq_user)).
+session (`quotes[*]` in the operator-lane `rfq_open` / `rfq_user` reads).
 
 ---
 
@@ -2421,7 +2420,7 @@ clears at the batch's uniform price on the next settle boundary.
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional: submit **as** this master / vault (approved agents only). **Not** digest-bound — resolved at admission, mirroring the order actions |
-| `market` | uint32 | an FBA-enabled market | Asset/market id (see [`market_info.fba_enabled`](./info/perpetuals.md#market_info)) |
+| `market` | uint32 | an FBA-enabled market | The market's [`signing_id`](./info/perpetuals.md#signing_id); check `fba_enabled` on the same [`markets_meta`](./info/perpetuals.md#markets_meta) row |
 | `side` | enum | `"Bid"` / `"Ask"` | Order side |
 | `size` | uint64 | `> 0` | Order size, fixed-point size plane (widened to `u128`) |
 | `price` | uint64 | `> 0` | Order price, 1e8 plane (widened to `i128`) |
@@ -2434,7 +2433,7 @@ MetaFluxTransaction:FbaSubmit(string metafluxChain,uint32 market,uint8 side,uint
 ```
 
 Observe the pooled order and the indicative uniform clearing via
-[`fba_batch_state`](./info.md#fba_batch_state).
+the operator-lane `fba_batch_state` read.
 
 ---
 
@@ -3345,7 +3344,7 @@ omitted — `data` may be an empty array, but the key must be there.
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `token` | uint32 | a registered asset id | Asset to move. For USDC send **`0`**, not `100`: [both ids mean USDC](../../concepts/usdc.md#moving-usdc), but the spot id `100` carries no EVM contract binding and is refused with `asset not linked to an EVM contract` — the same rule `core_evm_transfer` applies to its `asset`. The native MTF gas token always crosses. Any **other** token must be bound to an EVM contract or it is refused the same way — ask the chain with the [`evm_contract_bindings`](../../evm/core-evm-transfers.md#which-assets-cross) read rather than guessing |
+| `token` | uint32 | a registered asset id | Asset to move. For USDC send **`0`**, not `100`: [both ids mean USDC](../../concepts/usdc.md#moving-usdc), but the spot id `100` carries no EVM contract binding and is refused with `asset not linked to an EVM contract` — the same rule `core_evm_transfer` applies to its `asset`. The native MTF gas token always crosses. Any **other** token must be bound to an EVM contract or it is refused the same way — ask the chain with the [`markets_meta`](./info/perpetuals.md#markets_meta) `kind: "spot"` read rather than guessing — see [which assets can cross](../../evm/core-evm-transfers.md#which-assets-cross) |
 | `amount` | decimal string | `> 0` | Amount in the **whole-token** plane, as a JSON string. Carried verbatim into the signed digest, then parsed. **An amount too small to credit is refused, not rounded down** — see [precision](#send_to_evm_with_data-precision) |
 | `source_dex` | uint32 | `0` only | **Any other value is refused.** ⚠️ **This is the row an existing client hits** — a payload written for Hyperliquid carries `source_dex: 1`. This action debits exactly one ledger, the spot ledger, so no other source exists to name. The field used to be accepted and ignored; it now fails closed rather than quietly debiting a ledger you did not ask for |
 | `destination_recipient` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). **The zero address is refused** (`zero destination`), as on [`core_evm_transfer`](#core_evm_transfer). Every other well-formed address is accepted: the credit is a **mint to this address, with no owner check** — read the [gotchas](#send_to_evm_with_data-gotchas) before you send |
@@ -3682,10 +3681,10 @@ action ran.** Admission checks the signature, the agent approval and the nonce
 shape — nothing else. Every business rule (position mode, collateral, feature
 gates, parameter bounds, ownership) runs later, when the block commits.
 
-**A commit-time rejection of a non-order action reaches you on no channel.** The
-HTTP reply already said `accepted: true`, no WS channel carries the failure, and
-no `/info` query takes an `action_hash`. The action simply never happens. This is
-not specific to one action — it is how every non-order action behaves.
+**A commit-time rejection of a non-order action pushes on no channel.** The HTTP
+reply already said `accepted: true`, and no WS channel carries the failure. This
+is not specific to one action — it is how every non-order action behaves. You
+must ASK for the verdict; nothing tells you.
 :::
 
 The two classes differ, so treat them differently:
@@ -3693,7 +3692,7 @@ The two classes differ, so treat them differently:
 | Action class | Commit-time rejection | How to confirm |
 |--------------|----------------------|----------------|
 | **Order-type** — [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`spot_order`](#spot_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order) | **Reported.** The `200 OK` body carries a per-leg `{"error": "<reason>"}`, and [`order_updates`](../ws/subscriptions.md#order_updates) pushes a `rejected` status | Read the `statuses` array; a `pending` entry means read `order_updates` |
-| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Silent.** No body field, no WS push, no query | Confirm by the EFFECT the action was supposed to have, on the `/info` or WS surface that serves it |
+| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Not pushed.** No body field and no WS push | Read [`action_outcome`](./info.md#action_outcome) with the returned `action_hash`. Fall back to the EFFECT the action was supposed to have, on the `/info` or WS surface that serves it |
 
 **Confirm by effect.** Each action's own section names the read that proves it
 landed — a TWAP parent on [`user_twaps`](./info.md#user_twaps), a leverage change
@@ -3702,21 +3701,22 @@ from [`open_orders`](./info.md#open_orders). Poll that read for a few blocks. If
 the effect has not appeared, the action was rejected; resubmit with a corrected
 body rather than waiting.
 
-:::warning
-**Coming in the next node release: ask for the verdict directly.** Two additions
-close this gap. **Neither is live yet.** Build the confirm-by-effect loop above
-today. To test whether a network has them, send
-`{"type":"action_outcome","action_hash":"0x00"}` to `/info`: a network without
-them answers `400 unknown info type: action_outcome`.
+:::tip
+**Ask for the verdict directly — this is live.** Two fields close the gap above.
+Prefer them to the confirm-by-effect loop; keep that loop only as a fallback.
 
-- **`committed` on this envelope.** The body gains `"committed": true|false`.
-  `true` = the action committed and applied. `false` = admitted only; it may
-  still commit, or be rejected. `accepted` keeps its current meaning, so nothing
-  breaks — but stop reading `accepted: true` as success once `committed` is
-  present.
+- **`committed` on this envelope.** `true` = the action committed and applied.
+  `false` = admitted only; it may still commit, or be rejected. `accepted` keeps
+  its old meaning, so nothing breaks — but stop reading `accepted: true` as
+  success now that `committed` is present.
 - **[`action_outcome`](./info.md#action_outcome) on `/info`.** Quote the
   `action_hash` this envelope returned and read the commit-time verdict, with
-  the reason text.
+  the reason text. Its verdict comes from a bounded per-node ring, so `unknown`
+  means "no record here", never "rejected" — that entry states the rule.
+
+To test whether a network serves them, send
+`{"type":"action_outcome","action_hash":"0x00"}` to `/info`. A network without
+them answers `400 unknown info type: action_outcome`.
 :::
 
 **The most common silent rejection is a position-mode mismatch.** A hedge account

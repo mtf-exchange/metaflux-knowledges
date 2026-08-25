@@ -219,7 +219,7 @@ The native [`account_state`](../api/rest/info.md#account_state) read exposes
 `abstraction: "portfolio"` (whether PM is active for the account) alongside
 `init_margin`, `health`, and `tier`; the account-level `maint_margin` figure —
 which already reflects the PM-derived maintenance when enrolled — lives on the
-lighter [`margin_summary`](../api/rest/info.md#margin_summary) read:
+lighter [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state):
 
 ```json
 {
@@ -272,6 +272,6 @@ A: Larger than classical (scenario grid), but bounded. The protocol caches per-a
 A: You can read the current PM-derived `maint_margin` from [`/info account_state`](../api/rest/info.md#account_state) — see [Querying](#querying). There is no separate pre-trade "what would this order cost me" read; the per-scenario breakdown is not yet a surfaced field (see the note above).
 
 **Q: Do MIP-3 listings get PM credit?**
-A: The engine has no per-pair correlation matrix (see the corrections note above) — every enrolled position nets through the same scenario grid unless its market is governance-flagged strict-isolated, which excludes it. Check a market's live `strict_isolated` field on [`market_info`](../api/rest/info/perpetuals.md#market_info); new long-tail listings are likely candidates for that flag.
+A: The engine has no per-pair correlation matrix (see the corrections note above) — every enrolled position nets through the same scenario grid unless its market is governance-flagged strict-isolated, which excludes it. Check a market's live `strict_isolated` field on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta); new long-tail listings are likely candidates for that flag.
 
 </details>

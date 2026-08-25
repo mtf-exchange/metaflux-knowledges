@@ -189,17 +189,17 @@ Pick by:
 
 ## APR estimation {#apr-estimation}
 
-The [`staking_apr`](../api/rest/info.md#staking_apr) `/info` query type is **live** —
+The [`staking_state`](../api/rest/info.md#staking_state) `/info` query type is **live** —
 it returns the effective bootstrap-reward APR the begin-block reward effect
 actually applies, plus its committed inputs:
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_apr"}'
+curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_state","address":"0x<addr>"}'
 ```
 
 ```json
 {
-  "type": "staking_apr",
+  "type": "staking_state",
   "data": {
     "total_stake":                 "1000000",
     "pending_validator_pool_usdc": "25.75",
@@ -262,8 +262,7 @@ sequenceDiagram
 
 - [`POST /exchange`](../api/rest/exchange.md) — `c_deposit` / `c_withdraw` / `token_delegate` / `claim_rewards`
 - [`POST /info staking_state`](../api/rest/info.md#staking_state)
-- [`POST /info staking_apr`](../api/rest/info.md#staking_apr) — effective bootstrap-reward APR + committed inputs
-- [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — protocol-wide staking aggregates (`staking.*`)
+- [`POST /info staking_state`](../api/rest/info.md#staking_state) — one account's stake, plus the `reward_pool` inputs
 - [Fees](./fees.md) — fee revenue is one of the staking reward sources
 
 ## FAQ {#faq}

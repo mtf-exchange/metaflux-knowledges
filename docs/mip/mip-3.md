@@ -121,13 +121,13 @@ the market is isolated and the reason the bond is slashable.
    until a two-thirds stake `ArmFeatures` vote arms it. While it is dormant, a
    push is refused with `mip3_deployer_oracle feature not active`. Read
    `feature_active` from
-   [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle) on the
+   the operator-lane [`mip3_deployer_oracle`](../api/rest/info.md#operator-reads) read on the
    network you target — do not assume a posture.
 2. **The source subset mask does not decide what a push accepts.** The mask
-   (`perp_set_oracle`) is validated at registration, committed, and served back
-   by [`oracle_sources`](../api/rest/info.md#oracle_sources). Nothing filters
-   prices by it today. A deployer push is bounded by the price rules below, and
-   by nothing else.
+   (`perp_set_oracle`) is validated at registration and committed, but nothing
+   filters prices by it today, and no read serves it — see
+   [oracle prices](../concepts/oracle-prices.md#composition). A deployer push is
+   bounded by the price rules below, and by nothing else.
 :::
 
 ### Running the oracle for your market {#running-the-oracle}
@@ -172,7 +172,7 @@ reason is what tells you how to size your own push cadence.
    against every trader on the book.
 
 6. **Monitor with a read, not a stopwatch.**
-   [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle) reports
+   the operator-lane [`mip3_deployer_oracle`](../api/rest/info.md#operator-reads) read reports
    `stale`, `until_stale_ms`, and the reference stamp the gate itself uses. Alert
    on `until_stale_ms`, not on your own send time — a push counts only once it is
    committed.

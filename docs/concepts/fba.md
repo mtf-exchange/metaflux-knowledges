@@ -46,12 +46,12 @@ The fill price is **uniform** across all participants in the batch — no one is
 | Spot pairs | Continuous CLOB | Convention |
 | Index / structured products | FBA | Composite pricing needs synchronous clearing |
 
-Each market's matching mode is in [`market_info.fba_enabled`](../api/rest/info/perpetuals.md#market_info). Markets with FBA on accept `fba_submit` into the live batch window. See [`fba_submit`](../api/rest/exchange.md#fba_submit) for the full action.
+Each market's matching mode is in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) as `fba_enabled`. Markets with FBA on accept `fba_submit` into the live batch window. See [`fba_submit`](../api/rest/exchange.md#fba_submit) for the full action.
 
 ## Batch interval {#batch-interval}
 
 Governed per market as `period_ms`, bounded to `[100 ms, 5 s]`; read the live
-value from [`fba_batch_state`](../api/rest/info.md#fba_batch_state)`.period_ms`
+value from the operator-lane `fba_batch_state` read
 rather than assuming a fixed default — do not derive it from block cadence.
 
 Faster intervals reduce the wait but increase computational cost.
@@ -167,17 +167,25 @@ next window opens
 FBA fills settle into each account's positions and balances like any other
 fill, but they carry **no live public event** today: they do not appear on
 [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills),
-or [`user_events`](../api/ws/subscriptions.md#userevents), and there is no
+and there is no
 `/info` read that lists past fills for a closed window. Observe a settlement
 by diffing [`account_state`](../api/ws/subscriptions.md#account_state) before
-and after, or by watching [`fba_batch_state`](../api/rest/info.md#fba_batch_state)'s
-pool contents drain at the window boundary.
+and after.
 
 ## Querying {#querying}
 
 The live FBA pool + indicative clearing is exposed on the node `/info` read path
-via [`fba_batch_state`](../api/rest/info.md#fba_batch_state) — see that entry for
-the full response shape and field table. It takes `coin` (the market symbol). FBA is a
+via `fba_batch_state`.
+
+:::warning
+**This read is OPERATOR LANE, not public.** The FBA engine is not reachable from
+the public `/exchange` yet, so its read does not ship publicly either — it
+answers with the same error an unknown type gets. See
+[operator lane](../api/rest/info.md#operator-reads). The shape below is what a node operator sees
+today, and what the public API will serve on the day the engine opens.
+:::
+
+It takes `coin` (the market symbol). FBA is a
 per-market opt-in, so an unregistered market is **not a 404** — it returns a 200
 with zeroed fields (`enabled:false`, empty `orders`, `indicative:null`).
 
@@ -210,14 +218,14 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 Prices and sizes are **human decimal strings**, tick- and lot-normalized — this is a read, not the raw order-submission plane. `next_settle` is **derived** as `last_settle + period_ms`. The `indicative` block is the volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, not yet settled — and is `null` when there is no cross (one-sided or empty window). This is what p\* would be if the batch closed now, useful for traders deciding whether to add to the batch.
 
-Timestamp keys carry no `_ms` suffix; only a key naming a DURATION keeps it, which is why `period_ms` does and `last_settle` does not. Full rows on the [`fba_batch_state` read](../api/rest/info.md#fba_batch_state).
+Timestamp keys carry no `_ms` suffix; only a key naming a DURATION keeps it, which is why `period_ms` does and `last_settle` does not. Full rows on the `fba_batch_state` read above.
 
 ## See also {#see-also}
 
 - [Order types](./order-types.md)
 - [`fba_submit`](../api/rest/exchange.md#fba_submit) — the full action reference
 - [MIP-3](../mip/mip-3.md) — markets opt into FBA at deploy
-- [`market_info`](../api/rest/info/perpetuals.md#market_info) — check `fba_enabled` per market
+- [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) — check `fba_enabled` per market
 
 ## FAQ {#faq}
 

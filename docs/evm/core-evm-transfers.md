@@ -50,26 +50,43 @@ nothing, so that path fails closed and points here instead.
 Not every token you hold can. Ask the chain rather than guessing:
 
 ```json
-{ "type": "evm_contract_bindings" }
+{ "type": "markets_meta", "kind": "spot" }
 ```
 
 ```json
-{ "bindings": [
-  { "asset": 101, "token": "BTC", "variant": 0,
-    "address": "0x…" },
-  { "asset": 5, "token": "asset:5", "variant": 2, "address": null }
-] }
+{ "spot": { "tokens": [
+  { "id": 101, "name": "BTC",
+    "evm_contract": { "address": "0x…", "variant": 0, "evm_extra_wei_decimals": 0 } },
+  { "id": 5, "name": "TOKEN5", "evm_contract": null }
+] } }
 ```
 
-An `address` is the ERC-20 the asset is bound to, and its presence is the test:
-the read resolves it through the SAME predicate the transfer path uses, so an
-asset with an address can cross and one with `address: null` cannot. Two assets
-cross without appearing here as a bound ERC-20: **USDC**, which is the fixed
+**`evm_contract` is the test.** A token with an object can cross; a token with
+`null` cannot. The read resolves the address through the SAME predicate the
+transfer path uses, so it can never offer a binding the chain would then refuse.
+`variant` names how the token is bound — `0` a deployed contract, `1` and `2`
+storage-slot forms — and it does not change whether the asset crosses.
+
+The [token registry](../api/rest/info/spot.md#spot_meta) is one section of
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), so the same call
+that gives you the tradable universe gives you this. There is no separate
+bindings read.
+
+Two assets cross without a bound ERC-20 row: **USDC**, which is the fixed
 FiatToken predeploy, and the **native gas token**, which is the EVM balance
 itself rather than a contract.
 
-Offer the transfer only for those. An asset the chain cannot resolve is the
-silent-failure case above: the burn transaction succeeds and nothing moves.
+:::warning
+**The bound address ROTATES — read it, never freeze it.** A validator-quorum
+vote can re-bind a token to a different contract. An address copied into your
+config, your source, or your own documentation then points at a contract the
+chain no longer credits. Ask `markets_meta` on each use, and key your own
+records on the asset id, which does not move.
+:::
+
+Offer the transfer only for the assets that resolve. An asset the chain cannot
+resolve is the silent-failure case above: the burn transaction succeeds and
+nothing moves.
 
 ## EVM → Core (via CoreWriter) {#evm--core-via-corewriter}
 
@@ -100,7 +117,7 @@ CoreWriter transaction top-level from an EOA, or move value through the
 [withdraw sink](#evm--core-value) above, which is live at every height.
 
 Read the live height before you rely on this —
-`{"type":"web_data","address":"0x…"}` carries it as `height`.
+`{"type":"account_state","address":"0x…"}` carries it as `height`.
 :::
 
 ## Moving VALUE from Core to EVM {#core--evm-value}

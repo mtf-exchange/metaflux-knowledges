@@ -36,15 +36,15 @@ what to skip. For the field-level schema of any action, follow its link into
 
 The write path takes a **numeric market id**. Read it once at start-up, with the
 price and size grids, from
-[`market_info`](../api/rest/info/perpetuals.md#market_info):
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta):
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"market_info","coin":"BTC"}'
+  -d '{"type":"markets_meta","coin":"BTC"}'
 ```
 
-| You need | Field on `market_info` | Example |
+| You need | Field on `markets_meta` | Example |
 |----------|------------------------|---------|
 | Market id for `market` | `asset_id` | `0` |
 | Price grid | `tick_size` (whole units) | `"0.1"` |

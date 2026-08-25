@@ -313,9 +313,9 @@ produces alerts that never fire.
    decides your tier. No read returns it as its own field — derive it
    yourself from `account_value` and `maint_margin`, both on
    [`account_state`](../api/rest/info.md#account_state) /
-   `margin_summary`.
+   `account_state` with `detail: "margin"`.
 2. **The wire `health` field.** The `health` field that `account_state` and
-   `margin_summary` actually return is a signed DOLLAR DIFFERENCE —
+   `account_state` actually returns is a signed DOLLAR DIFFERENCE —
    `account_value − maint_margin` — not a ratio. A healthy account can show a
    large positive dollar figure; it does not sit near `1.0`.
 
@@ -324,7 +324,7 @@ such as `1.1` or `1.2` — it is dollars, so the comparison is meaningless. To
 track the tier decision instead:
 
 - read the `tier` field directly (`Safe` / `T0` / `T1` / `T2` / `T3`, on
-  `account_state`, `margin_summary`, and every
+  `account_state` and every
   [`notifications`](../api/ws/subscriptions.md#notifications) record), or
 - compute the ratio yourself from `account_value` / `maint_margin`.
 

@@ -1,14 +1,59 @@
 ---
-description: Breaking API changes in node + gateway 0.7.14 — coin/address addressing, removed query types, inline margin tiers, and WS channel updates. A migration checklist for integrators and market makers.
+description: Breaking API changes on the MetaFlux read API — the read-surface cut, and the earlier 0.7.14 addressing change. A migration checklist for integrators and market makers.
 ---
 
-# API migration — 0.7.14
+# API migrations
 
 :::warning
-**Breaking changes.** This release changes how markets and accounts are addressed
-on the read API, removes three query types, and updates several WS channels.
-Signed `/exchange` actions are **unchanged**. Work through the checklist below
+**Breaking changes.** Two migrations are on this page, newest first. Signed
+`/exchange` actions are **unchanged** by both. Work through the checklists
 before upgrading a client.
+:::
+
+# The read-surface cut {#read-surface-cut}
+
+:::info
+**One question, one read.** The `/info` surface carried several reads that
+answered the same question as another read. A caller had to choose, and a wrong
+choice was silent. The cut removes the duplicate in every such pair and keeps
+the read that answers the question completely in one round trip.
+:::
+
+**Nothing a public caller could read is gone.** Every retired name has a
+forwarding address. The full table, with the replacement for each, is
+[Reads that are no longer public](./rest/info.md#retired-reads).
+
+The four shapes of the change:
+
+| Shape | What to do |
+|---|---|
+| **A read merged into a bigger one** — `agents`, `sub_accounts`, `user_to_multi_sig_signers`, `user_vault_equities`, `delegator_summary`, `user_role`, `pm_summary`, `evm_contract_bindings`, `bridge_chain_configs` | Call the read that owns the question. [`account_state`](./rest/info.md#account_state) with `detail: "overview"` carries the first six as named sub-objects; `account_state` already carries the PM figures; the EVM binding rides [`markets_meta`](./rest/info/perpetuals.md#markets_meta) `kind: "spot"`; the bridge config rows ride [`bridge_user_outbox`](./rest/info/bridge.md#bridge_user_outbox) |
+| **A read became a PARAMETER** — `market_info`, `margin_summary`, `account_overview` (and its old name `web_data`), `user_fills_by_time`, `trades_by_time`, `max_builder_fee` | Same question, one read, one argument: `coin` on [`markets`](./rest/info/perpetuals.md#markets), `detail: "margin"` or `detail: "overview"` on [`account_state`](./rest/info.md#account_state), `start_time` / `end_time` on [`user_fills`](./rest/info.md#user_fills) and [`trades`](./rest/info/perpetuals.md#trades) |
+| **A read was RENAMED** — `spot_deploy_state` → [`spot_deploy_auction`](./rest/info/spot.md#spot_deploy_auction), `recent_trades` → [`trades`](./rest/info/perpetuals.md#trades) | Change the `type` string. The payload is the same |
+| **A read left the public API** — `protocol_metrics`, `mip3_deployer_oracle`, `rfq_open`, `rfq_user`, `fba_batch_state` | Operator lane. Every public fact `protocol_metrics` carried is on `markets`, `markets_meta` and `staking_state`; the RFQ and FBA reads ship publicly with their engines |
+| **A read was DELETED outright** — `oracle_sources` | It served a per-market source bitmask nothing acts on. Its static facts — the ten source slots and their protocol-fixed weights — are prose on [oracle prices](../concepts/oracle-prices.md#source-table) |
+
+**Two reads gained a field**, and both answer a question that used to need
+off-wire knowledge:
+
+- [`markets_meta[*].signing_id`](./rest/info/perpetuals.md#signing_id) — the
+  uint32 you put in the EIP-712 `market` field. It replaces the deprecated
+  `asset_id` shim. The signing type string is unchanged.
+- [`markets_meta[*].risk_override`](./rest/info/perpetuals.md#risk_override) —
+  the governance risk override in force on that market, `null` when none.
+
+**Three WS channels are retired**: `all_mids` and `active_asset_ctx` (both
+projections of [`markets`](./ws/subscriptions.md#markets) rows) and `user_events`
+(a grab-bag; every event it carried has a typed home on `fills`,
+`order_updates`, `ledger_updates` or `notifications`). See
+[WS subscriptions](./ws/subscriptions.md#channels-at-a-glance).
+
+# API migration — 0.7.14 {#migration-0714}
+
+:::note
+**This section is history.** It describes the earlier `coin` / `address`
+addressing change. Where it names a query type the cut above retired, read the
+cut's table for the current name.
 :::
 
 ## At a glance {#at-a-glance}
@@ -19,8 +64,8 @@ before upgrading a client.
 | Address an account (reads) | `account_id` **or** `address` | **`address`** (0x hex) only |
 | Candle history | `candle` (executed-trade bars) | **`candle_snapshot`** (the single candle query) — **price** bars, `candle_type` `mark` (default) / `oracle` |
 | Composite frontend snapshot | `web_data2` (REST + WS) | **removed** — compose focused reads |
-| Margin ladder | `margin_table` query | **`margin_tiers`** inline on `market_info` / `markets` |
-| Recent trades by window | — | **`trades_by_time`** (new) |
+| Margin ladder | `margin_table` query | **`margin_tiers`** inline on `markets_meta` |
+| Recent trades by window | — | a ranged **`trades`** ask |
 | WS subscription cap | 256 / connection | **64 / connection** |
 
 ## 1. Markets are addressed by `coin` {#1-markets-are-addressed-by-coin}
@@ -30,29 +75,26 @@ numeric `asset_id` / `market_id` request arguments are **removed** — a request
 that supplies them (and omits `coin`) is rejected with
 `400 {"error":"missing field coin"}`.
 
-Affected reads: `market_info`, `markets`, `l2_book`, `recent_trades`,
-`trades_by_time`, `funding_history`, `oracle_sources`, `active_asset_data`,
-`fba_batch_state`.
+Affected reads: `markets`, `markets_meta`, `l2_book`, `trades`,
+`funding_history`, `active_asset_data`.
 
 ```diff
 - {"type":"l2_book","market_id":0}
 + {"type":"l2_book","coin":"BTC"}
 
-- {"type":"market_info","asset_id":0}
-+ {"type":"market_info","coin":"BTC"}
+- {"type":"markets","asset_id":0}
++ {"type":"markets","coin":"BTC"}
 ```
 
-Responses echo the `coin` symbol (e.g. `recent_trades` rows carry
-`"coin":"BTC"`). `market_info` / `markets` keep a **`asset_id`** field for now as
-a deprecated indexer shim — **do not build against it**; it may be dropped
-without a wire-version bump.
+Responses echo the `coin` symbol (e.g. `trades` rows carry `"coin":"BTC"`).
+The deprecated `asset_id` shim is gone; the number a SIGNER needs is
+[`markets_meta[*].signing_id`](./rest/info/perpetuals.md#signing_id).
 
 ## 2. Accounts are addressed by `address` {#2-accounts-are-addressed-by-address}
 
 Account-scoped reads no longer accept `account_id`; pass `address` (0x hex).
 
-Affected reads: `open_orders`, `user_fills`, `user_fills_by_time`, `agents`,
-`sub_accounts`, `rfq_user`, `pm_summary`.
+Affected reads: `open_orders`, `user_fills`, `account_state`.
 
 ```diff
 - {"type":"open_orders","account_id":42}
@@ -66,9 +108,9 @@ The `account_id` echo field is gone from these responses.
 | Removed | Returns now | Use instead |
 |---------|-------------|-------------|
 | `candle` | `400 unknown info type: candle` | [`candle_snapshot`](./rest/info/perpetuals.md#candle_snapshot) |
-| `margin_table` | `400 unknown info type: margin_table` | `margin_tiers` inline on [`market_info`](./rest/info/perpetuals.md#market_info) / [`markets`](./rest/info/perpetuals.md#markets) |
-| `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](./rest/info.md#account_state) + [`spot_clearinghouse_state`](./rest/info/spot.md#spot_clearinghouse_state) + [`open_orders`](./rest/info.md#open_orders) + [`user_vault_equities`](./rest/info.md#user_vault_equities) + [`exchange_status`](./rest/info.md#exchange_status) |
-| `web_data2` (WS channel) | `unknown channel: web_data2` | `account_state` WS channel + poll `spot_clearinghouse_state` (no live WS push for plain spot balances) |
+| `margin_table` | `400 unknown info type: margin_table` | `margin_tiers` inline on [`markets_meta`](./rest/info/perpetuals.md#markets_meta) |
+| `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](./rest/info.md#account_state) (default and `detail: "overview"`) + [`open_orders`](./rest/info.md#open_orders) + [`exchange_status`](./rest/info.md#exchange_status) |
+| `web_data2` (WS channel) | `unknown channel: web_data2` | `account_state` WS channel |
 
 ## 4. `margin_tiers` — inline notional-banded ladder {#4-margin_tiers--inline-notional-banded-ladder}
 
@@ -93,16 +135,16 @@ The maintenance-margin ladder now rides **inline** on each market record as
 Tier = the first band whose `max_open_interest` bound is not exceeded. Leverage
 falls and maintenance rises as open interest grows.
 
-## 5. New: `trades_by_time` {#5-new-trades_by_time}
+## 5. New: a ranged `trades` ask {#5-new-ranged-trades}
 
 Recent public prints for one market over a `[start_time, end_time]` window (the
 bounded ring; deep history via the gateway archive):
 
 ```json
-{ "type": "trades_by_time", "coin": "BTC", "start_time": 1783000000000, "end_time": 1783011600000 }
+{ "type": "trades", "coin": "BTC", "start_time": 1783000000000, "end_time": 1783011600000 }
 ```
 
-Rows share the [`recent_trades`](./rest/info/perpetuals.md#recent_trades) shape.
+Rows share the un-ranged [`trades`](./rest/info/perpetuals.md#trades) shape.
 
 ## 6. `markets` shape {#6-markets-shape}
 
@@ -113,7 +155,7 @@ Rows share the [`recent_trades`](./rest/info/perpetuals.md#recent_trades) shape.
   "spot": { "pairs": [ /* … */ ], "tokens": [ /* … */ ] } } }
 ```
 
-Each `perp[]` element carries a market's **dynamic** fields only — the same dynamic subset `market_info` includes for one `coin`. The **static** fields (precision grids, leverage/margin ladders, trade-control flags) live separately on [`markets_meta`](./rest/info/perpetuals.md#markets_meta); `market_info` returns the union of both.
+Each `perp[]` element carries a market's **dynamic** fields only. The **static** fields (precision grids, leverage/margin ladders, trade-control flags) live separately on [`markets_meta`](./rest/info/perpetuals.md#markets_meta), joined on `(coin, kind)`.
 
 ## 7. WebSocket changes {#7-websocket-changes}
 
@@ -129,23 +171,22 @@ Each `perp[]` element carries a market's **dynamic** fields only — the same dy
   header.
 - **`order_updates`**: on a `filled` record, the `order.sz` is the **FILLED** size
   and `order.orig_sz` the **original** order size.
-- **Active channels**: `account_state`, `spot_margin_state`, `order_updates`, `fills`,
-  `user_events`, `user_fundings`, `ledger_updates`, `l2_book`, `bbo`, `trades`,
-  `candles` (gateway only — the node does not serve it), `all_mids`,
-  `active_asset_ctx`, `active_asset_data`, `explorer_block`, `explorer_txs`.
+- **Active channels**: see the [channels at a glance](./ws/subscriptions.md#channels-at-a-glance)
+  table for the current set. `all_mids`, `active_asset_ctx` and `user_events`
+  were retired by the cut above.
 
-## 8. `predicted_fundings` semantics {#8-predicted_fundings-semantics}
+## 8. Predicted funding semantics {#8-predicted-funding-semantics}
 
-Keyed by `coin`; each entry is
-`{coin, predicted_rate, next_funding_time}`:
+The predicted rate is on each [`markets`](./rest/info/perpetuals.md#markets)
+row's `funding` block:
 
-- `predicted_rate` is the **clamped** rate actually charged at the boundary
+- `rate_per_hr` is the **clamped** rate actually charged at the boundary
   (premium passed through the per-asset `±cap`), not the raw premium.
-- `next_funding_time` is the **next aligned per-asset settlement boundary** (ms).
+- `next_payment_ts` is the **next aligned per-asset settlement boundary** (ms).
 
 Funding settles **discretely** at per-asset boundaries (1h default); the
-`funding_history` samples remain the raw premium ring. `market_info.funding`
-carries `interval_ms` (per-asset cadence) and `next_payment_ts` (the boundary).
+`funding_history` samples remain the raw premium ring. The same `funding` block
+carries `interval_ms` (per-asset cadence).
 
 ## 9. Rate limits {#9-rate-limits}
 

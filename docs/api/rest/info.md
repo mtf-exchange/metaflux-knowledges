@@ -101,9 +101,28 @@ Per-account snapshot.
 { "type": "account_state", "address": "0x<addr>" }
 ```
 
-| Arg | Type | Required |
-|-----|------|----------|
-| `address` | hex address | yes |
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `address` | hex address | yes | Account address |
+| `detail` | `"full"` \| `"margin"` \| `"overview"` | no | Response depth. Absent ⇒ `"full"` |
+
+`detail: "margin"` answers with the **margin scalars only** — `address`,
+`account_value`, `withdrawable`, `maint_margin`, `init_margin`, `health`,
+`tier`, `abstraction`. It skips the position walk and the balance scan, so it is
+the right call for a frequent liquidation-health poll (a risk-watcher bot, an
+automated margin top-up). Both depths compute the scalars with one shared
+helper, so the two can never disagree.
+
+**`maint_margin` is served only at `detail: "margin"`.** The full depth carries
+the per-leg `maint_margin` on each position row instead.
+
+`detail: "overview"` answers with the account's **non-trading** state instead —
+vaults, staking, sub-accounts, multisig, agents and the derived role. One
+account has one state, so it has one read; `detail` chooses which half of that
+state you want. `"full"` and `"margin"` both answer the trading half — `margin`
+is the scalar-only subset of it — while `"overview"` answers the other half. The
+only fields all three share are `address` and the `height` / `time` stamp. See
+[`detail: "overview"`](#account_state-overview) below.
 
 An **unknown address** (never seen on-chain) returns **200** with a fully zeroed
 record (`account_value:"0"`, empty `clearinghouse_state` / `balances`), NOT a
@@ -136,9 +155,6 @@ Response (a faucet-funded account, no positions):
 }
 ```
 
-`account_state` carries **no account-level `maint_margin`** — that scalar
-lives on the lighter [`margin_summary`](#margin_summary) read only, so a
-liquidation-health poll does not have to pull the full position/balance walk.
 `abstraction` is `"unified"` (default cross-collateral account) or
 `"portfolio"` (portfolio-margin enrolled) — derive PM enrollment as
 `abstraction == "portfolio"`. `pm_maint_margin` / `pm_net_value` /
@@ -164,9 +180,9 @@ number the admission gate uses, clamped at zero. See
 and a worked example.
 :::
 
-For a **light** read of just the margin scalars (no position walk, no balance
-scan — the right call for a liquidation-health poll), use
-[`margin_summary`](#margin_summary).
+**`balances` is the whole spot ledger.** Every token the account holds appears
+here, so this read answers the spot-balance question as well as the margin one.
+There is no separate spot-balance read.
 
 A positioned account adds entries under `clearinghouse_state["<dex>"].positions`
 — the empty-string key `""` is the core dex; a MIP-3 deployer dex keys by the
@@ -251,22 +267,169 @@ stopped advancing). The same stamp appears on the WS
 [`account_state`](../ws/subscriptions.md#account_state) channel with identical
 values, so a client can cross-check or de-duplicate REST and WS against it.
 
-### Lightweight margin-only account summary {#margin_summary}
+#### Cost basis and spot PnL {#avg-entry-px}
 
-The **margin scalars only** — `account_state` minus the `clearinghouse_state`
-walk and the balance scan. The right call for a frequent liquidation-health
-poll (a risk-watcher bot, an automated margin top-up) where the
-position/balance detail is not needed. Required: `address` (0x hex).
+:::caution
+**Treat a missing key exactly like `null`** — no basis known. An older node
+serves `balances` rows carrying `asset`, `name`, `total` and `hold` only.
+:::
 
-```json
-{ "type": "margin_summary", "address": "0x<addr>" }
+`avg_entry_px` is what the account paid, per token, for what it holds. It is the
+one input spot PnL needs:
+
+```
+unrealized_spot_pnl = (mark_px − avg_entry_px) × total
 ```
 
-Response (`data`): `address`, `account_value`, `withdrawable`,
-`maint_margin`, `init_margin`, `health`, `tier`, `abstraction` — identical
-field semantics to the same-named fields on [`account_state`](#account_state)
-(computed by the shared helper, so the two never disagree). `maint_margin`
-lives **only** here — `account_state` drops it.
+It is a PRICE and not a total on purpose. `total` includes the part locked behind
+resting orders (`hold`), so a server-computed notional would have to choose which
+quantity to multiply by, and you could not see which it chose. Multiply by the
+quantity YOU mean.
+
+**The rule behind it — basis is recorded on spot BUYS only.**
+
+- A spot **buy** rolls the weighted average acquisition cost forward.
+- A spot **sell** reduces the balance but **keeps the per-unit average
+  unchanged**. Selling does not re-price what remains.
+- **Deposits record no basis.** Tokens that arrive by bridge deposit, by a
+  Core↔EVM credit, by a spot transfer from another account, or by a governance
+  adjustment were not bought on this chain, so there is no price to record.
+
+**Consequences to code against:**
+
+- A holding acquired **entirely** by deposit or transfer has **`avg_entry_px:
+  null`**. It is never `"0"`. A zero would claim the tokens were free and make
+  the whole balance look like profit; `null` says plainly that the basis is not
+  known. This matches the `null`-over-wrong-but-plausible rule used by the
+  [position history](./info/position-history.md#honesty-flags) completeness flags.
+- A holding **partly** bought and partly transferred in prices the transferred
+  tokens at the standing average, because the transfer wrote no basis of its own.
+  `avg_entry_px` is then a real number, but it covers the bought portion's price
+  applied across the whole balance.
+- Do not render a PnL figure when `avg_entry_px` is `null`. Render "—" instead. A
+  PnL computed against a null basis is not a small error; it is the entire
+  notional reported as gain.
+
+**Perp positions are unaffected.** They carry their own `entry` price on the
+`clearinghouse_state` rows above; `avg_entry_px` is the spot ledger's equivalent.
+
+:::info
+**No basis on the USDC row.** USDC is the quote asset — its cost basis in USDC
+is meaningless — so `balances[0].avg_entry_px` is always `null`. See
+[USDC unification](../../concepts/usdc.md).
+:::
+
+
+#### `detail: "overview"` — everything that is not trading {#account_state-overview}
+
+The account's full **non-trading** state: vaults, staking, sub-accounts,
+multisig, agent wallets, and the derived role. The default depth owns margin,
+positions and balances. This depth owns everything else.
+
+**Why this is a depth and not its own read.** One account has one state, so it
+answers on one read. The facets below change rarely — a vault deposit, a
+delegation, an agent approval — while margin and positions change every commit.
+A depth keeps the default answer small for the callers that poll it, and still
+gives the whole account in ONE round trip to a caller that wants it. Ask for
+this depth when you render an account page, approve an agent, or list
+sub-accounts. Do not ask for it in a poll loop.
+
+**The WS [`account_state`](../ws/subscriptions.md#account_state) channel pushes
+the DEFAULT depth only.** A depth is a REST parameter. Read this depth over REST
+when you need it.
+
+```json
+{ "type": "account_state", "address": "0x<addr>", "detail": "overview" }
+```
+
+An **unknown address** answers **200** with every sub-object honest-empty, NOT a
+`404` — the same rule the default depth follows.
+
+Response:
+
+```json
+{
+  "type": "account_state",
+  "data": {
+    "address": "0x<addr>",
+    "role":    "user",
+    "vault": {
+      "equities": [
+        { "vault_id": 7, "vault_address": "0x<vault>", "shares": "1", "equity": "5000000000" }
+      ],
+      "vaults": [ /* a <vault_state> body per vault this account follows or leads */ ]
+    },
+    "staking": {
+      "state":   { /* a <staking_state> body, minus the repeated address */ },
+      "summary": {
+        "undelegated":        "250",
+        "total_delegated":    "500",
+        "pending_withdrawal": "50",
+        "claimable_rewards":  "7",
+        "n_delegations":      2
+      }
+    },
+    "sub_accounts": [
+      { "index": 0, "address": "0x<sub_addr>", "equity": "2500" }
+    ],
+    "multisig": { "is_multi_sig": true, "threshold": 2, "signers": ["0x…", "0x…"] },
+    "agents": [
+      { "agent": "0x<agent_addr>", "name": "trading-bot", "expires_at_ms": 1700000500000 }
+    ],
+    "height": 562,
+    "time":   1700000000555
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | hex address | Resolved account address. Carried ONCE at the top — no sub-object repeats it |
+| `role` | `"missing" \| "user" \| "agent" \| "vault" \| "sub_account"` | Derived role. Precedence: `vault` (the address is a vault) → `sub_account` → `agent` (an approved agent of some master) → `user` (has account, config or spot state) → `missing` |
+| `vault.equities[*].vault_id` | uint64 | Vault id |
+| `vault.equities[*].vault_address` | hex address | Vault address |
+| `vault.equities[*].shares` | Decimal string | The account's share count in **WHOLE shares**, not the raw 10¹⁸ integer. Send this exact string back to [`vault_withdraw`](./exchange.md#vault_withdraw) — read and write use one plane |
+| `vault.equities[*].equity` | Decimal string | `shares × share_price`, truncated — whole-USDC. Share price is mark-to-market NAV per share, so this is what a redemption pays now, not a high-water-mark figure |
+| `vault.vaults[*]` | object | One [`vault_state`](#vault_state) body per vault the account **follows or leads**, field-identical to that read. A leader with no deposit still gets a row |
+| `staking.state` | object | A [`staking_state`](#staking_state) body for this account, minus the repeated `address` |
+| `staking.summary.undelegated` | Decimal string | The free staking pool: MTF moved in with `staking_deposit` and **not yet delegated** (whole-MTF) |
+| `staking.summary.total_delegated` | Decimal string | Sum of active delegations (whole-MTF) |
+| `staking.summary.pending_withdrawal` | Decimal string | Sum of pending undelegations (whole-MTF) |
+| `staking.summary.claimable_rewards` | Decimal string | Accumulated delegator rewards (whole-MTF) |
+| `staking.summary.n_delegations` | uint64 | Number of active delegations |
+| `sub_accounts[*].index` | uint32 | Sub-account index under this parent |
+| `sub_accounts[*].address` | hex address | Sub-account address |
+| `sub_accounts[*].equity` | Decimal string | The sub-account's mark-to-market equity, whole-USDC — the same figure its own `account_state.account_value` reports |
+| `multisig.is_multi_sig` | bool | Whether the account is multisig |
+| `multisig.threshold` | uint32 | M-of-N threshold; `0` if not multisig |
+| `multisig.signers` | hex address[] | Signer set; empty if not multisig |
+| `agents[*].agent` | hex address | Approved agent / API wallet address |
+| `agents[*].name` | string \| null | Agent label set at approval time; `null` if unset |
+| `agents[*].expires_at_ms` | uint64 \| null | Approval expiry (consensus ms); `null` for a never-expiring approval |
+| `height` / `time` | uint64 | Committed block this snapshot was rendered against — the same as-of stamp the default depth carries |
+
+**The three staking balances are disjoint — add them for the whole holding.**
+`staking.summary.undelegated`, `total_delegated` and `pending_withdrawal` never
+overlap. A screen that shows `total_delegated` alone shows the user less than
+they hold. `undelegated` is the figure a delegate form needs: `token_delegate`
+draws from it, so an amount above it is refused.
+
+**`sub_accounts[*].equity` counts unrealised PnL.** A sub-account deep in loss
+reads DOWN here, not at its settled cash, so a parent scanning this list sees the
+one that is near liquidation.
+
+**Shares are WHOLE shares on both read and write.** Committed state keeps shares
+as a raw integer on a 10¹⁸ scale; this depth divides by 10¹⁸ before it answers.
+Do **not** multiply `shares` by 10¹⁸. The division truncates **toward zero**, so
+the string a holder reads back is never larger than the shares they hold — a
+holder can under-ask, never over-burn.
+
+**Every sub-object is honest-empty, never absent.** An account with no vaults,
+no stake, no sub-accounts, no multisig and no agents still answers with all six
+keys present and each one empty or zeroed.
+
+State source: `user_vaults`, `c_staking`, `sub_account_tracker`,
+`multi_sig_tracker.configs[addr]`, `locus.user_account_configs[addr].approved_agents`.
 
 ### Per-vault TVL, share price, and strategy {#vault_state}
 
@@ -336,7 +499,12 @@ Response:
     ],
     "pending_unstakes": [
       { "amount": "200000000", "matures_at_ts": 1735780000000 }
-    ]
+    ],
+    "reward_pool": {
+      "total_stake":                 "1000000",
+      "pending_validator_pool_usdc": "25.75",
+      "reward_source":               "fee_funded_on_book_buy"
+    }
   }
 }
 ```
@@ -352,12 +520,21 @@ Response:
 | `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards (whole-MTF) |
 | `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window (whole-MTF) |
 | `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable (consensus ms) |
+| `reward_pool.total_stake` | Decimal string | Total staked MTF across the chain (whole-MTF) — the denominator this account's delegated stake competes in |
+| `reward_pool.pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool and not yet distributed, whole USDC. This is the reward the next distribution draws from |
+| `reward_pool.reward_source` | string | Always `"fee_funded_on_book_buy"`. A constant, present so a client can tell a fee-funded chain from an emission-funded one without inferring it |
 
-> ⬆️ **Upgrade notice — not live yet.** `undelegated_pool_balance` is not served
-> here. Treat a missing key as "this node predates the field", not as a zero
-> balance. **The same figure IS live on another read**: take
-> [`delegator_summary.undelegated`](#delegator_summary), which the node answers
-> today.
+:::warning
+**`reward_pool` serves NO APR, and that is deliberate.** The emission era is
+over. Rewards are funded from fees, not minted on a curve, so there is no annual
+rate to publish. **Do not derive one.** The pending pool is a snapshot of accrued
+fees, not a rate: it depends on trading volume that has not happened yet. A
+plausible-looking wrong number is worse than an honest absence.
+:::
+
+> ⬆️ **Upgrade notice — not live yet.** `undelegated_pool_balance` and
+> `reward_pool` are not served here. Treat a missing key as "this node predates
+> the field", not as a zero balance.
 
 **`total_staked` alone under-reports what an account holds.** It counts
 **delegated** stake. `stakingDeposit` credits a free pool and `stakingWithdraw`
@@ -368,6 +545,14 @@ have. Add `undelegated_pool_balance` to get the account's full staked balance.
 The free pool is also **not** the same thing as `pending_unstakes`. Undelegated
 stake is already free. `pending_unstakes` is stake still inside its unbonding
 window, which is not withdrawable until `matures_at_ts`.
+
+**The three balances are disjoint — add them for the whole staked holding.**
+`staking_deposit` credits `undelegated_pool_balance`; `token_delegate` moves
+stake out of that pool into `total_staked`; undelegating moves it out of
+`total_staked` into `pending_unstakes` for the unbonding window.
+`undelegated_pool_balance` is the spendable figure a delegate form needs — it is
+what `token_delegate` draws from, and the only one of the three that
+`staking_withdraw` returns to spot with no unbonding window.
 
 ### Volume-tiered maker and taker fees {#fee_schedule}
 
@@ -480,9 +665,16 @@ realized PnL and funding folded over a whole life — use
 |-----|------|----------|-------------|
 | `address` | hex address | yes | Account address |
 | `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring |
+| `start_time` | uint64 | no | Window start (consensus ms, inclusive); filters on the fill `time`. Absent ⇒ open lower bound |
+| `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent ⇒ open upper bound |
 
 The account is identified by `address` (0x hex). Missing `address` →
 `400 {"error":"missing field address"}`.
+
+**One read, two asks.** Send `address` alone for the recent window. Add
+`start_time` / `end_time` to filter the same records by time. The response
+echoes both bounds as `start_time` / `end_time` (`null` for a bound you omit),
+and the fill-record shape is identical either way.
 
 Response:
 
@@ -518,6 +710,10 @@ Records are ordered oldest-first (newest last). The ring is bounded, so this is
 a recent window, not all history. An account with no fills returns
 `"fills": []`.
 
+**A ranged ask reaches past the ring.** A request that carries `start_time`
+older than the oldest ring record is answered from the archive. An un-ranged
+request always answers from the ring.
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `address` | hex address | Resolved account address |
@@ -547,42 +743,6 @@ ring is answered from the archive, which stores the attribution fields
 not the `cause` string. Classify a forced close by `liquidated_user` and a TWAP
 slice by `twap_id` — both work on every row; a `cause` test silently misses
 archive-era rows.
-
-### Fill history filtered by time window {#user_fills_by_time}
-
-Like [`user_fills`](#user_fills), but filtered to a time window over each
-record's consensus `time`. Same fill-record shape.
-
-```json
-{ "type": "user_fills_by_time", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
-```
-
-| Arg | Type | Required | Description |
-|-----|------|----------|-------------|
-| `address` | hex address | yes | Account address |
-| `start_time` | uint64 | no | Window start (ms, inclusive); filters on the fill `time`. Absent ⇒ open lower bound |
-| `end_time` | uint64 | no | Window end (ms, inclusive). Absent ⇒ open upper bound |
-
-Response:
-
-```json
-{
-  "type": "user_fills_by_time",
-  "data": {
-    "address":    "0x<addr>",
-    "start_time": 1700000000000,
-    "end_time":   1700003600000,
-    "fills": [ /* same record shape as user_fills */ ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | Resolved account address |
-| `start_time` | uint64 \| null | Echoed window start (`null` if omitted) |
-| `end_time` | uint64 \| null | Echoed window end (`null` if omitted) |
-| `fills` | array | In-window fill records (same per-fill shape as [`user_fills`](#user_fills)), oldest-first |
 
 ### Look up a single order's lifecycle {#order_status}
 
@@ -725,572 +885,67 @@ Response:
 | `timestamp` | uint64 | Block timestamp (consensus ms) |
 | `block_hash` | hex string (32 bytes) | Real committed block hash (now plumbed into the read state — no longer the all-zero placeholder) |
 
-### Approved agent wallets for an account {#agents}
+### Canonical action bytes for a multisig inner action {#encode_action}
 
-Approved agent / API wallets for an account.
+Lower an ordinary wire action to the **canonical `Action` JSON** that a
+[multisig](../../concepts/multi-sig.md) roster signs. The read is stateless: it
+takes no address and reads no committed state.
+
+A multisig bundle carries an `inner_action_blob`. Every roster member signs
+those EXACT bytes, and the node verifies and executes those exact bytes — it
+never re-serializes them. The canonical form is **not** the `{type, params}`
+wire form, so a client cannot build it from the wire action alone. This read
+applies the same lowering `/exchange` admission applies, so the bytes a member
+signs are the bytes the node accepts.
 
 ```json
-{ "type": "agents", "address": "0x<addr>" }
+{
+  "type": "encode_action",
+  "action": { "type": "claim_referral_rewards", "params": {} }
+}
 ```
 
-| Arg | Type | Required |
-|-----|------|----------|
-| `address` | hex address | yes |
-
-Missing `address` → `400 {"error":"missing field address"}`.
+| Arg | Type | Required | Description |
+|-----|------|----------|-------------|
+| `action` | object | yes | The inner action in the ordinary `/exchange` wire form (`{type, params}`) |
 
 Response:
 
 ```json
-{
-  "type": "agents",
-  "data": {
-    "address":    "0x<master>",
-    "agents": [
-      { "agent": "0x<agent_addr>", "name": "trading-bot", "expires_at_ms": 1700000500000 }
-    ]
-  }
-}
+{ "type": "encode_action", "data": { "action_json": "{\"<Variant>\":{ … }}" } }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `address` | hex address | Resolved master address |
-| `agents[*].agent` | hex address | Approved agent wallet address |
-| `agents[*].name` | string \| null | Agent label set at approval time; `null` if unset |
-| `agents[*].expires_at_ms` | uint64 \| null | Agent approval expiry (consensus ms); `null` for a never-expiring approval |
+| `action_json` | string | The canonical `Action` JSON. It is externally tagged — one key naming the variant. UTF-8 encode this string to get the `inner_action_blob` bytes |
 
-### List of an account's sub-accounts {#sub_accounts}
-
-Sub-accounts of an account.
-
-```json
-{ "type": "sub_accounts", "address": "0x<addr>" }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `address` | hex address | yes |
-
-Missing `address` → `400 {"error":"missing field address"}`.
-
-Response:
-
-```json
-{
-  "type": "sub_accounts",
-  "data": {
-    "address":    "0x<parent>",
-    "sub_accounts": [
-      { "index": 0, "address": "0x<sub_addr>", "equity": "2500" }
-    ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | Resolved parent address |
-| `sub_accounts[*].index` | uint32 | Sub-account index under the parent |
-| `sub_accounts[*].address` | hex address | Sub-account address |
-| `sub_accounts[*].equity` | Decimal string | The sub-account's mark-to-market equity, whole-USDC — the same figure its own [`account_state.account_value`](#account_state) reports |
-
-`equity` counts unrealised PnL on the sub-account's open positions. A sub-account
-that is deep in loss therefore reads DOWN here, not at its settled cash, so a
-parent scanning this list sees the one that is near liquidation.
-
-### Protocol-wide counters and accumulators {#protocol_metrics}
-
-Protocol-wide committed accumulators / counters. No parameters. Every field is
-read straight off committed `Exchange` state (counters, fee pools, BOLE reserves,
-staking) — nothing is computed off the match engine or oracle, so a replay
-reproduces it exactly.
-
-```json
-{ "type": "protocol_metrics" }
-```
-
-Response:
-
-```json
-{
-  "type": "protocol_metrics",
-  "data": {
-    "counters": {
-      "total_orders":               1000,
-      "total_fills":                750,
-      "total_liquidations":         3,
-      "total_deposits":             40,
-      "total_withdrawals":          12,
-      "total_vault_transfers":      0,
-      "total_sub_account_transfers":0
-    },
-    "fee_pools": {
-      "buyback_pool":   "8000",
-      "validator_pool": "1000",
-      "treasury":       "1000",
-      "burned_mtf":     "55"
-    },
-    "buyback_status": {
-      "mtf_asset_id":   null,
-      "pool":           "12500",
-      "held_at_hub":    "0",
-      "trigger_usdc":   "10000",
-      "interval_ms":    60000,
-      "slice_usdc":     "250",
-      "drip_active":    false,
-      "blocking_guard": "mtf_asset_unbound"
-    },
-    "insurance_fund_total":    "750",
-    "treasury_backstop_total": "9000",
-    "bole_pool": {
-      "total_deposits":     "20000",
-      "shortfall_total":    "7",
-      "insurance_fund":     [ { "asset": 0, "amount": "750" } ],
-      "treasury_backstop":  [ { "asset": 0, "amount": "9000" } ],
-      "asset_to_shortfall": [ { "asset": 0, "amount": "7" } ]
-    },
-    "evm": {
-      "native_balance_wei": "12000000000000000000",
-      "n_nonzero_holders":  3,
-      "n_accounts":         11
-    },
-    "position_size_signed_sum_by_asset": [ { "asset": 0, "sum_signed": "0" } ],
-    "open_interest_by_asset":            [ { "asset": 0, "amount": "0.015" } ],
-    "staking": {
-      "total_stake":   "100",
-      "n_validators":  1,
-      "n_active":      1,
-      "n_jailed":      0,
-      "current_epoch": 4
-    },
-    "counts": {
-      "n_markets":             1,
-      "n_spot_pairs":          5,
-      "n_user_vaults":         0,
-      "n_accounts_with_state": 12
-    }
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `counters.total_orders` | uint64 | Lifetime orders admitted |
-| `counters.total_fills` | uint64 | Lifetime fills (the only itemized trade signal — a **count**, not a notional) |
-| `counters.total_liquidations` | uint64 | Lifetime liquidations |
-| `counters.total_deposits` / `total_withdrawals` | uint64 | Lifetime deposit / withdrawal counts |
-| `counters.total_vault_transfers` | uint64 | Lifetime vault deposit/withdraw transfers |
-| `counters.total_sub_account_transfers` | uint64 | Lifetime sub-account transfers |
-| `fee_pools.buyback_pool` | Decimal string | USDC accrued to the buyback and not yet spent (whole-USDC). **Not cumulative** — a fire resets it to `0`. It is the same committed field `buyback_status.pool` serves |
-| `fee_pools.validator_pool` | Decimal string | USDC accrued for validators and not yet paid out (whole-USDC). **Not cumulative** — a payout resets it to the unspent remainder |
-| `fee_pools.treasury` | Decimal string | Cumulative treasury fee accrual (whole-USDC). This one only ever grows |
-| `fee_pools.burned_mtf` | Decimal string | Cumulative MTF retired by the buyback executor |
-| `buyback_status.mtf_asset_id` | uint32 \| null | The spot asset id the buyback buys. `null` = the executor is UNBOUND and the buyback can never fire — see below |
-| `buyback_status.pool` | Decimal string | USDC accrued to the buyback and not yet realized (whole-USDC) |
-| `buyback_status.held_at_hub` | Decimal string | The [assistance fund](../../concepts/system-addresses.md) address's whole USDC balance (whole-USDC). It is the buyback's realized, unspent carry **plus** any USDC a third party sent to that address — see below |
-| `buyback_status.trigger_usdc` | Decimal string | The next fire needs `pool + held_at_hub` to reach this. Governed, floored at `1` |
-| `buyback_status.interval_ms` | uint64 | Minimum consensus ms between two fires. Governed |
-| `buyback_status.slice_usdc` | Decimal string | USDC one fire may spend once the drip is live. Governed, default `250` |
-| `buyback_status.drip_active` | bool | `true` once the chain is at or above the drip activation height. `false` = one fire still spends everything available |
-| `buyback_status.blocking_guard` | string \| null | Why the next fire cannot happen, or `null` when nothing stops it — see [the guard tokens](#buyback-blocking-guard) |
-| `insurance_fund_total` | Decimal string | Σ per-asset `bole_pool.insurance_fund` reserves (whole-USDC) |
-| `treasury_backstop_total` | Decimal string | Σ per-asset `bole_pool.treasury_backstop` reserves (whole-USDC) |
-| `bole_pool.total_deposits` | Decimal string | BOLE lending-pool total deposits (whole-USDC) |
-| `bole_pool.shortfall_total` | Decimal string | Σ residual bad debt parked after the ADL → insurance → treasury waterfall |
-| `bole_pool.insurance_fund` | array&lt;{asset, amount}&gt; | Per-asset insurance reserve (whole-USDC), ascending `asset`. The total alone cannot say WHICH market holds the reserve |
-| `bole_pool.treasury_backstop` | array&lt;{asset, amount}&gt; | Per-asset treasury backstop (whole-USDC), ascending `asset` |
-| `bole_pool.asset_to_shortfall` | array&lt;{asset, amount}&gt; | Per-asset residual bad debt (whole-USDC), ascending `asset`. This names the market that carries the shortfall; `shortfall_total` only sums it |
-| `evm.native_balance_wei` | u128 string | Σ native MTF held on the EVM side, in **wei**. Core-side mirror only — the authoritative EVM state root is separate |
-| `evm.n_nonzero_holders` | uint64 | EVM accounts with a non-zero native balance |
-| `evm.n_accounts` | uint64 | EVM accounts with any committed state |
-| `position_size_signed_sum_by_asset` | array&lt;{asset, sum_signed}&gt; | Per market, Σ `size_signed` over **every** position row, ascending `asset`. `sum_signed` is a signed decimal string in the market's raw committed lot plane (per-asset `sz_decimals`), **not** 1e8. Every long leg has a short leg, so the honest value is `"0"` on every asset — a non-zero entry marks a committed one-sided write to a position row, which the open-interest figure cannot show. No market ⇒ typed empty `[]` |
-| `open_interest_by_asset` | array&lt;{asset, amount}&gt; | Per-market open interest as a **whole-unit size string** on that market's own size plane, ascending `asset`. There is **no cross-market total** — see below. No market ⇒ typed empty `[]`. See the upgrade notice below |
-| `staking.total_stake` | Decimal string | Total staked MTF (whole-MTF) |
-| `staking.n_validators` | uint64 | Validators in the committed set |
-| `staking.n_active` | uint64 | Validators active this epoch |
-| `staking.n_jailed` | uint64 | Currently-jailed validators |
-| `staking.current_epoch` | uint64 | Current staking epoch |
-| `counts.n_markets` | uint64 | Registered MIP-3 perp markets (`mip3_market_specs`) |
-| `counts.n_spot_pairs` | uint64 | Registered spot pairs (`mip3_spot_pair_specs`) |
-| `counts.n_user_vaults` | uint64 | Registered user vaults |
-| `counts.n_accounts_with_state` | uint64 | Accounts with committed user-state |
-
-#### Why open interest is now per-asset {#open-interest-by-asset}
-
-> ⬆️ **Upgrade notice — not live yet.** `open_interest_by_asset` replaces
-> `open_interest_total_1e8`. The change is written and under test; it is **not on
-> the live chain**. Until it ships, the live node still answers
-> `open_interest_total_1e8` and does **not** answer `open_interest_by_asset`.
-> Read both keys and prefer the new one when it is present.
-
-`open_interest_total_1e8` was **not a usable number**. It summed each market's
-stored open interest as a raw integer, and each market keeps that figure on its
-**own** size plane (per-asset `sz_decimals`). Adding a market with 3 decimals to
-a market with 8 decimals gives a total that means nothing in either plane, and no
-client can un-mix it. The `_1e8` label made this worse by naming a single plane
-the value never actually rode.
-
-The replacement keeps every market separate and converts each one to a
-**whole-unit size string** on its own plane. There is deliberately **no
-cross-market total**, because no honest one exists. To get a protocol-wide
-figure, convert each market to notional first — a size in one market is not
-comparable to a size in another.
-
-`position_size_signed_sum_by_asset` is a **different** quantity and stays.
-Open interest is the stored per-market scalar; that field re-adds the individual
-position rows, and the two disagreeing is the signal it exists to give.
-
-#### Why the buyback is or is not firing {#buyback-blocking-guard}
-
-:::caution
-**`buyback_status` is LIVE** since node 0.8.9. A node that predates it carries
-every other field on this page but no `buyback_status` key — treat an absent key
-as "this node is older", not as "the buyback is healthy".
-:::
-
-The buyback stops for six unrelated reasons and reports the same silence for all
-of them, so a stalled buyback and a healthy idle one look identical. `blocking_guard`
-names the reason. The sample above is the founding case: no asset id is bound, so
-the buyback has never fired and the pool only grows.
-
-| `blocking_guard` | Meaning |
-|---|---|
-| `null` | Nothing stops the next fire. The interval throttle may still delay it |
-| `mtf_asset_unbound` | No MTF asset id is bound. **The buyback has never fired and cannot fire.** The pool keeps growing |
-| `pool_below_trigger` | `pool + held_at_hub` is under `trigger_usdc`. Normal — the buyback batches |
-| `no_mtf_usdc_pair` | The bound asset has no MTF/USDC pair to buy on |
-| `no_price_ceiling` | No trustworthy price reference exists, so the protocol defers rather than buy at an unverified price. See [Fees](../../concepts/fees.md#where-fees-go) |
-| `book_unfillable` | The pair and the ceiling both resolve, but **no ask rests at or under the ceiling**, so the next fire would buy nothing. The book is too thin or too expensive right now |
-| `slice_below_one_lot` | An ask DOES rest at or under the ceiling, but the whole accrued pool cannot afford **one lot** of it, so the next fire would buy nothing. The buyback waits and fires as soon as accrual passes one lot's cost. **Added in the next release; an older node never reports it** |
-
-Two rules read the tokens correctly:
-
-- **The checks run in the order the buyback runs them, and the token names the
-  FIRST one that stops it.** A chain reporting `mtf_asset_unbound` may also have
-  no pair; fix the first, then read again.
-- **A throttled fire is never reported.** The interval is progress, not a block,
-  so a buyback waiting out `interval_ms` reports `null`.
-- **`book_unfillable` and `slice_below_one_lot` are different states.** The first
-  says no ask is cheap enough. The second says an ask is cheap enough but the
-  money is not there yet. Starting the next release the per-fire slice is floored
-  at one lot's cost, so a fire buys nothing ONLY when the whole pool cannot
-  afford a lot.
-
-`pool` and `held_at_hub` are separate money. `pool` is accrued and unrealized;
-`held_at_hub` is already realized as a real, explorer-visible balance. **The next
-fire may spend their SUM**, and that sum is what `trigger_usdc` is compared
-against. Each fire conserves it exactly: what leaves the pool is either spent to
-the sellers it matched or held at the hub for the next fire. Nothing is minted and
-nothing is lost.
-
-**`held_at_hub` is the hub's whole USDC balance, not only the buyback's own
-carry.** The assistance-fund address accepts an ordinary spot transfer, so anyone
-may send USDC to it, and that USDC lands in this figure and counts toward
-`trigger_usdc`. What a donation **cannot** do is keep a started drain running
-below the trigger: only the schedule the buyback itself started may do that. See
-[The buyback drips, it does not sweep](../../concepts/fees.md#buyback-drip).
-
-:::info
-**No cumulative traded-notional figure.** The engine tracks per-user **30-day fee
-volume** (see [`user_fees`](#user_fees)) and a lifetime fill **count**
-(`counters.total_fills`) — there is **no committed running protocol-wide traded-USD
-accumulator**, so this read intentionally omits one rather than implying a volume
-total exists. Counters are monotonic activity tallies, not money.
-:::
-
-State source: `locus.{counters, fee_tracker.fee_distribution, bole_pool}` + `c_staking` + registry sizes.
-
-### Per-account fee tier and volume {#user_fees}
-
-Per-account fee / volume tier. Required: `account_id` (u64) **OR** `address` (0x hex).
-
-```json
-{ "type": "user_fees", "account_id": 42 }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `account_id` | uint64 | one of `account_id` / `address` |
-| `address` | hex address | one of `account_id` / `address` |
-
-Neither present → `400`. An account with no fee state returns a **200** with
-zeroed volumes and the base-tier bps — the established zeroed idiom.
-
-Response:
-
-```json
-{
-  "type": "user_fees",
-  "data": {
-    "address":          "0x<addr>",
-    "account_id":       42,
-    "taker_volume_30d": "1250000",
-    "maker_volume_30d": "800000",
-    "vip_tier":         2,
-    "mm_tier":          1,
-    "referrer":         "0x<referrer>",
-    "referrer_credit":  "420",
-    "maker_bps":        "0.1",
-    "taker_bps":        "0.3"
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | Resolved account address |
-| `account_id` | uint64 | Echoed only when the request used `account_id` |
-| `taker_volume_30d` | Decimal string | Rolling 30-day taker volume (whole-USDC) |
-| `maker_volume_30d` | Decimal string | Rolling 30-day maker volume (whole-USDC) |
-| `vip_tier` | uint | Committed per-user VIP tier index; `0` when untracked |
-| `mm_tier` | uint | Committed per-user market-maker tier index; `0` when untracked |
-| `referrer` | hex address \| null | This account's referrer if set, else `null` |
-| `referrer_credit` | Decimal string | Σ rebate accrued *to* this address acting as a referrer (whole-USDC) |
-| `maker_bps` | string | **Effective** maker fee in basis points, resolved from the committed [`fee_schedule`](#fee_schedule) volume-tier ladder at this account's 30-day maker volume. A decimal string with ONE fraction digit (`"8.0"`) — the ladder is stored in deci-bps, so a tier can sit on a tenth of a bp |
-| `taker_bps` | string | **Effective** taker fee in basis points, resolved from the committed ladder at this account's 30-day taker volume. Same one-fraction-digit decimal string as `maker_bps` |
-
-The effective `maker_bps` / `taker_bps` are resolved per side from the committed
-volume-tier ladder ([`fee_schedule`](#fee_schedule)) — the maker rate at the
-account's maker volume, the taker rate at its taker volume — using the same
-routine the settlement path charges with, so the reported bps match what the
-account is billed. A MIP-3 per-market spec override is **not** reflected here:
-this is the cross-market base rate. `vip_tier` / `mm_tier` remain the committed
-per-user tier indices and are a separate signal, surfaced alongside the effective
-bps.
-
-State source: `locus.fee_tracker.{user_to_taker_volume_30d, user_to_maker_volume_30d, user_to_vip_tier, user_to_mm_tier, referee_to_referrer, referrer_credit}` + the committed volume-tier ladder.
-
-### Staking reward inputs {#staking_apr}
-
-The committed inputs to the staking reward. No parameters.
-
-> ⚠️ **This read serves NO APR, and that is deliberate.** The emission era is
-> over. Rewards are funded from fees, not minted on a curve, so there is no
-> annual rate to publish. The fields `effective_apr`, `effective_apr_bps`,
-> `governance_rate_bps`, `emission_floor_stake` and `is_gross_pre_commission`
-> were documented here and **no longer exist on the wire**. If your client reads
-> any of them, it is reading a field the node does not send. Compute nothing from
-> a missing value: a documented-wrong APR costs more than no APR.
-
-```json
-{ "type": "staking_apr" }
-```
-
-Response:
-
-```json
-{
-  "type": "staking_apr",
-  "data": {
-    "total_stake":                "1000000",
-    "pending_validator_pool_usdc": "25.75",
-    "n_active_validators":         1,
-    "current_epoch":               2,
-    "reward_source":               "fee_funded_on_book_buy"
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `total_stake` | Decimal string | Total staked MTF (whole-MTF) |
-| `pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool and not yet distributed, in whole USDC. This is the reward the next distribution draws from |
-| `n_active_validators` | uint64 | Validators marked active this epoch |
-| `current_epoch` | uint64 | Current staking epoch |
-| `reward_source` | string | Always `"fee_funded_on_book_buy"`. A constant, present so a client can tell a fee-funded chain from an emission-funded one without inferring it |
-
-**There is no APR to derive from these fields, and do not fabricate one.** The
-pending pool is a snapshot of accrued fees, not a rate: it depends on trading
-volume that has not happened yet. An APR needs a formula nobody has defined, and
-a plausible-looking wrong number is worse than an honest absence.
-
-State source: `c_staking.{total_stake, current_epoch, validators}` +
-`locus.fee_tracker.fee_distribution.validator_pool`.
-
-### Per-market oracle source subset {#oracle_sources}
-
-The committed per-market oracle-source subset. Resolves the market by `coin` (symbol).
-
-```json
-{ "type": "oracle_sources", "coin": "BTC" }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `coin` | symbol | yes |
-
-Missing `coin` → `400 {"error":"missing field coin"}`; unknown market →
-`404 {"error":"market not found"}`.
-
-Response:
-
-```json
-{
-  "type": "oracle_sources",
-  "data": {
-    "coin":              "BTC",
-    "oracle_set":        true,
-    "source_count":      10,
-    "num_sources":       10,
-    "enabled_sources":   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-    "subset_mask":       1023,
-    "weights_committed": false
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `coin` | string | Echoed / resolved market symbol |
-| `oracle_set` | bool | Whether the deployer explicitly confirmed the subset via `SetOracle` |
-| `source_count` | uint64 | Number of enabled sources (popcount of the mask) |
-| `num_sources` | uint8 | Total source slots (`NUM_ORACLE_SOURCES = 10`) |
-| `enabled_sources` | uint8[] | Set bit indices of the subset mask (the enabled source slots) |
-| `subset_mask` | uint16 | Committed 10-bit `oracle_source_subset_mask`. Bit `i` names source slot `i`. **Recorded and served, not yet enforced** — see the note below |
-| `weights_committed` | bool | Always `false` — per-source weights are NOT committed (see flag) |
+Missing `action` → ``400 {"error":"missing field `action`"}``. An action the node
+cannot parse → `400 {"error":"invalid action: …"}`. A wire action with no
+canonical form → `400 {"error":"unsupported action: …"}`.
 
 :::warning
-**Only the numeric bitmask is on-chain — venue NAMES and WEIGHTS are NOT
-committed** (`weights_committed: false`). The 10 source identities are
-protocol-fixed off-chain and their weights are
-protocol-fixed, so committed state carries only the subset bitmask. This read
-surfaces `enabled_sources` as **bit indices**, not named venues, and emits no
-per-venue weight list rather than fabricating one.
+**Do not port this lowering into your client.** The variant names and their
+field shapes live in the node and move when actions move. A client-side copy
+that drifts builds a blob the roster signs and the node then refuses — and the
+member signatures are already spent. Ask the chain each time.
 :::
 
-:::warning
-**The subset mask is recorded, not enforced.** An earlier version of this page
-said that bit `i` decides whether source `i` feeds the weighted median. It does
-not, yet. `perp_set_oracle` validates the mask and commits it, and this read
-serves it back — but the price aggregator does not filter its inputs by the mask.
-Every market therefore composes its oracle price from the same source set today.
-
-Treat the mask as a **declared intent** you can read back, never as a live
-filter. Do not size risk on it. Source filtering is a change to price formation,
-so it needs a hard-fork boundary and its own feature gate; it is not scheduled
-here. This note goes away when the aggregator honours the mask.
-:::
-
-State source: `mip3_market_specs[asset].{oracle_source_subset_mask, oracle_set}`.
-
-### MIP-3 deployer-oracle liveness {#mip3_deployer_oracle}
-
-One [MIP-3](../../mip/mip-3.md) market's **deployer-operated oracle**: who may
-push its index price, when the last push landed, and whether the feed is stale.
-A MIP-3 market prices from its own deployer, so this read is the market's
-health check. Resolves the market by `coin` (symbol), exactly like
-[`oracle_sources`](#oracle_sources).
-
-Use it to monitor a market you deploy. A push cadence that misses the staleness
-window flips the market **reduce-only for opens**, and this read is how you see
-that coming before it happens.
-
-```json
-{ "type": "mip3_deployer_oracle", "coin": "WIF" }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `coin` | symbol | yes |
-
-Missing `coin` → `400 {"error":"missing field coin"}`; a coin that names no
-MIP-3 market → `404 {"error":"market not found"}`. Those are the only two
-rejections.
-
-Response:
-
-```json
-{
-  "type": "mip3_deployer_oracle",
-  "data": {
-    "coin":                "WIF",
-    "asset":               1000,
-    "feature_active":      true,
-    "deployer_oracle_live": true,
-    "deployer":            "0x0101010101010101010101010101010101010101",
-    "sub_deployers":       ["0x0202020202020202020202020202020202020202"],
-    "last_px":             "1250.500001",
-    "last_push_ts":        70000,
-    "source_ts":           70000,
-    "stale_threshold_ms":  60000,
-    "as_of_ts":            100000,
-    "stale":               false,
-    "until_stale_ms":      30000
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `coin` | string | Resolved market symbol |
-| `asset` | uint32 | Asset id. A MIP-3 market is always at or above `1000` |
-| `feature_active` | bool | Whether the `mip3_deployer_oracle` protocol feature is active on **this** chain. See the note below |
-| `deployer_oracle_live` | bool | Whether the market prices from its deployer **now**. `true` only when `feature_active` is `true` AND the market has taken at least one push |
-| `deployer` | address | The market deployer. May always push |
-| `sub_deployers` | address[] | Delegates the deployer authorized to push. Sorted, may be empty |
-| `last_px` | string \| null | Last pushed index price, whole-USDC decimal. `null` before the first push |
-| `last_push_ts` | uint64 \| null | Consensus ms of the block that recorded the last push. `null` before the first push |
-| `source_ts` | uint64 | The **staleness reference**: the later of `last_push_ts` and the canonical per-asset price-source stamp. `0` when neither exists |
-| `stale_threshold_ms` | uint64 | The staleness window in ms. Default `60000`, governance-tunable |
-| `as_of_ts` | uint64 | The committed block time this answer is evaluated against. Consensus-derived, never the server's clock |
-| `stale` | bool | Whether the feed is stale **and** the market prices from it. See the rules below |
-| `until_stale_ms` | uint \| null | Milliseconds until the feed goes stale. **`null` when no countdown exists** — the market has had no push, or is not a deployer-oracle market. Never `0` for "no data": a `0` beside `"stale": false` would read as "about to expire". |
-
-**Why `source_ts` is not just `last_push_ts`.** A push lands in one block; the
-canonical price-source stamp for that asset is written one block later, when the
-begin-block aggregation folds the push in. Reading either stamp alone leaves a
-one-block hole, so the protocol takes the later of the two — and this read
-reports the same reference the gate uses.
-
-**What `stale` means, and what it does not.**
-
-- `stale` is `stale_threshold_ms` measured against `source_ts` at `as_of_ts`,
-  under the same guard the order-admission gate applies. The read calls the
-  gate's own predicate, so the two cannot disagree.
-- `stale` reports **one** condition: the staleness-driven, **market-wide**
-  reduce-only state. While it is `true`, an order that opens or increases a
-  position on this market is refused, and a closing order still passes.
-- `stale` does **not** model the margin-isolation rejects. Those are decided
-  **per sender and per order** from that account's own positions, so they are not
-  market state and no market-wide read can predict them.
-- `stale` is always `false` when `deployer_oracle_live` is `false`, because the
-  gate itself does nothing on a market that does not price from a deployer. Read
-  the two fields together; `stale: false` alone does not mean "feed healthy".
-- The comparison is strict. An age exactly equal to `stale_threshold_ms` is not
-  yet stale, so `until_stale_ms: 0` means "stale now, or stale on the next
-  millisecond".
-
-**Never-pushed markets answer `200`, not an error.** A registered MIP-3 market
-that has taken no push returns the **full shape** with `last_px` and
-`last_push_ts` set to `null`, `source_ts: 0` and `deployer_oracle_live: false`.
-This is the house typed-empty rule: the shape is stable, so a client parses one
-layout. Only market resolution rejects.
-
-:::info
-**`feature_active` is per chain — read it, do not assume it.** The
-`mip3_deployer_oracle` feature is active from genesis on a chain that started
-fresh, and dormant on any other chain until a two-thirds stake `ArmFeatures` vote
-arms it. So the same node build answers differently on different networks. While
-it is `false`, [`mip3_set_oracle_px`](../rest/exchange.md#mip3_set_oracle_px) is
-refused with `mip3_deployer_oracle feature not active`, and a market cannot
-become deployer-priced. Query this field against the network you target instead
-of assuming a posture.
-:::
-
-State source: `mip3_market_specs[asset]` + `oracle_history.deployer_oracle` +
-the governed staleness window.
+**Encode ONCE, then distribute.** Call this read once per bundle, send the
+returned string to every member, and have each member sign over the identical
+bytes. Two members who each call the read separately are trusting two answers to
+agree; one call and one distribution cannot disagree. See
+[signing the inner action](../../concepts/multi-sig.md#signing-the-inner-action).
 
 ## Account history query types {#account-history-query-types}
 
 Per-account history reads — funding payments, ledger updates, past orders, TWAP
-slice fills, and staking events. Same `{type, data}` envelope and MTF-native
+slice fills, and staking rewards. Same `{type, data}` envelope and MTF-native
 conventions as the reads above (decimal-string money, `0x`-hex addresses, coin
 **symbols**). Every type here requires `address` (0x hex; missing or malformed →
 `400`); an **unknown address is never an error** — it answers **200** with the
 empty shape (the established zeroed idiom).
 
-Three of the six types ship the locked wire contract with an **honest-empty**
+Some of these types ship the locked wire contract with an **honest-empty**
 array today (marked **Status: empty (history retention pending)** below): their
 backing events currently stream on the live
 [WS channels](../ws/subscriptions.md) only and are not yet retained for REST.
@@ -1298,9 +953,12 @@ The retention backfill fills them **without a wire change** — the
 request/response envelopes below are final, and the documented record shapes are
 the locked forms the arrays will carry.
 
-[`user_ledger_updates`](#user_ledger_updates) is the fourth empty one, for a
-different reason: its records live in the archive, not on the node. Read its own
-notice below.
+[`user_ledger_updates`](#user_ledger_updates) is empty for a different reason:
+its records live in the archive, not on the node. Read its own notice below.
+
+**An honest-empty array is not the same as a hardcoded one.** A read that could
+only ever answer `[]` was deleted rather than documented — see
+[deleted reads](#deleted-reads).
 
 ### Realized funding-payment history {#user_funding}
 
@@ -1467,15 +1125,6 @@ State source: the committed per-account fill ring (`Exchange.account_fills[addr]
 
 ### Commit-time verdict on a submitted action {#action_outcome}
 
-:::warning
-**Not live yet.** This read ships in the next node release. A network that does
-not serve it answers `400` with `{"error":"unknown info type: action_outcome"}`,
-so one probe tells you which side of the upgrade you are on. Keep the
-confirm-by-effect loop from
-[`accepted` is not `committed`](./exchange.md#accepted-is-not-committed) as your
-fallback until the probe succeeds.
-:::
-
 Read whether a submitted action applied at commit, and if it did not, **why**.
 This is the answer to the gap that `accepted: true` leaves: `POST /exchange` can
 reply before the action commits, and a commit-time rejection has no other channel.
@@ -1550,42 +1199,6 @@ TWAP id, `fill` a full [`user_fills`](#user_fills) record for the slice.
 
 State source: the transient TWAP slice-fill WS sink (streamed, not yet retained for REST).
 
-### Staking delegation event history {#delegator_history}
-
-**Status: empty (history retention pending).** `history` is `[]` — no
-delegation event log is retained yet, and entries are deliberately **not**
-synthesized from the current delegation set (event timestamps are not kept;
-CURRENT state is already served by [`staking_state`](#staking_state) /
-[`delegator_summary`](#delegator_summary)).
-
-```json
-{ "type": "delegator_history", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
-```
-
-Response:
-
-```json
-{
-  "type": "delegator_history",
-  "data": {
-    "address":    "0x<addr>",
-    "start_time": 1700000000000,
-    "end_time":   1700003600000,
-    "history":    []
-  }
-}
-```
-
-Future record shape (locked):
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `history[*].time` | uint64 | Event timestamp (consensus ms) |
-| `history[*].kind` | enum | `"delegate"` \| `"undelegate"` \| `"deposit"` \| `"withdraw"` \| `"claim"` |
-| `history[*].validator` | hex address | Present on validator-scoped kinds; absent otherwise |
-| `history[*].amount` | Decimal string | Event amount (whole-MTF) |
-| `history[*].hash` | hex string | Acting transaction hash |
-
 ### Per-validator staking reward accruals {#delegator_rewards}
 
 The delegator's live per-validator reward accruals, plus the total a claim-all
@@ -1656,7 +1269,7 @@ client.
 current value of every governed parameter. Use
 [`validator_votes`](./info/governance.md#validator_votes) with `status: "voting"`
 for the open votes. Current parameter VALUES are on the reads that own them — a
-market's risk parameters on [`market_info`](./info/perpetuals.md#market_info),
+market's risk parameters on [`markets_meta`](./info/perpetuals.md#markets_meta),
 the fee ladder on [`fee_schedule`](#fee_schedule), global trading flags on
 [`exchange_status`](#exchange_status).
 
@@ -1677,259 +1290,6 @@ time range.
 carried one value per entry, no asset, no voters and no prior value, and it did
 not record every enactment. A margin-parameter vote could enact and leave no row
 at all, which is the defect the replacement exists to fix.
-
-## Advanced query types (RFQ / FBA / portfolio margin) {#advanced-query-types-rfq--fba--portfolio-margin}
-
-These read the live state behind the RFQ, FBA, and portfolio-margin engines — they complement
-the `market_info.fba_enabled` flag / `account_state.abstraction` with the engine
-state itself. Same `{type, data}` envelope and MTF-native conventions.
-
-**Price plane: every number in these three reads is HUMAN, not raw.** RFQ and FBA
-prices and sizes are **decimal strings**, tick- and lot-normalized exactly as
-[`market_info`](./info/perpetuals.md#market_info) renders them; portfolio-margin
-magnitudes are **whole-USD decimal strings**. None of them is 1e8 fixed-point,
-and none of them is USD cents.
-
-This is a statement about `rfq_open`, `rfq_user`, `fba_batch_state` and
-`pm_summary` — **not** a rule for every read on the site. A few operator-facing
-reads do answer in a raw plane, and each says so on its own row
-([`protocol_metrics`](#protocol_metrics) is the one to watch). Read the row.
-
-The **write** side is the one that is raw. `/exchange` order and RFQ submission
-fields carry raw integers on the 1e8 price plane and the per-asset lot plane. So
-a price you read here is not a price you can post back without converting. Check
-which side of the wire you are on before you compare two numbers.
-
-### Open RFQ requests and maker quotes {#rfq_open}
-
-Every open RFQ request plus its maker quotes. No parameters. See the [RFQ concept](../../concepts/rfq.md).
-
-```json
-{ "type": "rfq_open" }
-```
-
-Response:
-
-```json
-{
-  "type": "rfq_open",
-  "data": {
-    "rfqs": [
-      {
-        "rfq_id":              1,
-        "coin":                "SOL",
-        "side":                "B",
-        "sz":                  "1000",
-        "requester":           "0x<addr>",
-        "requester_stp_group": 42,
-        "expiry":              5000,
-        "limit_px":            "0.00000105",
-        "created_at":          10,
-        "quotes": [
-          {
-            "maker":           "0x<addr>",
-            "maker_stp_group": null,
-            "price":           "0.00000104",
-            "max_size":        "800",
-            "valid_until":     4000,
-            "submitted_at":    20
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-`rfqs` iterates deterministically by `rfq_id`. An empty engine returns `"rfqs": []`. This is a **read**, not the write side: unlike [`rfq_request`](./exchange.md#rfq_request)'s raw `u64` fields, every price/size here is a **human decimal string**, tick/lot-normalized the same way [`market_info`](./info/perpetuals.md#market_info) renders them — do not treat this as the 1e8 plane.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `rfqs[*].rfq_id` | uint64 | RFQ request id |
-| `rfqs[*].coin` | string | Market symbol the RFQ is for (join key, like `trades`/`fills`) |
-| `rfqs[*].side` | `"B"` / `"A"` | Side the requester wants to take — `B` = bid, `A` = ask (same convention as [`open_orders`](#open_orders), not the write-side `"Bid"`/`"Ask"`) |
-| `rfqs[*].sz` | decimal string | Requested size, whole units |
-| `rfqs[*].requester` | hex address | Requesting account |
-| `rfqs[*].requester_stp_group` | uint \| null | Requester self-trade-prevention group; `null` when unset |
-| `rfqs[*].expiry` | uint64 | RFQ expiry timestamp (consensus ms) |
-| `rfqs[*].limit_px` | decimal string \| null | Requester limit price, whole units, tick-rounded; `null` when unset |
-| `rfqs[*].created_at` | uint64 | Creation timestamp (consensus ms) |
-| `rfqs[*].quotes[*].maker` | hex address | Quoting maker |
-| `rfqs[*].quotes[*].maker_stp_group` | uint \| null | Maker STP group; `null` when unset |
-| `rfqs[*].quotes[*].price` | decimal string | Quote price, whole units, tick-rounded |
-| `rfqs[*].quotes[*].max_size` | decimal string | Max size the maker will fill, whole units |
-| `rfqs[*].quotes[*].valid_until` | uint64 | Quote validity deadline (consensus ms) |
-| `rfqs[*].quotes[*].submitted_at` | uint64 | Quote submission timestamp (consensus ms) |
-
-### RFQs an account requested or quoted {#rfq_user}
-
-RFQs an account is party to — split into those it opened and those it quoted on. See the [RFQ concept](../../concepts/rfq.md).
-
-```json
-{ "type": "rfq_user", "address": "0x<addr>" }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `address` | hex address | yes |
-
-The account is identified by `address` (0x hex). Missing `address` →
-`400 {"error":"missing field address"}`; malformed `address` →
-`400 {"error":"invalid hex"}`.
-
-Response:
-
-```json
-{
-  "type": "rfq_user",
-  "data": {
-    "address":    "0x<addr>",
-    "requested": [ /* <rfq>, same per-RFQ shape as rfq_open */ ],
-    "quoted":    [ /* <rfq> */ ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | Resolved account address |
-| `requested` | array&lt;rfq&gt; | RFQs this account opened (requester); same per-RFQ shape as [`rfq_open`](#rfq_open) |
-| `quoted` | array&lt;rfq&gt; | RFQs this account quoted on (appears as a `maker`); same per-RFQ shape |
-
-Each list iterates deterministically by `rfq_id`. An account party to nothing
-returns a **200** with both lists empty (the established zeroed idiom).
-
-### Live FBA pool and indicative clearing {#fba_batch_state}
-
-Live FBA pool plus the indicative clearing for one market. See the [FBA concept](../../concepts/fba.md).
-
-```json
-{ "type": "fba_batch_state", "coin": "BTC" }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `coin` | symbol | yes |
-
-Missing `coin` → `400 {"error":"missing field coin"}`. There is **no 404** for an
-unregistered market: FBA is per-market opt-in, so a market with no pool returns a
-**200** with zeroed fields (`enabled:false`, `period_ms:0`, empty `orders`,
-`indicative:null`).
-
-Response:
-
-```json
-{
-  "type": "fba_batch_state",
-  "data": {
-    "coin":        "BTC",
-    "enabled":     true,
-    "period_ms":   200,
-    "min_lot":     "1",
-    "last_settle": 500,
-    "next_settle": 700,
-    "order_count": 2,
-    "bid_count":   1,
-    "ask_count":   1,
-    "bid_size":    "10",
-    "ask_size":    "6",
-    "orders": [
-      {
-        "oid":          1,
-        "owner":        "0x<addr>",
-        "side":         "bid",
-        "price":        "105",
-        "sz":           "10",
-        "stp_group":    null,
-        "submitted_at": 1
-      }
-    ],
-    "indicative": { "clearing_px": "100", "matched_size": "6" }
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `coin` | string | Echoed market symbol |
-| `enabled` | bool | Whether FBA is on for this market |
-| `period_ms` | uint32 | Batch period |
-| `min_lot` | decimal string | Minimum lot size, whole units |
-| `last_settle` | uint64 | Last batch-settle timestamp (consensus ms) |
-| `next_settle` | uint64 | **Derived** `last_settle + period_ms` — the next due boundary the begin-block `is_due` check uses (not stored explicitly); `0` when `period_ms == 0` |
-| `order_count` | uint64 | Orders in the current window |
-| `bid_count` / `ask_count` | uint64 | Per-side order counts in the window |
-| `bid_size` / `ask_size` | decimal string | Per-side summed size, whole units |
-| `orders[*].oid` | uint64 | Server order id |
-| `orders[*].owner` | hex address | Order owner |
-| `orders[*].side` | `"bid"` / `"ask"` | Order side |
-| `orders[*].price` | decimal string | Order price, whole units, tick-rounded |
-| `orders[*].sz` | decimal string | Order size, whole units |
-| `orders[*].stp_group` | uint \| null | Self-trade-prevention group; `null` when unset |
-| `orders[*].submitted_at` | uint64 | Order submission timestamp (consensus ms) |
-| `indicative` | object \| null | The volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, **not yet settled / committed**. `null` when there is no cross (one-sided or empty window) |
-| `indicative.clearing_px` | decimal string | Indicative uniform clearing price, whole units, tick-rounded |
-| `indicative.matched_size` | decimal string | Size that would clear at `clearing_px`, whole units |
-
-**Timestamp keys carry no `_ms` suffix.** The wire drops a redundant `_ms` on a
-key that names a point in time; only a key that names a DURATION keeps it. So the
-settle timestamps are `last_settle` / `next_settle` and the order stamp is
-`submitted_at`, while the batch period stays `period_ms`. A client that reads
-`last_settle_ms` or `submitted_at_ms` finds nothing.
-
-### Portfolio margin enrollment and scenario figures {#pm_summary}
-
-Portfolio-margin enrollment + last-computed scenario figures for an account. See [Portfolio margin](../../concepts/portfolio-margin.md).
-
-```json
-{ "type": "pm_summary", "address": "0x<addr>" }
-```
-
-| Arg | Type | Required |
-|-----|------|----------|
-| `address` | hex address | yes |
-
-The account is identified by `address` (0x hex). Missing `address` →
-`400 {"error":"missing field address"}`. A non-enrolled account returns a **200**
-with `enrolled:false` and zeroed figures.
-
-Response:
-
-```json
-{
-  "type": "pm_summary",
-  "data": {
-    "address":                  "0x<addr>",
-    "enrolled":                 true,
-    "enrolled_at":              1000,
-    "last_computed_block":      77,
-    "pm_maint_margin":          "2500",
-    "pm_net_value":             "90000",
-    "pm_concentration_penalty": "15"
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `address` | hex address | Resolved account address |
-| `enrolled` | bool | Whether the account is enrolled in portfolio margin |
-| `enrolled_at` | uint64 | Enrollment timestamp (consensus ms); `0` when not enrolled |
-| `last_computed_block` | uint64 | Block height of the last PM scenario computation |
-| `pm_maint_margin` | decimal string | Last-computed PM maintenance requirement, **whole USD** |
-| `pm_net_value` | decimal string | Last-computed account net value, **whole USD**; may be negative |
-| `pm_concentration_penalty` | decimal string | Last-computed concentration penalty, **whole USD** |
-
-The portfolio-margin engine stores these three figures in **USD cents** as
-integers. This read divides by 100 before it answers, so every one of them is a
-whole-USD decimal string — the same plane as `account_state`. You never have to
-know which read you asked. The key names carry **no** `_cents` suffix, and the
-enrollment stamp carries no `_ms` suffix, for the same reason the FBA rows do
-not: a key names the quantity, not the storage scale.
-
-The worst-case scenario loss is intentionally **omitted**: it is not persisted in
-committed state, and recomputing it would require re-running the scenario sweep,
-which is not a read-only operation.
 
 ## Node snapshot query types {#node-snapshot-query-types}
 
@@ -2069,67 +1429,10 @@ Response:
 | `vaults[*].follower_count` | uint64 | Number of share holders |
 | `vaults[*].kind` | `"user" \| "metaliquidity"` | Vault kind |
 
+Every vault appears, and each row names its `leader`. To list the vaults ONE
+address leads, filter these rows on `leader`; there is no per-leader read.
+
 State source: `Exchange.user_vaults`.
-
-### Vaults a user has deposited into {#user_vault_equities}
-
-Vaults a user has deposited into + share / equity. Required: `address` (0x hex).
-
-```json
-{ "type": "user_vault_equities", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{
-  "type": "user_vault_equities",
-  "data": {
-    "address": "0x<addr>",
-    "equities": [ { "vault_id": 7, "vault_address": "0x<vault>", "shares": "1", "equity": "5000000000" } ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `equities[*].vault_id` | uint64 | Vault id |
-| `equities[*].vault_address` | hex address | Vault address |
-| `equities[*].shares` | decimal string | Caller's share count in **WHOLE shares**, not the raw 10¹⁸ integer. Send this exact string back to [`vault_withdraw`](./exchange.md#vault_withdraw) — read and write use one plane. See the note below |
-| `equities[*].equity` | decimal string | `shares × share_price`, truncated — whole-USDC. The share price is mark-to-market NAV per share, so this is what a redemption pays right now, not a high-water-mark figure |
-
-State source: `user_vaults[*].follower_shares[addr]` (keyed per vault).
-
-**Shares are WHOLE shares on both read and write.** Committed state keeps shares
-as a raw integer on a 10¹⁸ scale. This read divides by 10¹⁸ before it answers, so
-`shares` is already a whole-share decimal string. Do **not** multiply it by 10¹⁸.
-`vault_withdraw` reads the same plane, so the string this read gives you is the
-string that action takes — round-tripping needs no conversion at all.
-
-The whole-share plane is **live on both sides**. The write half arrived with the
-`vault_withdraw_share_plane` behaviour at block 6,565,000; the read half needs no
-activation height, because a read cannot change what a committed block did.
-
-The division is exact for ordinary holdings. A holding too large for a decimal
-mantissa drops its lowest fractional digits **toward zero**, so the string a
-holder reads back is never larger than the shares they hold. That direction is
-deliberate: a holder can under-ask, never over-burn.
-
-### Vaults led by the user {#leading_vaults}
-
-Vaults led by the user. Required: `address` (0x hex). Returns the same row shape as `vault_summaries`.
-
-```json
-{ "type": "leading_vaults", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{ "type": "leading_vaults", "data": { "address": "0x<addr>", "vaults": [ /* <vault_summaries row> */ ] } }
-```
-
-State source: `Exchange.user_vaults` filtered by `leader == addr`.
 
 ### A user's action stats {#user_rate_limit}
 
@@ -2161,86 +1464,12 @@ Response:
 
 State source: `locus.user_action_registry[addr]` (`UserActionStats`); absent account → zeroed.
 
-### Staking summary for an address {#delegator_summary}
-
-Staking summary for an address. Required: `address` (0x hex).
-
-```json
-{ "type": "delegator_summary", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{
-  "type": "delegator_summary",
-  "data": {
-    "address": "0x<addr>", "undelegated": "250", "total_delegated": "500",
-    "pending_withdrawal": "50", "claimable_rewards": "7", "n_delegations": 2
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `undelegated` | decimal string | The free staking pool: MTF moved in with `staking_deposit` and **not yet delegated** (whole-MTF) |
-| `total_delegated` | decimal string | Sum of active delegations |
-| `pending_withdrawal` | decimal string | Sum of pending undelegations |
-| `claimable_rewards` | decimal string | Accumulated delegator rewards |
-| `n_delegations` | uint64 | Number of active delegations |
-
-**The three balances are disjoint — add them for the whole staked holding.**
-`staking_deposit` credits `undelegated`; `token_delegate` moves stake out of
-`undelegated` into `total_delegated`; undelegating moves it out of
-`total_delegated` into `pending_withdrawal` for the unbonding window. A screen
-that shows `total_delegated` alone shows the user less than they hold.
-
-**`undelegated` is the spendable figure a delegate form needs.** It is what
-`token_delegate` draws from, so an amount above it is refused. It is also the
-only one of the three that `staking_withdraw` can return to spot immediately —
-no unbonding window applies to the free pool.
-
-State source: `c_staking.{staking_balance, delegations, pending_undelegations, delegator_rewards}`.
-
-### Approved builder fee ceiling {#max_builder_fee}
-
-Approved builder-fee ceiling for `(address, builder)`. Required: `address` (0x hex) + `builder` (0x hex).
-
-```json
-{ "type": "max_builder_fee", "address": "0x<addr>", "builder": "0x<builder>" }
-```
-
-Response:
-
-```json
-{
-  "type": "max_builder_fee",
-  "data": { "address": "0x<addr>", "builder": "0x<builder>", "max_fee_bps": "8", "approved": true }
-}
-```
-
-> ⬆️ **Upgrade notice — the last seven `*_bps` fields that were JSON numbers
-> become STRINGS at the next node release.** The VALUE does not change; only the
-> JSON type does. Most of the surface already served strings; these seven were
-> the stragglers. Parse every `*_bps` field as a decimal string. **Most carry
-> whole basis points; `maker_bps` and `taker_bps` carry ONE fraction digit**
-> because the fee ladder is stored in deci-bps. A client that reads any of them
-> as a number breaks on the day of that release, so accept a string now.
-
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points; `"0"` if not approved |
-| `approved` | bool | Whether `(address, builder)` is an approved pair |
-
-State source: `locus.fee_tracker.approved_builders[addr][builder]` (keyed).
-
 ### All approved builder-fee grants {#approved_builders}
 
-Every builder-fee grant an account has approved — the **enumerated** counterpart
-to the keyed-single [`max_builder_fee`](#max_builder_fee) lookup (same committed
-value, field-identical `max_fee_bps`; the two reads are complementary, not
-derivable from each other). Required: `address` (0x hex).
+Every builder-fee grant an account has approved, and the bps ceiling on each.
+Required: `address` (0x hex). To check one `(address, builder)` pair, look the
+builder up in this list — an address that is absent is not approved, which is
+the same answer as a `"0"` ceiling.
 
 ```json
 { "type": "approved_builders", "address": "0x<addr>" }
@@ -2264,93 +1493,19 @@ Response:
 | Field | Type | Description |
 |-------|------|-------------|
 | `builders[*].builder` | hex address | Approved builder address |
-| `builders[*].max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points — the same committed value [`max_builder_fee`](#max_builder_fee) reports, in the same type |
+| `builders[*].max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points |
+
+> ⬆️ **Upgrade notice — `max_fee_bps` becomes a STRING at the next node
+> release.** The VALUE does not change; only the JSON type does. Parse every
+> `*_bps` field as a decimal string. **Most carry whole basis points;
+> `maker_bps` and `taker_bps` carry ONE fraction digit** because the fee ladder
+> is stored in deci-bps. A client that reads any of them as a number breaks on
+> the day of that release, so accept a string now.
 
 Builders list in ascending address order; an account with no approvals returns
 an empty array.
 
 State source: `locus.fee_tracker.approved_builders[addr]` (the account's full grant map).
-
-### Multisig configuration for an address {#user_to_multi_sig_signers}
-
-Multisig config for an address. Required: `address` (0x hex).
-
-```json
-{ "type": "user_to_multi_sig_signers", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{
-  "type": "user_to_multi_sig_signers",
-  "data": { "address": "0x<addr>", "is_multi_sig": true, "threshold": 2, "signers": ["0x…", "0x…"] }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `is_multi_sig` | bool | Whether the account is multisig |
-| `threshold` | uint32 | M-of-N threshold; `0` if not multisig |
-| `signers` | hex address[] | Signer set; empty if not multisig |
-
-State source: `multi_sig_tracker.configs[addr]` (`MultiSigConfig`).
-
-### An account's derived role {#user_role}
-
-Derived account role. Required: `address` (0x hex).
-
-```json
-{ "type": "user_role", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{ "type": "user_role", "data": { "address": "0x<addr>", "role": "user" } }
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `role` | `"missing" \| "user" \| "agent" \| "vault" \| "sub_account"` | Derived role |
-
-Precedence: `vault` (a `user_vaults[*].vault_address`) → `sub_account` (`sub_account_tracker.sub_to_parent`) → `agent` (an approved agent of some master) → `user` (has a user-state / config / spot entry) → `missing`.
-
-### An account's abstraction entries {#abstraction_state}
-
-The account's user-scoped and agent-scoped abstraction config entries — the
-values written by
-[`user_set_abstraction`](./exchange.md#user_set_abstraction) /
-[`agent_set_abstraction`](./exchange.md#agent_set_abstraction). Required:
-`address` (0x hex) — the **user** address in both cases (the `agent` list is
-what agents set **for** that user, not the agents' own state).
-
-```json
-{ "type": "abstraction_state", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{
-  "type": "abstraction_state",
-  "data": {
-    "address": "0x<addr>",
-    "user":  [ { "kind": 3, "value": "1.5" }, { "kind": 7, "value": "2" } ],
-    "agent": [ { "kind": 1, "value": "9" } ]
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `user` / `agent` | array | One entry per set `kind` — user-scoped vs agent-scoped writes |
-| `*.kind` | uint8 | Sub-type tag (the dispatch key the set actions carry) |
-| `*.value` | Decimal string | Stored setting value (interpretation is per-`kind`) |
-
-Both arrays are honest-empty when nothing has been set.
-
-State source: the committed abstraction entries keyed by the user address (user- and agent-scoped).
 
 ### Current per-validator oracle vote metadata {#validator_l1_votes}
 
@@ -2525,11 +1680,74 @@ data with stable, independently-versioned shapes:
 | Old `web_data2` section | Use instead |
 |-------------------------|-------------|
 | `clearinghouse` (margin + positions) | [`account_state`](#account_state) (REST) / `account_state` WS channel |
-| `spot_balances` | [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state) (REST only — no live WS push for plain spot balances) |
+| `spot_balances` | [`account_state`](#account_state) — the `balances` array carries every spot token |
 | `open_orders` | [`open_orders`](#open_orders) (carries `tif` / `cloid` / `trigger` detail already) |
-| `vault_equities` | [`user_vault_equities`](#user_vault_equities) |
+| `vault_equities` | [`account_state`](#account_state) with `detail: "overview"` — the `vault.equities` array |
 | `exchange_status` | [`exchange_status`](#exchange_status) |
 :::
+
+## Reads that are no longer public {#retired-reads}
+
+The read surface was cut so that **each question has exactly one read**. Two
+reads that answered one question forced the caller to choose, and a wrong choice
+was silent. Every name below now answers
+`400 {"error":"unknown info type: <name>"}` on the public API.
+
+### Merged into another read {#merged-reads}
+
+Nothing is lost. Each row names the read that carries the same data.
+
+| Retired | Ask this instead |
+|---|---|
+| `user_fees` | [`fee_schedule`](#fee_schedule) with `address` — it resolves the effective maker / taker bps for that account |
+| `margin_summary` | [`account_state`](#account_state) with `detail: "margin"` |
+| `spot_clearinghouse_state` | [`account_state`](#account_state) — `balances` is the whole token ledger |
+| `agents` | [`account_state`](#account_state) with `detail: "overview"` — `agents` |
+| `sub_accounts` | [`account_state`](#account_state) with `detail: "overview"` — `sub_accounts` |
+| `user_to_multi_sig_signers` | [`account_state`](#account_state) with `detail: "overview"` — `multisig` |
+| `user_vault_equities` | [`account_state`](#account_state) with `detail: "overview"` — `vault.equities` |
+| `delegator_summary` | [`account_state`](#account_state) with `detail: "overview"` — `staking.summary` |
+| `user_role` | [`account_state`](#account_state) with `detail: "overview"` — `role` |
+| `web_data`, `account_overview` | [`account_state`](#account_state) with `detail: "overview"` — the same body, now a depth on the one account read |
+| `pm_summary` | [`account_state`](#account_state) — the default depth carries `pm_maint_margin`, `pm_net_value` and `pm_concentration_penalty`, and `abstraction: "portfolio"` is the enrolment flag. Its `height` / `time` stamp tells you how fresh the figures are, which `pm_summary` never did |
+| `evm_contract_bindings` | [`markets_meta`](./info/perpetuals.md#markets_meta) with `kind: "spot"` — the per-token `evm_contract` object |
+| `bridge_chain_configs` | [`bridge_user_outbox`](./info/bridge.md#bridge_user_outbox) — it carries `withdrawals_halted` and `configs` alongside your own entries |
+| `staking_apr` | [`staking_state`](#staking_state) — `reward_pool`. It never served an APR; see that entry |
+| `user_fills_by_time` | [`user_fills`](#user_fills) with `start_time` / `end_time` |
+| `recent_trades`, `trades_by_time` | [`trades`](./info/perpetuals.md#trades) — un-ranged for the recent window, ranged for a time window |
+| `market_info` | [`markets`](./info/perpetuals.md#markets) with `coin` (dynamic) + [`markets_meta`](./info/perpetuals.md#markets_meta) with `coin` (static) |
+| `token_info` | [`markets_meta`](./info/perpetuals.md#markets_meta) with `kind: "spot"` |
+| `predicted_fundings` | [`markets`](./info/perpetuals.md#markets) — every row's `funding` block carries the charged rate and the next boundary |
+| `max_market_order_ntls`, `perps_at_open_interest_cap` | [`markets`](./info/perpetuals.md#markets) `open_interest` + [`markets_meta`](./info/perpetuals.md#markets_meta) `oi_cap` |
+| `dynamic_risk` | [`markets_meta`](./info/perpetuals.md#markets_meta) — the per-row `risk_override` object |
+| `perp_dex_limits` | [`perp_dexs`](./info/perpetuals.md#perp_dexs) — the `limits` object |
+| `spot_deploy_state` | [`spot_deploy_auction`](./info/spot.md#spot_deploy_auction) — the same read, renamed |
+| `leading_vaults` | [`vault_summaries`](#vault_summaries) — filter the rows on `leader` |
+| `max_builder_fee` | [`approved_builders`](#approved_builders) — look the builder up in the list |
+
+### Deleted, with nothing to replace them {#deleted-reads}
+
+| Deleted | Why |
+|---|---|
+| `delegator_history` | It answered a hardcoded `[]`. No delegation event log is committed, so the read documented a capability that does not exist. It comes back with the event log, not before |
+| `abstraction_state` | Its `kind` / `value` pair is per-kind free-form, so the meaning of a value was never on the wire. It comes back when the kinds have a wire-defined meaning |
+| `oracle_sources` | It served a per-market source bitmask that the price aggregator does not read. The mask was a declared intent, never a live filter, so the read invited callers to size risk on a number that decides nothing. The static facts it also carried are now prose — see [Oracle prices](../../concepts/oracle-prices.md#source-table). It comes back if and when the aggregator honours the mask |
+
+### Operator lane {#operator-reads}
+
+These reads stay available to a node operator reading a node directly. They
+answer on the public API with the same error an unknown type gets.
+
+| Read | Why it is not public |
+|---|---|
+| `protocol_metrics` | Every public fact it carried is on [`markets`](./info/perpetuals.md#markets), [`markets_meta`](./info/perpetuals.md#markets_meta) and [`staking_state`](#staking_state). The rest — value-conservation sums, the EVM full-account sum, the buyback executor's `buyback_status` — are operator diagnostics |
+| `position_size_signed_sum_by_asset` | A fork detector for one-sided position writes, not a trading read |
+| [`node_info`](#node_info), [`block_info`](#block_info) | Per-node identity and replay progress. Take the block head from the [`explorer_block`](../ws/subscriptions.md#explorer_block) WS channel |
+| `bridge_outbox`, `bridge_finalized_cosignatures` | Whole-chain withdrawal queue and cosignature detail. One account's own withdrawals are on [`bridge_user_outbox`](./info/bridge.md#bridge_user_outbox) |
+| `mip3_deployer_oracle` | Deployer-oracle liveness for one MIP-3 market — a read for the deployer who operates the feed |
+| `rfq_open`, `rfq_user`, `fba_batch_state` | The RFQ and FBA engines are not reachable from `/exchange` yet. These reads ship publicly WITH the capability, not before |
+| `gov_state`, `gov_proposals`, `gov_history` | Replaced by [`validator_votes`](./info/governance.md#validator_votes) — see [governance queries](./info/governance.md#retired-reads) |
+
 
 ## Errors {#errors}
 
@@ -2540,7 +1758,7 @@ data with stable, independently-versioned shapes:
 | 400 | `{"error":"unknown info type: <X>"}` | Misspelled or unsupported `type` |
 | 400 | `{"error":"missing field: address"}` / `{"error":"missing field coin"}` | Required type-specific arg omitted (casing varies by reader) |
 | 400 | `{"error":"invalid hex"}` | Address arg malformed |
-| 404 | `{"error":"market not found"}` | `coin` symbol unknown (`market_info` etc.) |
+| 404 | `{"error":"market not found"}` | `coin` symbol unknown (`markets`, `l2_book` etc.) |
 | 404 | `{"error":"vault not found"}` | Vault address unknown (`vault_state` only) |
 | 405 | (no body) | Not POST |
 | 429 | `{"status":"err","response":"rate limit exceeded"}` | No retry hint is sent — see [rate limits](../rate-limits.md) |
@@ -2593,8 +1811,8 @@ arguments were removed; only `coin` is accepted, and responses render coin symbo
 everywhere. (The signed `/exchange` write path still uses the numeric `asset` —
 that field is consensus-frozen and unrelated to these read args.)
 
-**Q: Do `user_fills` / `recent_trades` need an external indexer?**
-A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md). History PAST the ring is a different question: the archive holds it, and from the next gateway release a RANGED `trades_by_time` ask reaches it. An un-ranged `recent_trades` always answers from the ring — see [Deep history, past the ring](./info/perpetuals.md#recent_trades-archive).
+**Q: Do `user_fills` / `trades` need an external indexer?**
+A: No. Both read a committed on-node tape (a bounded per-account fill ring and per-market trade ring folded into the AppHash), so any node serves real records directly — no external indexer required. The rings are bounded, so they hold a recent window; for an unbroken live feed subscribe to the [WS channels](../ws/subscriptions.md). History PAST the ring is a different question: the archive holds it, and a RANGED ask (one that carries `start_time`) reaches it. An un-ranged ask always answers from the ring — see [Deep history, past the ring](./info/perpetuals.md#trades-archive).
 
 **Q: Is the response deterministic across nodes?**
 A: Yes. Any honest node returns identical responses for the same query at the same committed height. Nodes with different commit heights may differ. Per-node identity fields (`node_info.validator_index` / `uptime_seconds`, `gossip_root_ips`) are NOT consensus state and legitimately differ. `gossip_root_ips` reads each node's own config, so nodes that carry the same roster answer identically, and nodes that do not may differ. Use [`block_info`](#block_info) to see the height a node has committed to.

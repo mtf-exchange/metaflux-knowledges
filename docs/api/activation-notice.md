@@ -9,7 +9,7 @@ description: What changed on devnet chain 114514 at block 7,400,000 — an admis
 is in force. It is kept as a record of what changed at that boundary, because a
 client written against the older behaviour breaks on the rows below.
 
-`{"type":"web_data","address":"0x…"}` carries the live `height` if you need to
+`{"type":"account_state","address":"0x…"}` carries the live `height` if you need to
 check where the chain is.
 :::
 

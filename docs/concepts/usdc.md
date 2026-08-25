@@ -48,7 +48,7 @@ not a free choice:
   contract binding**, because the EVM-side USDC is reached through the
   collateral-plane id instead. `asset` defaults to `0`; leave it alone.
 - The spot market and balance surfaces — [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta),
-  `account_state.balances[]`, [`spot_clearinghouse_state`](../api/rest/info/spot.md#spot_clearinghouse_state),
+  [`account_state.balances[]`](../api/rest/info.md#account_state),
   and every `*/USDC` pair's `quote` — use **`100`**.
 :::
 
@@ -107,7 +107,7 @@ withdrawable = max(0, free collateral)
 ```
 
 Read it from [`account_state.withdrawable`](../api/rest/info.md#account_state)
-or the lighter [`margin_summary`](../api/rest/info.md#margin_summary). A
+or the lighter [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state). A
 `withdrawable` of `"0"` therefore means "nothing to take out", NOT "the account
 is broke" — see [account value](./account-value.md#withdrawable). Two rules
 behind the formula are worth stating:
@@ -211,42 +211,32 @@ USDC" and differ by unrealised PnL. Use `account_value` for equity and risk; use
 `balances[0].total` for cash that has actually settled. The USDC row is always
 present, even at zero.
 
-### `spot_clearinghouse_state` {#spot-clearinghouse-state}
+### One ledger, one read {#one-ledger}
 
-[`POST /info` `spot_clearinghouse_state`](../api/rest/info/spot.md#spot_clearinghouse_state)
-reads the **spot token ledger only**.
+[`account_state.balances`](../api/rest/info.md#account_state) carries the WHOLE
+token ledger: the unified USDC pool in row 0, and every spot token after it.
+There is no second balance read to merge in.
 
 :::warning
-**Your USDC is not there.** Because USDC's spendable side is the unified pool,
-this read returns **no spendable USDC row**. USDC appears only when some is
-escrowed behind a resting spot bid — and then `total` equals `hold`, because the
-spendable part is zero.
-
-An integrator who polls this read for a USDC balance gets nothing and concludes
-the account is empty. Poll [`account_state`](#account-state) instead. Use
-`spot_clearinghouse_state` for the **other** tokens (MTF, listed base tokens).
+**Read `withdrawable`, not `total − hold`.** `hold` is spot order escrow only.
+USDC that margins an open perpetual position stays in `total` and never enters
+`hold`, so the subtraction leaves the margin in and overstates the budget.
 :::
 
-The two reads therefore return **disjoint asset sets** for most accounts:
-`account_state` surfaces the unified USDC pool, and `spot_clearinghouse_state`
-lists the spot tokens. Neither read is a superset of the other, so a client that
-wants the whole picture calls both and merges them by `asset`.
-
-Cost basis follows the same split. `spot_clearinghouse_state` carries
-[`avg_entry_px`](../api/rest/info/spot.md#avg-entry-px) per spot token, which is what
-spot PnL needs. The unified USDC pool carries none — a cost basis on the quote
-asset in terms of itself has no meaning.
+Cost basis rides on the same rows.
+[`avg_entry_px`](../api/rest/info.md#avg-entry-px) is the per-token acquisition
+price spot PnL needs. The USDC row always reads `null` — a cost basis on the
+quote asset in terms of itself has no meaning.
 
 ### A worked check {#worked-check}
 
 Claim the devnet [faucet](../networks.md#faucet), which grants 3000 USDC and
-10 MTF, then read both:
+10 MTF, then read `account_state`:
 
-- `account_state` → `account_value: "3000"`, and `balances` carries the USDC row
-  (`asset 100`, `total "3000"`) **and** an MTF row (`asset 104`, `total "10"`).
-- `spot_clearinghouse_state` → **only** the MTF row. No USDC.
+- `account_value: "3000"`, and `balances` carries the USDC row (`asset 100`,
+  `total "3000"`) **and** an MTF row (`asset 104`, `total "10"`).
 
-That difference is the unification, visible in two calls.
+One call, both rows. That is the unification.
 
 ## USDC on the MetaFlux EVM {#evm-side}
 

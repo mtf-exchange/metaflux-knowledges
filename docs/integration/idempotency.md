@@ -125,7 +125,7 @@ There is no per-action commit lookup for non-order actions. Reconcile from
 the resulting state instead: check the
 [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) on-subscribe
 snapshot (the most recent 100 records for the account) for a matching
-record, or diff [`account_state`](../api/ws/subscriptions.md#account_state) (perp) / poll [`spot_clearinghouse_state`](../api/rest/info/spot.md#spot_clearinghouse_state) (plain spot balances — there is no live WS channel for these) across the drop.
+record, or diff [`account_state`](../api/ws/subscriptions.md#account_state) across the drop — its `balances` array carries every spot token.
 `action_hash` is deterministic and computable locally, but it is **not**
 echoed on any WS event or `/info` read today — it is only useful as the
 correlation key in the synchronous `/exchange` response you already have, not

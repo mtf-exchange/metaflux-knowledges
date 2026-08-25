@@ -5,12 +5,12 @@ The node `/ws` surface pushes real committed data, change-driven: a channel emit
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `active_asset_ctx`, `fills`, `user_events`. The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`, and adds `candles` on top of it.
+**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `markets`, `fills`, `order_updates`. The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`, and adds `candles` on top of it.
 :::
 
 ## TL;DR {#tldr}
 
-A single WS connection multiplexes subscriptions to many channels. The frame protocol mirrors HL's (`{"method":"subscribe","subscription":{"type":...}}`), but the **channel names are MTF-native snake_case** (`l2_book`, `user_events`, …): you send a subscribe, the server replies with a `subscriptionResponse` ack followed by an initial snapshot, and then pushes `{"channel":...,"data":...}` frames as state commits. Book channels (`l2_book`, `bbo`) are **per-market** and require a `coin`. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
+A single WS connection multiplexes subscriptions to many channels. The frame protocol mirrors HL's (`{"method":"subscribe","subscription":{"type":...}}`), but the **channel names are MTF-native snake_case** (`l2_book`, `order_updates`, …): you send a subscribe, the server replies with a `subscriptionResponse` ack followed by an initial snapshot, and then pushes `{"channel":...,"data":...}` frames as state commits. Book channels (`l2_book`, `bbo`) are **per-market** and require a `coin`. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
 
 ## URL {#url}
 
@@ -66,7 +66,7 @@ All frames are JSON **text** frames. Binary frames are rejected with an error fr
 ```
 
 - `subscription.type` (required) — the channel name (snake_case, e.g. `l2_book`). Unknown names produce an error frame.
-- `subscription.coin` (required for per-market channels `l2_book` / `bbo` / `trades` / `active_asset_ctx`; omitted for `user_events`) — see [Coin parameter](#coin-parameter).
+- `subscription.coin` (required for per-market channels `l2_book` / `bbo` / `trades`; omitted for the account channels) — see [Coin parameter](#coin-parameter).
 
 The server replies with **two** frames, in order:
 
@@ -130,7 +130,7 @@ Live data frames share one envelope:
 { "channel": "<channel>", "data": { /* channel-specific */ }, "is_snapshot": false }
 ```
 
-- `is_snapshot` is a boolean: `true` on the initial on-subscribe frame (the full snapshot), `false` on the subsequent change-driven pushes. **Every frame body is a full snapshot regardless** (e.g. `l2_book` is the full top-20 levels, `all_mids` the full map, `account_state` the full account state) — `is_snapshot` is informational, not a "this is a diff" flag. A client that simply replaces its local state on every frame stays correct and can ignore the field.
+- `is_snapshot` is a boolean: `true` on the initial on-subscribe frame (the full snapshot), `false` on the subsequent change-driven pushes. **Every frame body is a full snapshot regardless** (e.g. `l2_book` is the full top-20 levels, `account_state` the full account state) — `is_snapshot` is informational, not a "this is a diff" flag. A client that simply replaces its local state on every frame stays correct and can ignore the field.
 - There is **no** `seq`, `ts`, or `sub_id` field on the frame. Demultiplex on `channel` (and, for per-market channels, the `coin` inside `data`).
 
 Updates are **change-driven**: after each commit the node publishes a frame for a subscribed channel **only when that channel's committed state actually changed** since the previous commit. A commit that leaves a watched channel untouched emits nothing for it — so you receive fewer frames than there are blocks, never a redundant re-push of unchanged data (see [Per-subscriber push](#per-subscriber-push)).
@@ -216,9 +216,9 @@ On this signal, re-subscribe (you will get a fresh snapshot). The node does **no
 
 ## Authentication {#authentication}
 
-Public market channels (`l2_book`, `bbo`, `trades`, `all_mids`) require **no auth**.
+Public market channels (`l2_book`, `bbo`, `trades`, `markets`) require **no auth**.
 
-Per-account channels (`fills`, `user_events`) are live and route per 0x `user` address, but there is **no auth gate yet** — any connection can subscribe to any address's feed (the data is the same public committed fills, keyed by account). A dedicated auth-at-subscribe envelope (so a connection only sees its own account) is roadmap. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). See [subscriptions](./subscriptions.md).
+Per-account channels (`fills`, `order_updates`) are live and route per 0x `user` address, but there is **no auth gate yet** — any connection can subscribe to any address's feed (the data is the same public committed fills, keyed by account). A dedicated auth-at-subscribe envelope (so a connection only sees its own account) is roadmap. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). See [subscriptions](./subscriptions.md).
 
 ## Multiplexing {#multiplexing}
 

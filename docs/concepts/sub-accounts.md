@@ -196,7 +196,7 @@ use two master accounts.
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
-  -d '{"type":"sub_accounts","address":"0x<master>"}'
+  -d '{"type":"account_state","address":"0x<master>","detail":"overview"}'
 ```
 
 Returns the sub list with indices, derived addresses, labels, and a snapshot of each sub's clearinghouse state.
@@ -290,7 +290,7 @@ sequenceDiagram
 - [Agent wallets](./agent-wallets.md) — per-sub hot keys
 - [Portfolio margin](./portfolio-margin.md) — interaction with cross-asset PM
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso per sub
-- [`POST /info sub_accounts`](../api/rest/info.md#sub_accounts) — MTF-native query
+- [`POST /info account_state`](../api/rest/info.md#account_state-overview) with `detail: "overview"` — MTF-native query; the sub-account list is one facet of it
 
 ## FAQ {#faq}
 

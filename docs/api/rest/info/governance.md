@@ -90,7 +90,7 @@ window it can serve.
 otherwise.** A vote that is still open therefore moves inside the window as new
 casts arrive; an enacted vote is pinned by its enactment. Rows return
 oldest-first within the window, matching
-[`user_fills_by_time`](../info.md#user_fills_by_time).
+[`user_fills`](../info.md#user_fills).
 
 Markets are addressed by `coin` symbol. There is no numeric market argument.
 
@@ -205,7 +205,7 @@ replaced by [`validator_votes`](#validator_votes).
 
 | Retired read | Use instead |
 |--------------|-------------|
-| `gov_state` | [`validator_votes`](#validator_votes) with `status: "voting"` for the open votes. Current parameter VALUES are on the reads that own them — a market's risk parameters on [`market_info`](./perpetuals.md#market_info), the fee ladder on [`fee_schedule`](../info.md#fee_schedule), global trading flags on [`exchange_status`](../info.md#exchange_status) |
+| `gov_state` | [`validator_votes`](#validator_votes) with `status: "voting"` for the open votes. Current parameter VALUES are on the reads that own them — a market's risk parameters on [`markets_meta`](./perpetuals.md#markets_meta), the fee ladder on [`fee_schedule`](../info.md#fee_schedule), global trading flags on [`exchange_status`](../info.md#exchange_status) |
 | `gov_proposals` | [`validator_votes`](#validator_votes) with `status: "voting"` — same rounds, same stake tallies, plus the per-cast detail and the time range |
 | `gov_history` | [`validator_votes`](#validator_votes) with `status: "enacted"` — every enactment, not a subset, with the asset, the voters and the prior value |
 

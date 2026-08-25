@@ -10,7 +10,7 @@ every rule below turned on one block later. This page is kept as the record of
 what changed at that boundary, because a client written against the older
 behaviour breaks on the rows below.
 
-`{"type":"web_data","address":"0x…"}` carries the live `height` if you need to
+`{"type":"account_state","address":"0x…"}` carries the live `height` if you need to
 check where the chain is.
 :::
 
@@ -80,9 +80,10 @@ existed.
 
 ## Read surface {#read-surface}
 
-`protocol_metrics.buyback_status` ships with the binary and is live **at the
-swap**, one block before everything else on this page. Its `drip_active` field is
-`false` until 13,350,001 and `true` after.
+`buyback_status` ships with the binary and is live **at the swap**, one block
+before everything else on this page. Its `drip_active` field is `false` until
+13,350,001 and `true` after. It is read through the operator-lane
+[`protocol_metrics`](./rest/info.md#operator-reads) query, not the public API.
 
 ## What does NOT change {#unchanged}
 

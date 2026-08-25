@@ -35,7 +35,7 @@ There is one MTF-native surface; you call it through the SDK or build the envelo
 | `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) — **one kind for both**. There is no separate "frontend" variant; the time-in-force, `cloid` and trigger detail is folded into every `open_orders` row. |
 | `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
 | `POST /info` `candleSnapshot` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) (the standalone `candle` type is removed). **Bars carry a price series, not executions** — `candle_type` is `mark` (default) or `oracle`, and `v` / `q` are always `"0"` |
-| WS `userEvents`, `l2Book`, `candle` | `user_events`, `l2_book`, `candles` (snake_case) — see [WS subscriptions](../api/ws/subscriptions.md) |
+| WS `userEvents`, `l2Book`, `candle` | `fills` / `order_updates` / `ledger_updates` (there is no grab-bag events channel), `l2_book`, `candles` — see [WS subscriptions](../api/ws/subscriptions.md) |
 
 The full catalogs are [`POST /exchange`](../api/rest/exchange.md) and [`POST /info`](../api/rest/info.md).
 
@@ -95,7 +95,7 @@ Translate each action your bot sends to its MTF-native equivalent (see the table
 
 ### Day 2 — wire the new signals {#day-2--wire-the-new-signals}
 
-- Subscribe to `sub_accounts` reads if you operate sub-accounts (MTF allows up to 32 subs per master).
+- Read `account_state` with `detail: "overview"` if you operate sub-accounts (MTF allows up to 32 subs per master); the sub-account list is one of its facets.
 - Add a handler for T0 yellow-card events on the [`notifications`](../api/ws/subscriptions.md#notifications) WS channel (kind `yellow_card`).
 - If you depend on portfolio margin, enroll on MTF with [`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin). The threshold and scenario set are network parameters — see [portfolio margin](../concepts/portfolio-margin.md).
 
@@ -139,7 +139,7 @@ The strategy stays; the client layer becomes the SDK call.
 
 ### 2. Liquidation-watching bot (margin top-up) {#2-liquidation-watching-bot-margin-top-up}
 
-HL emits `liquidation` events at the partial / market tier. MTF adds a **`yellow_card`** notification as the earliest signal, on the dedicated [`notifications`](../api/ws/subscriptions.md#notifications) channel — not `user_events` (which only tags fills today).
+HL emits `liquidation` events at the partial / market tier. MTF adds a **`yellow_card`** notification as the earliest signal, on the dedicated [`notifications`](../api/ws/subscriptions.md#notifications) channel.
 
 ```typescript
 import { isChannelFrame } from '@metaflux-dex/client';

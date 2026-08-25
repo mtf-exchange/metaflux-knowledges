@@ -130,12 +130,8 @@ flowchart TD
    dividend is funded from the validator fee share, not from the bought-back MTF.
 
 Cumulative pool totals (MTF bought back and locked out of circulation, validator
-pool, treasury) are tracked in committed state and exposed on the read path via
-[`protocol_metrics`](../api/rest/info.md#protocol_metrics):
-
-```bash
-curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"protocol_metrics"}'
-```
+pool, treasury) are tracked in committed state. They are read through the
+operator-lane [`protocol_metrics`](../api/rest/info.md#operator-reads) query, not the public API.
 
 Because the staker dividend is delivered through the validator share, stake more
 MTF (or delegate to a validator) to receive a larger slice — see [Staking](./staking.md).
@@ -149,8 +145,8 @@ additionally refused below block 13,350,001 — see the sequencing rule below.
 
 The buyback executor buys ONE asset, and it must be told which one. That binding
 is a single asset id. **Until it is bound the buyback cannot fire at all**, and the
-accrued USDC keeps growing behind it. The read that reports this is
-[`protocol_metrics.buyback_status`](../api/rest/info.md#buyback-blocking-guard):
+accrued USDC keeps growing behind it. The operator-lane
+[`protocol_metrics`](../api/rest/info.md#operator-reads) read reports this as `buyback_status`:
 `mtf_asset_id: null` with `blocking_guard: "mtf_asset_unbound"`.
 
 Genesis binds the id by name. A chain whose MTF token was registered AFTER genesis
@@ -211,8 +207,8 @@ The rest is realized at the [assistance fund](./system-addresses.md) and the nex
 fire continues from there, so a large pool reaches the book over many blocks
 instead of in one order.
 
-Two rules follow, and both are visible on
-[`protocol_metrics`](../api/rest/info.md#protocol_metrics):
+Two rules follow, and both are visible on the operator-lane
+[`protocol_metrics`](../api/rest/info.md#operator-reads) read:
 
 - **A schedule that has started runs to completion.** The first slice drops the
   pool under `trigger_usdc`, so a drain already in progress SKIPS the trigger test.
@@ -228,9 +224,9 @@ would let anyone send it 1 USDC and make every later fire skip the trigger, whic
 turns a two-thirds-stake parameter into a suggestion.
 
 So money sent to that address **counts toward** `trigger_usdc` — it is real USDC
-the next fire may spend, and
-[`held_at_hub`](../api/rest/info.md#buyback-blocking-guard) reports it — but it
-**cannot start a drain** below the trigger. Only a slice the buyback already
+the next fire may spend — but it
+**cannot start a drain** below the trigger. The `held_at_hub` figure that reports
+it is an operator read and is no longer public. Only a slice the buyback already
 fired does that.
 
 A drain that is **already running** is a different case. Its next fire folds in
@@ -371,9 +367,9 @@ The value is a quantity, so the fee does not scale with the amount transferred: 
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
 curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
-# your personal tier and recent volume — MTF-native
+# your effective tier and recent volume — same read, with an address
 curl -X POST https://api.devnet.mtf.exchange/info \
-  -d '{"type":"user_fees","address":"0x<addr>"}'
+  -d '{"type":"fee_schedule","address":"0x<addr>"}'
 ```
 
 ## Edge cases {#edge-cases}
@@ -400,9 +396,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 - [Fee schedule](./fee-schedule.md) — the rate card: volume fee tiers, maker-rebate
   tiers, and staking discount tiers, and how the three combine
 - [Staking](./staking.md) — stake MTF for the validator-share dividend and the taker discount
-- [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule)
-- [`POST /info user_fees`](../api/rest/info.md#user_fees) — MTF-native per-user tier / 30-day volume
-- [`POST /info protocol_metrics`](../api/rest/info.md#protocol_metrics) — cumulative fee pools (burn / treasury / validator)
+- [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule) — the ladder, and the effective rate for one address
 - [Tiered liquidation](./tiered-liquidation.md) — liquidation mechanics
 - [Core ↔ EVM transfers](../evm/core-evm-transfers.md) — the lane the
   [Core to EVM transfer fee](#core-evm-transfer-fee) applies to

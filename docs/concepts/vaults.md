@@ -147,7 +147,7 @@ share_price = NAV(vault) / total_shares
 
 `NAV` is marked to market: settled cash, plus unrealised PnL on every open position at the latest oracle mark, plus unrealised funding. The Metaliquidity backstop vault also subtracts its pending-loss reserve. Pricing updates every commit — a deposit or withdrawal executes at the **post-commit** share price, not the price at request time.
 
-The reads carry that same NAV. [`vault_state`](../api/rest/info.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info.md#vault_summaries) `tvl`, and [`user_vault_equities`](../api/rest/info.md#user_vault_equities) `equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange.md#vault_withdraw) pays.
+The reads carry that same NAV. [`vault_state`](../api/rest/info.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info.md#vault_summaries) `tvl`, and [`account_state`](../api/rest/info.md#account_state-overview) `vault.equities[*].equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange.md#vault_withdraw) pays.
 
 #### `high_water_mark` is not NAV {#high-water-mark}
 
@@ -210,7 +210,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 [Fees](#fees)); `strategy` is the vault's `kind` (`"User"` or
 `"Metaliquidity"`). See [`vault_state`](../api/rest/info.md#vault_state) for
 the full field table. This read carries no `manager` field and no
-per-caller `your_*` fields — query [`user_vault_equities`](../api/rest/info.md#user_vault_equities) for one account's own share holding.
+per-caller `your_*` fields — query [`account_state`](../api/rest/info.md#account_state-overview) with `detail: "overview"` for one account's own share holding.
 
 ## Insurance pool {#insurance-pool}
 
@@ -223,7 +223,7 @@ A subset of the Metaliquidity vault is the **insurance pool** — a designated r
 
 - **Leader rotation.** There is no live action that reassigns a vault's `leader` — the leader address is fixed at [`create_vault`](#deploy).
 - **Leader goes silent.** Existing positions sit; no auto-trade. Depositors can still withdraw against share price (which reflects MTM of those positions). If positions get liquidated due to mark moves, that hits NAV.
-- **Paused vault.** A leader can set `new_paused: true` via [`vault_modify`](#config); check the live `vault_state` / `web_data` read for the current paused flag before assuming withdrawals are open.
+- **Paused vault.** A leader can set `new_paused: true` via [`vault_modify`](#config); check the live `vault_state` read, or `account_state` with `detail: "overview"`, for the current paused flag before assuming withdrawals are open.
 - **Lock-up math.** The lock is the vault kind's fixed duration from [Lock-up](#lock-up), not a caller-chosen value.
 
 </details>
@@ -247,7 +247,7 @@ sequenceDiagram
 
 - [Tiered liquidation](./tiered-liquidation.md) — T3 backstop, insurance pool
 - [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`POST /info user_vault_equities`](../api/rest/info.md#user_vault_equities) — one account's own share holding
+- [`POST /info account_state`](../api/rest/info.md#account_state-overview) with `detail: "overview"` — one account's own share holding
 - [`ledger_updates` WS](../api/ws/subscriptions.md#ledger_updates) — a leader's `vault_transfer` rides this channel (`kind: vault_transfer`); there is no live event today for `vault_distribute`, `vault_withdraw`, or fee accrual — poll [`vault_state`](../api/rest/info.md#vault_state) for share-price and NAV changes
 - [Staking](./staking.md) — separate from vaults
 

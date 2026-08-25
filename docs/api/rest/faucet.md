@@ -78,7 +78,7 @@ curl -s -X POST https://api.devnet.mtf.exchange/faucet \
 `"queued"` is literal: the grant is two validator-injected system actions
 (`SystemUserModify{AdjustCrossAccountValue}` for USDC + `SystemSpotSend` for MTF)
 prepended to the next proposed block. Poll [`account_state`](./info.md#account_state)
-(or [`spot_clearinghouse_state`](./info/spot.md#spot_clearinghouse_state)) ~1 block
+~1 block
 later to see the balance:
 
 ```json
@@ -136,6 +136,6 @@ hashed into the AppHash.
 
 ## See also {#see-also}
 
-- [`POST /info`](./info.md) — read `account_state` / `spot_clearinghouse_state` to confirm the credit
+- [`POST /info`](./info.md) — read `account_state` to confirm the credit
 - [`POST /exchange`](./exchange.md) — the user-action write path (system actions like the faucet's credits never transit it)
 - [Networks](../../networks.md) — chain ids per network

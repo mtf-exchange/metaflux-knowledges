@@ -114,7 +114,7 @@ A keeps the unrealised PnL on its remaining position; A only loses the *closed* 
 
 ADL execution carries **no dedicated event on any channel today** — no
 [`notifications`](../api/ws/subscriptions.md#notifications) kind, no
-`user_events` entry, and no `ledger_updates` record. The haircut is a direct
+`fills` entry, and no `ledger_updates` record. The haircut is a direct
 state mutation, so the only live signal is your position itself: the
 affected account's position size and unrealised PnL change on the next
 [`account_state`](../api/ws/subscriptions.md#account_state) push (it is
@@ -135,7 +135,7 @@ ahead of time.
 The closest proxy you can compute yourself: your position's unrealised PnL as
 a share of the asset's total profitable-side unrealised PnL — derived from
 your own [`account_state`](../api/rest/info.md#account_state) and the market's
-open interest on [`market_info`](../api/rest/info/perpetuals.md#market_info).
+open interest on [`markets`](../api/rest/info/perpetuals.md#markets).
 For market makers running large books, the headline risk is concentration —
 one big winning position dominating the asset's profitable side; diversifying
 across assets reduces ADL exposure.

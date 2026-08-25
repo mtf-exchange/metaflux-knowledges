@@ -23,7 +23,7 @@ Margin, liquidation, and funding all need a price that an adversary **cannot** p
 
 `oracle_px` is the **weighted median** of the present spot venues for the asset.
 
-### Default spot weight table (sum = 15) {#default-spot-weight-table-sum--15}
+### The ten source slots and their weights {#source-table}
 
 | Venue | Weight | | Venue | Weight |
 |-------|-------:|-|-------|-------:|
@@ -35,11 +35,19 @@ Margin, liquidation, and funding all need a price that an adversary **cannot** p
 
 A **weighted median** (not a weighted mean) is used so a single venue printing a garbage tick cannot drag the result — it only shifts which sample sits at the weighted midpoint.
 
+**There are exactly TEN source slots, and both the slot identities and these
+default weights are protocol-fixed.** They are not committed state, so no read
+serves them and no governance vote moves them. They change only when a node
+release changes them. Track them in the release notes for the version you run,
+and re-read this table after an upgrade.
+
 ### Per-symbol governance weights {#per-symbol-governance-weights}
 
 The default table is a fallback. A governance-only `SetOracleWeights { asset_id, weights }` action (`ActionId 148`) **replaces** (not merges) the table for one asset — necessary because long-tail and permissionless ([MIP-3](../mip/mip-3.md)) markets are often not listed on Binance / Coinbase, so the default weights would resolve to nothing usable. Inside this venue-weighted-median lane, market deployers **cannot** set their own weights (choosing your oracle sources = choosing your own mark); new markets cold-start on the default table and only governance can override.
 
-The committed per-market source set is queryable — see [`oracle_sources`](#querying) — as a subset mask over the venue list. The mask is **recorded, not enforced**: the aggregator does not filter its inputs by it today, so read it as a declared intent and never as a live filter.
+A market also carries a **source-subset mask** — one bit per slot, committed per market. The mask is **recorded, not enforced**: the aggregator does not filter its inputs by it today, so every market composes its price from the same source set. Source filtering is a change to price formation, so it needs its own hard-fork boundary; it is not scheduled. Do not size risk on the mask.
+
+**A market's own mask is not a fixed value.** A [MIP-3](../mip/mip-3.md) market's deployer rewrites it at will with `perp_set_oracle`. This page therefore states that the mechanism exists and who controls it; it never states a value for any market. Anything you cache goes stale on the next deployer push.
 
 :::warning
 **There is a second price lane, and this page does not describe it.** Everything above is the **venue-weighted-median** lane: validators feed it, governance owns the weights, and no deployer can touch either. A market deployed through [MIP-3](../mip/mip-3.md) does **not** use it. That market prices from a **deployer-operated oracle**: the deployer pushes the index price itself, through [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px).
@@ -54,7 +62,7 @@ therefore the deployer's decision, not the protocol's, and BOTH answers are supp
 - **Keep pushing through the closed hours**, at whatever price your own discovery produces, and the
   market trades continuously. A push must land at least once per staleness window
   (`stale_threshold_ms`, read it from
-  [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle); **60 s** on the live devnet),
+  the operator-lane `mip3_deployer_oracle` read; **60 s** on the live devnet),
   for every market you operate.
 - **Or stop, and let the market FREEZE.** Past the window it goes reduce-only, so no one may open,
   and liquidation defers rather than run at a price nobody trusts. Open positions sit untouched
@@ -64,7 +72,7 @@ therefore the deployer's decision, not the protocol's, and BOTH answers are supp
 What you may not do is push a price you do not believe. The push is bounded, but inside those bounds
 the number is yours, and the deploy bond is slashable.
 
-That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. Read `feature_active` from [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle) on the network you target. See [MIP-3 — oracle](../mip/mip-3.md#oracle) for the operator rules.
+That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. A [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) push is refused with `mip3_deployer_oracle feature not active` on a chain where it is off, so a test push tells you the posture. See [MIP-3 — oracle](../mip/mip-3.md#oracle) for the operator rules.
 :::
 
 ## Reliability rules {#reliability-rules}
@@ -89,17 +97,17 @@ The composed `oracle_px` is published **once per block**, derived from the conse
 
 ## Querying {#querying}
 
-The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`market_info`](../api/rest/info/perpetuals.md#market_info) read, alongside `mark_px`:
+The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`markets`](../api/rest/info/perpetuals.md#markets) read, alongside `mark_px`:
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"market_info","coin":"BTC"}'
+  -d '{"type":"markets","coin":"BTC"}'
 ```
 
 ```json
 {
-  "type": "market_info",
+  "type": "markets",
   "data": {
     "coin":      "BTC",
     "mark_px":   "67042.335",
@@ -108,17 +116,9 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 }
 ```
 
-The committed per-market source set is queryable via `oracle_sources` (the enabled-venue subset for a market):
+**Only the composed price is on the wire.** The per-venue raw inputs, the weights used in a tick, and the per-market source-subset mask are not served by any read. The weights and the slot identities are [protocol-fixed](#source-table) — read them from the release notes. The mask decides nothing today, so there is nothing to act on.
 
-```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
-  -H 'content-type: application/json' \
-  -d '{"type":"oracle_sources","coin":"BTC"}'
-```
-
-The per-venue raw inputs and the exact weights used in a tick live in committed state; they are not (yet) broken out as wire fields beyond the source subset.
-
-A [MIP-3](../mip/mip-3.md) market prices from its deployer instead, so `oracle_sources` says nothing useful about its liveness. Use [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle) for that market — it reports the last pushed price, the staleness window, and whether the market is currently reduce-only for opens:
+A [MIP-3](../mip/mip-3.md) market prices from its deployer instead. A deployer monitors that feed with the operator-lane `mip3_deployer_oracle` read, which reports the last pushed price, the staleness window, and whether the market is currently reduce-only for opens:
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
@@ -156,9 +156,9 @@ A: No. The oracle is a pure external-spot reference. The mark is a manipulation-
 A: A pure-oracle mark would let them. That is exactly why mark is a median-of-three: the oracle is only one of three components, so a manipulated feed is outvoted unless the book and external perps move with it.
 
 **Q: Which venues price a given market?**
-A: The default 10-venue table, unless governance set a per-symbol override. Query `oracle_sources` for the committed subset of a specific market. Note that the subset mask is recorded, not enforced — the aggregator does not filter by it today.
+A: The default 10-venue table, unless governance set a per-symbol override. The per-market subset mask is recorded, not enforced — the aggregator does not filter by it today — so in practice every market prices off the same ten slots. See [the source table](#source-table).
 
 **Q: Does this apply to a market deployed through MIP-3?**
-A: No. A MIP-3 market prices from a **deployer-operated oracle**: its deployer pushes the index price directly, and none of the venue table, the weights or the reliability rules above apply to it. Query [`mip3_deployer_oracle`](../api/rest/info.md#mip3_deployer_oracle) for that market's feed instead. See [MIP-3 — oracle](../mip/mip-3.md#oracle).
+A: No. A MIP-3 market prices from a **deployer-operated oracle**: its deployer pushes the index price directly, and none of the venue table, the weights or the reliability rules above apply to it. See [MIP-3 — oracle](../mip/mip-3.md#oracle).
 
 </details>

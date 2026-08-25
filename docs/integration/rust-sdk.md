@@ -166,7 +166,7 @@ loop {
 }
 ```
 
-`WsClient::connect(url)` returns a handle as soon as the socket is open; `.messages()` returns a `tokio::sync::broadcast::Receiver<WsFrame>` — clone the client and call `.messages()` again for a second independent receiver. Each channel has a `subscribe_*` convenience method (`subscribe_l2_book`, `subscribe_trades`, `subscribe_account_state`, `subscribe_user_events`, `subscribe_web_data`, …); a channel without one — `notifications`, `ledger_updates` — takes the generic `subscribe(Subscription::Variant { .. })`. `WsMessage::as_account_state()` / `as_open_orders()` / `as_order_updates()` decode a raw payload into the same typed DTOs the REST reads return. Drop the client (or call `.shutdown().await`) to disconnect.
+`WsClient::connect(url)` returns a handle as soon as the socket is open; `.messages()` returns a `tokio::sync::broadcast::Receiver<WsFrame>` — clone the client and call `.messages()` again for a second independent receiver. Each channel has a `subscribe_*` convenience method (`subscribe_l2_book`, `subscribe_trades`, `subscribe_account_state`, `subscribe_markets`, …); a channel without one — `notifications`, `ledger_updates` — takes the generic `subscribe(Subscription::Variant { .. })`. `WsMessage::as_account_state()` / `as_open_orders()` / `as_order_updates()` decode a raw payload into the same typed DTOs the REST reads return. Drop the client (or call `.shutdown().await`) to disconnect.
 
 ## Numeric types {#numeric-types}
 

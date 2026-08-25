@@ -14,13 +14,13 @@ Two reads carry these scalars:
 
 ```json
 { "type": "account_state",   "address": "0x…" }
-{ "type": "margin_summary",  "address": "0x…" }
+{ "type": "account_state", "address": "0x…", "detail": "margin" }
 ```
 
-`margin_summary` is the cheap one. It returns the scalars alone — no positions
+`detail: "margin"` is the cheap one. It returns the scalars alone — no positions
 and no balances. `account_state` returns the scalars plus positions and
 balances, but it **omits `maint_margin`**. To compute `health` yourself, read
-`margin_summary`.
+`detail: "margin"`.
 
 ## The scalars {#the-scalars}
 
@@ -29,7 +29,7 @@ balances, but it **omits `maint_margin`**. To compute `health` yourself, read
 | `account_value` | both | Everything the account is worth right now, unrealized profit included |
 | `withdrawable` | both | Cash you can take out. **Clamped at zero** |
 | `init_margin` | both | Margin currently committed to open CROSS positions |
-| `maint_margin` | `margin_summary` only | Margin below which the account is liquidated |
+| `maint_margin` | `detail: "margin"` only | Margin below which the account is liquidated |
 | `health` | both | `account_value - maint_margin`. The cushion above liquidation |
 | `tier` | both | The liquidation band the engine has you in |
 | `abstraction` | both | `"unified"` (default) or `"portfolio"` (portfolio margin enrolled) |
@@ -151,11 +151,11 @@ maintenance margin = |notional| × maintenance ratio
 
 The maintenance ratio comes from the market's margin ladder — a bigger position
 sits in a higher band with a stricter ratio. Read the ladder from
-`market_info.margin_tiers`; each rung carries its own `max_leverage` and
+`markets_meta.margin_tiers`; each rung carries its own `max_leverage` and
 `maint_margin_ratio`.
 
 **Leverage is capped by the maintenance ratio.** Admission refuses leverage that
-could not survive its own maintenance requirement, so `market_info.max_leverage`
+could not survive its own maintenance requirement, so `markets_meta.max_leverage`
 is the ceiling admission accepts, not merely the one configured. An order above
 it is refused with `InsufficientMargin` — no order id is burned and nothing
 rests on the book.
@@ -192,8 +192,8 @@ Use `withdrawable` for withdrawable. It is the only field that answers that
 question.
 :::
 
-`account_state.balances` and `spot_clearinghouse_state.balances` return the SAME
-row shape. Either read answers the same question the same way.
+`account_state.balances` is the whole token ledger — the unified USDC pool and
+every spot token, one row shape throughout.
 
 ## Per-market sizing {#per-market-sizing}
 

@@ -134,7 +134,8 @@ authorization check below resolves it with no special case.
 
 The practical consequence: **do not require `owner == signer` in a client.** That
 equality is not the chain's rule, and enforcing it locally makes the vault lane
-unreachable. Read the vault's agents with `{"type":"agents","address":"<vault>"}`
+unreachable. Read the vault's agents with
+`{"type":"account_state","address":"<vault>","detail":"overview"}`
 if you want to check before signing.
 :::
 
@@ -239,7 +240,7 @@ Battle-tested patterns for running an agent-key fleet in production:
 | Agent name encodes the host + start time | Makes audit forensics trivial: `mm-host-3 / 2026-Q2` |
 | Rotation script: pre-stage new agent before old expires | Submit `approve_agent` for the new key 24h before the old expiry; switch traffic; let the old key expire |
 | Compromise drill: revoke + rotate runbook tested quarterly | When a key actually leaks, mechanical execution matters |
-| Poll `/info` `agents` after every approval / rotation | Confirm chain-side state matches your expectation — there is no live event for an agent-approval change |
+| Poll `/info` `account_state` with `detail: "overview"` after every approval / rotation | Confirm chain-side state matches your expectation — there is no live event for an agent-approval change |
 | Use a different agent for cancel-only vs full trading | Cancel-only keys are safer in semi-trusted environments |
 
 ### Rotation pattern {#rotation-pattern}

@@ -16,7 +16,7 @@ Public CLOB execution leaks intent. A $5M order on a thin asset signals everythi
 - **Makers** (any account — there is no registration or per-asset opt-in) respond with quotes within a window (typically 1–5 seconds).
 - **Taker** accepts the best quote → atomic settlement at that price; the rest of the quotes expire.
 
-Quotes are visible to the taker only (not on the public book). An accepted RFQ settles **off** the public trade tape today: it does not appear on [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills), or `user_events`, and carries no distinguishing tag anywhere. The only ways to observe one live are the [`rfq_open`](#querying-open-rfqs) / [`rfq_user`](#querying-open-rfqs) reads, or the resulting position change on your own [`account_state`](../api/ws/subscriptions.md#account_state).
+Quotes are visible to the taker only (not on the public book). An accepted RFQ settles **off** the public trade tape today: it does not appear on [`trades`](../api/ws/subscriptions.md#trades) or [`fills`](../api/ws/subscriptions.md#fills), and carries no distinguishing tag anywhere. The only ways to observe one live are the [`rfq_open`](#querying-open-rfqs) / [`rfq_user`](#querying-open-rfqs) reads, or the resulting position change on your own [`account_state`](../api/ws/subscriptions.md#account_state).
 
 ## Lifecycle {#lifecycle}
 
@@ -136,7 +136,7 @@ the request itself carries no allow-list.
 | Price | The accepted quote's `price`, regardless of public book |
 | Counter-party | One maker only (the chosen quote's signer) |
 | Book impact | None — the trade does not match against resting orders |
-| Public visibility | None today — it does not appear on the public trade tape, `fills`, or `user_events` |
+| Public visibility | None today — it does not appear on the public trade tape or `fills` |
 | Fees | Standard maker/taker per fee schedule |
 | Margin | Same as a regular fill (`init_margin` debited from both sides) |
 | Liquidation | Same — the position becomes a regular position post-settle |
@@ -151,9 +151,17 @@ the request itself carries no allow-list.
 ## Querying open RFQs {#querying-open-rfqs}
 
 The RFQ engine state is exposed on the node `/info` read path via two query
-types — see [`rfq_open`](../api/rest/info.md#rfq_open) and
-[`rfq_user`](../api/rest/info.md#rfq_user) for the full response shapes and field
-tables. Unlike the write-side actions above, `sz` / `price` / `max_size` /
+types, `rfq_open` and `rfq_user`.
+
+:::warning
+**Both are OPERATOR LANE, not public.** The RFQ engine is not reachable from the
+public `/exchange` yet, so its reads do not ship publicly either — they answer
+with the same error an unknown type gets. See
+[operator lane](../api/rest/info.md#operator-reads). The shapes below are what a node operator
+sees today, and what the public API will serve on the day the engine opens.
+:::
+
+Unlike the write-side actions above, `sz` / `price` / `max_size` /
 `limit_px` on these reads are **human decimal strings**, tick/lot-normalized —
 not the raw 1e8 plane `rfq_request` / `rfq_quote` / `rfq_accept` take.
 

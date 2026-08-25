@@ -30,8 +30,8 @@ The watcher is a separate logical process even when co-located — its decisions
 
 - [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`) — the immediate signal that a tier changed.
 - [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `maint_margin`, `tier`. Derive your own health ratio from the first two — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
-- [`active_asset_ctx`](../api/ws/subscriptions.md#active_asset_ctx) WS push (per held asset): `mark_px` for forward-looking estimation, and `funding.rate_per_hr` / `funding.next_payment_ts` to anticipate the next funding charge before it settles.
-- [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments — one record per settlement, AFTER it applies. This channel cannot anticipate the next charge; use `active_asset_ctx`'s `funding` block for that.
+- [`markets`](../api/ws/subscriptions.md#markets) WS push: `mark_px` for forward-looking estimation, and `funding.rate_per_hr` / `funding.next_payment_ts` per market to anticipate the next funding charge before it settles.
+- [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments — one record per settlement, AFTER it applies. This channel cannot anticipate the next charge; use the `markets` row's `funding` block for that.
 
 ## Reaction rules {#reaction-rules}
 
@@ -40,7 +40,7 @@ The watcher is a separate logical process even when co-located — its decisions
 | Derived ratio < 1.5 and falling for 5 consecutive samples | Pre-emptive deposit to bring the ratio to 1.8 | Buffer before T0 |
 | `tier transition to T0` | Immediate deposit OR partial close | One block to act before T1 |
 | `tier transition to T1` | Emergency: full close on highest-loss position | Pre-empt the partial close at a worse price |
-| Projected charge from `active_asset_ctx.funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × `withdrawable` | Pre-pay deposit before settlement | Funding charge can flip you into T0 |
+| Projected charge from the `markets` row's `funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × `withdrawable` | Pre-pay deposit before settlement | Funding charge can flip you into T0 |
 | Mark moves > 3× recent-1h sigma in 30s | Snapshot positions + alert operator | Possible regime shift |
 
 Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (ratio 1.3 floor). Conservative books: looser (ratio 1.8 floor).
@@ -66,11 +66,11 @@ let recentSamples: number[] = [];
 
 // `account_state` does NOT carry an account-level `maint_margin` — only the
 // signed-dollar `health` field. The account-level `maint_margin` needed for
-// the ratio lives ONLY on the lightweight `margin_summary` read, which has no
+// the ratio lives ONLY on the margin-depth account read, which has no
 // dedicated SDK wrapper — use the typed `raw` escape hatch and poll it.
 async function pollMarginSummary() {
   const summary = await watcher.info.raw<MarginSummary>({
-    type: 'margin_summary',
+    type: 'account_state', detail: 'margin',
     address: traderAddr,
   });
   const accountValue = Number(summary.account_value);

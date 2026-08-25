@@ -6,6 +6,13 @@ description: POST /info read queries for spot markets, leveraged spot margin, an
 
 Read queries for [spot](../../../products/spot.md) markets, leveraged [spot margin](../../../products/spot-margin.md), and the [Earn](../../../concepts/earn.md) pool. Same `POST /info` endpoint and envelope as the [base page](../info.md).
 
+:::info
+**Plain spot token balances are on [`account_state`](../info.md#account_state).**
+Its `balances` array carries every token the account holds — USDC and spot
+tokens alike — with `avg_entry_px` per row. There is no separate spot-balance
+read.
+:::
+
 ## Spot, spot-margin & Earn query types {#spot-spot-margin--earn-query-types}
 
 ### Spot pair universe and token registry {#spot_meta}
@@ -42,7 +49,7 @@ Response (the `spot` section):
         {
           "id": 101, "name": "BTC", "sz_decimals": 5, "wei_decimals": 8,
           "token_id": "0xab…", "system_address": "0x55…",
-          "evm_contract": { "address": "0x66…", "evm_extra_wei_decimals": -3 },
+          "evm_contract": { "address": "0x66…", "variant": 0, "evm_extra_wei_decimals": -3 },
           "is_canonical": true, "total_supply": "21000000"
         }
       ]
@@ -78,7 +85,7 @@ Real pairs carry the live market-context fields (`mark_px`, `mid_px`,
 | `tokens[*].wei_decimals` | uint8 | Native (ERC-20-style) token decimals |
 | `tokens[*].token_id` | hex string (32 bytes) | Canonical token id, `0x`-hex |
 | `tokens[*].system_address` | hex address | Core-side anchor address |
-| `tokens[*].evm_contract` | object \| null | EVM binding `{address, evm_extra_wei_decimals}`; `null` when the token binds nothing. The address is the BOUND contract, never the deployer's declaration — see the rule below |
+| `tokens[*].evm_contract` | object \| null | EVM binding `{address, variant, evm_extra_wei_decimals}`; `null` when the token binds nothing. The address is the BOUND contract, never the deployer's declaration — see the rule below |
 | `tokens[*].is_canonical` | bool | Canonical (genesis / governance-listed) token |
 | `tokens[*].total_supply` | decimal string | Committed token issuance (whole units); `"0"` when none |
 
@@ -86,216 +93,6 @@ Real pairs carry the live market-context fields (`mark_px`, `mid_px`,
 
 State source: `Exchange.spot_pair_specs` (pairs) + `Exchange.spot_token_specs`
 (tokens) + `spot_clearinghouse.total_supply` (supply).
-
-### Single-token detail with tradable pairs and fees {#token_info}
-
-One spot token's identity / EVM-binding block, plus every tradable pair it
-fronts (where it is the **base**) with each pair's live market context and
-resolved fee rates. Resolve by `token` — the token **symbol** (`"MTF"`) or its
-numeric asset id sent as a string (`"104"`). Optionally pass `address` to also
-get that account's **effective** (post-staking-discount / post-maker-rebate)
-rates per pair.
-
-```json
-{ "type": "token_info", "token": "MTF" }
-```
-
-| Arg | Type | Required | Description |
-|-----|------|----------|-------------|
-| `token` | string | yes | Spot-token symbol, or its numeric asset id as a string |
-| `address` | hex address | no | Adds per-pair effective fee fields for this account (and echoes `address` top-level) |
-
-Missing `token` → `400 {"error":"missing field: token"}`; unknown token →
-`404 {"error":"spot token not found"}`.
-
-Response:
-
-```json
-{
-  "type": "token_info",
-  "data": {
-    "token": {
-      "id":             104,
-      "name":           "MTF",
-      "sz_decimals":    2,
-      "wei_decimals":   8,
-      "token_id":       "0xabababababababababababababababababababababababababababababababab",
-      "system_address": "0x5555555555555555555555555555555555555555",
-      "is_canonical":   true,
-      "total_supply":   "1000000",
-      "evm_contract":   { "address": "0x6666666666666666666666666666666666666666", "evm_extra_wei_decimals": -3 }
-    },
-    "pairs": [
-      {
-        "pair_id":            113,
-        "name":               "MTF/USDC",
-        "base":               104,
-        "quote":              100,
-        "active":             true,
-        "deployer":           "0x7777777777777777777777777777777777777777",
-        "registered_at":   1700000000000,
-        "min_notional":       "10",
-        "tick_size":          "0.0001",
-        "lot_size":           "1",
-        "mark_px":            "2.05",
-        "mid_px":             "2.06",
-        "day_ntl_vlm":        "15230.5",
-        "prev_day_px":        "1.98",
-        "circulating_supply": "1000000",
-        "fee": { "taker_bps": "3.0", "maker_bps": "1.0", "source": "pair_override" }
-      }
-    ]
-  }
-}
-```
-
-The `token` identity / binding block renders **identically** to the same token's
-row in [`spot_meta`](#spot_meta) `tokens` — the two reads never drift.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `token.id` | uint32 | Spot token asset id |
-| `token.name` | string | Token symbol |
-| `token.sz_decimals` | uint8 | Display / size precision |
-| `token.wei_decimals` | uint8 | Native (ERC-20-style) token decimals |
-| `token.token_id` | hex string (32 bytes) | MTF-native canonical token id, `0x`-hex; all-zero for a token registered without one |
-| `token.system_address` | hex address | The token's Core-side system anchor address |
-| `token.is_canonical` | bool | Canonical (protocol-registered) token flag |
-| `token.total_supply` | Decimal string | Committed Core-side total supply (whole units) |
-| `token.evm_contract` | object \| null | The token's EVM (ERC-20) binding — `null` when unbound, never a fabricated object |
-| `token.evm_contract.address` | hex address | Bound ERC-20 contract address on MetaFluxEVM |
-| `token.evm_contract.evm_extra_wei_decimals` | int (signed) | Deployer-declared, and NOT what a credit uses. A credit lands in the sibling `wei_decimals` |
-| `pairs[*].pair_id` | uint32 | Spot pair id (`SpotPairSpec.pair_id`) |
-| `pairs[*].name` | string | `BASE/QUOTE` display name |
-| `pairs[*].base` / `quote` | uint32 | Base / quote token asset ids |
-| `pairs[*].active` | bool | Pair active for trading |
-| `pairs[*].deployer` | hex address | Account that registered the pair (pair-level provenance) |
-| `pairs[*].registered_at` | uint64 | Pair registration timestamp (consensus ms) |
-| `pairs[*].min_notional` | Decimal string | Minimum order notional, whole-USDC |
-| `pairs[*].tick_size` | Decimal string | Price tick, human-decimal |
-| `pairs[*].lot_size` | u128 string | Size lot, raw base lots |
-| `pairs[*].mark_px` | Decimal string \| null | Last-trade mark; `null` before the first trade |
-| `pairs[*].mid_px` | Decimal string \| null | Book mid (falls back to the mark when one-sided); `null` when neither exists |
-| `pairs[*].day_ntl_vlm` | Decimal string | 24h notional volume |
-| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; `null` if unknown |
-| `pairs[*].circulating_supply` | Decimal string | Base token committed total supply |
-| `pairs[*].fee.taker_bps` / `maker_bps` | bps string | The pair's resolved base rates, decimal bps (`"3.0"` = 3 bps) — the same rates the settlement path charges |
-| `pairs[*].fee.source` | `"pair_override"` \| `"volume_tier"` | Where the resolved rate came from — a per-pair deployer override, or the shared volume-tier ladder (the default) |
-
-With `address`, each pair's `fee` object additionally carries the account's
-effective rates, and the resolved `address` is echoed top-level:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `pairs[*].fee.effective_taker_bps` | bps string | Taker rate after the account's staking discount |
-| `pairs[*].fee.effective_maker_bps` | bps string | Maker rate after the account's maker rebate |
-| `pairs[*].fee.staking_discount_permille` | uint | Staking taker-fee discount applied (per-mille) |
-| `pairs[*].fee.maker_rebate_bps` | bps string | Maker rebate applied |
-| `address` | hex address | Echoed **only** when the request carried it |
-
-Pairs list the markets where this token is the base, in pair-id order; a token
-fronting no tradable pair returns an empty `pairs` array.
-
-State source: `Exchange.mip3_spot_token_specs` (identity / binding) + `Exchange.mip3_spot_pair_specs` (pairs) + the spot clearinghouse supply and per-pair market context.
-
-### Per-account spot token balances {#spot_clearinghouse_state}
-
-Per-account spot token balances. Required: `address` (0x hex).
-
-```json
-{ "type": "spot_clearinghouse_state", "address": "0x<addr>" }
-```
-
-Response:
-
-```json
-{
-  "type": "spot_clearinghouse_state",
-  "data": {
-    "address": "0x<addr>",
-    "balances": [ { "asset": 104, "name": "MTF", "total": "10", "hold": "0", "avg_entry_px": "2.54" } ],
-    "height": 562,
-    "time":   1700000000555
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `balances[*].asset` | uint32 | Spot asset id (`104` = MTF) |
-| `balances[*].name` | string | Token / pair name, else `asset:<id>` |
-| `balances[*].total` | decimal string | Full balance, truncated toward zero |
-| `balances[*].hold` | decimal string | Locked behind resting spot orders (escrow). Spot escrow ONLY — it never holds perp margin, so `total − hold` is not the spendable figure for USDC; read `withdrawable` from [`account_state`](../info.md#account_state) |
-| `balances[*].avg_entry_px` | decimal string \| null | Weighted-average acquisition cost, **whole USDC per whole token**. It is a PRICE, not a total. `null` when the account has no recorded basis for this token. See [cost basis](#avg-entry-px) |
-
-#### Cost basis and spot PnL {#avg-entry-px}
-
-:::caution
-**Treat a missing key exactly like `null`** — no basis known. An older node
-serves `balances` rows carrying `asset`, `name`, `total` and `hold` only.
-:::
-
-`avg_entry_px` is what the account paid, per token, for what it holds. It is the
-one input spot PnL needs:
-
-```
-unrealized_spot_pnl = (mark_px − avg_entry_px) × total
-```
-
-It is a PRICE and not a total on purpose. `total` includes the part locked behind
-resting orders (`hold`), so a server-computed notional would have to choose which
-quantity to multiply by, and you could not see which it chose. Multiply by the
-quantity YOU mean.
-
-**The rule behind it — basis is recorded on spot BUYS only.**
-
-- A spot **buy** rolls the weighted average acquisition cost forward.
-- A spot **sell** reduces the balance but **keeps the per-unit average
-  unchanged**. Selling does not re-price what remains.
-- **Deposits record no basis.** Tokens that arrive by bridge deposit, by a
-  Core↔EVM credit, by a spot transfer from another account, or by a governance
-  adjustment were not bought on this chain, so there is no price to record.
-
-**Consequences to code against:**
-
-- A holding acquired **entirely** by deposit or transfer has **`avg_entry_px:
-  null`**. It is never `"0"`. A zero would claim the tokens were free and make
-  the whole balance look like profit; `null` says plainly that the basis is not
-  known. This matches the `null`-over-wrong-but-plausible rule used by the
-  [position history](./position-history.md#honesty-flags) completeness flags.
-- A holding **partly** bought and partly transferred in prices the transferred
-  tokens at the standing average, because the transfer wrote no basis of its own.
-  `avg_entry_px` is then a real number, but it covers the bought portion's price
-  applied across the whole balance.
-- Do not render a PnL figure when `avg_entry_px` is `null`. Render "—" instead. A
-  PnL computed against a null basis is not a small error; it is the entire
-  notional reported as gain.
-
-**Perp positions are unaffected.** They carry their own entry price in
-[`account_state`](../info.md#account_state); `avg_entry_px` is the spot ledger's
-equivalent.
-
-:::info
-**No basis on the unified USDC pool.** `avg_entry_px` appears on spot token rows
-only. USDC is the quote asset — its cost basis in USDC is meaningless — and
-under [USDC unification](../../../concepts/usdc.md) the spot ledger holds no
-spendable USDC row at all.
-:::
-| `height` | uint64 | Committed block height this snapshot reflects — a **bare integer**, not a Decimal string. Advances on **every** commit, even when the balances are unchanged |
-| `time` | uint64 | Consensus block time in **milliseconds** — a **bare integer**, same consensus clock as `height` |
-
-`height` / `time` are an **as-of stamp** (identical semantics to the perp
-[`account_state`](../info.md#account_state) read): they advance every
-commit even when no balance moved, letting a client distinguish a fresh-but-quiet
-account from a stalled read path. There is no live WS channel that pushes this
-plain per-token balance view — poll this read instead. (The WS
-[`spot_margin_state`](../../ws/subscriptions.md#spot_margin_state) channel is a
-different, leveraged-position view, not a balances push.)
-
-Token set is the union of the account's balance and escrow (`reserved`) keys —
-a token that is entirely held with zero spendable still appears. Range-scanned
-per account (not a full-table walk). State source:
-`locus.spot_clearinghouse.{balances, reserved}` (both keyed by `(owner, asset)`).
 
 ### Every spot-margin position for an account {#spot_margin_state}
 
@@ -404,19 +201,25 @@ the time without stepping `borrow_index`. Do not compute an APY from a rising
 `share_value` that is not rising. A governance vote sets a non-zero rate — see
 [Earn](../../../concepts/earn.md).
 
-### Spot-pair-deploy gas-auction state {#spot_deploy_state}
+### Spot-pair-deploy gas-auction state {#spot_deploy_auction}
 
 MIP-1 spot-pair-deploy gas-auction state. No parameters.
 
+> ⬆️ **Upgrade notice — the name is not live yet.** Today the node answers this
+> read under the old name `spot_deploy_state`. `spot_deploy_state` is the OLD
+> name for this read, not a second read; it goes away at the release that ships
+> the rename. Until then `spot_deploy_auction` answers
+> `400 {"error":"unknown info type: spot_deploy_auction"}`.
+
 ```json
-{ "type": "spot_deploy_state" }
+{ "type": "spot_deploy_auction" }
 ```
 
 Response:
 
 ```json
 {
-  "type": "spot_deploy_state",
+  "type": "spot_deploy_auction",
   "data": {
     "auction_round": 3, "current_bid": "999", "current_winner": "0x<bidder>",
     "auction_end_ms": 0, "started_at_ms": 0, "total_burned": "4200", "deposit": "0"
@@ -442,14 +245,24 @@ State source: `Exchange.spot_pair_deploy_gas_auction`.
 - [Perpetual queries](./perpetuals.md) — perp-market reads
 - [Spot](../../../products/spot.md) / [Spot margin](../../../products/spot-margin.md) — the products
 
+| `tokens[*].evm_contract.address` | hex address | The ERC-20 the asset is bound to. It ROTATES — see the rule below |
+| `tokens[*].evm_contract.variant` | uint8 | How the token is bound: `0` a deployed contract, `1` first-storage-slot, `2` custom-storage-slot. It does not change whether the asset can cross |
+| `tokens[*].evm_contract.evm_extra_wei_decimals` | int8 | The deployer's declared decimal offset. It has NO effect on a credit — see the rule below |
+
 :::warning
 **`evm_contract` reports the BINDING, never a declaration.** `register_token` accepts an
 `evm_contract` field from the caller and stores it unvalidated, but no transfer path reads
-it. The address served here comes from the [`evm_contract_bindings`](../../../evm/core-evm-transfers.md#which-assets-cross)
-registry — the same source the Core-to-EVM transfer asks — so this read can never offer a
-contract the chain would refuse. A token whose deployer declared a contract that was never
-bound reports `null`.
+it. The address served here comes from the EVM binding registry — the same source the
+Core-to-EVM transfer asks — so this read can never offer a contract the chain would refuse.
+A token whose deployer declared a contract that was never bound reports `null`. See
+[which assets can cross](../../../evm/core-evm-transfers.md#which-assets-cross).
 
 `evm_extra_wei_decimals` is that declared value and has no effect on a credit. **A credit
 lands in the token's `wei_decimals`**, the sibling field.
+
+**The address ROTATES. Read it on each use; never copy it into config or prose.** A
+validator-quorum vote can re-bind a token to a different contract. An address you froze
+then names a contract the chain no longer credits, and a transfer against it is the silent
+failure — the burn succeeds and nothing arrives. Key your own records on `tokens[*].id`,
+which does not move.
 :::

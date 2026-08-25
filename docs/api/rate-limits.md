@@ -72,7 +72,7 @@ ladder is the one input that comes from committed chain state.
 |----------|--------|
 | `POST /info` (most types) | 1 |
 | `POST /info` `l2_book`, `markets` | 2 |
-| `POST /info` `user_fills`, `user_fills_by_time` | 2 |
+| `POST /info` `user_fills` | 2 |
 | `POST /exchange` | 5 |
 | `POST /evm` (single request) | 1 |
 | `POST /evm` (batch array) | 1 per element, minimum 1 |
@@ -164,7 +164,7 @@ exponential backoff.
 
 ### Market-data consumer {#market-data-consumer}
 
-- Subscribe to WS channels (`l2_book`, `trades`, `user_events`); do not poll.
+- Subscribe to WS channels (`l2_book`, `trades`, `fills`); do not poll.
 - A subscribe and an in-stream message both cost 0, so the feed spends no budget at all.
 - On reconnect you re-subscribe from a fresh snapshot (there are no resume tokens). Stay within the **64-subscription** per-connection cap.
 

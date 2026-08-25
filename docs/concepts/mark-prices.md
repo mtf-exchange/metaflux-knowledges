@@ -49,13 +49,13 @@ MTF carries prices on **two distinct numeric planes** — the #1 source of scale
 | Plane | Type | Scale | Used by |
 |-------|------|-------|---------|
 | **Book / order / mark plane** | `FixedPrice` (`i128`) / `price_e8` | **1e8 fixed-point** (raw integer = price × 10⁸) | the order book in committed state, `last_mark_px`, the EVM precompiles (`mark_px_e8`, `entry_px_e8`), and the **write** side: `/exchange` order `limit_px` and `trigger_px` |
-| **Oracle / notional / collateral plane** | `rust_decimal::Decimal` | **whole-USDC** (1 unit = 1 USDC) | the oracle aggregator + mark computer (C1/C2/C3 all in `Decimal`), funding `oracle_px`, PM scenario engine, margin/health, and the human `market_info`/`markets` read fields `mark_px`/`oracle_px` |
+| **Oracle / notional / collateral plane** | `rust_decimal::Decimal` | **whole-USDC** (1 unit = 1 USDC) | the oracle aggregator + mark computer (C1/C2/C3 all in `Decimal`), funding `oracle_px`, PM scenario engine, margin/health, and the human `markets` read fields `mark_px`/`oracle_px` |
 
 The mark computer and the oracle aggregation operate entirely in the **`Decimal` whole-USDC plane**. The result is converted to the **1e8 `FixedPrice` plane** when written to the book / `last_mark_px`.
 
 **The read side is human. The write side is raw.** That single line decides which plane a number is on:
 
-- **Every `/info` read answers in whole units** as a decimal string. `market_info` / `markets` report `mark_px` and `oracle_px` scaled back (e.g. `"67042.335"`, not raw 1e8). `l2_book` level `px` and `sz`, and `tick_size`, are the **same** — the node divides by 10⁸ and tick-rounds before it answers. Do not multiply a read value by 10⁸.
+- **Every `/info` read answers in whole units** as a decimal string. `markets` reports `mark_px` and `oracle_px` scaled back (e.g. `"67042.335"`, not raw 1e8). `l2_book` level `px` and `sz`, and `tick_size`, are the **same** — the node divides by 10⁸ and tick-rounds before it answers. Do not multiply a read value by 10⁸.
 - **`/exchange` order *submission* fields stay raw 1e8** — `limit_px` and `trigger_px` are `u64` tick units, and `size` is raw lots. Converting a read price back for submission is the caller's job.
 
 **Funding settlement is NOT on a third plane.** Core settles funding in the `Decimal` **whole-USDC** plane, the same plane the oracle and margin use. `accumulated_funding_e6` is an **EVM precompile ABI field only** — it exists in the `mark_settle` precompile's encoded input and output, because a Solidity caller has no decimal type and needs a fixed integer scale. It is not the plane Core settles on, and no `/info` read serves it. Always check which plane a formula is in before comparing magnitudes.
@@ -64,9 +64,9 @@ The mark computer and the oracle aggregation operate entirely in the **`Decimal`
 
 `oracle` — the C1 anchor — is the **weighted median** of up to 10 external spot venues (Binance 3, OKX 2, Bybit 2, Coinbase 2, Bitget / Kraken / KuCoin / Gate / MEXC / MetaFlux-spot 1 each; sum 15), published once per block and signed by the oracle validators. Per-symbol weights are governance-settable (`SetOracleWeights`, `ActionId 148`); a feed stale > 60 s or > 5 % off the cross-venue median is dropped; if < 50 % of weight is present the slot holds its last good value.
 
-The mark's **C3 component is a separate feed set** — perp mids from the **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC), not the spot oracle table. See **[Oracle prices](./oracle-prices.md)** for the full composition, reliability rules, per-symbol overrides, and the `oracle_sources` read.
+The mark's **C3 component is a separate feed set** — perp mids from the **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC), not the spot oracle table. See **[Oracle prices](./oracle-prices.md)** for the full composition, reliability rules, and per-symbol overrides.
 
-The [`market_info`](../api/rest/info/perpetuals.md#market_info) read surfaces `mark_source` (the descriptor `"MedianOfOraclesAndMid"`) and the composed `mark_px` / `oracle_px`; the individual C1/C2/C3 components and the weighted source list are not broken out as wire fields.
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) surfaces `mark_source` (the descriptor `"MedianOfOraclesAndMid"`) and [`markets`](../api/rest/info/perpetuals.md#markets) the composed `mark_px` / `oracle_px`; the individual C1/C2/C3 components and the weighted source list are not broken out as wire fields.
 
 ## Mark vs oracle — why they diverge {#mark-vs-oracle--why-they-diverge}
 
@@ -123,16 +123,16 @@ Consumers that use **last trade** instead of mark:
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
-  -d '{"type":"market_info","coin":"BTC"}'
+  -d '{"type":"markets","coin":"BTC"}'
 ```
 
-The [`market_info`](../api/rest/info/perpetuals.md#market_info) read reports `mark_px` and
+The [`markets`](../api/rest/info/perpetuals.md#markets) read reports `mark_px` and
 `oracle_px` on the **human-decimal plane** (e.g. `"67042.335"`), plus the
 `mark_source` descriptor:
 
 ```json
 {
-  "type": "market_info",
+  "type": "markets",
   "data": {
     "coin":        "BTC",
     "mark_source": "oracle_median",
@@ -145,11 +145,11 @@ The [`market_info`](../api/rest/info/perpetuals.md#market_info) read reports `ma
 The three internal components `C1`/`C2`/`C3` (oracle+EMA anchor / internal-book
 median / external-perp weighted median) and the band-state (`Ok` / `Banded` /
 `Frozen`) live inside the mark computer; they are
-**not** broken out as `market_info` wire fields today — only the composed
+**not** broken out as `markets` wire fields today — only the composed
 `mark_px` is published. Banded means the band clamped the candidate this block;
 Frozen means all sources failed and the protocol is holding prior mark.
 
-A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available) (not yet streaming); poll [`market_info`](../api/rest/info/perpetuals.md#market_info) for `mark_px` meanwhile.
+A dedicated `mark` WS channel is on the [WS roadmap](../api/ws/subscriptions.md#roadmap--not-yet-available) (not yet streaming); poll [`markets`](../api/rest/info/perpetuals.md#markets) for `mark_px` meanwhile.
 
 ## Edge cases {#edge-cases}
 

@@ -18,7 +18,7 @@ realized PnL, fees and funding.
 **This is not a trade log.** One row covers a whole life, not one execution. For
 **per-fill** rows — one record per execution, with price, size, fee and order id
 — use [`user_fills`](../info.md#user_fills) and
-[`user_fills_by_time`](../info.md#user_fills_by_time). If you are porting code
+[`user_fills`](../info.md#user_fills) with a time window. If you are porting code
 that reads another exchange's per-trade history, `user_fills` is the query you
 want, not this one.
 :::
