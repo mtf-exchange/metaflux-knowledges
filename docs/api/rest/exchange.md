@@ -217,7 +217,7 @@ complete.
 | Amends | [`modify`](#modify), [`batch_modify`](#batch_modify) |
 | Spot | [`spot_order`](#spot_order), [`spot_cancel`](#spot_cancel) |
 | Margin | [`update_leverage`](#update_leverage), [`update_isolated_margin`](#update_isolated_margin), [`top_up_isolated_only_margin`](#top_up_isolated_only_margin), [`set_position_mode`](#set_position_mode) |
-| Specialist venues | [`rfq_request`](#rfq_request), [`rfq_quote`](#rfq_quote), [`rfq_accept`](#rfq_accept), [`fba_submit`](#fba_submit) |
+| Specialist venues | [`rfq_request`](#rfq_request), [`rfq_quote`](#rfq_quote), [`rfq_accept`](#rfq_accept) — **all three refuse every market: RFQ is options-only** — and [`fba_submit`](#fba_submit) |
 
 **Every other action is `master only`.** That covers all fund movement
 (withdrawals, transfers, vaults, Earn, staking) and all account control (agent
@@ -2124,8 +2124,8 @@ re-aimed at another market or spliced onto another price.
 | `px` is within **±10 %** of the committed anchor | `invalid parameters: oracle px <px> outside the ±10% move band around committed anchor <anchor>` |
 
 Every rejection returns **before** any state is written, so a refused push
-changes nothing. The push is applied at commit, so read the outcome with
-[`action_outcome`](./info.md#action_outcome).
+changes nothing. The push is applied at commit, and this call waits for that
+commit, so the outcome is in the response you already have.
 
 **The ±10 % band, and the one push that escapes it.** The anchor is the last
 **committed** oracle price for the market, or the market's committed mark price
@@ -2282,6 +2282,29 @@ rejected `401`. Omitting `owner` keeps the plain sender-authorized digest.
 admission, **not** digest-bound.
 
 ### Open an RFQ session {#rfq_request}
+
+:::danger[RFQ is options-only, and options do not exist yet]
+**All three RFQ actions refuse every market today.** `rfq_request`, `rfq_quote`
+and `rfq_accept` return:
+
+```
+precondition failed: rfq is options-only: market <n> is not an option series
+```
+
+The actions still route — a routing break would answer `unknown variant` instead
+— but no market is an option series, so the refusal is total. There is no
+parameter, no permission and no market that gets past it.
+
+**Why.** A request-for-quote lane beside a public order book is not fair to that
+book: it lets size trade away from the price everyone else is posting against.
+MetaFlux offers RFQ only where there is no continuous book to undercut, which
+means options, and options are not built. See
+[MIP-4](../../mip/mip-4.md).
+
+The parameter documentation below describes the shape these actions will take
+when option series land. Do not build against it yet.
+:::
+
 
 Taker opens a request-for-quote session: `size` on `market`, optionally bounded
 by `limit_px`, open for maker quotes until `expiry_ms`.
@@ -3692,7 +3715,7 @@ The two classes differ, so treat them differently:
 | Action class | Commit-time rejection | How to confirm |
 |--------------|----------------------|----------------|
 | **Order-type** — [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`spot_order`](#spot_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order) | **Reported.** The `200 OK` body carries a per-leg `{"error": "<reason>"}`, and [`order_updates`](../ws/subscriptions.md#order_updates) pushes a `rejected` status | Read the `statuses` array; a `pending` entry means read `order_updates` |
-| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Not pushed.** No body field and no WS push | Read [`action_outcome`](./info.md#action_outcome) with the returned `action_hash`. Fall back to the EFFECT the action was supposed to have, on the `/info` or WS surface that serves it |
+| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Reported in this response.** The call waits for the commit, so a rejection returns as `200 OK` with an `error` body, and success returns `committed: true` | Read `committed` on the envelope. A `202` means the wait expired, not that the action failed — read the EFFECT the action was supposed to have |
 
 **Confirm by effect.** Each action's own section names the read that proves it
 landed — a TWAP parent on [`user_twaps`](./info.md#user_twaps), a leverage change
@@ -3702,21 +3725,21 @@ the effect has not appeared, the action was rejected; resubmit with a corrected
 body rather than waiting.
 
 :::tip
-**Ask for the verdict directly — this is live.** Two fields close the gap above.
-Prefer them to the confirm-by-effect loop; keep that loop only as a fallback.
+**Read `committed`, not `accepted`.**
 
-- **`committed` on this envelope.** `true` = the action committed and applied.
-  `false` = admitted only; it may still commit, or be rejected. `accepted` keeps
-  its old meaning, so nothing breaks — but stop reading `accepted: true` as
-  success now that `committed` is present.
-- **[`action_outcome`](./info.md#action_outcome) on `/info`.** Quote the
-  `action_hash` this envelope returned and read the commit-time verdict, with
-  the reason text. Its verdict comes from a bounded per-node ring, so `unknown`
-  means "no record here", never "rejected" — that entry states the rule.
+`accepted: true` means only "admitted to the mempool". An action can be admitted
+and then rejected at commit, so `accepted` alone reads as a success it does not
+promise.
 
-To test whether a network serves them, send
-`{"type":"action_outcome","action_hash":"0x00"}` to `/info`. A network without
-them answers `400 unknown info type: action_outcome`.
+`committed: true` means the action committed AND applied. `committed: false`
+marks a response that reports admission and nothing more — which happens only
+when the wait expired.
+
+There is no separate verdict read. The wait is about fifty blocks, so the answer
+is in this response. If you get a `202`, RE-READ the state the action was meant
+to change; re-submitting the same nonce is replay-safe but usually silent,
+because the block builder drops a committed replay before any verdict is
+produced.
 :::
 
 **The most common silent rejection is a position-mode mismatch.** A hedge account

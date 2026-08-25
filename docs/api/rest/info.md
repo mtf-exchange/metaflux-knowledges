@@ -1125,57 +1125,31 @@ State source: the committed per-account fill ring (`Exchange.account_fills[addr]
 
 ### Commit-time verdict on a submitted action {#action_outcome}
 
-Read whether a submitted action applied at commit, and if it did not, **why**.
-This is the answer to the gap that `accepted: true` leaves: `POST /exchange` can
-reply before the action commits, and a commit-time rejection has no other channel.
+:::danger[Removed]
+**`action_outcome` no longer exists.** The node answers it with
+`unknown info type`, the same error a type that never existed gets.
 
-Address the action either way:
+There is nothing to migrate to, because the answer already arrives earlier.
+`POST /exchange` waits for the commit and returns the real outcome — an order
+gets its assigned `oid` and its resting or filled state, and any other action
+gets a committed confirmation, or a rejection **with its reason**. Read
+[the submit response](./exchange.md), not a second call.
 
-```json
-{ "type": "action_outcome", "action_hash": "0x<action_hash>" }
-{ "type": "action_outcome", "user": "0x<addr>", "nonce": 1735689600001 }
-```
+The read existed for two residual cases, and neither earns a second endpoint:
 
-| Arg | Type | Required |
-|-----|------|----------|
-| `action_hash` | 0x hex | one of the two forms |
-| `user` + `nonce` | hex address + uint64 | the other form; **both** are required together |
+- **The wait expired.** `/exchange` bounds its wait at about fifty blocks. If it
+  gives up, the chain is not keeping up; the action may still commit. RE-READ the
+  state the action was meant to change. Do not treat the timeout as a failure.
+- **You passed `?confirm=async`.** You asked not to wait. For orders, subscribe
+  to the `order_updates` [WS channel](../ws/subscriptions.md).
 
-Response:
-
-```json
-{ "type": "action_outcome", "data": {
-  "status": "error",
-  "reason": "hedge account requires an explicit position_side",
-  "round":  81234,
-  "nonce":  1735689600001
-} }
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `status` | enum | `"ok"` the action committed and applied · `"error"` it was rejected at commit · `"unknown"` this node retains no verdict |
-| `reason` | string | Present on `"error"` only — the node's own rejection text |
-| `round` | uint64 | The consensus round the verdict came from |
-| `nonce` | uint64 | Echoed when the record carries one |
-
-**`unknown` is not `rejected`.** The verdict comes from a **bounded per-node
-ring** (about 8000 recent actions), not from committed state. `unknown` means
-this node has no record: the action may still be in the mempool, may have
-committed on a node that has since dropped the record, or may never have been
-seen. Poll a few times before you conclude anything, and never treat `unknown`
-as a failure you can safely resubmit past.
-
-**Nodes disagree by design.** The ring is host-side, so two nodes can answer
-differently for the same `action_hash`. It is a diagnostic, not a receipt: the
-authoritative confirmation is still the state the action was meant to change.
-
-**An action dropped before its signature was checked is readable by
-`action_hash` only.** The `(user, nonce)` form deliberately cannot see it —
-otherwise anyone could publish a rejection against another account's nonce.
-
-State source: a bounded per-node outcome ring, populated at commit. Not committed
-state, not replicated, not replayed.
+:::caution[Re-submitting the same nonce answers nothing]
+It is replay-SAFE — the committed nonce window rejects the duplicate — but it is
+usually SILENT. The block builder drops a committed replay before the commit loop
+sees it, so no verdict is ever produced and the second call times out exactly
+like the first. Re-read state instead.
+:::
+:::
 
 ### TWAP slice-fill history {#user_twap_slice_fills}
 
