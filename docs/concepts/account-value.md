@@ -19,18 +19,24 @@ Two reads carry these scalars:
 
 `detail: "margin"` is the cheap one. It returns the scalars alone — no positions
 and no balances. `account_state` returns the scalars plus positions and
-balances, but it **omits `maint_margin`**. To compute `health` yourself, read
-`detail: "margin"`.
+balances, but it **omits `cross_maintenance_margin_used`**. To compute `health`
+yourself, read `detail: "margin"`.
+
+The two reads do not carry the same scalar set, and the reason is cost.
+`total_ntl_pos` needs the position walk, and `detail: "margin"` is defined by
+skipping that walk — so `total_ntl_pos` is on the full read only.
 
 ## The scalars {#the-scalars}
 
 | Field | Read | What it is |
 |---|---|---|
 | `account_value` | both | Everything the account is worth right now, unrealized profit included |
+| `total_raw_usd` | both | **Settled cash equity.** Realized USDC only — it does NOT count unrealized PnL. This is the `settled cash` term both formulas below start from |
 | `withdrawable` | both | Cash you can take out. **Clamped at zero** |
-| `init_margin` | both | Margin currently committed to open CROSS positions |
-| `maint_margin` | `detail: "margin"` only | Margin below which the account is liquidated |
-| `health` | both | `account_value - maint_margin`. The cushion above liquidation |
+| `total_margin_used` | both | Margin currently committed to open CROSS positions |
+| `total_ntl_pos` | full read only | Mark notional of the account's CROSS positions, summed. Isolated legs are NOT in it |
+| `cross_maintenance_margin_used` | `detail: "margin"` only | Margin below which the CROSS account is liquidated. **The scope is cross, and the name says so on purpose** — see the caution below |
+| `health` | both | `account_value - cross_maintenance_margin_used`. The cushion above liquidation |
 | `tier` | both | The liquidation band the engine has you in |
 | `abstraction` | both | `"unified"` (default) or `"portfolio"` (portfolio margin enrolled) |
 | `health_deferred` | both, when true | The risk engine cannot price a leg. See below |
@@ -38,16 +44,25 @@ balances, but it **omits `maint_margin`**. To compute `health` yourself, read
 :::caution
 **`health_deferred: true` means the risk numbers are not a solvency statement.**
 The key is absent in the normal case. When it is present, at least one open
-position has no usable price, so the chain reports `maint_margin` of `0` and
-defers the decision. A `0` maintenance here does NOT mean the account carries no
-requirement. Do not read `health` or `tier` as safe while the flag is set.
+position has no usable price, so the chain reports
+`cross_maintenance_margin_used` of `0` and defers the decision. A `0`
+maintenance here does NOT mean the account carries no requirement. Do not read
+`health` or `tier` as safe while the flag is set.
 :::
 
-**Isolated positions are outside every scalar on this page.** `account_value`,
-`init_margin`, `maint_margin` and `health` cover the CROSS bucket only. An
-isolated position posts its own margin bucket when it opens, that margin already
-left settled cash, and the position is judged against that bucket alone. Read a
-position's own `margin` field for an isolated leg.
+:::caution
+**Do not size an isolated position off `cross_maintenance_margin_used`.**
+Isolated positions are outside every scalar on this page. `account_value`,
+`total_margin_used`, `total_ntl_pos`, `cross_maintenance_margin_used` and
+`health` cover the CROSS bucket only. An isolated position posts its own margin
+bucket when it opens, that margin already left settled cash, and the engine
+judges the position against that bucket alone. For an isolated leg, read that
+position's own `margin` and `maint_margin` fields instead.
+
+This is why the field carries `cross` in its name. An account that holds only
+isolated positions reports a `cross_maintenance_margin_used` of `0` and is still
+one adverse mark from a per-leg liquidation.
+:::
 
 ## account_value {#account-value}
 
@@ -82,7 +97,7 @@ haircut collateral. `abstraction` tells you which class the account is in.
 ```
 withdrawable = max(0,  settled cash
                      - unrealized funding you OWE (debit side only)
-                     - init_margin
+                     - total_margin_used
                      - initial requirement of spot-margin borrowing )
 ```
 
@@ -94,11 +109,13 @@ Two differences from `account_value`, and both surprise people:
    Funding you are OWED does not raise it. An unrealized credit must not fund a
    withdrawal.
 
-`init_margin` in this formula is the same `init_margin` the account read
-reports. The spot-margin term is a separate quantity and is NOT inside
-`init_margin`: when an account has borrowed against spot, `withdrawable` is
-lower than `settled cash - funding owed - init_margin` alone predicts. An
-account with no spot-margin borrowing subtracts exactly `0`, and the two agree.
+`total_margin_used` in this formula is the same `total_margin_used` the account
+read reports, and `settled cash` is the same quantity `total_raw_usd` reports.
+The spot-margin term is a separate quantity and is NOT inside
+`total_margin_used`: when an account has borrowed against spot, `withdrawable`
+is lower than `total_raw_usd - funding owed - total_margin_used` alone predicts.
+An account with no spot-margin borrowing subtracts exactly `0`, and the two
+agree.
 
 The consequence is worth stating plainly, because it looks alarming and is not:
 
@@ -111,11 +128,11 @@ cents** — round them first and the sums miss by a cent:
 
 | | |
 |---|---|
-| Settled cash | 878.4866 |
+| Settled cash (`total_raw_usd`) | 878.4866 |
 | Unrealized PnL (two CROSS positions) | +807.9313 |
 | Unrealized funding owed | -1.0439 |
 | **account_value** | **1685.3740** |
-| Committed margin (`init_margin`) | 1281.00 |
+| Committed margin (`total_margin_used`) | 1281.00 |
 | **withdrawable** | **0** |
 
 `account_value` is `878.4866 + 807.9313 - 1.0439 = 1685.3740`.
@@ -134,16 +151,17 @@ correct while their total is a cent away from the field the chain returns.
 To free cash, close a position. Realizing that 807.93 turns it into settled cash
 and releases the margin behind it at the same time.
 
-## init_margin and maint_margin {#margins}
+## total_margin_used and cross_maintenance_margin_used {#margins}
 
-`init_margin` is the sum, over every open position, of what admission reserved
-when it opened. Per position:
+`total_margin_used` is the sum, over every open position, of what admission
+reserved when it opened. Per position:
 
 ```
 initial margin = |notional| / effective leverage
 ```
 
-`maint_margin` is what the liquidation engine demands to LET you keep it:
+`cross_maintenance_margin_used` is what the liquidation engine demands to LET
+you keep it:
 
 ```
 maintenance margin = |notional| × maintenance ratio
@@ -160,10 +178,24 @@ is the ceiling admission accepts, not merely the one configured. An order above
 it is refused with `InsufficientMargin` — no order id is burned and nothing
 rests on the book.
 
+## total_ntl_pos {#total-ntl-pos}
+
+```
+total_ntl_pos = Σ over open CROSS positions of  |size| × mark price
+```
+
+Position notional at the MARK, not at entry — it moves when the mark moves. The
+sum is taken over the same cross legs the scalars above cover, so an isolated
+leg contributes nothing to it. Add up the `notional` field of every position row
+whose `isolated` is `false` and you get the same figure.
+
+It is served on the full `account_state` read only. `detail: "margin"` skips the
+position walk, so it cannot produce this sum.
+
 ## health and tier {#health-and-tier}
 
 ```
-health = account_value - maint_margin
+health = account_value - cross_maintenance_margin_used
 ```
 
 Positive is the cushion above liquidation, in USDC. `tier` is the band the

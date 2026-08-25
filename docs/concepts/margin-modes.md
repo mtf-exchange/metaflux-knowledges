@@ -34,7 +34,8 @@ free collateral  = cross_account_value − Σ held_initial_margin
 reject  iff  required_init > free collateral
 ```
 
-So `init_margin = notional / max_leverage` — the classic `1 / max_leverage` ratio.
+So each position contributes `notional / max_leverage` to the account's
+`total_margin_used` — the classic `1 / max_leverage` ratio.
 
 Free collateral here is the **raw signed gate value**, which goes negative when
 open profit funds the held margin. The account read publishes it clamped, as
@@ -62,11 +63,11 @@ This gate applies to every live order path that can open new exposure:
 ### Maintenance margin & health {#maintenance-margin--health}
 
 ```
-health = account_value / maint_margin
+health = account_value / cross_maintenance_margin_used
 ```
 
 - `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed `i128`.
-- `maint_margin` = the sum over every held position leg of `|entry_notional| × maint_margin_ratio` (derived live from positions) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`).
+- `cross_maintenance_margin_used` = the sum over every held CROSS position leg of `|entry_notional| × maint_margin_ratio` (derived live from positions) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`). An isolated leg is judged against its own bucket and is not in this sum.
 
 The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol's baseline maintenance ratio — a governed parameter (`set_risk_base_maint_ratio`). Read the live value from a market's `maint_margin_ratio` field on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), and its `risk_override` when governance has set one; never assume a fixed percentage. The derived forced-close slippage floor is half the effective ratio unless explicitly overridden.
 
@@ -80,10 +81,10 @@ Maintenance sits below the initial requirement (`notional / max_leverage`), so a
 flowchart LR
     A["free_balance + locked_margin"] --> AV["account_value"]
     PNL["Σ unrealised PnL (cross positions)"] --> AV
-    AV --> H["health = account_value / maint_margin"]
+    AV --> H["health = account_value / cross_maintenance_margin_used"]
 ```
 
-`maint_margin` is the sum of per-position maintenance requirements (or the PM number if [portfolio margin](./portfolio-margin.md) is enrolled).
+`cross_maintenance_margin_used` is the sum of per-position maintenance requirements across the CROSS bucket (or the PM number if [portfolio margin](./portfolio-margin.md) is enrolled).
 
 Implication: a 10% adverse move on BTC reduces account-wide health, even if your ETH position is fine. You can prop up the BTC position by closing the ETH winner.
 
@@ -121,7 +122,7 @@ When you toggle `is_isolated: true` for an asset, the protocol moves `isolated_a
 flowchart LR
     DM["deposited_margin"] --> AB["asset_bucket"]
     PNL["± unrealised PnL (this asset)"] --> AB
-    AB --> PH["position_health = asset_bucket / maint_margin(asset)"]
+    AB --> PH["position_health = asset_bucket / leg maintenance"]
 ```
 
 If `position_health` falls into a liquidation tier, the **per-position** ladder fires. The rest of the account is untouched.

@@ -479,8 +479,9 @@ with no funds), not an empty array.
   "channel": "account_state",
   "data": {
     "address": "0x<addr>",
-    "account_value": "10000", "withdrawable": "8500",
-    "init_margin": "1500", "health": "9700", "tier": "Safe",
+    "account_value": "10000", "total_raw_usd": "9559", "withdrawable": "8500",
+    "total_margin_used": "1500", "total_ntl_pos": "372.60",
+    "health": "9700", "tier": "Safe",
     "abstraction": "unified",
     "clearinghouse_state": { "": { "positions": [
       { "coin": "BTC", "size": "0.00600", "entry": "62000", "upnl": "441",
@@ -500,14 +501,21 @@ with no funds), not an empty array.
 }
 ```
 
-- Margin scalars (`account_value` / `withdrawable` / `init_margin`) are
-  **whole-USDC** decimal strings, identical to the REST account read's
-  `MarginScalars`. `health` is `account_value − maint_margin`, a **signed
-  whole-USDC dollar figure, not a ratio**. `tier` is the liquidation tier name
-  (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`). `abstraction` is `"unified"`
-  or `"portfolio"` (PM-enrolled) — there is no account-level `maint_margin` or
-  `mode`/`pm_enabled` field; poll [`account_state` with `detail: "margin"`](../rest/info.md#account_state)
-  for the account-level `maint_margin`.
+- Margin scalars (`account_value` / `total_raw_usd` / `withdrawable` /
+  `total_margin_used` / `total_ntl_pos`) are **whole-USDC** decimal strings,
+  identical to the REST account read's. `total_raw_usd` is settled cash equity
+  and excludes unrealised PnL, which is the one difference from `account_value`.
+  `total_ntl_pos` is the mark notional of the **CROSS** legs only — add up the
+  `notional` of every position row whose `isolated` is `false` and you get the
+  same figure. `health` is `account_value − cross_maintenance_margin_used`, a
+  **signed whole-USDC dollar figure, not a ratio**. `tier` is the liquidation
+  tier name (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`). `abstraction` is
+  `"unified"` or `"portfolio"` (PM-enrolled) — there is no account-level
+  `cross_maintenance_margin_used` or `mode`/`pm_enabled` field on this frame;
+  poll [`account_state` with `detail: "margin"`](../rest/info.md#account_state)
+  for `cross_maintenance_margin_used`. Its scope is the cross bucket: an
+  isolated leg is margined and liquidated on its own and contributes nothing to
+  it.
 - `clearinghouse_state` — keyed by dex (`""` = core dex, else a MIP-3
   deployer's `0x` address); each value is `{positions: [...]}`. A position row
   carries `coin` (market symbol, not a numeric id), `size` (signed **real**

@@ -104,7 +104,7 @@ post their own initial and maintenance margin, summed into the account
 requirement:
 
 ```
-required_margin = init_margin(long_leg) + init_margin(short_leg)
+required_margin = initial_margin(long_leg) + initial_margin(short_leg)
 ```
 
 This is intentionally conservative: a long+short in one market is delta-neutral

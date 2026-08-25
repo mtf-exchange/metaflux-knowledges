@@ -10,7 +10,7 @@ Production trading bots that hold positions overnight should run one. The protoc
 
 ## TL;DR {#tldr}
 
-Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values, top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before `maint_margin` becomes binding.
+Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values, top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before the maintenance requirement becomes binding.
 
 ## Architecture {#architecture}
 
@@ -29,7 +29,7 @@ The watcher is a separate logical process even when co-located — its decisions
 ## Inputs {#inputs}
 
 - [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`) — the immediate signal that a tier changed.
-- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `maint_margin`, `tier`. Derive your own health ratio from the first two — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
+- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `total_raw_usd`, `total_ntl_pos`, `tier`. The account-level `cross_maintenance_margin_used` is NOT on this push — poll `detail: "margin"` for it. Derive your own health ratio from `account_value` and `cross_maintenance_margin_used` — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
 - [`markets`](../api/ws/subscriptions.md#markets) WS push: `mark_px` for forward-looking estimation, and `funding.rate_per_hr` / `funding.next_payment_ts` per market to anticipate the next funding charge before it settles.
 - [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments — one record per settlement, AFTER it applies. This channel cannot anticipate the next charge; use the `markets` row's `funding` block for that.
 
@@ -59,22 +59,23 @@ const T0_DEPOSIT_USDC = 1000;  // tune to position size
 
 interface MarginSummary {
   account_value: string;
-  maint_margin: string;
+  cross_maintenance_margin_used: string;
 }
 
 let recentSamples: number[] = [];
 
-// `account_state` does NOT carry an account-level `maint_margin` — only the
-// signed-dollar `health` field. The account-level `maint_margin` needed for
-// the ratio lives ONLY on the margin-depth account read, which has no
-// dedicated SDK wrapper — use the typed `raw` escape hatch and poll it.
+// The full `account_state` does NOT carry an account-level maintenance figure —
+// only the signed-dollar `health` field. `cross_maintenance_margin_used`, which
+// the ratio needs, lives ONLY on the margin-depth account read, and that read
+// has no dedicated SDK wrapper — use the typed `raw` escape hatch and poll it.
+// The scope is the CROSS bucket: this watcher does not cover an isolated leg.
 async function pollMarginSummary() {
   const summary = await watcher.info.raw<MarginSummary>({
     type: 'account_state', detail: 'margin',
     address: traderAddr,
   });
   const accountValue = Number(summary.account_value);
-  const maintMargin = Number(summary.maint_margin);
+  const maintMargin = Number(summary.cross_maintenance_margin_used);
   const ratio = maintMargin === 0 ? Infinity : accountValue / maintMargin;
 
   recentSamples.push(ratio);
@@ -147,10 +148,10 @@ async function emergencyUnwind(c: Client) {
 To bring your derived ratio from H₀ to target H₁ (H here is the ratio from [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health), not the wire `health` field):
 
 ```
-needed_deposit = (H₁ - H₀) × maint_margin
+needed_deposit = (H₁ - H₀) × cross_maintenance_margin_used
 ```
 
-Example: maint = 10 USDC, current health 1.0, target 1.5.
+Example: maintenance = 10 USDC, current health 1.0, target 1.5.
 needed = (1.5 - 1.0) × 10 = 5 USDC.
 
 Cap your watcher's per-block deposit to avoid spending too much on a transient regime. Aggressive default: 1× position notional reserved for top-ups; once exhausted, escalate to operator.

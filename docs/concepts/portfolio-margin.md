@@ -171,7 +171,7 @@ your position on it will net inside PM.
 
 ## Liquidation under PM {#liquidation-under-pm}
 
-PM accounts go through the standard [tiered liquidation](./tiered-liquidation.md) ladder, but `maint_margin` is the PM number, not the classical sum.
+PM accounts go through the standard [tiered liquidation](./tiered-liquidation.md) ladder, but `cross_maintenance_margin_used` is the PM number, not the classical sum.
 
 One PM-specific consideration: a T1 partial close can shift the scenario worst-case enough that the remaining position is healthy under PM but would not be under classical. That's intended — the partial is sized against PM in both directions.
 
@@ -217,17 +217,19 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 The native [`account_state`](../api/rest/info.md#account_state) read exposes
 `abstraction: "portfolio"` (whether PM is active for the account) alongside
-`init_margin`, `health`, and `tier`; the account-level `maint_margin` figure —
-which already reflects the PM-derived maintenance when enrolled — lives on the
-lighter [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state):
+`total_margin_used`, `health`, and `tier`; the account-level
+`cross_maintenance_margin_used` figure — which already reflects the PM-derived
+maintenance when enrolled — lives on the lighter
+[`account_state` with `detail: "margin"`](../api/rest/info.md#account_state):
 
 ```json
 {
-  "abstraction": "portfolio",
-  "maint_margin": "8",
-  "init_margin":  "12",
-  "health":       "...",
-  "tier":         "Safe"
+  "abstraction":                   "portfolio",
+  "cross_maintenance_margin_used": "8",
+  "total_margin_used":             "12",
+  "total_raw_usd":                 "20",
+  "health":                        "...",
+  "tier":                          "Safe"
 }
 ```
 
@@ -235,8 +237,8 @@ lighter [`account_state` with `detail: "margin"`](../api/rest/info.md#account_st
 > breakdown (which price/vol shock combination drove the PM number) are **not yet
 > broken out** as separate fields in the
 > [`account_state`](../api/rest/info.md#account_state) response — the PM scenario
-> engine computes them internally, but only the final `maint_margin` is surfaced
-> today. A future read (a per-scenario PM-details field on `account_state`) will
+> engine computes them internally, but only the final
+> `cross_maintenance_margin_used` is surfaced today. A future read (a per-scenario PM-details field on `account_state`) will
 > expose the breakdown.
 
 ## Edge cases {#edge-cases}
@@ -269,7 +271,7 @@ A: Yes. Each sub is independent. A master can be PM-enrolled while its subs are 
 A: Larger than classical (scenario grid), but bounded. The protocol caches per-account scenario results and only re-computes on position changes or scenario-parameter updates.
 
 **Q: Is PM transparent — can I see the exact maint number before placing an order?**
-A: You can read the current PM-derived `maint_margin` from [`/info account_state`](../api/rest/info.md#account_state) — see [Querying](#querying). There is no separate pre-trade "what would this order cost me" read; the per-scenario breakdown is not yet a surfaced field (see the note above).
+A: You can read the current PM-derived `cross_maintenance_margin_used` from [`/info account_state`](../api/rest/info.md#account_state) — see [Querying](#querying). There is no separate pre-trade "what would this order cost me" read; the per-scenario breakdown is not yet a surfaced field (see the note above).
 
 **Q: Do MIP-3 listings get PM credit?**
 A: The engine has no per-pair correlation matrix (see the corrections note above) — every enrolled position nets through the same scenario grid unless its market is governance-flagged strict-isolated, which excludes it. Check a market's live `strict_isolated` field on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta); new long-tail listings are likely candidates for that flag.

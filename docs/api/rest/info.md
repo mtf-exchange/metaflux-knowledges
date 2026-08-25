@@ -107,14 +107,40 @@ Per-account snapshot.
 | `detail` | `"full"` \| `"margin"` \| `"overview"` | no | Response depth. Absent ⇒ `"full"` |
 
 `detail: "margin"` answers with the **margin scalars only** — `address`,
-`account_value`, `withdrawable`, `maint_margin`, `init_margin`, `health`,
-`tier`, `abstraction`. It skips the position walk and the balance scan, so it is
-the right call for a frequent liquidation-health poll (a risk-watcher bot, an
-automated margin top-up). Both depths compute the scalars with one shared
-helper, so the two can never disagree.
+`account_value`, `total_raw_usd`, `withdrawable`, `total_margin_used`,
+`cross_maintenance_margin_used`, `health`, `tier`, `abstraction`. It skips the
+position walk and the balance scan, so it is the right call for a frequent
+liquidation-health poll (a risk-watcher bot, an automated margin top-up). Both
+depths compute the scalars with one shared helper, so the two can never
+disagree.
 
-**`maint_margin` is served only at `detail: "margin"`.** The full depth carries
-the per-leg `maint_margin` on each position row instead.
+```json
+{
+  "type": "account_state",
+  "data": {
+    "address":                       "0x00000000000000000000000000000000000ca11e",
+    "account_value":                 "3000",
+    "total_raw_usd":                 "3000",
+    "withdrawable":                  "3000",
+    "total_margin_used":             "0",
+    "cross_maintenance_margin_used": "0",
+    "health":                        "3000",
+    "tier":                          "Safe",
+    "abstraction":                   "unified",
+    "height": 562,
+    "time":   1700000000555
+  }
+}
+```
+
+The two depths do NOT carry the same scalar set, in both directions:
+
+- **`cross_maintenance_margin_used` is served only at `detail: "margin"`.** The
+  full depth carries the per-leg `maint_margin` on each position row instead.
+  The two are different quantities — one is the account aggregate, one is a
+  single leg's contribution.
+- **`total_ntl_pos` is served only at the full depth.** It is a sum over the
+  position walk, and `detail: "margin"` is defined by skipping that walk.
 
 `detail: "overview"` answers with the account's **non-trading** state instead —
 vaults, staking, sub-accounts, multisig, agents and the derived role. One
@@ -135,12 +161,14 @@ Response (a faucet-funded account, no positions):
   "type": "account_state",
   "data": {
     "address":         "0x00000000000000000000000000000000000ca11e",
-    "account_value":   "3000",
-    "withdrawable":    "3000",
-    "init_margin":     "0",
-    "health":          "3000",
-    "tier":            "Safe",
-    "abstraction":     "unified",
+    "account_value":     "3000",
+    "total_raw_usd":     "3000",
+    "total_ntl_pos":     "0",
+    "withdrawable":      "3000",
+    "total_margin_used": "0",
+    "health":            "3000",
+    "tier":              "Safe",
+    "abstraction":       "unified",
     "clearinghouse_state": { "": { "positions": [] } },
     "balances": [
       { "name": "USDC", "signing_id": 100, "total": "3000", "hold": "0", "avg_entry_px": null }
@@ -208,10 +236,13 @@ deployer's lowercase `0x` address:
 | Field | Type | Description |
 |-------|------|-------------|
 | `account_value` | Decimal string | Equity incl. settled PnL, **whole-USDC plane** (`"3000"` = 3000 USDC, NOT base units) |
-| `withdrawable` | Decimal string | Cash you can take out, **clamped at zero**. Settled cash minus funding you owe minus `init_margin`. It does NOT count unrealised profit, so a healthy account funded by open profit reads `"0"` — see [account value](../../concepts/account-value.md#withdrawable). The admission gate still uses the raw signed figure, which can be negative; the read never is |
-| `init_margin` | Decimal string | Held initial-margin requirement |
-| `health` | Decimal string | `account_value − maint_margin` (signed dollar figure; can be negative) — **not a ratio** |
-| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / maint_margin`; `"Safe"` when no maint margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
+| `total_raw_usd` | Decimal string | **Settled cash equity**, whole-USDC. Realized USDC only — deposits, closed-position PnL, fees already paid. It **excludes unrealised PnL**, which is the one difference from `account_value`. It is the `settled cash` term the `withdrawable` formula starts from, so a caller can now reconcile that formula from the read alone |
+| `withdrawable` | Decimal string | Cash you can take out, **clamped at zero**. `total_raw_usd` minus funding you owe minus `total_margin_used`. It does NOT count unrealised profit, so a healthy account funded by open profit reads `"0"` — see [account value](../../concepts/account-value.md#withdrawable). The admission gate still uses the raw signed figure, which can be negative; the read never is |
+| `total_margin_used` | Decimal string | Held initial-margin requirement |
+| `total_ntl_pos` | Decimal string | Mark notional of the account's **CROSS** positions, summed: `Σ \|real size\| × mark_px`, whole-USDC, unsigned. **Isolated legs are excluded** — they are margined and liquidated on their own. Equal to the sum of the `notional` of every position row whose `isolated` is `false`. **Full depth only**: `detail: "margin"` skips the position walk that produces it |
+| `cross_maintenance_margin_used` | Decimal string | The **CROSS** account's maintenance requirement, whole-USDC — the figure the liquidation engine judges the cross bucket against. **`detail: "margin"` only**; the full depth omits it. **The scope is why the name says `cross`:** an isolated position posts its own margin bucket and is liquidated per leg, so it contributes nothing here. An account holding only isolated legs reports `"0"` and can still be liquidated. To size an isolated position, read that leg's own `maint_margin` row instead |
+| `health` | Decimal string | `account_value − cross_maintenance_margin_used` (signed dollar figure; can be negative) — **not a ratio** |
+| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
 | `abstraction` | enum | `"unified"` or `"portfolio"` (PM-enrolled) |
 | `clearinghouse_state` | object | Keyed by dex (`""` = core dex, else a MIP-3 deployer's `0x` address); each value is `{positions: [...]}` |
 | `clearinghouse_state["<dex>"].positions[*].coin` | string | Market symbol (e.g. `"BTC"`), not a numeric id |

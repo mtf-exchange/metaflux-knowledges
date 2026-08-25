@@ -70,7 +70,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## H {#h}
 
-**Health ratio.** `account_value / maint_margin`. Drives the [tiered liquidation](./tiered-liquidation.md) ladder.
+**Health ratio.** `account_value / cross_maintenance_margin_used`. Drives the [tiered liquidation](./tiered-liquidation.md) ladder.
 
 **High-water mark.** Highest historical share price for a vault, used to gate performance-fee accrual. See [vaults](./vaults.md).
 
@@ -94,7 +94,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## M {#m}
 
-**Maintenance margin.** Minimum collateral required to keep a position open. Health = `account_value / maint_margin`. See [margin modes](./margin-modes.md).
+**Maintenance margin.** Minimum collateral required to keep a position open. Health = `account_value / cross_maintenance_margin_used`. The account-level field covers the CROSS bucket only; an isolated leg carries its own `maint_margin` on its position row. See [margin modes](./margin-modes.md).
 
 **Maker / Taker.** Maker provides liquidity (resting order); taker removes it (crossing order). Different fee rates. See [fees](./fees.md).
 

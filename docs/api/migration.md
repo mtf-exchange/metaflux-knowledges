@@ -1,14 +1,77 @@
 ---
-description: Breaking API changes on the MetaFlux read API — the read-surface cut, and the earlier 0.7.14 addressing change. A migration checklist for integrators and market makers.
+description: Breaking API changes on the MetaFlux read API — the account-scalar rename, the read-surface cut, and the earlier 0.7.14 addressing change. A migration checklist for integrators and market makers.
 ---
 
 # API migrations
 
 :::warning
-**Breaking changes.** Two migrations are on this page, newest first. Signed
-`/exchange` actions are **unchanged** by both. Work through the checklists
+**Breaking changes.** Three migrations are on this page, newest first. Signed
+`/exchange` actions are **unchanged** by all three. Work through the checklists
 before upgrading a client.
 :::
+
+# The account-scalar rename {#account-scalar-rename}
+
+:::info
+**`account_state` now uses institution-standard names for its account-level
+scalars.** Two fields are renamed and two are new. Only the ACCOUNT object
+changes — every position row under `clearinghouse_state` keeps its own field
+names.
+:::
+
+| Was | Is now | Read |
+|---|---|---|
+| `init_margin` | `total_margin_used` | both depths |
+| `maint_margin` | `cross_maintenance_margin_used` | `detail: "margin"` only, as before |
+| — | `total_raw_usd` **(new)** | both depths |
+| — | `total_ntl_pos` **(new)** | full depth only |
+
+**The old names are gone, not aliased.** A client that reads `init_margin`
+receives `undefined`, which arithmetic turns into a silent `NaN` rather than an
+error. Grep your client for both old names before you upgrade.
+
+**Do not run a blind find-and-replace on `maint_margin`.** Three other fields
+share the word and NONE of them changed:
+
+| Field | Where | Status |
+|---|---|---|
+| `clearinghouse_state["<dex>"].positions[*].maint_margin` | position row | **unchanged** — this leg's maintenance contribution |
+| `pm_maint_margin` | account object | **unchanged** — the portfolio-margin figure |
+| `maint_margin_ratio` / `init_margin_ratio` | `markets_meta` | **unchanged** — per-market ratios, in bps |
+
+**The two new fields.**
+
+- **`total_raw_usd`** — settled cash equity, whole-USDC. Realized USDC only; it
+  excludes unrealized PnL, which is the one difference from `account_value`. It
+  is the `settled cash` term the `withdrawable` formula starts from, so the
+  formula is now reconcilable from one read.
+- **`total_ntl_pos`** — mark notional of the account's CROSS positions, summed
+  and unsigned. **Isolated legs are excluded.** It equals the sum of the
+  `notional` of every position row whose `isolated` is `false`. Full depth only:
+  `detail: "margin"` skips the position walk that produces it.
+
+**Why the name says `cross`.** `cross_maintenance_margin_used` is the figure the
+liquidation engine judges the CROSS bucket against. An isolated position posts
+its own margin bucket and is liquidated per leg, so it contributes nothing to
+this number. An account holding only isolated legs reports `"0"` and can still
+be liquidated. **Sizing an isolated position off this field is wrong** — read
+that leg's own `maint_margin` row instead. The old name did not say this, and
+the scope was the same then.
+
+Checklist:
+
+1. Rename `init_margin` → `total_margin_used` at every read site.
+2. Rename `maint_margin` → `cross_maintenance_margin_used`, but ONLY where you
+   read the account object. Leave every position-row read alone.
+3. If you derive the health ratio, it is now
+   `account_value / cross_maintenance_margin_used` — still on `detail: "margin"`
+   only. See [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health).
+4. Upgrade the client SDK. `@metaflux-dex/client` and the Rust client carry the
+   new field names; an older SDK build cannot reach them.
+
+See [account value](../concepts/account-value.md#the-scalars) for the arithmetic
+behind each scalar, and [`account_state`](./rest/info.md#account_state) for the
+full field table.
 
 # The read-surface cut {#read-surface-cut}
 

@@ -6,7 +6,7 @@
 
 ## TL;DR {#tldr}
 
-A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier defines what the protocol does as health drops. The [yellow card](#why-a-yellow-card) (T0) is MetaFlux's hysteresis grace period — one block of warning before any position is sold. T4 [ADL](./adl.md) is the last-resort loss mutualisation.
+A 5-tier ladder driven by `health = account_value / cross_maintenance_margin_used`. Each tier defines what the protocol does as health drops. The [yellow card](#why-a-yellow-card) (T0) is MetaFlux's hysteresis grace period — one block of warning before any position is sold. T4 [ADL](./adl.md) is the last-resort loss mutualisation.
 
 | Tier | Health band | Action | Position touched? |
 |------|-------------|--------|---|
@@ -17,7 +17,7 @@ A 5-tier ladder driven by `health = account_value / maint_margin`. Each tier def
 | **T3** | `health < 0.667` | [Metaliquidity vault first](#mlp-first-bite) on a core market, then [netting at mark](#t3-backstop--netting-at-mark) against profitable counter-parties (un-fillable T1/T2 remainders escalate here too) | Yes — taken over or netted, both at mark |
 | **T4** | negative equity after T3 | [Deficit waterfall](#t4--the-deficit-waterfall): Metaliquidity vault → ADL haircut → insurance fund → treasury queue | Winners' realized gains haircut |
 
-`account_value` includes unrealised PnL. `maint_margin` is per-asset baseline (classical) or SPAN-derived (PM-enrolled).
+`account_value` includes unrealised PnL. `cross_maintenance_margin_used` is per-asset baseline (classical) or SPAN-derived (PM-enrolled), and covers the CROSS bucket only — an isolated leg runs its own per-position ladder.
 
 **A [deployed market](../mip/mip-3.md#liquidation) can move these edges.** Its backstop settings
 raise the escalation level above the global one, and a market set to `Disabled` never escalates to
@@ -298,7 +298,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 |----------|----------|
 | Headed for T0 | Top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross). Pre-position trigger orders before stress. |
 | Already at T0 | Same. ALO orders are already cancelled; place fresh limits at protective levels. |
-| Bouncing in/out of T0 | Tighten your internal ratio alert toward `1.2` (the derived ratio from `account_value` / `maint_margin` — see [two meanings of health](#two-meanings-of-health), not the wire `health` field). Look at what's driving it — funding payment? mark band edge? oracle outage? |
+| Bouncing in/out of T0 | Tighten your internal ratio alert toward `1.2` (the derived ratio from `account_value` / `cross_maintenance_margin_used` — see [two meanings of health](#two-meanings-of-health), not the wire `health` field). Look at what's driving it — funding payment? mark band edge? oracle outage? |
 | T1 partial just fired | Re-eval. Position is 50% smaller; consider closing the remainder voluntarily before cooldown's full-close escalation. |
 | Repeated T1 cooldown traps | The position size is wrong for the bucket. Don't refill the bucket without also resizing. |
 
@@ -311,12 +311,13 @@ produces alerts that never fire.
    `health = account_value / maintenance_margin` and compares that RATIO
    against the yellow-card / partial / full-market thresholds. This ratio
    decides your tier. No read returns it as its own field — derive it
-   yourself from `account_value` and `maint_margin`, both on
-   [`account_state`](../api/rest/info.md#account_state) /
-   `account_state` with `detail: "margin"`.
+   yourself from `account_value` and `cross_maintenance_margin_used`. Both are
+   on [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state);
+   the full `account_state` carries `account_value` but NOT the maintenance
+   figure, so the ratio needs the margin depth.
 2. **The wire `health` field.** The `health` field that `account_state` and
    `account_state` actually returns is a signed DOLLAR DIFFERENCE —
-   `account_value − maint_margin` — not a ratio. A healthy account can show a
+   `account_value − cross_maintenance_margin_used` — not a ratio. A healthy account can show a
    large positive dollar figure; it does not sit near `1.0`.
 
 **Never compare the wire `health` field against a ratio-scale threshold**
@@ -326,7 +327,7 @@ track the tier decision instead:
 - read the `tier` field directly (`Safe` / `T0` / `T1` / `T2` / `T3`, on
   `account_state` and every
   [`notifications`](../api/ws/subscriptions.md#notifications) record), or
-- compute the ratio yourself from `account_value` / `maint_margin`.
+- compute the ratio yourself from `account_value` / `cross_maintenance_margin_used`.
 
 The yellow-card / partial / full-market thresholds are governance-tunable
 per-market parameters, not fixed forever. The `tier` field always reflects
@@ -335,7 +336,7 @@ hardcoding a ratio boundary in your own alerting.
 
 ## How to stay clear {#how-to-stay-clear}
 
-- Watch `account_value` and `maint_margin` via [`account_state`](../api/rest/info.md#account_state) queries and derive your own ratio from them — see [two meanings of health](#two-meanings-of-health) above; the wire `health` field is a dollar figure, not this ratio.
+- Watch `account_value` and `cross_maintenance_margin_used` via [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state) queries and derive your own ratio from them — see [two meanings of health](#two-meanings-of-health) above; the wire `health` field is a dollar figure, not this ratio.
 - Set an internal alert when your derived ratio drops under `1.2` — comfortably above the yellow-card entry.
 - For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when your `tier` crosses a threshold.
 - Watch [`notifications`](../api/ws/subscriptions.md#notifications) on the WS feed for immediate tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`), and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values.

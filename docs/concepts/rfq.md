@@ -138,7 +138,7 @@ the request itself carries no allow-list.
 | Book impact | None — the trade does not match against resting orders |
 | Public visibility | None today — it does not appear on the public trade tape or `fills` |
 | Fees | Standard maker/taker per fee schedule |
-| Margin | Same as a regular fill (`init_margin` debited from both sides) |
+| Margin | Same as a regular fill (initial margin reserved on both sides) |
 | Liquidation | Same — the position becomes a regular position post-settle |
 
 ## What RFQ doesn't do {#what-rfq-doesnt-do}
