@@ -87,7 +87,7 @@ Response (truncated to one entry per list):
     "spot": {
       "pairs": [
         {
-          "id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
+          "signing_id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
           "active": true, "mark_px": "50000", "mid_px": "50000", "prev_day_px": null,
           "day_ntl_vlm": "0", "min_notional": "1", "taker_fee_bps": "5",
           "circulating_supply": "0"

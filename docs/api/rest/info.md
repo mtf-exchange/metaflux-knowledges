@@ -143,7 +143,7 @@ Response (a faucet-funded account, no positions):
     "abstraction":     "unified",
     "clearinghouse_state": { "": { "positions": [] } },
     "balances": [
-      { "asset": 100, "name": "USDC", "total": "3000", "hold": "0", "avg_entry_px": null }
+      { "name": "USDC", "signing_id": 100, "total": "3000", "hold": "0", "avg_entry_px": null }
     ],
     "pm_maint_margin":          "0",
     "pm_net_value":             "0",
@@ -271,7 +271,7 @@ values, so a client can cross-check or de-duplicate REST and WS against it.
 
 :::caution
 **Treat a missing key exactly like `null`** — no basis known. An older node
-serves `balances` rows carrying `asset`, `name`, `total` and `hold` only.
+serves `balances` rows carrying `name`, `total` and `hold` only.
 :::
 
 `avg_entry_px` is what the account paid, per token, for what it holds. It is the

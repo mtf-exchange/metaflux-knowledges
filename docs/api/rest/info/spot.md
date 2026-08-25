@@ -39,7 +39,7 @@ Response (the `spot` section):
     "spot": {
       "pairs": [
         {
-          "id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
+          "signing_id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
           "taker_fee_bps": "5", "min_notional": "100", "active": true,
           "mark_px": "61650", "mid_px": "61651.5", "day_ntl_vlm": "15230.5",
           "prev_day_px": "61200", "circulating_supply": "21000000"
@@ -160,7 +160,8 @@ Response:
   "data": {
     "pools": [
       {
-        "asset": 100,
+        "name": "USDC",
+        "signing_id": 100,
         "total_supplied": "1000",
         "total_borrowed": "20",
         "idle": "980",
