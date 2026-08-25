@@ -104,7 +104,7 @@ Per-account snapshot.
 | Arg | Type | Required | Description |
 |-----|------|----------|-------------|
 | `address` | hex address | yes | Account address |
-| `detail` | `"full"` \| `"margin"` \| `"overview"` | no | Response depth. Absent ⇒ `"full"` |
+| `detail` | `"full"` \| `"margin"` \| `"overview"` \| `"adl"` | no | Response depth. Absent ⇒ `"full"` |
 
 `detail: "margin"` answers with the **margin scalars only** — `address`,
 `account_value`, `total_raw_usd`, `withdrawable`, `total_margin_used`,
@@ -149,6 +149,10 @@ state you want. `"full"` and `"margin"` both answer the trading half — `margin
 is the scalar-only subset of it — while `"overview"` answers the other half. The
 only fields all three share are `address` and the `height` / `time` stamp. See
 [`detail: "overview"`](#account_state-overview) below.
+
+`detail: "adl"` answers the **full body widened**, not a different body: every
+field of `"full"` plus `adl_lamps` on each position row. See
+[`detail: "adl"`](#account_state-adl) below.
 
 An **unknown address** (never seen on-chain) returns **200** with a fully zeroed
 record (`account_value:"0"`, empty `clearinghouse_state` / `balances`), NOT a
@@ -258,6 +262,7 @@ deployer's lowercase `0x` address:
 | `clearinghouse_state["<dex>"].positions[*].maint_margin` | Decimal string | This leg's maintenance-margin contribution, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
 | `clearinghouse_state["<dex>"].positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
 | `clearinghouse_state["<dex>"].positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
+| `clearinghouse_state["<dex>"].positions[*].adl_lamps` | uint8 \| absent | **`detail: "adl"` only** — the ADL queue indicator, `0` to `4`. More lamps = sooner deleveraged. Omitted at every other depth, and on the WS frame. See [`detail: "adl"`](#account_state-adl) |
 | `balances[*].asset` | uint32 | Asset id (`100` for USDC) |
 | `balances[*].name` | string | Token symbol (`"USDC"` for row 0) |
 | `balances[*].total` | Decimal string | Full balance. **Not** the spendable amount — perp margin sits inside it. Use `withdrawable` |
@@ -461,6 +466,74 @@ keys present and each one empty or zeroed.
 
 State source: `user_vaults`, `c_staking`, `sub_account_tracker`,
 `multi_sig_tracker.configs[addr]`, `locus.user_account_configs[addr].approved_agents`.
+
+#### `detail: "adl"` — the ADL queue indicator {#account_state-adl}
+
+`detail: "adl"` returns the DEFAULT body with one extra key on every position
+row: `adl_lamps`, an integer from `0` to `4`. More lamps means the position sits
+sooner in the auto-deleveraging queue. Nothing else changes, so a caller can
+switch a screen from `"full"` to `"adl"` without touching any other field.
+
+```json
+{ "type": "account_state", "address": "0x<addr>", "detail": "adl" }
+```
+
+```json
+{
+  "coin":              "BTC",
+  "size":              "1.00000",
+  "entry":             "67000.00",
+  "upnl":              "5.00",
+  "isolated":          false,
+  "lev":               10,
+  "liq":               "61000.00",
+  "roe":               "0.0075",
+  "funding":           "-0.12",
+  "margin":            "201.00",
+  "maint_margin":      "670.00",
+  "notional":          "6705.00",
+  "adl_lamps":         3
+}
+```
+
+**It is opt-in for a reason.** Each lamp ranks the position against every other
+position in that market, so the node pays one extra pass over the market per
+row. Ask for `"adl"` only on a screen that shows the column; poll the default
+depth otherwise.
+
+**It is REST-only.** The [WS `account_state`](../ws/subscriptions.md#account_state)
+frame always carries the default shape and never `adl_lamps` — the lamp ranks
+your seat against OTHER accounts, so a stranger's PnL crossing a quartile edge
+would re-emit your frame.
+
+:::warning
+**Two rules a caller gets wrong.**
+
+**1. It is a RANKING, not a probability.** The lamps say where you sit in the
+queue among the profitable holders on your side — the quartile of your seat, `4`
+= top quarter, `1` = bottom quarter. They do NOT say ADL is likely. Four lamps
+with nobody being liquidated on the other side still means **nothing happens**.
+Never render it as a risk percentage.
+
+**2. ZERO lamps is meaningful.** Zero is not "unknown" and not "safest of the
+ranked". Zero means **not in the queue at all**, which is the honest answer for
+a position ADL cannot structurally reach: no committed mark for the market, no
+unrealised profit, no cost basis, or **nobody on the opposite side to be
+deleveraged against**. That last one includes a hedge account whose only
+opposing leg is its OWN — ADL never nets an account against itself, so a sole
+hedge holder reads `0` on both legs. A floor of one lamp would be a false alarm.
+:::
+
+**What the ranking is.** The queue is ordered by the same expression the settle
+path uses to pick its counterparty: return on committed margin, `unrealised PnL
+÷ |entry notional|`, highest first, with a `(address, leg)` ascending tiebreak.
+So a small, highly levered winner is netted ahead of a large, lightly levered one
+with bigger absolute PnL. Hedge legs rank SEPARATELY, because ADL settles per
+leg: a long leg is only ever ranked against other longs.
+
+This is the **netting-at-mark** queue — who gets deleveraged. It is a different
+question from who pays the [deficit haircut](../../concepts/adl.md#2-allocation--deterministic-capacity-pro-rata),
+which is allocated pro-rata by capacity and has no ranking at all.
 
 ### Per-vault TVL, share price, and strategy {#vault_state}
 
@@ -676,6 +749,47 @@ WS never drift. An unknown field renders `null`.
 A parked TP/SL leg is an open order too: it renders with `tif: "trigger"` and a
 populated `trigger` block.
 
+**Inside the `trigger` block.** A resting book order with an attached trigger
+carries `trigger_px` + `trigger_above` only. A parked (off-book) leg carries
+`is_parked: true`, `is_market`, and `limit_px` as well. Two further keys appear
+only on the leg that owns them:
+
+| Key | Type | When it is present |
+|-----|------|--------------------|
+| `trigger_px` | Decimal string | Always. The mark level the leg fires at |
+| `trigger_above` | bool | Always. `true` = fire when the mark rises to `trigger_px` |
+| `is_parked` | bool | Parked legs only. Absent on a resting book order's block |
+| `is_market` | bool | Parked legs only. `true` = fires a market exit; `false` = rests a limit exit |
+| `limit_px` | Decimal string \| null | Parked legs only. The resting price of a limit trigger; `null` on a market trigger |
+| `group` | uint64 | **Ladder legs only.** The handle every leg of one scaled TP/SL ladder shares |
+| `trail_px` | Decimal string | **Trailing legs only.** The callback offset the level ratchets by |
+
+:::info
+**`group` and `trail_px` are ABSENT unless the leg owns them.** Read absence as
+"not a ladder leg" and "not a trailing leg". Every row you read before these
+keys existed is byte-identical, so a decoder that types them as optional needs
+no other change. A decoder that makes them REQUIRED fails on every ordinary
+trigger.
+:::
+
+**`group` — the scaled TP/SL ladder.** A
+[`positionTpsl`](./exchange.md#position-tpsl-ladder) batch of **three or more**
+protective legs parks a *ladder*: the legs share one `group`, and they are **not
+OCO** — a fill of one leg does not cancel the others, which is the point of
+scaling out in steps. One or two legs stay the older shapes: a lone trigger, or
+an OCO pair whose first fill cancels its partner. Group the rows by this value to
+render one ladder as one control. The whole ladder retires together the moment
+the position it protects is closed, by any path.
+
+**`trail_px` — the trailing stop.** The parked level ratchets toward the mark by
+this offset and never away from it, once per block. So when `trail_px` is
+present, **`trigger_px` is the RATCHETED level, not the level the owner sent** —
+do not render it as a static order the user placed. A trailing leg is always a
+stop-loss; the chain refuses a trailing take-profit, which would chase its level
+away from a winning position. `trail_px` is a **read-only** field today — see
+[trailing stops](./exchange.md#trailing-stops-read-only) for why no caller can
+send one yet.
+
 ### Recent fill history for an account {#user_fills}
 
 Account-scoped fill history, served directly from committed on-node state (a
@@ -810,13 +924,13 @@ The `data.status` discriminates the branch:
   "data": {
     "status": "resting",
     "order": {
-      "oid":            12345,
-      "market_id":      0,
-      "side":           "bid",
-      "px":             "67000",
-      "size":           "700",
-      "inserted_at_ms": 1700000000000,
-      "cloid":          "0x000000000000000000000000cafef00d"
+      "oid":         12345,
+      "coin":        "BTC",
+      "side":        "B",
+      "px":          "67000",
+      "sz":          "700",
+      "inserted_at": 1700000000000,
+      "cloid":       "0x000000000000000000000000cafef00d"
     }
   }
 }
@@ -830,16 +944,44 @@ The `data.status` discriminates the branch:
   "data": {
     "status": "triggered",
     "trigger": {
-      "oid":              12345,
-      "market_id":        0,
-      "side":             "ask",
-      "trigger_px":       "66000",
-      "trigger_above":    false,
-      "is_market":        false,
-      "limit_px":         "65000",
-      "size":             "700",
+      "oid":           12345,
+      "coin":          "BTC",
+      "side":          "A",
+      "trigger_px":    "66000",
+      "trigger_above": false,
+      "is_market":     false,
+      "limit_px":      "65000",
+      "sz":            "700",
       "registered_at": 1700000000000,
-      "fired":            false
+      "fired":         false
+    }
+  }
+}
+```
+
+A **ladder** leg adds `group`, and a **trailing** leg adds `trail_px`. Both keys
+follow the same absence rule as on [`open_orders`](#open_orders) — the node
+writes each one only on the leg that owns it, so an ordinary trigger carries
+neither:
+
+```json
+{
+  "type": "order_status",
+  "data": {
+    "status": "triggered",
+    "trigger": {
+      "oid":           12346,
+      "coin":          "BTC",
+      "side":          "A",
+      "trigger_px":    "65750",
+      "trigger_above": false,
+      "is_market":     true,
+      "limit_px":      null,
+      "sz":            "250",
+      "registered_at": 1700000000000,
+      "fired":         false,
+      "group":         12345,
+      "trail_px":      "250"
     }
   }
 }
@@ -869,8 +1011,8 @@ registry and fill ring are keyed by `oid`):
 | Field | Type | Description |
 |-------|------|-------------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | Resolved lifecycle state |
-| `order` | object | Present on `"resting"` — `oid`, `market_id`, `side` (`"bid"`/`"ask"`), `px` / `size` (fixed-point decimal strings), `inserted_at_ms`, `cloid` (hex \| null) |
-| `trigger` | object | Present on `"triggered"` — `oid`, `market_id`, `side`, `trigger_px` / `size` (fixed-point decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (fixed-point decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool) |
+| `order` | object | Present on `"resting"` — `oid`, `coin` (market symbol or spot pair name), `side` (`"B"` = bid / `"A"` = ask), `px` / `sz` (decimal strings), `inserted_at`, `cloid` (hex \| null) |
+| `trigger` | object | Present on `"triggered"` — `oid`, `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (fixed-point decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
 | `fill` | object | Present on `"filled"` — the matching fill record (see [`user_fills`](#user_fills)) |
 
 ### Latest committed block metadata {#block_info}

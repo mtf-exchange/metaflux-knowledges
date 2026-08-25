@@ -371,6 +371,7 @@ The snapshot is an **array** of records, each in the same fixed shape as an [`or
 
 - Each element is one resting order: the nested `order` object (`coin`, `side`, `limit_px`, `sz` = remaining size, `orig_sz`, `oid`, `cloid`, `tif`, `reduce_only`), with `filled_sz` / `avg_px` / `reason` all `null` (a standing order, not an event) and `time` the order's insertion timestamp (consensus ms). On this snapshot `orig_sz` is `null` (the placed size is not re-derived for a standing order) and `reduce_only` is `false`; `cloid` is the client id or `null`. `limit_px` is whole-USDC, `sz` is size-plane.
 - Because every frame is a full snapshot, `is_snapshot` is always `true` here — treat each frame as the account's complete current resting set, not an incremental change.
+- A parked TP/SL leg renders the SAME `trigger` block the REST read serves, so a ladder leg carries `group` and a trailing leg carries `trail_px` here too. Both keys are absent on every other leg — see [`open_orders`](../rest/info.md#open_orders) for the rule.
 
 ### Per-account margin and liquidation notices {#notifications}
 
@@ -516,6 +517,11 @@ with no funds), not an empty array.
   for `cross_maintenance_margin_used`. Its scope is the cross bucket: an
   isolated leg is margined and liquidated on its own and contributes nothing to
   it.
+- **This frame never carries `adl_lamps`.** `detail` is a REST parameter only,
+  so the push always renders the default shape. The lamp ranks your seat against
+  OTHER accounts, so an always-on lamp would re-emit your frame whenever a
+  stranger's PnL crossed a quartile edge. Poll
+  [`account_state` with `detail: "adl"`](../rest/info.md#account_state-adl) for it.
 - `clearinghouse_state` — keyed by dex (`""` = core dex, else a MIP-3
   deployer's `0x` address); each value is `{positions: [...]}`. A position row
   carries `coin` (market symbol, not a numeric id), `size` (signed **real**

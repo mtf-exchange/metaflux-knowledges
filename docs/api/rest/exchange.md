@@ -582,6 +582,7 @@ grow a position.
 | `trigger.trigger_px` | uint64 | `> 0` | Trigger price in fixed-point tick units (widened to `i128`). The mark crossing this price fires the leg. For a **market** trigger it is also the fired price; for a **limit** trigger it drives the fire direction only (the resting price is `limit_px`) |
 | `trigger.is_market` | bool | — | Selects the fired exit. `true` = **market trigger**: fire a reduce-only slippage-bounded IOC. `false` = **limit trigger**: rest a reduce-only `gtc` limit at the order's `limit_px` (rules below) |
 | `trigger.tpsl` | enum | `"tp"` / `"sl"` | Take-profit / stop-loss label, surfaced in [`/info`](./info.md#order_status). The fire direction comes from the leg `side` versus the mark, not from this label |
+| `trigger.trail_px` | uint64 | — | **REFUSED today — do not send it.** The trailing callback. The chain reads and serves it, but the frozen signing type does not bind it, so an order carrying it is rejected. See [trailing stops](#trailing-stops-read-only) |
 
 :::info
 **`is_market` controls the exit type .** Before
@@ -656,6 +657,37 @@ committed effect observable on the [WS feed](../ws/subscriptions.md) / `/info`.
 Multi-leg entry-plus-protective baskets use [`batch_order`](#batch_order) with
 `grouping: "normalTpsl"` / `"positionTpsl"`.
 
+#### Trailing stops — READ side only, not yet submittable {#trailing-stops-read-only}
+
+:::danger
+**You cannot submit a trailing stop today.** `/exchange` REJECTS any
+`submit_order` or `batch_order` whose trigger block carries `trail_px`:
+
+```
+400 trail_px is not bound by the order signing type yet; a trailing stop cannot be submitted over the typed path
+```
+
+Do not build a write path against this field. Build the READ path — the chain
+already serves `trail_px` on [`open_orders`](./info.md#open_orders) and
+[`order_status`](./info.md#order_status).
+:::
+
+**Why it is refused instead of ignored.** The `SubmitOrder` and `BatchOrder`
+EIP-712 type strings are frozen, and neither binds `trail_px`. An unsigned
+control field can be added or removed in flight while the signature still
+verifies — and `trail_px` moves WHERE a position closes. The chain refuses the
+order rather than silently downgrading a requested trailing stop into a static
+one, because the silent downgrade is the worse failure.
+
+**What a trailing stop is, when it lands.** The parked level ratchets toward the
+mark by the callback offset, once per block, and never away from it. So the
+served `trigger_px` is a high-water mark, not the level the owner sent. It is
+always a stop-loss: the chain refuses a trailing take-profit, whose level would
+chase a winning position downward and fire at a price nobody asked for.
+
+The write path opens when a **versioned** type string binds the field. Until
+then this section is an upgrade notice, not a capability.
+
 ---
 
 ### Place multiple orders in one signature {#batch_order}
@@ -698,6 +730,51 @@ per placed leg**, in input order, each echoing its own `cloid`. Legs are
 **independent**: each runs the full order gate on its own, so one rejected leg
 does not roll back the others. A batch carries at most **1000** orders; an empty
 `orders` array is rejected (`empty batch`).
+
+#### `positionTpsl` — protective legs, and the scaled ladder {#position-tpsl-ladder}
+
+`grouping: "positionTpsl"` parks protective legs against a position you already
+hold. There is no entry order: **every** leg parks. The **LEG COUNT decides the
+shape**, and the three shapes behave differently:
+
+| Legs | Shape | What the parked rows carry |
+|------|-------|----------------------------|
+| 1 | A lone trigger | No `group` |
+| 2 | An **OCO pair** — a fill of either leg cancels the other | No `group` |
+| 3 or more | A scaled **LADDER**, NOT an OCO set | Every leg shares one `group` |
+
+**The ladder is the new shape.** Its legs share a `group` handle — the `oid` of
+the ladder's first parked leg — which every leg reports on
+[`open_orders`](./info.md#open_orders) and
+[`order_status`](./info.md#order_status). Group the rows by that value to render
+one ladder as one control. Legs of a ladder are **not** OCO: a fill of one leg
+does not cancel the others, which is the point of scaling out of a position in
+steps.
+
+**A ladder retires WHOLE.** It parks only against a live position, so the moment
+that position is gone — by any close path, including a liquidation — every leg
+of the ladder retires together on the next block. You do not have to cancel the
+survivors yourself.
+
+**A tpsl group is NOT leg-independent.** Group validation runs before any state
+change, so a bad group rejects the WHOLE action and parks nothing. That is the
+opposite of `grouping: "na"`, where one bad leg leaves the others resting.
+
+Admission rules a ladder adds:
+
+- **It needs an open position to close.** Three or more legs against a flat
+  position are rejected `Precondition` (`a scaled tpsl ladder needs an open
+  position to close`) — a ladder parked against nothing would die on the next
+  block anyway.
+- **Each leg infers its own fire direction against the mark.** A PAIR reads its
+  two directions off the two leg prices and needs no mark; a lone leg and every
+  ladder leg need an effective mark, and are rejected `Precondition` (`no mark
+  price to infer the trigger direction`) without one.
+- **The per-account parked-trigger cap still applies per leg.** A ladder that
+  crosses the governed cap gets a per-leg error, not a whole-batch one.
+
+One or two legs behave exactly as before. A caller that never sends three legs
+sees no change at all.
 
 ---
 
@@ -3767,6 +3844,7 @@ the `error` reason, and the `mempool_depth` at the time:
 | `unsupported action: <Variant>` | Action variant recognised but not bridged on `/exchange` | See the [non-bridged table](#non-bridged-actions) |
 | `unsupported time-in-force` / `unsupported stp_mode` | Order carried `aon` (no core all-or-none) / `reject` (no core STP equivalent) | Use a supported value |
 | `unsupported order kind` | `stop_loss` / `take_profit` **without** a `trigger` block | Add a [`trigger`](#trigger-orders-stop_loss--take_profit) block, or use `limit` / `market` |
+| `trail_px is not bound by the order signing type yet; a trailing stop cannot be submitted over the typed path` | The order's `trigger` block carried `trail_px`. The frozen signing type does not bind it, so an unsigned value could be added or removed in flight | Drop `trail_px`. There is no submit path today — see [trailing stops](#trailing-stops-read-only) |
 | `action carries no owner` | An owner-less action that is not sender-authorized | Use a supported action |
 | `duplicate cloid` | `submit_order` reused a client order id on the same account | Use a fresh `cloid` |
 

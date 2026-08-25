@@ -126,18 +126,41 @@ between pushes; treat a shrink you did not order yourself as a forced event
 
 ## Predicting ADL exposure {#predicting-adl-exposure}
 
-There is **no live field that ranks or scores your ADL exposure** — no
-`/info` read returns a percentile or a rank estimate. Allocation happens at
-the moment ADL actually fires, computed fresh (capacity-pro-rata, see above)
-against then-current haircut-able unrealised PnL; there is nothing to poll
-ahead of time.
+Read [`account_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl).
+Each position row then carries `adl_lamps`, an integer from `0` to `4`. More
+lamps means the position sits sooner in the queue.
 
-The closest proxy you can compute yourself: your position's unrealised PnL as
-a share of the asset's total profitable-side unrealised PnL — derived from
-your own [`account_state`](../api/rest/info.md#account_state) and the market's
-open interest on [`markets`](../api/rest/info/perpetuals.md#markets).
-For market makers running large books, the headline risk is concentration —
-one big winning position dominating the asset's profitable side; diversifying
+**What the lamps rank is step 1 — the netting at mark.** That step closes the
+dying leg against the most profitable OPPOSITE-side positions, ordered by return
+on committed margin (`unrealised PnL ÷ |entry notional|`, highest first). The
+lamps are the quartile of your seat in exactly that order: `4` = top quarter,
+`1` = bottom quarter. Hedge legs rank separately, because the step settles per
+leg.
+
+The lamps do **not** rank step 2, the [deficit
+haircut](#2-allocation--deterministic-capacity-pro-rata). That step is
+capacity-pro-rata and has no queue at all — every winner gives up the same
+fraction of capacity, so there is nothing to rank.
+
+:::warning
+**It is a RANKING, not a probability.** Four lamps with nobody being liquidated
+on the other side still means nothing happens. Do not render it as a percentage
+chance.
+
+**ZERO lamps is meaningful, not unknown.** Zero says the position is not in the
+queue at all — no committed mark, no unrealised profit, no cost basis, or nobody
+on the opposite side to be deleveraged against. A hedge account whose only
+opposing leg is its OWN reads zero on both legs, because ADL never nets an
+account against itself.
+:::
+
+The depth is opt-in: each lamp costs one pass over the market's positions, so
+ask for `detail: "adl"` only on a screen that shows the column, and poll the
+default depth otherwise. The [WS `account_state`](../api/ws/subscriptions.md#account_state)
+frame always carries the default shape and never `adl_lamps`.
+
+For market makers running large books, the headline risk is still concentration
+— one big winning position dominating the asset's profitable side; diversifying
 across assets reduces ADL exposure.
 
 ## Edge cases {#edge-cases}
@@ -179,6 +202,7 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 - [Insurance pool](./vaults.md#insurance-pool) — T3 mechanism
 - [Portfolio margin](./portfolio-margin.md) — how PM interacts with ADL
 - [`account_state` WS](../api/ws/subscriptions.md#account_state) — the only live signal that an ADL haircut changed your position
+- [`account_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl) — the `adl_lamps` queue indicator
 
 ## FAQ {#faq}
 
