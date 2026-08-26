@@ -130,12 +130,20 @@ The assembled `signatures` array is collected off-chain (a coordinator gathers
 each member's signature over the identical `inner_action_blob`) and submitted by
 any account.
 
-**Ask the chain for the blob — do not build it.** The canonical inner-action
-JSON is not the `{type, params}` wire form, and its variant names move when
-actions move. Call
-[`encode_action`](../api/rest/info.md#encode_action) once per bundle, then send
-the string it returns to every member. A client-side encoder that drifts from
-the node produces bytes the roster signs and the node then refuses.
+**Use the ordinary wire action as the blob.** UTF-8 encode the same
+`{type, params}` object you would post to `/exchange`, and let every member sign
+those bytes. The node decodes the blob through the same lowering `/exchange`
+admission runs, so a member signs the action the chain executes.
+
+Build the blob ONCE and distribute it. Every member must sign identical bytes,
+and two members who each serialize their own copy are trusting two JSON writers
+to agree on key order and spacing. One blob and one distribution cannot
+disagree.
+
+The node also accepts the core `Action` JSON, which is what older bundles carry.
+Do not build that form by hand: its variant names live in the node and move when
+actions move, and a blob that drifts is refused after the member signatures are
+already spent.
 
 ### User-bound inner signatures {#user-bound-inner-signatures}
 
@@ -280,7 +288,6 @@ sequenceDiagram
 
 ## See also {#see-also}
 
-- [`POST /info encode_action`](../api/rest/info.md#encode_action) — the canonical `inner_action_blob` bytes every member signs
 - [`POST /exchange convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)
 - [`/exchange` signed-by semantics](../api/rest/exchange.md#signed-by-semantics) — multi-sig wrapper envelope
 - [Agent wallets](./agent-wallets.md) — combine multi-sig with agent delegation

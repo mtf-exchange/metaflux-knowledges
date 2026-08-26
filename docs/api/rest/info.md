@@ -1058,57 +1058,6 @@ Response:
 | `timestamp` | uint64 | Block timestamp (consensus ms) |
 | `block_hash` | hex string (32 bytes) | Real committed block hash (now plumbed into the read state — no longer the all-zero placeholder) |
 
-### Canonical action bytes for a multisig inner action {#encode_action}
-
-Lower an ordinary wire action to the **canonical `Action` JSON** that a
-[multisig](../../concepts/multi-sig.md) roster signs. The read is stateless: it
-takes no address and reads no committed state.
-
-A multisig bundle carries an `inner_action_blob`. Every roster member signs
-those EXACT bytes, and the node verifies and executes those exact bytes — it
-never re-serializes them. The canonical form is **not** the `{type, params}`
-wire form, so a client cannot build it from the wire action alone. This read
-applies the same lowering `/exchange` admission applies, so the bytes a member
-signs are the bytes the node accepts.
-
-```json
-{
-  "type": "encode_action",
-  "action": { "type": "claim_referral_rewards", "params": {} }
-}
-```
-
-| Arg | Type | Required | Description |
-|-----|------|----------|-------------|
-| `action` | object | yes | The inner action in the ordinary `/exchange` wire form (`{type, params}`) |
-
-Response:
-
-```json
-{ "type": "encode_action", "data": { "action_json": "{\"<Variant>\":{ … }}" } }
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `action_json` | string | The canonical `Action` JSON. It is externally tagged — one key naming the variant. UTF-8 encode this string to get the `inner_action_blob` bytes |
-
-Missing `action` → ``400 {"error":"missing field `action`"}``. An action the node
-cannot parse → `400 {"error":"invalid action: …"}`. A wire action with no
-canonical form → `400 {"error":"unsupported action: …"}`.
-
-:::warning
-**Do not port this lowering into your client.** The variant names and their
-field shapes live in the node and move when actions move. A client-side copy
-that drifts builds a blob the roster signs and the node then refuses — and the
-member signatures are already spent. Ask the chain each time.
-:::
-
-**Encode ONCE, then distribute.** Call this read once per bundle, send the
-returned string to every member, and have each member sign over the identical
-bytes. Two members who each call the read separately are trusting two answers to
-agree; one call and one distribution cannot disagree. See
-[signing the inner action](../../concepts/multi-sig.md#signing-the-inner-action).
-
 ## Account history query types {#account-history-query-types}
 
 Per-account history reads — funding payments, ledger updates, past orders, TWAP
@@ -1894,6 +1843,7 @@ answer on the public API with the same error an unknown type gets.
 | `mip3_deployer_oracle` | Deployer-oracle liveness for one MIP-3 market — a read for the deployer who operates the feed |
 | `rfq_open`, `rfq_user`, `fba_batch_state` | The RFQ and FBA engines are not reachable from `/exchange` yet. These reads ship publicly WITH the capability, not before |
 | `gov_state`, `gov_proposals`, `gov_history` | Replaced by [`validator_votes`](./info/governance.md#validator_votes) — see [governance queries](./info/governance.md#retired-reads) |
+| `encode_action` | Nothing left to encode. The multisig inner blob accepts the ordinary `{type, params}` wire action, so UTF-8 encode the action you would post to `/exchange` — see [signing the inner action](../../concepts/multi-sig.md#signing-the-inner-action) |
 
 
 ## Errors {#errors}
