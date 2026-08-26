@@ -59,10 +59,16 @@ Under PM the maintenance number comes from a **SPAN-style scenario engine** that
 for each (δp, δσ) in price_shocks × vol_shocks:
     scenario_total = Σ_i ( delta_pnl_i + gamma_pnl_i )
         delta_pnl_i = size_i · mark_i · δp                       # linear
-        gamma_pnl_i = 0.5 · |size_i| · mark_i · iv_i · δσ · δp²   # convex (Black-Scholes-flavoured)
+        gamma_pnl_i = 0.5 · gamma_size_i · mark_i · iv_i · δσ · δp²  # convex (Black-Scholes-flavoured)
 worst        = min( scenario_total over the grid )              # most negative
 pm_margin    = max(0, −worst) + concentration_penalty
 ```
+
+`gamma_size_i` is SIGNED, and every instrument you can hold today leaves it at
+`|size_i|`. A perp carries no true gamma, so this term is a vol-risk overlay
+that charges both size signs alike. A negative value is short gamma, which
+loses when vol RISES; nothing on the chain sets one yet, so the formula reduces
+to `|size_i|` for every position a caller can open.
 
 The grid and concentration coefficients below are the protocol defaults:
 
@@ -147,8 +153,17 @@ Master-only. `enroll: false` disables — symmetric.
 | Constraint | Value |
 |------------|-------|
 | `pm_min_equity` | default 100 000 USDC; governance-set |
+| `pm_max_enrolled_users` | default 512; governance-set (kind 117), bounds `[1, 100 000]` |
 | Effective from | next block after commit |
 | Currently-violating positions | enrollment rejected if PM would put you in T1+; close down first |
+
+`pm_max_enrolled_users` caps the COUNT of enrolled accounts, where
+`pm_min_equity` caps the value of one. The chain re-prices every enrolled
+account each block, so the count sets that pass's cost. The cap applies at
+enrollment only: it never evicts an enrolled account, an enrolled account can
+always re-enroll, and unenrollment is never refused. Unenrollment frees a slot
+for the next applicant. The equity check runs before the cap check, so an
+underfunded account at the cap reads the equity refusal.
 
 Disabling reverts to classical at next block. Disabling while in T0+ is allowed (you can always go back to a more conservative model).
 

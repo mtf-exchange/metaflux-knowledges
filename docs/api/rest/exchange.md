@@ -2324,7 +2324,18 @@ Enroll or unenroll the account in portfolio margin.
 |-------|------|-------------|
 | `enroll` | bool | `true` = enroll, `false` = unenroll |
 
-Requires account equity ≥ `pm_min_equity` (governance parameter). See [portfolio margin](../../concepts/portfolio-margin.md).
+Enrollment is refused in two cases:
+
+- Account equity is below `pm_min_equity` (governance parameter, default
+  100 000 USDC).
+- The enrolled-account count is at the governed cap `pm_max_enrolled_users`
+  (default 512). The chain re-prices EVERY enrolled account each block, so the
+  count is a per-block cost, not just a per-account one. An account that is
+  already enrolled is exempt: it can always re-enroll, and it can always
+  unenroll. Unenrollment frees a slot.
+
+The equity check runs first, so an underfunded account at the cap reads the
+equity refusal. See [portfolio margin](../../concepts/portfolio-margin.md).
 
 ---
 
