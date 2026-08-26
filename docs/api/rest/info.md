@@ -1351,14 +1351,6 @@ no public read reported that it had happened. Stake quorum is ⅔ (stake-weighte
 The three older governance reads are **retired from the public gateway**. Each
 answers `410 Gone` with a body naming `validator_votes`.
 
-:::caution
-**Neither half is live yet.** `validator_votes` still answers
-`400 {"error":"unknown info type: validator_votes"}`, and the gateway still
-serves the three retired reads with their old shape. Read the
-[upgrade notices](./info/governance.md#upgrade-notices) before you change a
-client.
-:::
-
 ### `gov_state` — retired {#gov_state}
 
 **REMOVED from the public API.** This read carried the open vote rounds and the

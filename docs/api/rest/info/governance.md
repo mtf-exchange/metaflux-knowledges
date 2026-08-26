@@ -35,22 +35,6 @@ no vote had happened, which was wrong.
 enactment produces a row, with the asset, the action, the agreeing stake, and the
 before/after value of each field the vote moved.
 
-## Upgrade notices {#upgrade-notices}
-
-:::caution
-**This page describes the target shape. Two parts are not live yet.**
-
-1. **`validator_votes` is not served yet.** A request today returns
-   `400 {"error":"unknown info type: validator_votes"}`. The shape below is the
-   committed contract; build against it, but do not ship a client that depends on
-   it until this notice is removed.
-2. **The three retired reads still answer today.** `gov_state`, `gov_proposals`
-   and `gov_history` are documented below as retired from the public gateway.
-   The gateway has not started refusing them yet — it still answers them with
-   their old shape. **Stop calling them now.** When the retirement lands they
-   answer `410 Gone`, and the reply names `validator_votes` as the replacement.
-:::
-
 ## Query types {#query-types}
 
 ### Validator votes, open and enacted {#validator_votes}
