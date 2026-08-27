@@ -137,6 +137,20 @@ release timestamp; it is `null` for every other status.
 One user's pending bridge withdrawals, plus the committed deployment row for
 every chain.
 
+**Served by the archive, not by a validator.** A validator PRUNES a released
+entry out of its outbox, so it can only ever answer "in flight right now". The
+archive consumes the same state as a stream and keeps the history. Nothing about
+the request or the reply changes for a caller.
+
+One consequence is worth knowing: if the archive is unreachable, this read
+answers `503`. It never answers an empty `entries` list, because "no archive"
+and "no withdrawal in flight" are different facts and only one of them is about
+your money.
+
+The entry no longer carries a numeric `asset`. `token` names the asset, and it
+is resolved at admission, so a later token rename never rewrites what you asked
+for.
+
 **The two halves belong together.** An entry's `message_id` is computed FROM the
 deployment row — `evm_chain_id`, `evm_contract_address` and
 `validator_set_epoch`, as [above](#message-id). Serving the id without the
@@ -184,7 +198,6 @@ Response `data`:
   "entries": [
     {
       "chain": 1,
-      "asset": 0,
       "token": "USDC",
       "amount_units": "1000000",
       "dst_addr": "0x000000000000000000000000662971350e886a0a5631d3e9133d33f767f80611",
