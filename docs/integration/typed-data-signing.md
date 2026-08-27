@@ -651,6 +651,120 @@ actions) are submitted through the same `/exchange` envelope and signed the same
 EIP-712 typed-data way. Their action-body shapes are in the
 [`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
 
+### Order type strings and the trailing fold {#order-type-strings-and-the-trailing-fold}
+
+A trigger leg may carry a **trailing callback**,
+[`trigger.trail_px`](../api/rest/exchange.md#trailing-stops). That field moves
+WHERE a position closes, so it is a control field and it is **signed**. It is
+folded into the order type strings the same presence-selected way
+[`expiresAfter`](#action-expiry-expiresafter) is folded into every action: **no
+`trail_px` key, no change at all; a `trail_px` key anywhere, a different type
+string and a different digest.**
+
+**The selector is presence, not value.** An explicit `trail_px: 0` is a
+*present* trail. It takes the trailing digest and is then rejected on admission
+(`trailing callback must be > 0`). To sign as before, omit the key.
+
+#### `submit_order` {#trailing-fold-submit_order}
+
+```
+// no trail_px key — the frozen type string, unchanged
+MetaFluxTransaction:SubmitOrder(string metafluxChain,uint32 market,string side,string kind,uint64 size,uint64 limitPx,string tif,string stpMode,bool reduceOnly,string cloid,uint16 builderFee,address builderUser,string positionSide,uint64 triggerPx,bool triggerIsMarket,string triggerTpsl,uint64 nonce)
+
+// trail_px present — trailPx folded in before nonce
+MetaFluxTransaction:SubmitOrder(string metafluxChain,uint32 market,string side,string kind,uint64 size,uint64 limitPx,string tif,string stpMode,bool reduceOnly,string cloid,uint16 builderFee,address builderUser,string positionSide,uint64 triggerPx,bool triggerIsMarket,string triggerTpsl,uint64 trailPx,uint64 nonce)
+```
+
+`trailPx` is one extra 32-byte word — the callback as a big-endian `uint64`,
+left-padded — inserted **after `triggerTpsl` and before `nonce`**. It is not
+appended at the end, so it does not collide with the `expiresAfter` fold, which
+still goes last.
+
+#### `batch_order` {#trailing-fold-batch_order}
+
+A batch does **not** widen its per-leg encoding. The `orders` field stays exactly
+what it was — a keccak over each leg's fixed-width words, in leg order — so a leg
+is the same number of words whether it trails or not. Widening a leg would make
+the per-leg encoding variable-length inside a flat, unprefixed concatenation,
+which is malleable: two different batches could hash the same.
+
+Instead the callbacks travel in a **second** field, `trailPxs`, present only when
+at least one leg trails:
+
+```
+// no leg carries trail_px — frozen, unchanged
+MetaFluxTransaction:BatchOrder(string metafluxChain,bytes32 orders,string grouping,uint64 nonce)
+MetaFluxTransaction:BatchOrder(string metafluxChain,address owner,bytes32 orders,string grouping,uint64 nonce)
+
+// at least one leg carries trail_px — trailPxs folded in after grouping
+MetaFluxTransaction:BatchOrder(string metafluxChain,bytes32 orders,string grouping,bytes32 trailPxs,uint64 nonce)
+MetaFluxTransaction:BatchOrder(string metafluxChain,address owner,bytes32 orders,string grouping,bytes32 trailPxs,uint64 nonce)
+```
+
+**Computing `trailPxs`.** Like `orders`, it is a plain keccak over a
+concatenation you build yourself, not an EIP-712 array encoding. Walk the legs in
+the **same order** `orders` walks them, and emit **two fixed-width words per
+leg**:
+
+1. the presence flag — a 32-byte word, `1` if that leg carries `trail_px`, else `0`
+2. the callback — `trail_px` as a big-endian `uint64`, left-padded to 32 bytes;
+   `0` for a leg that does not trail
+
+`trailPxs = keccak256(concat(those words))`. Every leg contributes both words,
+including the ones with no trail — that is what makes **which** leg trails part
+of the digest. Moving the trail from leg 0 to leg 1 changes `trailPxs` while
+`orders` stays identical, and the signature stops verifying.
+
+The presence word is not redundant with the value word: without it, "no trail"
+and "a trail of 0" would hash alike, and one signature would cover two wire forms
+that behave differently.
+
+#### `eth_signTypedData_v4` field placement {#trailing-fold-field-placement}
+
+```js
+// submit_order, only when the order carries trail_px
+types['MetaFluxTransaction:SubmitOrder'].splice(16, 0, { name: 'trailPx', type: 'uint64' });
+message.trailPx = '100000000000';
+
+// batch_order, only when some leg carries trail_px
+// (index 3 without owner, 4 with owner — always just after `grouping`)
+types['MetaFluxTransaction:BatchOrder'].splice(3, 0, { name: 'trailPxs', type: 'bytes32' });
+message.trailPxs = '0x...';
+```
+
+When no trail is present, do **not** add the field or the message key. That
+reproduces the legacy typed data exactly, which is why an older client that never
+heard of `trail_px` keeps signing valid orders with no change.
+
+#### Known-answer digests {#trailing-fold-kat}
+
+Pinned on **Testnet** (`chainId = 114514`), `nonce = 1`. A compliant
+`eth_signTypedData_v4` assembly reproduces them byte-for-byte.
+
+| Vector | `expiresAfter` | Signed EIP-712 digest |
+|---|---|---|
+| `submit_order` with `trailPx = 50000000` | `0` | `0xf78212e9ab8ad38ad455552cd9343a7a6637a8d331f23528fe7ae84713a20b64` |
+| the same order | `1900000000000` | `0x3f4d7fd0d3fb293e604fe6e5c4fc52e7b76830eaa39f8dc5d4d26b34372d5d92` |
+| `batch_order` with `owner`, 2 legs, **leg 1 trails** | `0` | `0xdf6da2a4e1c3cabd1852bfa1aa05495a839d3787f1a01e2df18c199b53453b88` |
+| the same batch with **no leg trailing** | `0` | `0xef21c04ccb568652ab2d8950dffd1bd289acaafde846199f74a8ba72e0f5dad8` |
+
+The last row is the control, and it is **identical** to the digest the same batch
+produced before `trail_px` was bound — proof that not sending the field costs
+nothing. The two batch rows also share one `orders` hash,
+`0x1894b6b95a1e0af9b6c694e7ff0eef0f467701a1215973bb25c42f932f43f300`, and differ
+only in `trailPxs`:
+`0x74a1e15aa3dfcb4bfbf5c65b533597fe064fc7492edd6f5f843427d22feaf26d` (trailing)
+versus
+`0x012893657d8eb2efad4de0a91bcd0e39ad9837745dec3ea923737ea803fc8e3d` (control).
+
+#### Which actions can trail {#trailing-fold-scope}
+
+Only `submit_order` and `batch_order` carry `trail_px`. The
+[`scale_order`](#scale-ladder) ladder, [`chase_order`](#chase), TWAP and RFQ
+derive their legs with no trailing callback, and their type strings are
+untouched. A [multi-sig](../concepts/multi-sig.md) inner payload is signed over
+its own bytes and is likewise unaffected.
+
 ## See also {#see-also}
 
 - [`POST /exchange`](../api/rest/exchange.md) — the endpoint and full action catalog

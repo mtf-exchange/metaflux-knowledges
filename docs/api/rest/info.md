@@ -187,9 +187,12 @@ Response (a faucet-funded account, no positions):
 }
 ```
 
-`abstraction` is `"unified"` (default cross-collateral account) or
+`abstraction` is `"unified"` (default cross-collateral account), `"standard"`
+(per-product reservations — see
+[`user_set_abstraction`](../rest/exchange.md#user_set_abstraction)) or
 `"portfolio"` (portfolio-margin enrolled) — derive PM enrollment as
-`abstraction == "portfolio"`. `pm_maint_margin` / `pm_net_value` /
+`abstraction == "portfolio"`. A caller that switches on this field must handle
+the third value: `"standard"` was reserved and is now emitted. `pm_maint_margin` / `pm_net_value` /
 `pm_concentration_penalty` are always present (whole-USDC strings, `"0"` when
 not PM-enrolled) — see [portfolio margin](../../concepts/portfolio-margin.md).
 `position_mode` is `"one_way"` or `"hedge"` — see [hedge mode](../../concepts/hedge-mode.md).
@@ -786,9 +789,9 @@ this offset and never away from it, once per block. So when `trail_px` is
 present, **`trigger_px` is the RATCHETED level, not the level the owner sent** —
 do not render it as a static order the user placed. A trailing leg is always a
 stop-loss; the chain refuses a trailing take-profit, which would chase its level
-away from a winning position. `trail_px` is a **read-only** field today — see
-[trailing stops](./exchange.md#trailing-stops-read-only) for why no caller can
-send one yet.
+away from a winning position. `trail_px` is now **submittable** — see
+[trailing stops](./exchange.md#trailing-stops), and note that sending it changes
+the order's signing digest.
 
 ### Recent fill history for an account {#user_fills}
 

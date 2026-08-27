@@ -586,7 +586,7 @@ grow a position.
 | `trigger.trigger_px` | uint64 | `> 0` | Trigger price in fixed-point tick units (widened to `i128`). The mark crossing this price fires the leg. For a **market** trigger it is also the fired price; for a **limit** trigger it drives the fire direction only (the resting price is `limit_px`) |
 | `trigger.is_market` | bool | — | Selects the fired exit. `true` = **market trigger**: fire a reduce-only slippage-bounded IOC. `false` = **limit trigger**: rest a reduce-only `gtc` limit at the order's `limit_px` (rules below) |
 | `trigger.tpsl` | enum | `"tp"` / `"sl"` | Take-profit / stop-loss label, surfaced in [`/info`](./info.md#order_status). The fire direction comes from the leg `side` versus the mark, not from this label |
-| `trigger.trail_px` | uint64 | — | **REFUSED today — do not send it.** The trailing callback. The chain reads and serves it, but the frozen signing type does not bind it, so an order carrying it is rejected. See [trailing stops](#trailing-stops-read-only) |
+| `trigger.trail_px` | uint64 | `> 0`, optional | **Optional — makes the leg a trailing stop.** The callback offset, in the same fixed-point tick units as `trigger_px`. The parked level ratchets toward the mark by this offset once per block and never away from it. It is **signed**: sending the key changes the EIP-712 type string and the digest, so omit it unless you want a trail. See [trailing stops](#trailing-stops) |
 
 :::info
 **`is_market` controls the exit type .** Before
@@ -661,36 +661,78 @@ committed effect observable on the [WS feed](../ws/subscriptions.md) / `/info`.
 Multi-leg entry-plus-protective baskets use [`batch_order`](#batch_order) with
 `grouping: "normalTpsl"` / `"positionTpsl"`.
 
-#### Trailing stops — READ side only, not yet submittable {#trailing-stops-read-only}
+#### Trailing stops (`trail_px`) {#trailing-stops}
 
-:::danger
-**You cannot submit a trailing stop today.** `/exchange` REJECTS any
-`submit_order` or `batch_order` whose trigger block carries `trail_px`:
+A trigger leg becomes a **trailing stop** when its `trigger` block carries
+`trail_px`, the callback offset. The parked level then ratchets toward the mark
+by that offset, once per block, and never away from it.
 
+```json
+{
+  "type": "submit_order",
+  "order": {
+    "owner":       "0x00000000000000000000000000000000000000aa",
+    "market":       7,
+    "side":         "ask",
+    "kind":         "stop_loss",
+    "size":         50000000,
+    "limit_px":     0,
+    "tif":          "ioc",
+    "stp_mode":     "cancel_oldest",
+    "reduce_only":  false,
+    "trigger":     { "trigger_px": 4000000000000, "is_market": true, "tpsl": "sl",
+                     "trail_px": 100000000000 }
+  }
+}
 ```
-400 trail_px is not bound by the order signing type yet; a trailing stop cannot be submitted over the typed path
-```
 
-Do not build a write path against this field. Build the READ path — the chain
-already serves `trail_px` on [`open_orders`](./info.md#open_orders) and
-[`order_status`](./info.md#order_status).
-:::
+**The level you sign is a floor, not the fire price.** For a long's stop the
+level becomes `max(level, mark - trail_px)` on every mark update, so it rises
+with a winning position and holds when the mark falls back. The leg fires at the
+**ratcheted** level. This is why [`open_orders`](./info.md#open_orders) and
+[`order_status`](./info.md#order_status) serve a `trigger_px` that is not the one
+you sent — read the served value as the current high-water level, and `trail_px`
+as the offset that produced it.
 
-**Why it is refused instead of ignored.** The `SubmitOrder` and `BatchOrder`
-EIP-712 type strings are frozen, and neither binds `trail_px`. An unsigned
-control field can be added or removed in flight while the signature still
-verifies — and `trail_px` moves WHERE a position closes. The chain refuses the
-order rather than silently downgrading a requested trailing stop into a static
-one, because the silent downgrade is the worse failure.
+**A trailing leg must be the stop-loss.** The ratchet follows a winning
+position, so it only makes sense on the leg below a long (or above a short). A
+trailing take-profit would chase its level away from the position and fire at a
+price nobody asked for, so the chain refuses it.
 
-**What a trailing stop is, when it lands.** The parked level ratchets toward the
-mark by the callback offset, once per block, and never away from it. So the
-served `trigger_px` is a high-water mark, not the level the owner sent. It is
-always a stop-loss: the chain refuses a trailing take-profit, whose level would
-chase a winning position downward and fire at a price nobody asked for.
+##### Signing — `trail_px` is BOUND, and it changes the digest {#trailing-stops-signing}
 
-The write path opens when a **versioned** type string binds the field. Until
-then this section is an upgrade notice, not a capability.
+`trail_px` moves WHERE a position closes, so it is a **control** field: it must
+be covered by the signature, or a relay could add or strip it while the
+signature still verifies. It is covered. **Sending `trail_px` changes the EIP-712
+type string and the digest.** A client that computes the old digest and sends
+`trail_px` anyway gets its signature recovered to a different address and the
+action rejected.
+
+The rule is **presence, not value** — the same fold the
+[action expiry](../../integration/typed-data-signing.md#action-expiry-expiresafter)
+uses:
+
+| What you send | Type string | Digest |
+|---|---|---|
+| No `trail_px` key on any leg | The frozen one — unchanged | **Byte-identical to before this field existed.** An older client signs exactly as it always did |
+| `trail_px` present on any leg | The trailing variant | Differs — see [order type strings](../../integration/typed-data-signing.md#order-type-strings-and-the-trailing-fold) |
+
+**Do not send `trail_px: 0` to mean "no trail".** Presence is what selects the
+type string, so an explicit `0` is a *present* trail — it takes the trailing
+digest and is then rejected `InvalidParams` (`trailing callback must be > 0`).
+Omit the key.
+
+The exact type strings, the per-leg `trailPxs` hash used by
+[`batch_order`](#batch_order), and pinned known-answer digests are in
+[typed-data signing → order type strings](../../integration/typed-data-signing.md#order-type-strings-and-the-trailing-fold).
+
+**Rejections.**
+
+| Message | Cause |
+|---|---|
+| `trailing callback must be > 0` | `trail_px` present and `0` (or negative once widened). Omit the key instead |
+| `a trailing trigger leg must be the stop-loss, not the take-profit` | The trailing leg fires on the wrong side of the mark for the position it guards |
+| A signature-recovery failure (see [errors](../errors.md)) | The digest was computed without the trailing fold while the wire carried `trail_px` |
 
 ---
 
@@ -3058,21 +3100,62 @@ action id stays permanently reserved and is never reused.
 
 ---
 
-### Set self-scoped abstraction config {#user_set_abstraction}
+### Set the account's margin mode and per-product reservations {#user_set_abstraction}
 
-Self-scope abstraction config. `kind` is an opaque dispatch tag; `value` is the setting.
+Chooses the margin mode, and — in `standard` mode — how much USDC each product may
+encumber.
 
 ```json
 {
   "type": "user_set_abstraction",
-  "params": { "kind": 3, "value": "42" }
+  "params": { "kind": 0, "value": "1" }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `kind` | uint8 | Sub-type tag (0–255) |
-| `value` | decimal (string or number) | Setting value (interpretation per `kind`) |
+| `kind` | uint8 | `0` sets the mode; `1` perp, `2` spot, `3` option reservation. Any other value is rejected. |
+| `value` | decimal (string or number) | For `kind: 0`, `0` = unified or `1` = standard. For a reservation, whole USDC; `0` removes it. |
+
+**Modes.** `unified` is the default and the behaviour every account has today:
+one collateral pool, any product may draw on all of it. `standard` splits that
+pool by product — collateral one product has committed is not available to
+another.
+
+**A reservation is a CEILING ON ENCUMBRANCE, not on spending.** This is the rule
+callers get wrong, so read it before you set one. A reservation caps how much
+USDC a product may have COMMITTED at one time — perp margin, an option writer's
+escrow, a spot-margin borrow. It does not cap what a product may SPEND. An option
+PREMIUM and a plain spot BUY are conversions, not encumbrance: the USDC leaves the
+account and something else arrives, so they are bounded by your balance, never by
+a reservation. Only the escrow the option WRITER posts is bounded by the option
+reservation.
+
+**Entering `standard` with no reservations admits nothing.** Every product's
+ceiling starts at zero, so a new standard-mode account can open no position until
+it allocates. That is deliberate and fail-closed.
+
+**A mode change needs a FLAT account.** Every perp leg, spot order, spot-margin
+position, option position, live TWAP, parked trigger and open RFQ must be gone.
+The rejection names the first surface it found. A RESERVATION change needs no
+flat account — but lowering one below what is already committed does not release
+anything, it only stops further commitment. Lowering a reservation is always
+allowed, even when your equity has fallen below the total already reserved.
+
+**`standard` and `portfolio` are mutually exclusive.** Each refuses the other, in
+both directions.
+
+Rejections, all `Precondition` unless noted:
+
+| Message | Cause |
+|---|---|
+| `unknown abstraction kind` (`InvalidParams`) | `kind` above 3 |
+| `abstraction mode must be 0 (unified) or 1 (standard)` (`InvalidParams`) | a `kind: 0` value that is neither |
+| `reservation must be >= 0` (`InvalidParams`) | a negative reservation |
+| `reservations require standard abstraction mode` | a reservation set on a unified account |
+| `reservations exceed account value` | an INCREASE whose new total exceeds account value |
+| `cannot change abstraction while enrolled in portfolio margin` | PM enrolled |
+| `cannot change abstraction with <surface>` | the account is not flat |
 
 ---
 
@@ -3922,7 +4005,8 @@ the `error` reason, and the `mempool_depth` at the time:
 | `unsupported action: <Variant>` | Action variant recognised but not bridged on `/exchange` | See the [non-bridged table](#non-bridged-actions) |
 | `unsupported time-in-force` / `unsupported stp_mode` | Order carried `aon` (no core all-or-none) / `reject` (no core STP equivalent) | Use a supported value |
 | `unsupported order kind` | `stop_loss` / `take_profit` **without** a `trigger` block | Add a [`trigger`](#trigger-orders-stop_loss--take_profit) block, or use `limit` / `market` |
-| `trail_px is not bound by the order signing type yet; a trailing stop cannot be submitted over the typed path` | The order's `trigger` block carried `trail_px`. The frozen signing type does not bind it, so an unsigned value could be added or removed in flight | Drop `trail_px`. There is no submit path today — see [trailing stops](#trailing-stops-read-only) |
+| `trailing callback must be > 0` | The `trigger` block carried `trail_px: 0`. Presence selects the trailing signing type, so an explicit `0` is a present trail, not an absent one | Omit the `trail_px` key entirely — see [trailing stops](#trailing-stops) |
+| `a trailing trigger leg must be the stop-loss, not the take-profit` | The trailing leg fires on the wrong side of the mark for the position it guards. The ratchet follows a winning position, so only the stop-loss may trail | Put `trail_px` on the protective leg, not the profit-taking one |
 | `action carries no owner` | An owner-less action that is not sender-authorized | Use a supported action |
 | `duplicate cloid` | `submit_order` reused a client order id on the same account | Use a fresh `cloid` |
 

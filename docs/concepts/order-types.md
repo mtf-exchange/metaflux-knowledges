@@ -129,6 +129,14 @@ trigger and its sibling collapse on the first fill; a **limit** trigger and its
 sibling collapse at **conversion** — the instant the resting limit is placed —
 because the live limit order is now the protection.
 
+**Trailing stops.** A trigger leg that carries `trail_px` parks a *trailing*
+stop: the level ratchets toward the mark by that callback offset once per block
+and never away from it, so it fires at the ratcheted level, not the one you sent.
+Only the stop-loss leg may trail. `trail_px` is part of the signed order —
+sending it changes the EIP-712 type string — so see
+[`POST /exchange` → trailing stops](../api/rest/exchange.md#trailing-stops)
+before you build a write path.
+
 Trigger state machine:
 
 ```mermaid
