@@ -663,6 +663,14 @@ Multi-leg entry-plus-protective baskets use [`batch_order`](#batch_order) with
 
 #### Trailing stops (`trail_px`) {#trailing-stops}
 
+:::info
+**Not live yet.** Trailing stops are written here ahead of activation. The
+network REFUSES an order carrying `trail_px` until the release that binds it
+activates — the current node answers `trail_px is not bound by the order signing
+type yet`. Everything below is the target behaviour, including the digest rules:
+build against it, but do not submit one until the release lands.
+:::
+
 A trigger leg becomes a **trailing stop** when its `trigger` block carries
 `trail_px`, the callback offset. The parked level then ratchets toward the mark
 by that offset, once per block, and never away from it.

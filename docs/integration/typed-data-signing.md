@@ -653,6 +653,14 @@ EIP-712 typed-data way. Their action-body shapes are in the
 
 ### Order type strings and the trailing fold {#order-type-strings-and-the-trailing-fold}
 
+:::info
+**Not live yet.** The trailing fold is written here ahead of activation. The
+network REFUSES an order carrying `trail_px` until the release that binds it
+activates. The type strings and digests below are the target, and they are
+already exact — build against them, but do not submit a trailing order until the
+release lands.
+:::
+
 A trigger leg may carry a **trailing callback**,
 [`trigger.trail_px`](../api/rest/exchange.md#trailing-stops). That field moves
 WHERE a position closes, so it is a control field and it is **signed**. It is
