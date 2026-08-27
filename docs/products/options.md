@@ -160,22 +160,32 @@ an existing row is always allowed.
 
 ## Reads {#reads}
 
-[`option_series`](../api/rest/info.md#option_series) is the public read. It serves
-every live series, with the `signing_id` to sign against and the
-`escrow_per_unit` a writer locks.
+Two public reads cover the lane.
 
-:::caution[Your option position is not on a public read yet]
-There is no public read for an option position, its escrow, or a series pot, and
-the RFQ session reads are [operator lane](../api/rest/info.md#operator-reads)
-today. The visible effect of a fill on the public API is the **USDC balance
-change** on [`account_state`](../api/rest/info.md#account_state) — the premium on
-both sides, and the escrow on the writer's side. Settlement lands the same way.
+| Read | Answers |
+|---|---|
+| [`option_series`](../api/rest/info.md#option_series) | Which series are live, the `signing_id` to sign against, and the `escrow_per_unit` a writer locks |
+| [`option_positions`](../api/rest/info.md#option_positions) | What one account holds: units long, units written, and the USDC it has locked |
+
+A fill writes no ledger row of its own. Between the fill and expiry,
+[`option_positions`](../api/rest/info.md#option_positions) is the only read where
+a writer sees the escrow it locked and a holder sees its units.
+
+:::danger[A position row carries TWO planes]
+`long` and `short` are **unit counts**, already on the series size scale.
+`escrow` is **money**, a decimal USDC string. Both are decimal strings, so a
+caller that reads `escrow` as units, or `short` as dollars, gets a wrong number
+that still parses.
 :::
+
+There is still no public read for a series pot. The pot moves the same USDC that
+[`account_state`](../api/rest/info.md#account_state) shows leaving and returning.
 
 ## See also {#see-also}
 
 - [RFQ](../concepts/rfq.md) — the only way to trade an option
 - [`option_series`](../api/rest/info.md#option_series) — the live series registry
+- [`option_positions`](../api/rest/info.md#option_positions) — what one account holds in a series
 - [`/exchange` RFQ actions](../api/rest/exchange.md#rfq-fba--utility-actions) — the field tables and the typed-data primary types
 - [Oracle prices](../concepts/oracle-prices.md) — the price source settlement reads
 - [MIP-4](../mip/mip-4.md) — the proposal this product came from

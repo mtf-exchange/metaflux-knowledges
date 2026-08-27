@@ -1126,9 +1126,95 @@ number signs a market the chain may not resolve.
 
 **What the row does not carry.** There is no option price, no implied volatility,
 and no open interest. The chain never prices an option: the premium is what two
-accounts agree on in an [RFQ](../../concepts/rfq.md). There is also no read for
-your own option position yet — see
-[options](../../products/options.md#reads).
+accounts agree on in an [RFQ](../../concepts/rfq.md). For your own holding in a
+series, read [`option_positions`](#option_positions).
+
+### An account's open option positions {#option_positions}
+
+Every open [option](../../products/options.md) leg one account holds. Each row
+carries the series terms beside the position, so one call answers both questions.
+
+```json
+{ "type": "option_positions", "address": "0x0000000000000000000000000000000000000000" }
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `address` | string | yes | Account to read, `0x` hex |
+
+Response:
+
+```json
+{
+  "type": "option_positions",
+  "data": {
+    "address": "0x0000000000000000000000000000000000000000",
+    "positions": [
+      {
+        "signing_id": 2147483649,
+        "underlying": "BTC",
+        "kind":       "put",
+        "strike":     "100000",
+        "expiry":     1735689600000,
+        "long":       "2.5",
+        "short":      "0",
+        "escrow":     "0"
+      },
+      {
+        "signing_id": 2147483650,
+        "underlying": "BTC",
+        "kind":       "capped_call",
+        "strike":     "100000",
+        "expiry":     1735689600000,
+        "long":       "0",
+        "short":      "1.5",
+        "escrow":     "45000"
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Plane | Description |
+|-------|------|-------|-------------|
+| `signing_id` | uint32 | — | **The number to sign.** The same value [`option_series`](#option_series) serves for this series |
+| `underlying` | string | — | Symbol of the underlying market the settlement price comes from |
+| `kind` | enum | — | `"put"` or `"capped_call"` |
+| `strike` | decimal string | money | Strike `K`, whole USDC |
+| `expiry` | uint64 | — | Expiry (consensus ms) |
+| `long` | decimal string | **units** | Units held, on the series size scale. Already whole units |
+| `short` | decimal string | **units** | Units written, on the series size scale. Already whole units |
+| `escrow` | decimal string | **money** | USDC this account has locked in the series pot |
+
+An account that is party to no series answers `200` with `"positions": []`. A
+missing `address` answers `400` with `missing field: address`.
+
+:::danger[One row carries TWO planes]
+`long` and `short` are **unit counts**. They render on the series size scale and
+they are already divided — the node applies `sz_decimals` for you, so `"2.5"`
+means two and a half whole units.
+
+`escrow` is **money**: a decimal USDC string, like every other money field on
+this page.
+
+A caller that reads `escrow` as a unit count, or `short` as a dollar figure,
+reads a wrong number that still parses. Both planes are decimal strings, so
+nothing in the shape catches the mistake.
+:::
+
+**Why this read exists.** An option fill writes no ledger row of its own. Between
+the fill and expiry, this is the only read where a writer sees the escrow it
+locked and a holder sees the units it owns.
+
+**One of `long` / `short` is always `"0"`.** A fill consumes an account's
+opposite leg before it opens a new one: a holder that writes gives up long units,
+and a writer that buys closes short units. So a row is either a holding or a
+written position, never both. `escrow` is what stays locked after that netting,
+and it is `"0"` on a pure holding.
+
+**The row omits the series-wide terms.** There is no `cap`, no `sz_decimals` and
+no `escrow_per_unit` here. Read [`option_series`](#option_series) for those — on a
+`capped_call` the cap is there, not on the position row.
 
 ## Account history query types {#account-history-query-types}
 
