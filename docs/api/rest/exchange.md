@@ -217,7 +217,7 @@ complete.
 | Amends | [`modify`](#modify), [`batch_modify`](#batch_modify) |
 | Spot | [`spot_order`](#spot_order), [`spot_cancel`](#spot_cancel) |
 | Margin | [`update_leverage`](#update_leverage), [`update_isolated_margin`](#update_isolated_margin), [`top_up_isolated_only_margin`](#top_up_isolated_only_margin), [`set_position_mode`](#set_position_mode) |
-| Specialist venues | [`rfq_request`](#rfq_request), [`rfq_quote`](#rfq_quote), [`rfq_accept`](#rfq_accept) — **all three refuse every market: RFQ is options-only** — and [`fba_submit`](#fba_submit) |
+| Specialist venues | [`rfq_request`](#rfq_request), [`rfq_quote`](#rfq_quote), [`rfq_accept`](#rfq_accept) — **the option trade path; all three refuse any market that is not a live option series** — and [`fba_submit`](#fba_submit) |
 
 **Every other action is `master only`.** That covers all fund movement
 (withdrawals, transfers, vaults, Earn, staking) and all account control (agent
@@ -363,6 +363,10 @@ Request-for-quote ([RFQ](../../concepts/rfq.md)) block trading, the
 frequent-batch-auction ([FBA](../../concepts/fba.md)) entry, and the deliberate
 no-op. See [the field-level sections](#rfq-fba--utility-actions) for the wire
 planes and the digest-bound `owner` rule.
+
+The three RFQ actions are the **option trade path**. They take an
+[option series](./info.md#option_series) `signing_id` as the market, and they
+refuse every other market. See [options](../../products/options.md).
 
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
@@ -2344,11 +2348,25 @@ equity refusal. See [portfolio margin](../../concepts/portfolio-margin.md).
 [RFQ](../../concepts/rfq.md) block trading, the
 [FBA](../../concepts/fba.md) frequent-batch-auction entry, and the deliberate
 no-op. All five return the
-[`202 Accepted`](#202-accepted--non-order-admission) admission envelope; the
-committed outcome is observable via the operator-lane `rfq_open` /
-`rfq_user` / `fba_batch_state` reads (see
-[operator lane](./info.md#operator-reads)) and the
-[WS feed](../ws/subscriptions.md).
+[`202 Accepted`](#202-accepted--non-order-admission) admission envelope, so a
+commit-time refusal comes back as a `200` with an `error` body — read
+[`accepted` is not `committed`](#accepted-is-not-committed).
+
+**RFQ is the option trade path.** It clears
+[option series](../../products/options.md) and nothing else. The market a
+request names is the `signing_id` of a live series, from
+[`option_series`](./info.md#option_series).
+
+:::note[The session is read by polling, not by a feed]
+[`rfq_open`](../../concepts/rfq.md#querying-open-rfqs) lists every open session and its quotes, and
+[`rfq_user`](../../concepts/rfq.md#querying-open-rfqs) lists the sessions one account requested or
+quoted on. Both are public. **No WS channel carries an RFQ event**, so a taker
+polls for its quotes and a maker polls for requests to answer.
+
+A fill itemises nothing of its own: the **balance change** on
+[`account_state`](./info.md#account_state) is the public trace of the premium
+and the escrow.
+:::
 
 **Wire planes.** The RFQ / FBA numeric fields (`size`, `price`, `max_size`,
 `limit_px`) are unsigned fixed-point `u64` JSON **numbers** on the wire — the
@@ -2371,26 +2389,26 @@ admission, **not** digest-bound.
 
 ### Open an RFQ session {#rfq_request}
 
-:::danger[RFQ is options-only, and options do not exist yet]
-**All three RFQ actions refuse every market today.** `rfq_request`, `rfq_quote`
-and `rfq_accept` return:
+:::danger[`market` is an option series, and nothing else]
+`market` takes the `signing_id` of a **live option series**, from
+[`option_series`](./info.md#option_series). Every other market is refused, on
+all three actions:
 
 ```
 precondition failed: rfq is options-only: market <n> is not an option series
 ```
 
-The actions still route — a routing break would answer `unknown variant` instead
-— but no market is an option series, so the refusal is total. There is no
-parameter, no permission and no market that gets past it.
+A series that has already expired is refused too, with
+`precondition failed: option series expired`.
 
-**Why.** A request-for-quote lane beside a public order book is not fair to that
-book: it lets size trade away from the price everyone else is posting against.
-MetaFlux offers RFQ only where there is no continuous book to undercut, which
-means options, and options are not built. See
-[MIP-4](../../mip/mip-4.md).
+**Do not compute the number.** `signing_id` is served whole because the encoding
+behind it is internal. There is no public formula and no base to add.
 
-The parameter documentation below describes the shape these actions will take
-when option series land. Do not build against it yet.
+**Why the lane is options-only.** A request-for-quote lane beside a public order
+book is not fair to that book: it lets size trade away from the price everyone
+else is posting against. MetaFlux offers RFQ only where there is no continuous
+book to undercut, and options have none. See
+[options](../../products/options.md) and [MIP-4](../../mip/mip-4.md).
 :::
 
 
@@ -2414,9 +2432,9 @@ by `limit_px`, open for maker quotes until `expiry_ms`.
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional: open the RFQ **as** this master / vault (approved agents only). **Digest-bound** — see above |
-| `market` | uint32 | a perp market | Asset/market id |
-| `side` | enum | `"Bid"` / `"Ask"` | Side the requester wants to take |
-| `size` | uint64 | `> 0` | Requested size, fixed-point size plane (widened to `u128`) |
+| `market` | uint32 | a live option series | The [`option_series`](./info.md#option_series) `signing_id`. Any other market is refused |
+| `side` | enum | `"Bid"` / `"Ask"` | Side the requester wants to take. `"Bid"` BUYS the option and pays the premium; `"Ask"` WRITES it and locks the escrow |
+| `size` | uint64 | `> 0` | Requested size, on the series' `10^sz_decimals` plane (widened to `u128`) |
 | `limit_px` | uint64 \| null | — | Optional taker limit price, 1e8 plane; `null` / omitted = none |
 | `expiry_ms` | uint64 | — | Session expiry timestamp (consensus ms) |
 | `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
@@ -2432,9 +2450,21 @@ In the digest, `side` encodes as a `uint8` (`0` = bid, `1` = ask) and each
 optional flattens to a presence `bool` + value (`0` when absent).
 
 The assigned `rfq_id` is a committed effect — read it back from
-the operator-lane `rfq_user` read or the WS feed. The session is
-**requester-gated**: only the account that opened it can
-[`rfq_accept`](#rfq_accept) on it.
+[`rfq_user`](../../concepts/rfq.md#querying-open-rfqs). No WS channel carries it, so poll. The session
+is **requester-gated**: only the account that
+opened it can [`rfq_accept`](#rfq_accept) on it.
+
+**A bounded request is collateral-checked at once.** With `limit_px` present the
+chain proves the taker can carry the worst case now — the premium on a `"Bid"`,
+or the escrow the premium does not fund on an `"Ask"`. It refuses with
+`precondition failed: insufficient free collateral for the request`. Without
+`limit_px` the worst case is unbounded, so the binding check waits for the
+[accept](#rfq_accept), which gates both sides at the real price.
+
+`expiry_ms` is an absolute consensus-ms stamp, not a duration. `0` takes the
+governed default window. There is no expiry sweep: an expired request is refused
+by every later action, but it stays in the book until the open-request cap
+evicts it.
 
 ---
 
@@ -2459,9 +2489,9 @@ maker will fill, valid until `valid_until_ms`.
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional: quote **as** this master / vault (approved agents only). **Digest-bound** — see above |
-| `rfq_id` | uint64 | an open session | The RFQ session id (the operator-lane `rfq_open` read / the WS feed) |
-| `price` | uint64 | `> 0` | Quote price, 1e8 plane (widened to `i128`) |
-| `max_size` | uint64 | `> 0` | Maximum size the maker will fill, fixed-point size plane (widened to `u128`) |
+| `rfq_id` | uint64 | an open session | The RFQ session id, from [`rfq_user`](../../concepts/rfq.md#querying-open-rfqs) |
+| `price` | uint64 | `> 0` | Quoted **premium per whole unit**, 1e8 plane (widened to `i128`) |
+| `max_size` | uint64 | `> 0` | Maximum size the maker will fill, on the series' `10^sz_decimals` plane (widened to `u128`) |
 | `valid_until_ms` | uint64 | — | Quote validity deadline (consensus ms) |
 | `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
 
@@ -2475,7 +2505,7 @@ MetaFluxTransaction:RfqQuote(string metafluxChain,address owner,uint64 rfqId,uin
 The optional `stp_group` flattens to a presence `bool` + value in the digest.
 The quote is recorded under the acting account as its maker — the digest-bound
 `owner` when quoting as a vault, else the signer — and the taker sees it on the
-session (`quotes[*]` in the operator-lane `rfq_open` / `rfq_user` reads).
+session (`quotes[*]` in the [`rfq_open`](../../concepts/rfq.md#querying-open-rfqs) / [`rfq_user`](../../concepts/rfq.md#querying-open-rfqs) reads).
 
 ---
 
@@ -2496,8 +2526,8 @@ the session.
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional: accept **as** this master / vault (approved agents only). **Digest-bound**. Both legs must carry `owner` for an operator to open **and** accept as the vault |
 | `rfq_id` | uint64 | own open session | The RFQ session id |
-| `quote_idx` | uint32 | a quote on the session | Index of the accepted quote |
-| `size` | uint64 | `> 0` | Fill size, fixed-point size plane (widened to `u128`) |
+| `quote_idx` | uint32 | a quote on the session | Index of the accepted quote, from the [`rfq_open`](../../concepts/rfq.md#querying-open-rfqs) / [`rfq_user`](../../concepts/rfq.md#querying-open-rfqs) reads |
+| `size` | uint64 | `> 0` | Fill size, on the series' `10^sz_decimals` plane (widened to `u128`) |
 
 Typed-data primary type (`owner` absent / present):
 
@@ -2508,6 +2538,43 @@ MetaFluxTransaction:RfqAccept(string metafluxChain,address owner,uint64 rfqId,ui
 
 **Requester-gated.** The accept is only honored for the account that opened the
 session — this binding is why the RFQ `owner` is part of the signed digest.
+
+#### What the fill moves {#rfq_accept-effects}
+
+The accept settles one option fill. It moves three amounts and nothing else.
+
+1. The **premium** goes from the buyer to the writer. Premium in USDC = quoted
+   `price` × whole units, truncated toward zero to micro-USDC.
+2. The **escrow** goes from the writer's balance into the series pot. Escrow in
+   USDC = [`escrow_per_unit`](./info.md#option_series) × whole units. It is the
+   strike for a put, and the **cap minus the strike** for a capped call.
+3. A closing writer's escrow comes **out** of the pot, exactly. The chain nets
+   each account's own legs first, so a round trip returns what it locked.
+
+The fill opens no perpetual position, charges **no trading fee**, and reserves no
+margin. An option position can never be liquidated. See
+[options](../../products/options.md).
+
+#### Refusals {#rfq_accept-refusals}
+
+Every check runs before anything moves, so a refused accept changes no state.
+
+| Body | Cause |
+|---|---|
+| `precondition failed: rfq is options-only: market <n> is not an option series` | The session's market is not a live series |
+| `precondition failed: option series expired` | The series is at or past its `expiry` |
+| `precondition failed: request expired` / `quote expired` | The session or the quote is past its own deadline |
+| `precondition failed: quote idx <n> not found on rfq RfqId(<n>)` | No quote at that index |
+| `precondition failed: quote price violates taker limit` | The quote is worse than the request's `limit_px` |
+| `precondition failed: self-trade blocked` | Buyer and writer are the same account, or share an STP group |
+| `precondition failed: premium truncates to zero` | `price` × units is below one micro-USDC. Raise the size or the price |
+| `precondition failed: insufficient free collateral for premium` | The buyer cannot pay the premium |
+| `precondition failed: insufficient free collateral for escrow` | The writer cannot fund the escrow the premium does not cover |
+| `precondition failed: option series holds the maximum number of positions` | The series holds 2,048 position rows. Closing an existing row is still allowed |
+| `precondition failed: option position registry is full` | The chain holds 32,768 option position rows |
+| `precondition failed: series escrow would exceed the ceiling` | The series pot is at its ceiling |
+| `unauthorized` | The accepter is not the account that opened the session |
+| `invalid parameters: accepted size exceeds quote max_size` / `... exceeds request size` | The fill size is above one of the two bounds |
 
 ---
 

@@ -56,7 +56,7 @@ financial advice.
 - [Multi-sig](./multi-sig.md) — institutional M-of-N
 - [Vaults](./vaults.md) — MFlux Vault + user vaults
 - [Staking](./staking.md) — delegate MTF, earn rewards
-- [RFQ](./rfq.md) — request-for-quote for size
+- [RFQ](./rfq.md) — request-for-quote, the option trade path
 - [FBA](./fba.md) — frequent batch auction matching
 
 ## Reference {#reference}

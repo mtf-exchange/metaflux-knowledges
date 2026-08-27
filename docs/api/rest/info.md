@@ -1058,6 +1058,78 @@ Response:
 | `timestamp` | uint64 | Block timestamp (consensus ms) |
 | `block_hash` | hex string (32 bytes) | Real committed block hash (now plumbed into the read state — no longer the all-zero placeholder) |
 
+### The live option series registry {#option_series}
+
+Every live [option](../../products/options.md) series, oldest series first. No
+parameters.
+
+```json
+{ "type": "option_series" }
+```
+
+Response:
+
+```json
+{
+  "type": "option_series",
+  "data": {
+    "series": [
+      {
+        "signing_id":      2147483649,
+        "underlying":      "BTC",
+        "kind":            "put",
+        "strike":          "100000",
+        "expiry":          1735689600000,
+        "sz_decimals":     5,
+        "escrow_per_unit": "100000"
+      },
+      {
+        "signing_id":      2147483650,
+        "underlying":      "BTC",
+        "kind":            "capped_call",
+        "strike":          "100000",
+        "cap":             "130000",
+        "expiry":          1735689600000,
+        "sz_decimals":     5,
+        "escrow_per_unit": "30000"
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `signing_id` | uint32 | **The number to sign.** Put it in the `market` field of every RFQ action for this series |
+| `underlying` | string | Symbol of the underlying market the settlement price comes from |
+| `kind` | enum | `"put"` or `"capped_call"`. A call is always capped |
+| `strike` | decimal string | Strike `K`, whole USDC |
+| `cap` | decimal string | Cap `C`, whole USDC. Present on a `capped_call` only — **absent on a put** |
+| `expiry` | uint64 | Expiry (consensus ms). The first settlement attempt runs at this stamp |
+| `sz_decimals` | uint8 | Size precision. An RFQ `size` of `10^sz_decimals` is ONE whole unit |
+| `escrow_per_unit` | decimal string | What a **writer** locks per whole unit, whole USDC |
+
+An empty registry answers `200` with `"series": []`.
+
+:::warning[`escrow_per_unit` on a call is the width, not the strike]
+For a `capped_call` it is `cap − strike`. A $100,000 strike capped at $130,000
+escrows **$30,000** per unit, not $100,000. Reading `strike` as the lock
+overstates it by the whole strike. Take the served field.
+:::
+
+:::danger[Sign `signing_id`. Do not compute it]
+`signing_id` is the number an RFQ action carries. It is served whole for that
+reason. **There is no public formula, base, or arithmetic that turns a series
+into it** — the encoding is internal and it can move. A client that derives the
+number signs a market the chain may not resolve.
+:::
+
+**What the row does not carry.** There is no option price, no implied volatility,
+and no open interest. The chain never prices an option: the premium is what two
+accounts agree on in an [RFQ](../../concepts/rfq.md). There is also no read for
+your own option position yet — see
+[options](../../products/options.md#reads).
+
 ## Account history query types {#account-history-query-types}
 
 Per-account history reads — funding payments, ledger updates, past orders, TWAP
@@ -1833,7 +1905,7 @@ answer on the public API with the same error an unknown type gets.
 | [`node_info`](#node_info), [`block_info`](#block_info) | Per-node identity and replay progress. Take the block head from the [`explorer_block`](../ws/subscriptions.md#explorer_block) WS channel |
 | `bridge_outbox`, `bridge_finalized_cosignatures` | Whole-chain withdrawal queue and cosignature detail. One account's own withdrawals are on [`bridge_user_outbox`](./info/bridge.md#bridge_user_outbox) |
 | `mip3_deployer_oracle` | Deployer-oracle liveness for one MIP-3 market — a read for the deployer who operates the feed |
-| `rfq_open`, `rfq_user`, `fba_batch_state` | The RFQ and FBA engines are not reachable from `/exchange` yet. These reads ship publicly WITH the capability, not before |
+| `fba_batch_state` | The FBA engine is not reachable from `/exchange` yet. The read ships publicly WITH the capability, not before |
 | `gov_state`, `gov_proposals`, `gov_history` | Replaced by [`validator_votes`](./info/governance.md#validator_votes) — see [governance queries](./info/governance.md#retired-reads) |
 | `encode_action` | Nothing left to encode. The multisig inner blob accepts the ordinary `{type, params}` wire action, so UTF-8 encode the action you would post to `/exchange` — see [signing the inner action](../../concepts/multi-sig.md#signing-the-inner-action) |
 

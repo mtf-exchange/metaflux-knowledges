@@ -46,7 +46,7 @@ Also live in devnet preview:
   [spot margin](products/spot-margin.md).
 
 For the full list of trading products and their status — perpetuals, spot, spot
-margin, and the planned options and CDS tracks — see [Products](products/index.md).
+margin, options, and the planned CDS track — see [Products](products/index.md).
 
 ## The handful of concepts to know {#the-handful-of-concepts-to-know}
 

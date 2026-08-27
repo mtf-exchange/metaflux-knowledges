@@ -1,13 +1,19 @@
 # MIP-4 — Options
 
-:::warning
-**Planned. No code, no wire, nothing to integrate against yet.** This page states
-the scope and the constraints that shape it. It does not describe a live product.
-Every mechanism below is under design and can still change.
+:::info
+**A first release is live, and it is deliberately narrow.** European,
+cash-settled, **fully collateralized** puts and capped calls, cleared through
+[RFQ](../concepts/rfq.md) only. Read
+[Options](../products/options.md) for the product, and
+[`option_series`](../api/rest/info.md#option_series) for the wire.
+
+The **margined** options book this page originally scoped is NOT built. The
+constraints below are the reason, and the shipped design answers them by
+side-stepping them: the chain never prices an option, so no option value ever
+enters committed state.
 :::
 
-MIP-4 is the MetaFlux options product: on-chain options cleared and margined by
-the same clearinghouse that carries perpetuals.
+MIP-4 is the MetaFlux options product.
 
 MIP-4 previously named a perps liquidity aggregator. That design is withdrawn and
 the number is reassigned to options.
@@ -29,20 +35,28 @@ sum of its legs.
 
 ## Scope {#scope}
 
-**In scope for the first release:**
+**What the first release shipped:**
 
-- Cash-settled options on assets that already have a MetaFlux mark price.
-- The existing cross-margin account. An option position sits in the same account
-  as a perpetual position and offsets it.
+- Cash-settled puts and **capped** calls on assets that already carry a live
+  MetaFlux price feed.
+- Full collateralization. The holder pays the premium; the writer escrows the
+  worst case. Neither leg can be liquidated.
+- RFQ clearing. There is no option order book, and the chain computes no premium.
+- Settlement from a window mean of committed oracle prices, with a defer-and-widen
+  rule and an abandonment backstop.
+
+**Deliberately out of the first release**, so the first version can be proved
+rather than merely shipped:
+
+- Margined options. An option position holds its own collateral and does not
+  offset a perpetual.
 - Portfolio margin across options and perpetuals together.
-
-**Deliberately out of scope for the first release**, so the first version can be
-proved rather than merely shipped:
-
-- Physical settlement. Cash settlement stays inside the existing collateral plane.
-- Exotic payoffs. Vanilla calls and puts only.
-- Permissionless options deployment. That is the MIP-3 pattern and it can follow,
-  but a permissionless options market is a risk surface that must be earned.
+- Uncapped calls. An uncapped call has no finite worst case, so cash cannot fully
+  collateralize it.
+- Physical settlement, and exotic payoffs.
+- Permissionless options deployment. A series is listed by validator ⅔-stake vote.
+  The MIP-3 pattern can follow, but a permissionless options market is a risk
+  surface that must be earned.
 
 ## The constraints that shape the design {#constraints}
 
@@ -81,15 +95,21 @@ design question which source carries it.
 
 ## What exists today {#what-exists}
 
-Nothing an integrator can call. The portfolio margin engine, the governed scenario
-grid, the oracle lane and the liquidation waterfall are all live for perpetuals and
-are the foundation MIP-4 builds on. No option instrument, no option order type and
-no expiry mechanism exists.
+The collateralized lane is live: the series registry, the RFQ trade path, the
+escrow lifecycle and the expiry settlement. See
+[Options](../products/options.md).
+
+What is not built is everything that needs an option VALUE — a margined option
+position, portfolio margin over options and perpetuals together, and any read that
+serves a premium or an implied volatility. The three constraints above are open,
+and the shipped lane needs none of them answered.
 
 ## Related {#related}
 
 - [MIP-3 — Permissionless perp market deploy](./mip-3.md) — the deploy pattern a
   permissionless options market would follow later
-- [Perpetuals](../products/perpetuals.md) — the margin account options share
+- [Options](../products/options.md) — the live product
+- [RFQ](../concepts/rfq.md) — the only trade path into it
+- [Perpetuals](../products/perpetuals.md) — the other derivative, on its own margin account
 - [MIP-6 — Outcomes / prediction markets](./mip-6.md) — the other deferred payoff
   primitive

@@ -102,8 +102,11 @@ staking bond, then configuring leverage, fee tier, and oracle before activating
 it. No review committee, no allow-list — but a builder-deployed market is
 isolated in the deployer's own dex, not the shared market set every trader sees
 by default. See [MIP-3](../mip/mip-3.md) for the deploy flow and the isolation
-rule. Perpetuals also share their margin account with the planned options product
-— see [MIP-4](../mip/mip-4.md).
+rule.
+
+Perpetuals and [options](./options.md) do **not** share a margin account. An
+option is fully collateralized on its own lane: it holds no margin, takes no mark
+price, and cannot be liquidated.
 
 ## See also {#see-also}
 

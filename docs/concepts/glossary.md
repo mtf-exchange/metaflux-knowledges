@@ -134,7 +134,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **Reduce-only.** Order flag that rejects the order at admission if it would grow position size. See [order types](./order-types.md#reduce-only).
 
-**RFQ — Request for Quote.** Maker-quote workflow for size that doesn't want to advertise on the public book. See [RFQ](./rfq.md).
+**RFQ — Request for Quote.** The option trade path: a taker asks makers for a premium on one option series, and accepts one quote. It refuses every market that is not a live option series. See [RFQ](./rfq.md).
 
 ## S {#s}
 

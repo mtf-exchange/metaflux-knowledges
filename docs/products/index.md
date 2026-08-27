@@ -17,15 +17,17 @@ machinery they share — order types, margin, liquidation, fees — see
 | [Perpetuals](./perpetuals.md) | Leveraged long/short on an asset's price, no expiry, anchored by funding | **Live** |
 | [Spot](./spot.md) | Token-for-token CLOB, settled against your balance, no leverage | **Live** |
 | [Spot margin](./spot-margin.md) | Leveraged spot funded by the [Earn](../concepts/earn.md) lending pool | **Devnet preview** — no pair is calibrated for borrowing yet |
-| [Options](./options.md) | On-chain options (calls / puts) | **Planned** |
+| [Options](./options.md) | European cash-settled puts and capped calls, fully collateralized, traded through [RFQ](../concepts/rfq.md) only | **Live** — series are listed by validator vote |
 | [CDS](./cds.md) | Credit-default-swap-style protection contracts | **Planned** |
 
 **Perpetuals** are the default market and where most leveraged trading happens —
 funding rates, mark prices, margin modes, and the liquidation ladder all assume
 perps unless noted. **Spot** is the balance-only baseline. **Spot margin** is the
 opt-in leverage overlay on spot, with the [Earn](../concepts/earn.md) pool as the
-lending supply side. **Options** and **CDS** are planned and have no committed wire
-surface yet — see their pages for the current state.
+lending supply side. **Options** are live on their own lane: they have no order
+book, no margin and no liquidation, and they trade only through
+[RFQ](../concepts/rfq.md). **CDS** is planned and has no committed wire surface
+yet — see its page for the current state.
 
 :::info
 **Non-leveraged spot only is Sharia-compliant.** Among the products here, only

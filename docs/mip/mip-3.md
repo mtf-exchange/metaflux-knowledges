@@ -278,8 +278,10 @@ drawn in by builder-fee rebates, or a user-created vault.
 
 ## MIP-4 {#mip-4}
 
-A market deployed here shares its margin account with the planned options
-product. See [MIP-4 — Options](mip-4.md).
+A market deployed here can be the **underlying** of an
+[option series](../products/options.md), if it carries a live price feed. The
+option lane keeps its own collateral: it does not share the margin account of the
+perpetual. See [MIP-4 — Options](mip-4.md).
 
 ## See also {#see-also}
 
