@@ -16,41 +16,22 @@ One public query:
   each with a status, plus the committed [deployment row](#chain-configs) for
   each chain.
 
-Two operator queries, listed here for completeness. **The public API refuses
-both** with the same error an unknown type gets:
-
-- [`bridge_outbound_queue`](#bridge_outbound_queue) — every pending withdrawal, plus the
-  per-chain rotation verdict.
-- [`bridge_finalized_cosignatures`](#bridge_finalized_cosignatures) — the
-  validator multisig retained for one message id.
-
 :::warning
-**`bridge_chain_configs` is REMOVED.** It answered a strict subset of the read
-above, so a caller had to pick, and picking the config read alone hid the
-entries whose ids that config defines. A request now returns
+**`bridge_chain_configs` is removed.** A request now returns
 `400 {"error":"unknown info type: bridge_chain_configs"}`. Read
-[`bridge_withdrawal_history`](#bridge_withdrawal_history) — `withdrawals_halted` and `configs`
-are on it, unchanged.
+[`bridge_withdrawal_history`](#bridge_withdrawal_history) instead —
+`withdrawals_halted` and `configs` are on it, unchanged.
 :::
 
-## Why this read exists {#why}
+## The withdrawal lifecycle {#why}
 
-**A withdrawal can be stuck, and until this read nothing told the user which
-kind of stuck it was.**
-
-A bridge withdrawal moves through the outbox. Validators co-sign it; at a
-two-thirds stake quorum the co-signatures become a releasable multisig; a relay
-submits that multisig to the destination chain. Every step is committed state,
-and none of it was readable.
-
-The founding case: governance rotated the Base deployment while one withdrawal
-already held a quorum. That withdrawal can never be released, and no error was
-ever reported to the user or to the operator who cast the vote. Both saw only a
-balance that had been debited and funds that never arrived.
+A bridge withdrawal moves through the outbox. Validators co-sign it. At a
+two-thirds stake quorum, the co-signatures become a releasable multisig. A
+relay submits that multisig to the destination chain.
 
 ## The message id moves {#message-id}
 
-A withdrawal has **two** 32-byte ids. Confusing them is the whole defect above.
+A withdrawal has **two** 32-byte ids.
 
 | Id | What it is | Moves on rotation? |
 |---|---|---|
@@ -82,8 +63,13 @@ Only partial-signature progress resets; the withdrawal itself is not at risk.
 ### `ready_to_release`
 
 A releasable two-thirds multisig exists under the current deployment. The relay
-can submit it now. **This is the only status a rotation can break** — see
-[`safe_to_rotate`](#safe_to_rotate).
+can submit it now.
+
+**This is the only status a rotation can break.** A deployment rotation retires
+the domain the multisig was signed under, so the entry moves to
+`stranded_on_retired_domain` and no releasable multisig ever appears again. You
+stay debited until a governance re-credit. A withdrawal below quorum is safe: it
+re-signs under the new domain by itself.
 
 ### `stranded_on_retired_domain`
 
@@ -147,101 +133,90 @@ what is moving right now, never where a withdrawal went.
 Read `open` to tell the two apart. `released_at_ms` cannot do it alone — an entry
 pruned by retention also leaves the queue and carries no release stamp.
 
-Neither carries `economic_id`. It is not a signing digest, and pairing it with
-`message_id` on a public read is the confusion that stranded a live withdrawal.
+Neither carries `economic_id`. It is not a signing digest — do not pair it with
+`message_id`.
 
-## `bridge_withdrawal_history` {#bridge_withdrawal_history}
+## A user's pending bridge withdrawals {#bridge_withdrawal_history}
 
-One user's pending bridge withdrawals, plus the committed deployment row for
-every chain.
+One account's pending bridge withdrawals, plus the committed deployment row
+for every configured chain, served by the archive rather than a validator.
 
-**Served by the archive, not by a validator.** A validator PRUNES a released
-entry out of its outbox, so it can only ever answer "in flight right now". The
-archive consumes the same state as a stream and keeps the history. Nothing about
-the request or the reply changes for a caller.
-
-One consequence is worth knowing: if the archive is unreachable, this read
-answers `503`. It never answers an empty `entries` list, because "no archive"
-and "no withdrawal in flight" are different facts and only one of them is about
-your money.
-
-The entry no longer carries a numeric `asset`. `token` names the asset, and it
-is resolved at admission, so a later token rename never rewrites what you asked
-for.
-
-**The two halves belong together.** An entry's `message_id` is computed FROM the
-deployment row — `evm_chain_id`, `evm_contract_address` and
-`validator_set_epoch`, as [above](#message-id). Serving the id without the
-domain that defines it made a caller join two reads to know whether the id they
-held was still the current one. One read answers it.
-
-Request:
-
-| Param | Type | Required | Meaning |
-|---|---|---|---|
-| `address` | string | yes | The withdrawing account. `400` if missing or malformed. |
-| `chain` | number | no | Restrict `entries` to `1` or `2`. `400` on any other value. |
+**Request**
 
 ```json
 { "type": "bridge_withdrawal_history", "address": "0x6629…0611", "chain": 1 }
 ```
 
-Response `data`:
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `address` | string | yes | The withdrawing account. |
+| `chain` | number | no | Restrict `entries` to `1` or `2`. |
+
+**Response**
 
 ```json
 {
-  "withdrawals_halted": false,
-  "configs": [
-    {
-      "chain": 1,
-      "contract_address": "0x00000000000000000000000010f1a0f6153b8b77a355098e5f19c659a9a0965a",
-      "validator_quorum_threshold_bps": "6700",
-      "replay_nonce": 12,
-      "paused": false,
-      "evm_chain_id": 8453,
-      "evm_contract_address": "0x10f1a0f6153b8b77a355098e5f19c659a9a0965a",
-      "validator_set_epoch": 2,
-      "release_retention_ms": 0,
-      "effective_release_retention_ms": 86400000,
-      "scan_policy": {
-        "confirmations_only": false,
-        "confirmations": 0,
-        "effective_confirmations": 5,
-        "confirmations_only_depth": 0,
-        "usdc_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
-        "raw_transfer_credit": true
+  "type": "bridge_withdrawal_history",
+  "data": {
+    "withdrawals_halted": false,
+    "configs": [
+      {
+        "chain": 1,
+        "contract_address": "0x00000000000000000000000010f1a0f6153b8b77a355098e5f19c659a9a0965a",
+        "validator_quorum_threshold_bps": "6700",
+        "replay_nonce": 12,
+        "paused": false,
+        "evm_chain_id": 8453,
+        "evm_contract_address": "0x10f1a0f6153b8b77a355098e5f19c659a9a0965a",
+        "validator_set_epoch": 2,
+        "release_retention_ms": 0,
+        "effective_release_retention_ms": 86400000,
+        "scan_policy": {
+          "confirmations_only": false,
+          "confirmations": 0,
+          "effective_confirmations": 5,
+          "confirmations_only_depth": 0,
+          "usdc_token": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          "raw_transfer_credit": true
+        }
       }
-    }
-  ],
-  "entries": [
-    {
-      "chain": 1,
-      "token": "USDC",
-      "amount_units": "1000000",
-      "dst_addr": "0x000000000000000000000000662971350e886a0a5631d3e9133d33f767f80611",
-      "nonce": 1,
-      "ts_ms": 1753576000000,
-      "message_id": "0x8565…",
-      "status": "stranded_on_retired_domain",
-      "pending_cosigner_count": 0,
-      "released_at_ms": null,
-      "open": true
-    }
-  ],
-  "truncated": false
+    ],
+    "entries": [
+      {
+        "chain": 1,
+        "token": "USDC",
+        "amount_units": "1000000",
+        "dst_addr": "0x000000000000000000000000662971350e886a0a5631d3e9133d33f767f80611",
+        "nonce": 1,
+        "ts_ms": 1753576000000,
+        "message_id": "0x8565…",
+        "status": "stranded_on_retired_domain",
+        "pending_cosigner_count": 0,
+        "released_at_ms": null,
+        "open": true
+      }
+    ],
+    "truncated": false
+  }
 }
 ```
 
-`configs` and `withdrawals_halted` do not depend on `address`, and the `chain`
-filter does not narrow them. A caller who wants only the deployment rows passes
-their own address and reads an empty `entries` — one round trip either way.
-
-`entries` is capped at 256, which is also the per-user admission cap, so
-`truncated` is `false` in practice.
-
-An empty `entries` array means this account has no pending withdrawal. It does
-**not** mean a past withdrawal failed — a completed withdrawal leaves the outbox
-once its retention window elapses.
+| Field | Type | Meaning |
+|---|---|---|
+| `withdrawals_halted` | bool | Chain-wide refusal of new withdrawals — see the [deployment row](#chain-configs) |
+| `configs` | object[] | One [deployment row](#chain-configs) per configured chain |
+| `entries[*].chain` | number | Chain id, `1` (Base) or `2` (Arbitrum) — see [Conventions](#conventions) |
+| `entries[*].token` | string | Asset symbol, resolved at admission |
+| `entries[*].amount_units` | Decimal string | Amount in the destination chain's base units — see [Conventions](#conventions) |
+| `entries[*].dst_addr` | string | Destination address, 32-byte, left-padded |
+| `entries[*].nonce` | number | Per-entry nonce |
+| `entries[*].ts_ms` | number | When the entry was recorded, consensus ms |
+| `entries[*].message_id` | string | The current signing digest for this withdrawal — see [The message id moves](#message-id) |
+| `entries[*].status` | enum | One of the four values — see [Withdrawal status](#status) |
+| `entries[*].pending_cosigner_count` | number | How many validators have signed so far |
+| `entries[*].released_at_ms` | number \| null | Release timestamp. `null` for every status except `released` |
+| `entries[*].open` | bool | Whether the entry is still moving — see [Conventions](#conventions) |
+| `truncated` | bool | Whether `entries` was cut short — see Rules |
 
 ### The deployment row {#chain-configs}
 
@@ -249,14 +224,23 @@ One row per configured chain. This is the row a deployment-rotation vote must
 restate in full. Each field is independently verifiable against the deployed
 contract on Base or Arbitrum.
 
-| Field | Meaning |
-|---|---|
-| `withdrawals_halted` | Chain-wide refusal of new withdrawals, all chains. Governance clears it. A bridge can be unable to PAY while still able to ACCEPT; this flag stops the accept. |
-| `contract_address` | The 32-byte deployment id — the EVM address left-padded. |
-| `validator_quorum_threshold_bps` | Stake share required to co-sign, a decimal string of whole basis points. `"6700"` = 67%. |
-| `replay_nonce` | Per-chain replay counter. Shared by both directions. Preserved across a rotation. |
-| `paused` | Per-chain kill switch. Blocks withdrawals AND deposit attestation on this chain. |
-| `evm_chain_id`, `evm_contract_address`, `validator_set_epoch` | The deployment triple folded into `message_id`. Rotating any of the three moves the id of every in-flight withdrawal. |
+| Field | Type | Meaning |
+|---|---|---|
+| `chain` | number | Chain id, `1` (Base) or `2` (Arbitrum) |
+| `withdrawals_halted` | bool | Chain-wide refusal of new withdrawals, all chains. Governance clears it. A bridge can be unable to PAY while still able to ACCEPT; this flag stops the accept |
+| `contract_address` | string | The 32-byte deployment id — the EVM address left-padded |
+| `validator_quorum_threshold_bps` | Decimal string | Stake share required to co-sign, in whole basis points. `"6700"` = 67% |
+| `replay_nonce` | number | Per-chain replay counter. Shared by both directions. Preserved across a rotation |
+| `paused` | bool | Per-chain kill switch. Blocks withdrawals AND deposit attestation on this chain |
+| `evm_chain_id` | number | Part of the deployment triple folded into `message_id` — see [The message id moves](#message-id) |
+| `evm_contract_address` | string | Part of the deployment triple folded into `message_id` — see [The message id moves](#message-id) |
+| `validator_set_epoch` | number | Part of the deployment triple folded into `message_id` — see [The message id moves](#message-id) |
+| `release_retention_ms` | number | `0`-as-unset sentinel — see [The `effective_*` fields](#effective-fields) |
+| `effective_release_retention_ms` | number | The retention window actually in force, ms — see [The `effective_*` fields](#effective-fields) |
+| `scan_policy.confirmations_only` | bool | Confirmation mode flag. Not a configuration a real-funds chain uses |
+| `scan_policy.confirmations` | number | `0`-as-unset sentinel — see [The `effective_*` fields](#effective-fields) |
+| `scan_policy.effective_confirmations` | number | The confirmation depth actually in force — see [The `effective_*` fields](#effective-fields) |
+| `scan_policy.confirmations_only_depth` | number | Read only while `confirmations_only` is `true` |
 
 :::danger
 **Every value in this row ROTATES. Read it; never freeze it.** A governance
@@ -295,118 +279,28 @@ Two config fields are **not served here**: the backfill-acknowledgement pair is
 internal node-instance identity with no caller value, and it appears on the
 operator read instead. A retired always-zero field is omitted entirely.
 
-## `bridge_outbound_queue` {#bridge_outbound_queue}
+**Rules**
 
-:::warning
-**Operator lane only — this query is REFUSED on the public API.** It answers
-with the same error an unknown type gets. It stays available to node operators
-reading a node directly.
-:::
+- `entries[*].token` is a symbol string, resolved at admission — the entry
+  carries no numeric `asset` id. Resolving at admission means a later token
+  rename never rewrites what you asked for.
+- `entries[*].message_id` is computed from the matching `configs[*]` row's
+  deployment triple (`evm_chain_id`, `evm_contract_address`,
+  `validator_set_epoch` — see [The message id moves](#message-id)). Read both
+  together: an id read alone cannot tell you whether it is still current.
+- `configs` and `withdrawals_halted` do not depend on `address`, and the
+  `chain` filter does not narrow them. A caller who wants only the deployment
+  rows passes their own address and reads an empty `entries` — one round trip
+  either way.
+- `entries` is capped at 256, which is also the per-user admission cap, so
+  `truncated` is `false` in practice.
+- An empty `entries` array means this account has no pending withdrawal. It
+  does **not** mean a past withdrawal failed — a completed withdrawal leaves
+  the outbox once its retention window elapses.
 
-Every pending withdrawal on every chain, plus the per-chain rotation verdict and
-the full config rows.
+**Errors**
 
-Request — all parameters optional:
-
-| Param | Type | Default | Meaning |
-|---|---|---|---|
-| `chain` | number | all | Restrict `entries` to `1` or `2`. |
-| `status` | string | all | Restrict `entries` to one of the four status values. |
-| `start` | number | `0` | Page offset. |
-| `limit` | number | `256` | Page size, clamped to `1024`. |
-
-Response `data`:
-
-```json
-{
-  "summary": [
-    { "chain": 1, "total": 3,
-      "awaiting_cosignatures": 1, "ready_to_release": 0,
-      "released_retained": 1, "stranded_on_retired_domain": 1,
-      "safe_to_rotate": true },
-    { "chain": 2, "total": 0,
-      "awaiting_cosignatures": 0, "ready_to_release": 0,
-      "released_retained": 0, "stranded_on_retired_domain": 0,
-      "safe_to_rotate": true }
-  ],
-  "configs": [ /* the public config rows, plus the backfill-ack pair */ ],
-  "entries": [ /* bridge_withdrawal_history rows, plus user / economic_id / pending_cosigners */ ],
-  "start": 0, "limit": 256, "returned": 3, "truncated": false
-}
-```
-
-`summary` is always computed over the **full** per-chain outbox and always
-carries a row for every chain, whatever `chain` / `status` / `start` / `limit`
-say. Those parameters shape `entries` only. The summary is the rotation verdict,
-and a verdict that a filter could hide would be worse than none.
-
-Each entry adds three operator fields to the public shape:
-
-| Field | Meaning |
-|---|---|
-| `user` | The withdrawing account. |
-| `economic_id` | The rotation-invariant **dedup key**. Not a signing digest — never relay against it. Useful only for forensics against the replay guard. |
-| `pending_cosigners` | Validator **addresses** that have signed so far, in canonical order — which validator is lagging. Signature bytes are never served. |
-
-`configs` rows carry two fields the public read omits:
-`scan_policy.backfill_ack_l1` and `scan_policy.backfill_ack_start_block`. A
-deployment-rotation vote **replaces the whole scan policy**, so a rotation must
-restate them; this read is where they are readable.
-
-### `safe_to_rotate` is one of two numbers {#safe_to_rotate}
-
-Rotating a deployment has two distinct hazards, at two different severities.
-Read both.
-
-**`safe_to_rotate` — fund safety.** It is `true` when
-`ready_to_release == 0`. Rotating while any entry is `ready_to_release`
-**permanently strands that withdrawal**: the user stays debited, and only a
-governance re-credit recovers it. Never rotate a chain whose
-`safe_to_rotate` is `false`.
-
-**`released_retained` — entry leaking.** A released entry is retained for the
-retention window, keyed under the current `message_id`. Rotating inside that
-window makes the pruner unable to find it, and the entry stays in the outbox
-forever. It costs no funds, but it never goes away.
-
-:::tip
-**Rotate at least one full retention window after the last release.** Read
-`effective_release_retention_ms` from the config row for the window length —
-24 hours by default. Waiting drives `released_retained` to `0` on its own, and
-it drives `ready_to_release` to `0` too if the relay is healthy.
-:::
-
-## `bridge_finalized_cosignatures` {#bridge_finalized_cosignatures}
-
-:::warning
-**Operator lane only — this query is REFUSED on the public API.** It answers
-with the same error an unknown type gets. It stays available to node operators
-reading a node directly.
-:::
-
-The retained two-thirds multisig for one message id.
-
-| Param | Type | Required | Meaning |
-|---|---|---|---|
-| `message_id` | string | yes | 32-byte hex. `400` if missing or malformed, `404` if no set exists. |
-
-```json
-{ "type": "bridge_finalized_cosignatures", "message_id": "0x3756…" }
-```
-
-Response `data`:
-
-```json
-{
-  "message_id": "0x3756…",
-  "cosigners": [
-    { "validator": "0xd486…", "signature": "0x…130 hex chars" }
-  ]
-}
-```
-
-The lookup uses the id **as given**, including a retired-domain id. That is the
-point: a stranded entry's multisig sits under an id that the current config row
-can no longer derive, so this is the only way to inspect it. `404` means no set
-exists under that exact id — for a stranded withdrawal, querying its *current*
-`message_id` returns `404` while its *retired* id returns the bundle.
+- `chain` outside `1` / `2` → `400`.
+- Archive unreachable → `503`. This read never answers an empty `entries` list
+  for that case — "no archive" and "no withdrawal in flight" are different
+  facts, and only one of them is about your money.

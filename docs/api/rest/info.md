@@ -1853,6 +1853,7 @@ landed in, see [migration](../migration.md).
 | `agents` | [`account_state`](#account_state) with `detail: "overview"` — `agents` |
 | `block_info` | [`account_state`](#account_state) for the committed `height` / `time` stamp; the [`explorer_block`](../ws/subscriptions.md#explorer_block) WS channel for the full block head |
 | `bridge_chain_configs` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) — `withdrawals_halted` and `configs` |
+| `bridge_finalized_cosignatures`, `bridge_outbound_queue` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) for one account's own withdrawals. The whole-chain queue and the raw validator cosignature bytes are not part of this API |
 | `delegator_history` | Nothing. No delegation event log is committed |
 | `delegator_summary` | [`account_state`](#account_state) with `detail: "overview"` — `staking.summary` |
 | `dynamic_risk` | [`markets_meta`](./info/perpetuals.md#markets_meta) — `risk_override` |
@@ -1883,16 +1884,17 @@ landed in, see [migration](../migration.md).
 | `user_vault_equities` | [`account_state`](#account_state) with `detail: "overview"` — `vault.equities` |
 | `web_data2` | [`account_state`](#account_state) for margin, positions, balances and vault equities; [`open_orders`](#open_orders) for resting orders; [`exchange_status`](#exchange_status) for status. The WS channel is removed too, and answers `{"channel":"error","data":{"error":"unknown channel: web_data2"}}` |
 
-## Reads that are not public {#operator-reads}
+## Reads gated by their capability {#operator-reads}
 
-These reads still answer on a node read directly by its operator. On this API
-they return the same error an unknown type gets.
+These two reads exist on the wire already. Each answers with the same error an
+unknown type gets, not because it is restricted to an operator, but because the
+capability it reads is not reachable yet. Each ships publicly the day that
+capability does.
 
-| Read | Why it is not public |
+| Read | Ships when |
 |---|---|
-| `bridge_outbound_queue`, `bridge_finalized_cosignatures` | The whole-chain withdrawal queue, and raw validator cosignature bytes. Your own withdrawals are on [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) |
-| `mip3_deployer_oracle` | Oracle liveness for one MIP-3 market, for the deployer who operates that feed |
-| `fba_batch_state` | The FBA engine is not reachable from `/exchange` yet. The read ships publicly with the capability, not before |
+| `mip3_deployer_oracle` | The `mip3_deployer_oracle` protocol feature is armed on the target chain |
+| `fba_batch_state` | The FBA engine becomes reachable from `/exchange` |
 
 
 ## Errors {#errors}

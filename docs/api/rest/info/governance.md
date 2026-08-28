@@ -10,42 +10,30 @@ governance-specific `type`s.
 
 ## TL;DR {#tldr}
 
-One query, [`validator_votes`](#validator_votes). It reports **both** votes that
-are still open and votes that already enacted, over a time range. It is the ONE
-place a caller learns that a governance action happened, who voted for it, and
-what the parameter was before.
+One query, [`validator_votes`](#validator_votes). It reports both votes that
+are still open and votes that already enacted, over a time range. It is the
+one place a caller learns that a governance action happened, who voted for
+it, and what the parameter was before.
 
-## Why this read exists {#why}
+## What this read reports {#why}
 
-**A governance vote can move a MARGIN parameter, and until this read nothing
-published that it had happened.**
-
-The founding case: a two-thirds-stake vote lowered `max_leverage` on BTC and ETH
-from 100 to 20. The chain applied it correctly. No public read reported it. A
-trader could see the new ceiling on the market, but could not learn that a vote
-set it, when, at what prior value, or which validators agreed.
-
-The old `gov_history` read did not close that hole. It logged a SUBSET of
-enactments and classified only some of what it logged — many rows carried
-`kind: 255`, `kind_name: null` and `via: "other"`. **A partial log is worse than
-no log, because it reads as complete.** A caller who found no BTC row concluded
-no vote had happened, which was wrong.
-
-`validator_votes` is a ledger, not a classifier. Every vote cast and every
-enactment produces a row, with the asset, the action, the agreeing stake, and the
-before/after value of each field the vote moved.
+A governance vote can change a margin parameter. For example, a vote can
+lower `max_leverage` on BTC and ETH from 100 to 20. `validator_votes` is the
+read that reports it: every vote cast and every enactment produces a row,
+carrying the asset, the action, the agreeing stake, and the before/after
+value of each field the vote moved.
 
 ## Query types {#query-types}
 
 ### Validator votes, open and enacted {#validator_votes}
 
-Every governance vote in a time window — the ones still collecting stake and the
-ones that already changed a parameter. One row per vote **lifecycle**, not per
-cast: all casts that back the same payload in the same vote round fold into one
-row, with the casts listed inside it.
+Every governance vote in a time window — the ones still collecting stake and
+the ones that already changed a parameter. One row per vote **lifecycle**, not
+per cast: all casts that back the same payload in the same vote round fold
+into one row, with the casts listed inside it. All arguments are optional;
+with no arguments the read returns the most recent window it can serve.
 
-All arguments are optional. With no arguments the read returns the most recent
-window it can serve.
+**Request**
 
 ```json
 {
@@ -60,9 +48,9 @@ window it can serve.
 }
 ```
 
-| Arg | Type | Required | Description |
-|-----|------|----------|-------------|
-| `start_time` | uint64 | no | Window start (ms, inclusive). Filters on the row's **anchor time** — see below. Absent ⇒ open lower bound |
+| Field | Type | Required | Meaning |
+|-------|------|----------|---------|
+| `start_time` | uint64 | no | Window start (ms, inclusive). Filters on the row's **anchor time** — see Rules. Absent ⇒ open lower bound |
 | `end_time` | uint64 | no | Window end (ms, inclusive). Same anchor time. Absent ⇒ open upper bound |
 | `limit` | uint32 | no | Rows returned. Default `500`, clamped to `1 … 5000` |
 | `coin` | string | no | Market symbol, e.g. `"BTC"`. Keeps only votes scoped to that market. A vote with no market scope is excluded |
@@ -70,15 +58,7 @@ window it can serve.
 | `validator` | hex address | no | Keeps only rows this validator cast a vote in |
 | `status` | `"voting" \| "enacted" \| "expired"` | no | Keeps only rows in that lifecycle state |
 
-**The anchor time is `enacted_at` when the row enacted, and `last_cast_at`
-otherwise.** A vote that is still open therefore moves inside the window as new
-casts arrive; an enacted vote is pinned by its enactment. Rows return
-oldest-first within the window, matching
-[`user_fills`](../info.md#user_fills).
-
-Markets are addressed by `coin` symbol. There is no numeric market argument.
-
-Response:
+**Response**
 
 ```json
 {
@@ -112,8 +92,8 @@ Response:
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
+| Field | Type | Meaning |
+|-------|------|---------|
 | `round` | uint64 | Vote round id. Casts pool by round; the round also carries the category |
 | `category` | string | Vote category (same values the `category` argument accepts) |
 | `action` | string | The signed action the validators cast, e.g. `"setDynamicRiskParam"`. **This is the field that names WHAT was voted**, and it is always present |
@@ -133,24 +113,32 @@ Response:
 | `casts[*].value` | string | The voted value, decoded where the category's payload is known, else `0x`-prefixed hex |
 | `changes` | array \| null | Per-field before/after of the enactment. `null` unless enacted |
 | `changes[*].field` | string | Parameter field the vote moved, e.g. `"max_leverage"` |
-| `changes[*].prior` | string \| null | The **effective** prior — see below. `null` only where the enacting action does not know its own prior |
+| `changes[*].prior` | string \| null | The **effective** prior — see [prior is the effective prior](#effective-prior). `null` only where the enacting action does not know its own prior |
 | `changes[*].new` | string | The value written |
 
-Competing payloads in one round are **separate rows**. Two validators voting
-different values in the same round do not tally together, so they do not fold
-together here either.
+**Rules**
+
+- **The anchor time is `enacted_at` when the row enacted, and `last_cast_at`
+  otherwise.** A vote that is still open therefore moves inside the window as
+  new casts arrive; an enacted vote is pinned by its enactment.
+- Rows return oldest-first within the window, matching
+  [`user_fills`](../info.md#user_fills).
+- Markets are addressed by `coin` symbol. There is no numeric market argument.
+- Competing payloads in one round are **separate rows**. Two validators voting
+  different values in the same round do not tally together, so they do not
+  fold together here either.
 
 #### `prior` is the EFFECTIVE prior {#effective-prior}
 
 `changes[*].prior` is the value a caller would have READ just before the
 enactment — not the previous override row.
 
-This distinction is the whole point of the field. The BTC vote was the FIRST
-override on that market: there was no previous override, so a naive
-"previous override" answer is `null` and tells the caller nothing. The effective
-prior resolves the same ladder a read resolves — override ladder top rung, else
-the flat override value, else the market's genesis value — so the BTC row reports
-`prior: "100"`, which is the number the market actually showed.
+A vote can be the FIRST override on a market. When it is, there is no
+previous override row, so a naive "previous override" answer is `null` and
+tells the caller nothing. The effective prior instead resolves the same
+ladder a read resolves — override ladder top rung, else the flat override
+value, else the market's genesis value — so a first-override BTC row reports
+`prior: "100"`, the number the market actually showed before the vote.
 
 #### Status {#status}
 
@@ -175,9 +163,9 @@ and `enacted_block` say when, and `casts[]` says who and with how much stake.
 
 #### Coverage {#coverage}
 
-Rows are served from the archive, so this read covers history, not only the live
-window. The two founding leverage votes on BTC and ETH predate the read and are
-backfilled, so a query over their window returns them.
+Rows are served from the archive, so this read covers history, not only the
+live window. The BTC and ETH leverage votes described above predate this read
+and are backfilled, so a query over their window returns them.
 
 If a deployment has no archive configured, the read answers `200` with
 `"votes": []` rather than an error.
