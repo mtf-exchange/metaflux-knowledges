@@ -154,7 +154,7 @@ Request:
 {
   "method": "post",
   "id": 42,
-  "request": { "type": "info", "payload": { "type": "node_info" } }
+  "request": { "type": "info", "payload": { "type": "fee_schedule" } }
 }
 ```
 

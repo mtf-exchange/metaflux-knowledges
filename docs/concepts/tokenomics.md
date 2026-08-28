@@ -343,8 +343,7 @@ The value-accrual path is a clean four-step pipeline:
    recurring buy pressure proportional to exchange volume, and every token it
    acquires leaves the circulating float for good.
 
-Two operating rules sit under step 4, and both are visible on the
-operator-lane [`protocol_metrics`](../api/rest/info.md#operator-reads) read as `buyback_status`:
+Two operating rules sit under step 4:
 the executor must be told **which** asset id is MTF before it can buy at all, and
 it spends its balance in slices rather than in one order. See
 [Fees](./fees.md#buyback-asset-binding) for both, including the vote that binds the

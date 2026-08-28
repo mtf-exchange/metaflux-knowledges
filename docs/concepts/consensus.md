@@ -153,8 +153,11 @@ read only its own configured value.
 The chain has a **target** block interval, in milliseconds. It is a target, not a
 guarantee: it paces how often a validator proposes, and the rate you observe
 depends on load and network conditions as well. **Never size a deadline off the
-configured target** — measure the chain instead, from the block height on
-[`block_info`](../api/rest/info.md#block_info) sampled twice with a gap between.
+configured target** — measure the chain instead. [`account_state`](../api/rest/info.md#account_state) stamps the
+committed `height` and the consensus `time` it answers at — it is the only read that does — so
+sample it twice with
+a gap between, or read the head off the
+[`explorer_block`](../api/ws/subscriptions.md#explorer_block) WS channel.
 
 The target is set by a two-thirds-stake validator vote,
 `set_target_block_interval_ms`, bounded to `[50, 2000]` ms. Both ends are hard: a

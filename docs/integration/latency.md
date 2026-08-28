@@ -27,24 +27,32 @@ the chain you trade on. The method is in the next section.
 
 ## Measure the cadence {#measure-the-cadence}
 
-The public [`block_info`](../api/rest/info.md#block_info) read carries both a committed `height`
-and the **consensus** `timestamp` of that block. Two reads give you the rate:
+[`account_state`](../api/rest/info.md#account_state) stamps the committed `height` it answers at
+and the **consensus** `time` of that block. It is the only read that does, and it is cheap: both
+stamps advance on every commit, even for an address that never traded, and `detail: "margin"`
+skips the position walk. Two reads give you the rate:
 
 ```bash
+ADDR=0x0000000000000000000000000000000000000001
 curl -s -X POST https://api.devnet.mtf.exchange/info \
-  -H 'content-type: application/json' -d '{"type":"block_info"}'
+  -H 'content-type: application/json' \
+  -d '{"type":"account_state","address":"'$ADDR'","detail":"margin"}'
 sleep 60
 curl -s -X POST https://api.devnet.mtf.exchange/info \
-  -H 'content-type: application/json' -d '{"type":"block_info"}'
+  -H 'content-type: application/json' \
+  -d '{"type":"account_state","address":"'$ADDR'","detail":"margin"}'
 ```
 
 ```
-ms per block = (timestamp_2 - timestamp_1) / (height_2 - height_1)
+ms per block = (time_2 - time_1) / (height_2 - height_1)
 ```
 
-**Use the returned `timestamp`, not your own clock.** `timestamp` is the consensus block time, so
-the division needs no clock synchronisation and no correction for your network round-trip. Your
-local clock only decides how long you wait between the two reads.
+**Use the returned `time`, not your own clock.** `time` is the consensus block time, so the
+division needs no clock synchronisation and no correction for your network round-trip. Your local
+clock only decides how long you wait between the two reads.
+
+Prefer a stream? The [`explorer_block`](../api/ws/subscriptions.md#explorer_block) WS channel
+pushes the same `height` and `time` on every commit.
 
 Sample over at least 30 seconds. A short sample measures jitter, not cadence.
 
@@ -265,8 +273,8 @@ Test it before you build on it — see [choose the transport](#choose-the-transp
 
 ## Checklist {#checklist}
 
-- [ ] You measured the block cadence yourself, from two `block_info` reads, using the consensus
-      `timestamp`.
+- [ ] You measured the block cadence yourself, from two reads, using the `height` / `time` the
+      response carries.
 - [ ] Timeouts and expiry windows are sized in measured blocks, not fixed milliseconds.
 - [ ] Writes go over **one kept-alive** connection to `POST /exchange`, not a fresh one per order.
 - [ ] If your loop relies on `?confirm=async`, you tested that your endpoint honours it.

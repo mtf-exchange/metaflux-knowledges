@@ -77,8 +77,8 @@ struct:
 | `31337` | `"Devnet"` |
 | any other | `"Devnet"` |
 
-Query the node's chain id from [`/info` `node_info`](../api/rest/info.md#node_info)
-(`data.chain_id`) and use the matching tag. A `metafluxChain` or `chainId` that
+The chain id is fixed per network — take it from [networks](../networks.md#summary)
+and use the matching tag. A `metafluxChain` or `chainId` that
 doesn't match the node recovers a different signer and the request is rejected.
 
 ## Encoding rules (atomic EIP-712) {#encoding-rules-atomic-eip-712}

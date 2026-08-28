@@ -79,7 +79,6 @@ impl Wallet {
 ```rust
 let info = client.rest().info();
 
-info.node_info().await?;
 info.markets().await?;                          // Vec<MarketDynamic> — live px/funding/OI
 info.markets_meta().await?;                      // Vec<MarketInfo> — precision grids, leverage ladders
 info.l2_book("BTC", None).await?;

@@ -13,14 +13,10 @@
 
 ## Version components {#version-components}
 
-The protocol's `protocol_version` is exposed via `/info node_info`:
-
-```json
-{
-  "type": "node_info",
-  "data": { "protocol_version": "1.2.0", ... }
-}
-```
+The protocol version is **not served on the wire**. No read returns it, so do not
+gate client behaviour on a version string fetched at run time. Take the version
+from the [change log](#change-log), and detect capability from the shapes the node
+actually accepts.
 
 | Component | Meaning | Examples |
 |-----------|---------|----------|

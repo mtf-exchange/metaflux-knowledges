@@ -17,7 +17,7 @@ One public query:
   each chain.
 
 Two operator queries, listed here for completeness. **The public API refuses
-both**, exactly as it refuses `node_info`:
+both** with the same error an unknown type gets:
 
 - [`bridge_outbound_queue`](#bridge_outbound_queue) — every pending withdrawal, plus the
   per-chain rotation verdict.

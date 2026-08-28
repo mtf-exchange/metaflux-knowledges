@@ -299,7 +299,7 @@ as proof the master acted.
 |---------|-------|-----|
 | `401 signer is neither the owner nor an approved agent` on every request | The approval has not committed yet | Wait one block after `approve_agent` |
 | The same `401` after a known-good period | The agent expired | Approve again with a new expiry, or rotate to a fresh agent |
-| The same `401` from the first request | The signing `chainId` does not match the node, so recovery returns a different address | Read `chain_id` from `/info` `node_info` and sign against it |
+| The same `401` from the first request | The signing `chainId` does not match the node, so recovery returns a different address | Sign against the chain id for your network — see [networks](../networks.md#summary) |
 | A withdrawal or transfer "succeeds" but the master's balance is unchanged | A master-only action was signed by the agent key, so it acted on the **agent's** account | Sign every master-only action with the master key. See [what an agent cannot do](#what-an-agent-cannot-do) |
 | `400 action carries no owner` | The action needs an `owner` and none was sent | Set `owner` (or `params.owner` on a batch) |
 

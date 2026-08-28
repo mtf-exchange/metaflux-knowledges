@@ -63,7 +63,7 @@ locking the account out. No support request is needed for that case.
 | A full position close | The row survives with its `margin_mode`. A later CROSS re-open then settles against the stale isolated bucket. | The flat row is pruned, so a re-open starts clean. |
 | An EVM block whose declared gas exceeds the block limit | Every committed transaction executes, so one oversized payload stalls the round. | The block admits the prefix that fits, defers the next transaction to a later block, and drops the rest. **A transaction may take an extra block to execute.** |
 | Governance `force_close_position`, partial | Leaves the full entry notional, open interest and isolated margin on the residual. | Settles the residual. |
-| The fee buyback | One fire spends the whole available balance. | One fire spends one slice (`buyback_status.drip_active` reads `true`). |
+| The fee buyback | One fire spends the whole available balance. | One fire spends one slice. |
 
 ## Votes that become castable {#new-votes}
 
@@ -80,10 +80,9 @@ existed.
 
 ## Read surface {#read-surface}
 
-`buyback_status` ships with the binary and is live **at the swap**, one block
-before everything else on this page. Its `drip_active` field is `false` until
-13,350,001 and `true` after. It is read through the operator-lane
-[`protocol_metrics`](./rest/info.md#operator-reads) query, not the public API.
+**Nothing on the public read surface changes.** The chain records the drip state
+as `buyback_status.drip_active` — `false` until 13,350,001, `true` after — but no
+read serves that record; see [deleted reads](./rest/info.md#retired-reads).
 
 ## What does NOT change {#unchanged}
 

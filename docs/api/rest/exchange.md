@@ -128,8 +128,8 @@ is `"typed"`.
 | Mainnet | `8964` |
 
 The signing-domain `chainId` **must equal the node's consensus `chain_id`** —
-query it via [`/info` `node_info`](./info.md#node_info) (`data.chain_id`) and use
-that exact value. Signing against the wrong `chainId` returns `401` because the
+take it from the table above, or confirm it live with the `eth_chainId` call in
+[networks](../../networks.md#summary). Signing against the wrong `chainId` returns `401` because the
 recovered address differs from the action's `owner` (or, for sender-authorized
 actions, recovers a phantom address that passes no authorization check). See
 [networks](../../networks.md) for endpoints.

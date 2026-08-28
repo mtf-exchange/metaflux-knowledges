@@ -62,9 +62,8 @@ succeeds. There is no key to return it and the protocol's only spend path is
 buying MTF, so USDC sent here is a permanent donation to the buyback. Check the
 destination before you sign.
 
-USDC sent here does count toward the buyback's next fire, and it appears as
-`buyback_status.held_at_hub` on the operator-lane
-[`protocol_metrics`](../api/rest/info.md#operator-reads) read.
+USDC sent here does count toward the buyback's next fire. **No read reports that
+balance** — see [deleted reads](../api/rest/info.md#retired-reads).
 What it cannot do is keep an already-started drain running below the governed
 trigger — only the buyback's own schedule does that. See
 [Fees](./fees.md#buyback-drip).

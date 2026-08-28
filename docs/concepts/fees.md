@@ -130,8 +130,8 @@ flowchart TD
    dividend is funded from the validator fee share, not from the bought-back MTF.
 
 Cumulative pool totals (MTF bought back and locked out of circulation, validator
-pool, treasury) are tracked in committed state. They are read through the
-operator-lane [`protocol_metrics`](../api/rest/info.md#operator-reads) query, not the public API.
+pool, treasury) are tracked in committed state. **No read serves them** — see
+[deleted reads](../api/rest/info.md#retired-reads).
 
 Because the staker dividend is delivered through the validator share, stake more
 MTF (or delegate to a validator) to receive a larger slice — see [Staking](./staking.md).
@@ -145,9 +145,9 @@ additionally refused below block 13,350,001 — see the sequencing rule below.
 
 The buyback executor buys ONE asset, and it must be told which one. That binding
 is a single asset id. **Until it is bound the buyback cannot fire at all**, and the
-accrued USDC keeps growing behind it. The operator-lane
-[`protocol_metrics`](../api/rest/info.md#operator-reads) read reports this as `buyback_status`:
-`mtf_asset_id: null` with `blocking_guard: "mtf_asset_unbound"`.
+accrued USDC keeps growing behind it. The chain records the unbound state as
+`buyback_status.mtf_asset_id: null` with `blocking_guard: "mtf_asset_unbound"`, but
+**no read serves that record** — see [deleted reads](../api/rest/info.md#retired-reads).
 
 Genesis binds the id by name. A chain whose MTF token was registered AFTER genesis
 therefore starts with nothing bound, which is the state of the hosted sandbox
@@ -207,8 +207,7 @@ The rest is realized at the [assistance fund](./system-addresses.md) and the nex
 fire continues from there, so a large pool reaches the book over many blocks
 instead of in one order.
 
-Two rules follow, and both are visible on the operator-lane
-[`protocol_metrics`](../api/rest/info.md#operator-reads) read:
+Two rules follow:
 
 - **A schedule that has started runs to completion.** The first slice drops the
   pool under `trigger_usdc`, so a drain already in progress SKIPS the trigger test.
