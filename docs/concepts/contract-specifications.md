@@ -156,9 +156,15 @@ realized volatility), not a static table. A market's dynamic-risk override carri
 - `funding_rate_cap` — the per-market funding cap (below).
 - a **notional-banded tier ladder** — ascending upper-bound bands, each
   `{max_open_interest, max_leverage, maint_margin_ratio}`. The applicable tier is
-  the **first band whose `max_open_interest` upper bound the open interest does not
-  exceed** (`null` marks the unbounded top band): as open interest grows, leverage
-  steps **down** and maintenance steps **up**, so large books are margined harder.
+  the first band whose `max_open_interest` is **strictly greater** than the value
+  selected on (`null` marks the unbounded top band): as the band rises, leverage
+  steps **down** and maintenance steps **up**.
+
+  Two details a caller gets wrong here. The comparison is STRICT: a value landing
+  exactly on a published `max_open_interest` belongs to the NEXT band up, not to
+  that one. And despite the field name, the ladder is selected on **your own
+  position's notional**, not on the market's open interest — the market's open
+  interest never enters it.
 
 The ladder ships **inline** as `margin_tiers` on the
 [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) /

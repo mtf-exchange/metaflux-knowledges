@@ -57,6 +57,150 @@ else                                                  → PartialMarket50 { size
 - `size_to_close` for a partial is `maintenance_margin / 2` (integer-truncated). The `deficit` for backstop is `maintenance_margin − account_value` when `account_value ≥ 0`, else `maintenance_margin + |account_value|`.
 - The driver evaluates an **incremental dirty set** each block (event-dirtied accounts + a rolling self-heal slice), not a full scan — proven equivalent to a from-scratch scan by fuzz test. T0 accounts get their resting ALO liquidity force-cancelled after classification.
 
+## Liquidation price {#liquidation-price}
+
+Every open leg carries a `liq` price: the mark at which that leg's own health
+crosses `1.0` and the tier ladder above puts the account into T0. Read it on
+[`account_state`](../api/rest/info.md#account_state), on the position row
+(`clearinghouse_state["<dex>"].positions[*].liq`).
+
+The formula differs by margin mode, because each mode measures maintenance
+against a different equity pool. Both formulas solve the same question: at
+what mark does THIS leg's health reach the tier-ladder boundary, holding
+every other reported input at its current value?
+
+### Cross {#liquidation-price-cross}
+
+A cross leg draws on the whole cross bucket, so its liquidation price also
+moves with every other cross position's PnL.
+
+```
+base_equity = account_value − upnl
+liq = entry_px + (cross_maintenance_margin_used − base_equity) / size
+```
+
+`upnl` is this leg's own unrealized PnL — subtracting it isolates the part of
+`account_value` that does not move with this leg's mark.
+
+| Term | Unit / plane | Where to read it |
+|---|---|---|
+| `account_value` | whole-USDC, signed | [`account_state`](../api/rest/info.md#account_state) |
+| `upnl` | whole-USDC, signed | Same read, this leg's `upnl` |
+| `cross_maintenance_margin_used` | whole-USDC | `account_state` with `detail: "margin"` |
+| `entry_px` | whole-USDC per whole unit | This leg's `entry` |
+| `size` | base units, signed | This leg's `size` — positive long, negative short |
+
+**Single-leg approximation.** The formula holds every OTHER cross leg's PnL
+fixed and solves only for where THIS leg's own mark crosses the line. An
+account with several cross positions can still be pushed into liquidation by
+a move on a different market — one leg's `liq` is not a promise about the
+whole account.
+
+Worked example — a leg of size 10, entry notional 1,000 (so `entry_px` =
+1,000 / 10 = 100), whose own unrealized PnL (200) is already inside the
+account's `account_value` of 1,200, against a `cross_maintenance_margin_used`
+of 30:
+
+```
+base_equity = 1200 - 200 = 1000
+liq = 100 + (30 - 1000) / 10 = 100 - 97 = 3
+```
+
+At mark 3, this leg's own move has taken the cross bucket down to exactly its
+maintenance requirement.
+
+### Isolated {#liquidation-price-isolated}
+
+An isolated leg is backed only by its own posted bucket, so its liquidation
+price never depends on any other position:
+
+```
+leg_maint = |entry_notional| × maint_margin_ratio
+shift     = leg_maint − isolated_margin        (long)
+          = isolated_margin − leg_maint        (short)
+liq       = entry_px + shift / |size|
+```
+
+`entry_notional` is fixed at the size the leg was opened or last resized —
+it is not recomputed from the current mark. A caller does not read
+`entry_notional` directly; `entry × |size|` reproduces it to display
+rounding only, since the served `entry` price is itself rounded from the
+stored notional. `maint_margin_ratio` is the tier-ladder ratio for this
+leg's own notional — see [the ladder](#margin-tier-ladder) below.
+
+Worked example — long leg, size 1, entry notional 100 (so `entry_px` = 100),
+isolated margin 50, maintenance ratio 3% (the protocol baseline; no ladder
+set on this market):
+
+```
+leg_maint = 100 × 0.03 = 3
+shift     = 3 - 50 = -47
+liq       = 100 + (-47) / 1 = 53
+```
+
+The same leg, short instead of long, isolated margin still 50:
+
+```
+shift = 50 - 3 = 47
+liq   = 100 + 47 / 1 = 147
+```
+
+A short's liquidation price sits ABOVE entry; a long's sits below it — the
+mark has to move against the position either way.
+
+### Zero size, and "no price liquidates this" {#liquidation-price-edge-cases}
+
+- **Flat leg.** A leg with no size carries no position row at all. It is not
+  reported with a `null` `liq` — it is absent from `positions[]`.
+- **The solve goes negative.** An isolated leg posted more margin than any
+  reachable loss can consume (isolated margin 200 against the long leg
+  above, for example) solves to a negative price. No non-negative mark
+  reaches maintenance, so `liq` reads `null` — never `"0"`. A `"0"` would
+  claim the leg liquidates right now; `null` says price alone cannot reach
+  it.
+- **Rounding.** The division keeps full precision, then the served value is
+  truncated toward zero. No half-up rounding anywhere in this calculation.
+
+## The margin-tier ladder {#margin-tier-ladder}
+
+`maint_margin_ratio` is not always one fixed number per market. A market can
+carry a **notional-banded ladder**: as a position's own entry notional grows,
+its maintenance ratio steps UP (and its allowed leverage steps DOWN). This is
+what `maint_margin_ratio` resolves to in the isolated formula above. The cross
+formula does not name the ratio: it reads `cross_maintenance_margin_used`, which
+a classical account builds by applying each cross leg's own banded ratio to that
+leg's `|entry_notional|` and summing. A PM-enrolled account uses its SPAN figure
+instead.
+
+**The ladder is governance-set, per market.** Read it from
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) (also carried
+on `markets`), field `margin_tiers`: an ascending array of
+`{max_open_interest, max_leverage, maint_margin_ratio}`. `max_open_interest`
+is each tier's upper notional bound; the top tier's is `null` (unbounded).
+`maint_margin_ratio` is a basis-points string.
+
+```json
+"margin_tiers": [
+  { "max_open_interest": "100000",  "max_leverage": 50, "maint_margin_ratio": "100" },
+  { "max_open_interest": "500000",  "max_leverage": 20, "maint_margin_ratio": "250" },
+  { "max_open_interest": null,      "max_leverage": 5,  "maint_margin_ratio": "1000" }
+]
+```
+
+**Selection rule: the highest tier whose lower bound does not exceed the
+position's own entry notional.** A market with no ladder set still answers
+with one tier, built from its flat maintenance ratio and max leverage — every
+market always has a ladder to read, even a one-tier one.
+
+**The notional that selects the tier is the leg's own `|entry_notional|`** —
+the same fixed figure the liquidation-price formulas above use, not the
+position's live mark-to-market notional. A position does not jump to a
+harsher tier purely because the mark moved; it moves tiers only when it is
+opened or resized at a new notional.
+
+Governance can move these bands at any time. Treat today's numbers as a
+snapshot: read `margin_tiers` fresh rather than caching it across a session.
+
 ## How a forced close executes (the price floor) {#how-a-forced-close-executes-the-price-floor}
 
 A T1/T2 forced close is **never a market sweep**. It executes as an IOC LIMIT
@@ -172,35 +316,55 @@ The cooldown is *not* a no-op zone — T1 keeps firing partials. Cooldown only g
 
 ### Worked example {#worked-example}
 
-Account: long 1 BTC at entry 100, USDC isolated bucket = 20.
+Account: one CROSS leg, long 1 BTC at entry 100, against 20 USDC of settled
+cross equity, on a market whose maintenance ratio is 5%.
+
+The ladder below is the CROSS rule. An isolated leg does NOT walk these
+tiers: it has one threshold, and the whole leg closes when its own bucket
+reaches maintenance. No yellow card, no 50% partial, no cooldown.
+
+**`maint` does not move as the mark moves.** It is `entry_notional x
+maint_margin_ratio`, and `entry_notional` is the cost basis of the open lots —
+fixed when you opened. Only `account_value` falls. This is the single most
+common mistake when a caller reproduces the ladder: computing `maint` from the
+CURRENT mark understates it on a losing position, so it predicts liquidation
+LATER than the chain does.
+
+Here `entry_notional` is 100, so `maint = 100 x 0.05 = 5` on every line until
+the position size changes.
 
 ```
-mark = 100   account_value = 20 + 0 = 20   maint = 5 (5% of 100)  health = 4.0  → Safe
-mark = 90    account_value = 20 - 10 = 10  maint = 4.5            health = 2.2  → Safe
-mark = 85    account_value = 20 - 15 = 5   maint = 4.25           health = 1.18 → T0 (alo cancel)
-mark = 84.5  account_value = 20 - 15.5     maint = 4.225          health = 1.06 → T0
-mark = 84    account_value = 20 - 16 = 4   maint = 4.2            health = 0.95 → T1
+mark = 100   account_value = 20 + 0 = 20    maint = 5   health = 4.0  → Safe
+mark = 90    account_value = 20 - 10 = 10   maint = 5   health = 2.0  → Safe
+mark = 85.5  account_value = 20 - 14.5 = 5.5 maint = 5  health = 1.1  → Safe (the T0 edge)
+mark = 85    account_value = 20 - 15 = 5    maint = 5   health = 1.0  → T0 (alo cancel)
+mark = 84.5  account_value = 20 - 15.5 = 4.5 maint = 5  health = 0.9  → T1
+mark = 84    account_value = 20 - 16 = 4    maint = 5   health = 0.8  → T1
                   T1 fire: close 0.5 BTC at mark 84
                   realised PnL: -8 (closed 0.5 BTC, entry 100, exit 84)
                   bucket: 20 - 8 = 12
                   remaining position: 0.5 BTC long entry 100, mark 84
+                  entry_notional falls with the size: 100 x 0.5 = 50
+                  maint = 50 x 0.05 = 2.5
                   account_value = 12 - 8 = 4 (unrealised -8 on 0.5 BTC)
-                  maint = 0.5 * 84 * 0.05 = 2.1
-                  health = 4 / 2.1 = 1.9 → back to Safe
+                  health = 4 / 2.5 = 1.6 → back to Safe
 ```
 
-A 50% partial restored health from 0.95 (T1) to 1.9 (Safe). The intent of partial close is to right-size the position so the remaining bucket can carry the smaller exposure.
+A 50% partial restored health from 0.8 (T1) to 1.6 (Safe). The intent of a
+partial close is to right-size the position so the remaining bucket can carry
+the smaller exposure. A close reduces `entry_notional` in proportion to the
+size it removes, so `maint` falls with it.
 
 If the 50% close doesn't restore health (deeper rout), a second T1 fire within cooldown would escalate:
 
 ```
-mark = 84    T1 fire partial: 0.5 BTC closed, health → 1.9
-mark = 82    health = 0.95 again (still in T1, cooldown active)
-              T1 escalates to full close: remaining 0.5 BTC closed at 82
-              realised PnL: -9
-              bucket: 12 - 9 = 3
+mark = 84    T1 fire partial: 0.5 BTC closed, health → 1.6
+mark = 80    health = 2 / 2.5 = 0.8 again (still in T1, cooldown active)
+              T1 escalates to full close: remaining 0.5 BTC closed at 80
+              realised PnL: -10
+              bucket: 12 - 10 = 2
               position: 0
-              account closed cleanly with 3 USDC remaining; insurance untouched
+              account closed cleanly with 2 USDC remaining; insurance untouched
 ```
 
 ## T3 backstop — netting at mark {#t3-backstop--netting-at-mark}

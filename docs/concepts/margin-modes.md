@@ -27,15 +27,28 @@ In Cross, profitable positions can carry less-healthy ones — your free balance
 An order opening new exposure must post initial margin:
 
 ```
-notional         = |px × size|                        # raw integer product, scale-0
-effective_lev    = the market's max leverage           # see the ladder below
-required_init    = ceil( notional / effective_lev )    # rounded UP — conservative
-free collateral  = cross_account_value − Σ held_initial_margin
+notional         = |px × size|                         # whole USDC, fractions kept
+effective_lev    = your leverage for the asset, capped # see the ladder below
+required_init    = ceil( notional / effective_lev ) + cushion   # ceil = conservative
+free collateral  = cross_account_value
+                   − Σ held_initial_margin             # cross perp positions
+                   − Σ spot-margin initial margin      # see below
+                   − funding accrued against you       # debits only, never credits
 reject  iff  required_init > free collateral
 ```
 
-So each position contributes `notional / max_leverage` to the account's
-`total_margin_used` — the classic `1 / max_leverage` ratio.
+`notional` is a whole-USDC amount and it keeps its fraction. It is not an
+integer: a price of 61750.25 and a size of 0.001 give a notional of 61.75025.
+
+`cushion` is a flat **1 USDC**, added once for each open **cross** position. An
+isolated position adds none. The cushion is a fixed unit, not a rate, so it does
+not scale with the notional. It covers the whole-USDC rounding the liquidation
+engine applies to the same position, so a new position cannot open already
+inside the engine's reach. A position you later grow pays the cushion once, at
+the open. A hedged account holds two positions on one asset, so it pays two.
+
+So each cross position contributes `ceil(notional / effective_lev) + 1` to the
+account's `total_margin_used`.
 
 Free collateral here is the **raw signed gate value**, which goes negative when
 open profit funds the held margin. The account read publishes it clamped, as
@@ -53,7 +66,7 @@ account that reads `withdrawable: "0"`. See
 
 Rounding is **up** so a remainder always tightens the gate. `reduce_only` orders bypass the gate — they only shrink exposure.
 
-`held_initial_margin` sums `ceil(|entry_notional| / effective_lev(asset))` over every **cross** open position (isolated positions are excluded — their collateral is the separately-posted bucket).
+`held_initial_margin` sums `ceil(|entry_notional| / effective_lev(asset)) + 1` over every **cross** open position — the same per-position term, cushion included (isolated positions are excluded — their collateral is the separately-posted bucket).
 
 This gate applies to every live order path that can open new exposure:
 `submit_order` / `batch_order` (limit, IOC, ALO), `scale_order`, `chase_order`,
@@ -63,17 +76,117 @@ This gate applies to every live order path that can open new exposure:
 ### Maintenance margin & health {#maintenance-margin--health}
 
 ```
-health = account_value / cross_maintenance_margin_used
+health = account_value − cross_maintenance_margin_used      # USDC, signed
+tier   = the band of  account_value / cross_maintenance_margin_used
 ```
 
-- `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed `i128`.
+**`health` is a subtraction, not a ratio.** The served `health` field is the
+cushion in USDC above the maintenance line. It is positive while the account is
+clear and negative once the account is under the line. The **ratio** of the same
+two numbers is the separate quantity that picks the liquidation band. Do not
+read one as the other: an account reading `health: "9752"` is not at a health of
+9752x.
+
+- `account_value` = `cross_account_value` (free balance ± unrealised PnL), signed.
 - `cross_maintenance_margin_used` = the sum over every held CROSS position leg of `|entry_notional| × maint_margin_ratio` (derived live from positions) **or** the PM number when [portfolio margin](./portfolio-margin.md) is enrolled (`last_computed_pm_cents / 100`). An isolated leg is judged against its own bucket and is not in this sum.
+- Each leg's term is **rounded DOWN to whole USDC before the sum**, so this account scalar is always a whole number. The per-position `maint_margin` field keeps its fraction; the account scalar does not. Do not expect the two to agree to the cent.
 
 The per-asset maintenance ratio is the market's dynamic-risk override when one has been set by governance, else the protocol's baseline maintenance ratio — a governed parameter (`set_risk_base_maint_ratio`). Read the live value from a market's `maint_margin_ratio` field on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), and its `risk_override` when governance has set one; never assume a fixed percentage. The derived forced-close slippage floor is half the effective ratio unless explicitly overridden.
 
-Maintenance sits below the initial requirement (`notional / max_leverage`), so a position can be opened and then ride down to the maintenance floor before liquidation. Health < 1.0 enters the [liquidation ladder](./tiered-liquidation.md) at the tier bands (1.1 / 1.0 / 0.8 / 0.667).
+Maintenance sits below the initial requirement, so a position can be opened and then ride down to the maintenance floor before liquidation. The **ratio** `account_value / cross_maintenance_margin_used` picks the band: at or above 1.1 the account is clear, and below that the [liquidation ladder](./tiered-liquidation.md) applies at 1.1 / 1.0 / 0.8 / 0.667. Read those four numbers against the ratio, never against the `health` field. The 1.1, 0.8 and 0.667 edges are governed values, so read them live rather than pinning them.
 
 > The arithmetic is exact fixed-point throughout — no floating point anywhere on this path. At extreme account values the tier decision scales both operands down by the same factor before it divides, which leaves the health ratio unchanged, so the tier you land in is the same.
+
+### Margin required — a worked example {#margin-required-worked-example}
+
+This walks one order through [`required_init`](#initial-margin-pre-trade-gate)
+and [maintenance](#maintenance-margin--health) together, naming the exact
+`account_state` field that carries each figure.
+
+A market that carries a margin-tier ladder bands **both** numbers off the same
+notional. Take the illustrative ladder from
+[`markets_meta.margin_tiers`](../api/rest/info/perpetuals.md#markets_meta):
+
+| `max_open_interest` (upper bound, whole USDC) | `max_leverage` | `maint_margin_ratio` (bps string) |
+|---|---|---|
+| `"100000"` | 50× | `"100"` (1.0%) |
+| `"500000"` | 20× | `"250"` (2.5%) |
+| `"2000000"` | 10× | `"500"` (5.0%) |
+| `null` (unbounded) | 5× | `"1000"` (10.0%) |
+
+A position's own notional picks the **first** row, in ascending order, whose
+`max_open_interest` is `null` or **strictly greater than** that notional.
+Landing exactly ON a bound does not satisfy "strictly greater than", so it
+selects the NEXT row — a position of exactly 100,000 notional gets the 20× /
+2.5% row, not the 50× / 1.0% row beside it.
+
+**Opening the position.** BTC trades at 61,750.00. You have set your own
+leverage preference for BTC to 20× with
+[`update_leverage`](../api/rest/exchange.md#update_leverage), and you buy 3.4 BTC:
+
+```
+notional      = px × size = 61750.00 × 3.4 = 209950.00
+tier          = the 500,000 row (209,950 < 500,000, and NOT < 100,000)
+effective_lev = min(your 20x preference, the row's 20x cap) = 20
+required_init = ceil(notional / effective_lev) + cushion
+              = ceil(209950.00 / 20) + 1
+              = ceil(10497.50) + 1
+              = 10499.00
+```
+
+Before the order your account reads `account_value: "15000"` and no open
+position, so free collateral is the full 15,000. `10499.00 <= 15000`, so the
+order is admitted.
+
+**After the fill**, the leg's own row under
+[`account_state`](../api/rest/info.md#account_state) reads:
+
+| Field | Value | What it is |
+|---|---|---|
+| `margin` | `"10499"` | This leg's initial margin — the figure above, cushion included |
+| `maint_margin` | `"5248.75"` | `209950.00 × 0.025` — the SAME row's ratio, on the SAME notional. The LEG field keeps the fraction |
+| `lev` | `20` | The effective leverage the fill used |
+
+and the account-wide scalars:
+
+| Field | Value | Depth |
+|---|---|---|
+| `total_margin_used` | `"10499"` | both — this is the account's only position |
+| `cross_maintenance_margin_used` | `"5248"` | `detail: "margin"` only — `5248.75` rounded DOWN to whole USDC |
+| `withdrawable` | `"4501"` | both — `15000 − 10499`; entry equals mark, so `account_value` has not moved |
+| `health` | `"9752"` | `account_value − cross_maintenance_margin_used` = `15000 − 5248` |
+| `tier` | `"Safe"` | the ratio `15000 / 5248` is about 2.86, comfortably clear of the 1.1 yellow-card threshold |
+
+The leg reads `5248.75` and the account reads `5248`. That is the rounding
+above, not an error: the account scalar rounds each leg down to whole USDC
+before it adds them. Size a withdrawal on the account scalar, never on the sum
+of the leg fields.
+
+**Zero notional.** An order whose price or size resolves to zero notional
+needs no initial margin at all — `required_init` is `0`, and free collateral
+is never tested.
+
+**The isolated case.** Fund the bucket first:
+[`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin)
+with a positive `delta` moves USDC out of cross balance into this asset's
+bucket. That transfer debits
+`cross_account_value` directly, so it has already left `withdrawable` before
+the order arrives — it never shows up as a `total_margin_used` subtrahend,
+because [`held_initial_margin`](#initial-margin-pre-trade-gate) sums CROSS legs
+only. Open the same 209,950 notional position isolated instead of cross, and
+the account read differs on exactly this leg:
+
+- `margin` still reads the leg's own bucket balance, not a live-recomputed
+  ceiling — top the bucket up or let it drain and `margin` follows the
+  balance.
+- `maint_margin` is the SAME `"5248.75"` — the ratio and the notional it
+  applies to do not depend on margin mode.
+- `total_margin_used` and `cross_maintenance_margin_used` carry **nothing**
+  for this leg. An account holding only this isolated position reports
+  `total_margin_used: "0"` and `cross_maintenance_margin_used: "0"` and can
+  still be liquidated — its own `margin` and `maint_margin` are the only
+  fields that size it. See [total_margin_used and
+  cross_maintenance_margin_used](./account-value.md#margins).
 
 ## Cross — the default {#cross--the-default}
 
@@ -81,7 +194,7 @@ Maintenance sits below the initial requirement (`notional / max_leverage`), so a
 flowchart LR
     A["free_balance + locked_margin"] --> AV["account_value"]
     PNL["Σ unrealised PnL (cross positions)"] --> AV
-    AV --> H["health = account_value / cross_maintenance_margin_used"]
+    AV --> H["health = account_value − cross_maintenance_margin_used"]
 ```
 
 `cross_maintenance_margin_used` is the sum of per-position maintenance requirements across the CROSS bucket (or the PM number if [portfolio margin](./portfolio-margin.md) is enrolled).

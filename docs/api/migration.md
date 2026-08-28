@@ -192,13 +192,15 @@ The maintenance-margin ladder now rides **inline** on each market record as
 ]
 ```
 
-- `max_open_interest` — **upper bound** of the band (decimal string, size units);
+- `max_open_interest` — **upper bound** of the band (decimal string, whole-USDC notional);
   `null` = the **unbounded top tier**.
 - `max_leverage` — max leverage in this band (`u8`).
 - `maint_margin_ratio` — maintenance-margin ratio, **decimal bps string**
   (`"100"` = 1.00%).
 
-Tier = the first band whose `max_open_interest` bound is not exceeded. Leverage
+Tier = the first band whose `max_open_interest` is STRICTLY greater than your
+position's notional — a notional landing exactly on a bound takes the next band
+up. Leverage
 falls and maintenance rises as open interest grows.
 
 ## 5. New: a ranged `trades` ask {#5-new-ranged-trades}

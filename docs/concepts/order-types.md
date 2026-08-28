@@ -121,6 +121,47 @@ trigger closes a short.
 | `true` | Fire a reduce-only **market** exit — a slippage-bounded IOC clamped to what reduces the position. `limit_px` is ignored. |
 | `false` | Rest a reduce-only **limit** at the order's `limit_px` (`limit_px > 0`, `tif: gtc`). It rests until it fills or you cancel it. |
 
+**The market exit's price.** A market trigger does not fire at `trigger_px`. It
+fires an IOC priced off the risk mark — the mark price clamped into a band
+around the oracle index — then widened by a second, governed slippage band:
+
+```
+risk_mark = clamp(committed_mark, oracle_px * (1 - oracle_band), oracle_px * (1 + oracle_band))
+
+fired_limit_px = risk_mark + risk_mark * slippage_band   # closes a short: buy back, price ceiling
+fired_limit_px = risk_mark - risk_mark * slippage_band   # closes a long: sell, price floor
+```
+
+- `oracle_band` defaults to 5% of the oracle index and is governance-adjustable
+  per market. A committed mark already inside the band passes through
+  unchanged — the clamp only pulls an outlier mark back toward the oracle, it
+  never pushes a normal mark away from it.
+- `slippage_band` defaults to 3% of the risk mark. Governance can retune it
+  chain-wide, and a retune applies immediately to stops already armed.
+- Both steps round toward zero, and the sell-side floor can never reach zero —
+  it holds at the smallest positive price even for an extreme band on a
+  near-zero mark.
+- The leg does not fire at all while its market has no fresh oracle index
+  (missing, or older than the staleness window). A stale oracle defers the
+  fire instead of pricing the exit off an unprotected last-trade print.
+
+Worked example — a stop-loss closing a **long**. BTC's oracle index reads
+`67000.00`; a thin-book print has pushed the committed mark to `71000.00`:
+
+```
+band       = 67000.00 * 0.05 = 3350.00
+risk_mark  = clamp(71000.00, 67000.00 - 3350.00, 67000.00 + 3350.00)
+           = clamp(71000.00, 63650.00, 70350.00)
+           = 70350.00
+
+slippage        = 70350.00 * 0.03 = 2110.50
+fired_limit_px  = 70350.00 - 2110.50 = 68239.50
+```
+
+The fired IOC sells at `68239.50` or better. It never dumps into the wash
+print at `71000.00`, and it never sells below `68239.50` even if the book gaps
+under that.
+
 `trigger_px` keeps every role for both variants — park price, fire direction, and
 the mark cross. For a limit trigger, `limit_px` is only the resting order's price.
 
@@ -505,10 +546,74 @@ matching engine has no order kind, so `"market"` and `"limit"` behave
 identically. Your `limit_px` and `tif` decide the behaviour. Sending
 `kind: "market"` with `tif: "gtc"` rests a normal limit order.
 
-Caveat: every market order is subject to the **mark-price band**. If the best ask
-is 5% above mark, your market buy fills the liquidity up to
-`mark × (1 + band_pct)` and cancels the remainder. See
-[mark prices](./mark-prices.md).
+**No mark-price band caps a market order you send.** The book fills every level
+priced at or inside your `limit_px`, however far past the mark that runs. There
+is no ceiling at `mark × (1 + band_pct)`, and no partial fill that stops at a
+band edge. The bands on [mark prices](./mark-prices.md) shape the **mark**, not
+the price you pay.
+
+The `mark ∓ band` price [above](#triggers) belongs to a **fired market trigger**,
+which the node prices for you. A market order you send yourself carries only the
+`limit_px` you signed, so set it deliberately.
+
+One mark-relative rule does exist, and it **rejects** instead of trimming: while
+a market sits at its
+[open-interest cap](./contract-specifications.md#order--position-limits), an
+order priced through the mark on the position-increasing side is refused whole,
+before any fill.
+
+### Bounding the fill price {#bounding-the-fill-price}
+
+Your own `limit_px` is the price bound the book enforces on a market or IOC
+order. A buy fills every ask at or below `limit_px`; a sell fills every bid at
+or above it, best price first. Set `limit_px` to your own worst acceptable
+price for a protected market order — an extreme `limit_px` accepts whatever
+price the book offers, with no other ceiling or floor.
+
+```
+buy IOC:  fills asks with price <= limit_px, best (lowest) price first
+sell IOC: fills bids with price >= limit_px, best (highest) price first
+worst_fill_price = the price of the last (deepest) level the order reaches
+```
+
+Each level fills at its own resting price — a fill is never one blended
+price. To predict your worst price before you send the order, walk an
+order-book read from the touch outward, summing size until you cover your
+order size or run out of depth priced at or inside your `limit_px`.
+
+**Worked example.** Buy 2.5 BTC, `tif: "ioc"`, `limit_px: 68000.00`. The
+order-book read shows:
+
+| Ask price | Size |
+|-----------|------|
+| 67010.00 | 1.0 |
+| 67025.50 | 1.0 |
+| 67040.00 | 1.2 |
+| 67600.00 | 3.0 |
+
+```
+level 1: 67010.00 x 1.0  -> filled 1.0, remaining 1.5
+level 2: 67025.50 x 1.0  -> filled 1.0, remaining 0.5
+level 3: 67040.00 x 1.2  -> crosses (67040.00 <= 68000.00); take 0.5, remaining 0
+
+worst_fill_price   = 67040.00
+filled_size        = 2.5
+average_fill_price = (1.0*67010.00 + 1.0*67025.50 + 0.5*67040.00) / 2.5 = 67022.20
+```
+
+Lower `limit_px` to `67030.00` and the third level no longer crosses: 2.0 BTC
+fills and the unfilled 0.5 BTC cancels — an IOC never rests the remainder.
+Depth beyond `limit_px` never counts toward your fill, however deep the book
+runs past it.
+
+**Edge cases.**
+
+- **Thin book.** Depth at or inside `limit_px` is less than your order size:
+  the order fills the depth that exists and cancels the rest. This is the
+  ordinary IOC outcome, not an error.
+- **Empty or fully-crossed-out book.** No level crosses `limit_px`: the order
+  fills nothing and cancels in full.
+- **Zero size.** Rejected before it reaches the book.
 
 ## Order lifecycle state machine {#order-lifecycle-state-machine}
 

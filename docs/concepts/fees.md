@@ -48,6 +48,114 @@ same flow — the protocol never pays out more than it takes in.
 Per-fill fee appears in every [`userFills`](../api/rest/info.md#user_fills) entry as
 `fee` (USDC base units; positive = paid, negative = rebate received).
 
+### Resolving your rate {#resolving-your-rate}
+
+Each fill resolves its base rate from **each party's own trailing 30-day volume**
+— the taker leg from the taker's volume, the maker leg from the maker's volume.
+The two can differ on the same fill, because they read different ladders:
+
+```text
+tier(volume)    = the highest tier whose volume floor the trader's trailing
+                   30-day volume clears (else the base rate)
+taker_base_rate = tier(taker's trailing 30-day TAKER volume).taker_rate
+maker_base_rate = tier(maker's trailing 30-day MAKER volume).maker_rate
+```
+
+Volume only rolls into that trailing window when a fill actually charges a
+**positive** fee — a fee-free market cannot farm a cheaper tier by trading with
+itself. Because volume updates fill by fill, a single order that crosses many
+resting orders can walk its own taker leg into a new tier partway through: the
+fifth fill of one order can price at a different rate than the first.
+
+The taker discount, then the maker rebate, apply on top of the base rate:
+
+```text
+effective_taker_rate = taker_base_rate × (1 − staking_discount)
+effective_maker_rate = maker_base_rate − maker_rebate_rate
+```
+
+`staking_discount` comes from how much MTF you stake or delegate, against the
+staking discount tiers on the [Fee schedule](./fee-schedule.md) — taker-only, and
+it can only shrink the rate, never flip it negative.
+
+`maker_rebate_rate` comes from your **share of the exchange's total 30-day maker
+volume** — your maker volume divided by every maker's maker volume, summed —
+against the maker-rebate tiers on the [Fee schedule](./fee-schedule.md). Because
+it is **subtracted**, a high enough rebate tier carries `effective_maker_rate`
+below zero: that is the rebate case above, a credit paid to the maker.
+
+**Rounding, in order.** The discounted taker rate is truncated toward zero to the
+nearest 0.1 basis point *before* it prices a fee. The dollar fee it then computes
+— taker, maker, or rebate — is truncated toward zero again, independently, to the
+nearest 1e-6 USDC. Two truncations, both toward zero, never a round-up.
+
+**Where to read it.** [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
+called with your `address` returns `taker_volume_30d`, `maker_volume_30d`,
+`effective_taker_bps`, `effective_maker_bps`, `staking_discount_permille`, and
+`maker_rebate_bps` for that account — the resolved numbers this section derives,
+not just the ladder.
+
+### Worked example {#worked-example}
+
+A taker buys `0.1` BTC at `$67,000` (notional `$6,700`) against a resting maker
+ask. Both accounts are new — base tier, no MTF staked, and the maker has not
+cleared a maker-rebate share tier:
+
+```text
+notional         = 67000 × 0.1              = 6700 USDC
+taker_base_rate  = 0.035 %  (base tier)
+maker_base_rate  = 0.010 %  (base tier)
+
+taker_fee = trunc(6700 × 0.00035) = 2.345 USDC   (paid by the taker)
+maker_fee = trunc(6700 × 0.00010) = 0.67  USDC   (paid by the maker)
+```
+
+Both are charged in full; the maker's `fee` on `userFills` reads a positive
+`"0.67"`.
+
+**Add a referrer.** The taker has a referrer on file:
+
+```text
+referrer_share = trunc(taker_fee × 10%) = trunc(2.345 × 0.10) = 0.2345 USDC
+protocol_fee   = taker_fee − referrer_share = 2.1105 USDC
+```
+
+The referrer share leaves the taker's *fee*, not an extra charge — the taker
+still pays exactly `2.345` in total. The credit accrues where
+[`/info fee_schedule`](../api/rest/info.md#fee_schedule) reports
+`user.referrer_credit`, for the referrer's own address.
+
+**A different maker, at a rebate tier.** Now the maker sits at the top volume
+tier (`maker_base_rate = 0.0000%`) and clears the 3%-share rebate tier
+(`maker_rebate_rate = 0.0030%`):
+
+```text
+effective_maker_rate = 0.0000% − 0.0030% = −0.0030%   (negative: a credit)
+rebate                = trunc(6700 × 0.000030) = 0.201 USDC
+rebate_paid           = min(rebate, protocol_fee) = min(0.201, 2.1105) = 0.201 USDC
+```
+
+The maker is credited `0.201` USDC instead of paying; `userFills` reports the
+maker's `fee` as `"-0.201"`. The credit is funded from this same fill's taker
+protocol fee — never minted — so it can never exceed what that fee has left
+after the referrer carve. On a fill where the taker fee is too small to cover
+the rebate, the maker is credited only the available remainder, not the full
+rebate rate.
+
+**What is left funds the 70 / 20 / 10 split:**
+
+```text
+pooled    = protocol_fee − rebate_paid = 2.1105 − 0.201 = 1.9095 USDC
+buyback   = trunc(pooled × 70%)        = 1.33665 USDC
+validator = trunc(pooled × 20%)        = 0.3819  USDC
+treasury  = pooled − buyback − validator = 0.19095 USDC
+```
+
+See [Where fees go](#where-fees-go) for what each share does next. A maker fee
+that is **paid, not credited**, skips the referrer step entirely and joins this
+same 70/20/10 split at its full amount — see
+[Referrer credit](#referrer-credit): the maker fee carries no referrer carve.
+
 ## Broker credit {#builder-credit}
 
 An order-flow originator can charge its own fee. It sets a broker address on the
@@ -66,11 +174,28 @@ whose rate is above the trader's approved ceiling or above the protocol cap. The
 broker credit is taker-only, with a per-order cap. It does not change the maker
 side. For the full rules, see [broker codes](./broker-codes.md).
 
+`broker_rate` is bounded twice before an order can even rest: at or below the
+protocol cap (a governed value, default 8 basis points) and at or below the
+ceiling the trader's own `approve_broker_fee` set for that broker. The charge is
+`notional × broker_rate`, truncated toward zero to the nearest 1e-6 USDC — the
+exact amount credited to the broker's address, so the debit and the credit never
+drift apart.
+
 ## Referrer credit {#referrer-credit}
 
 When an account has a referrer set, a share of its **taker fee** is routed to the
 referrer **before** the rest is distributed — it comes out of the protocol's take,
 not as an extra charge to the taker. The maker fee carries no referrer credit.
+
+```text
+referrer_share = taker_fee × 10%     # truncated toward zero, 1e-6 USDC
+```
+
+That share is a fixed 10% of the **collected fee**, not of the notional, and it
+is deducted before the remainder splits 70/20/10 (see
+[Where fees go](#where-fees-go)). A **maker** fee skips this step outright and
+joins the split at its full amount — the maker side never carries a referrer
+carve, positive or negative.
 
 Referrals are single-level (no multi-level chain — anti-Ponzi). A referrer is set
 once with [`set_referrer`](../api/rest/exchange.md#set_referrer) and is immutable
@@ -247,23 +372,26 @@ boundary is crossed.
 ## Spot fees {#spot-fees}
 
 The same maker/taker shape applies to spot fills, but spot fees are charged on a
-**separate fee account** from perps.
+**separate fee account** from perps. Spot resolves its rate through the exact
+mechanics in [Resolving your rate](#resolving-your-rate) — the 30-day tier from
+each party's own volume, the staking discount on the taker leg, the maker rebate
+on the maker leg, the same ladders and the same rates. There is no separate spot
+multiplier.
 
-**Today both sides pay in the QUOTE token of the pair.** The fee leaves the
-payer's spendable quote balance, never the base balance. Each spot pair may set
+**A SELLER pays in the QUOTE token of the pair; a BUYER pays in the BASE token
+it receives** (see [below](#spot-buy-fee-in-base)). Each spot pair may set
 its own maker/taker rate; when a pair leaves them unset, the global spot default
 applies. See the spot tiers in the
 [`/info fee_schedule`](../api/rest/info.md#fee_schedule) response, and
 [spot trading](../products/spot.md#matching-fills-and-fees) for the settlement
 model.
 
-### A spot BUY will pay its fee in the BASE token {#spot-buy-fee-in-base}
+### A spot BUY pays its fee in the BASE token {#spot-buy-fee-in-base}
 
-:::caution Scheduled change — read this before you reconcile balances
-This rule is **built but not yet active**. It switches on at one announced block
-height. Below that height the behavior above applies unchanged. The height is
-published in the release notes; there is no field on the wire that flips with it,
-so the height is the only boundary you can key on.
+:::caution LIVE since block 6,565,000 — read this before you reconcile balances
+Below that height a spot buyer paid its fee in the quote token. There is no field
+on the wire that flips with the change, so the block height is the only boundary
+you can key on.
 :::
 
 **Each side pays out of the leg it RECEIVES.** A sell receives USDC and already
@@ -271,6 +399,28 @@ pays from it. A **buy receives the base token, so the buy fee comes out of the
 base**, for the taker and the maker alike. The rule closes a real hole: a fee
 denominated in a token the buyer is not receiving can be charged against an empty
 balance, and a resting buyer holding no spendable quote paid nothing.
+
+```text
+buyer_rate = effective_taker_rate if the taker is buying, else effective_maker_rate
+base_fee   = gross_size × buyer_rate         # exact — see rounding below
+base_fee   = min(base_fee, gross_size)        # can never exceed what was bought
+net_credit = gross_size − base_fee
+```
+
+It is always the **buyer's own** resolved rate — the taker's when the taker is
+buying, the maker's when the maker is buying (the taker sold). A seller pays no
+base fee at all; its leg is untouched.
+
+**Rounding is different here than everywhere else on this page.** The base fee
+is computed at the token's own size precision plus five more decimal places —
+fine enough that the product never needs rounding for any realistic trade size.
+It is **not** truncated to the 1e-6 USDC quantum the quote-side fee uses:
+quantizing here would zero the fee on a small lot and reopen the hole this rule
+closes (see consequence 3 below). For a taker buying `1.0` BTC at the `0.035%`
+base rate: `base_fee = 1.0 × 0.00035 = 0.00035` BTC exactly, `net_credit =
+0.99965` BTC — the numbers in consequence 1 below. The referrer share and maker
+rebate carve out of this same `base_fee`, in kind, by the same 10% and rebate-tier
+rules as [above](#resolving-your-rate) — see consequence 2.
 
 Four consequences a caller must handle:
 
@@ -435,5 +585,3 @@ validators, who distribute it to their stakers — so staking (or delegating) ea
 you a slice of fee revenue. See [Staking](./staking.md).
 
 </details>
-</content>
-</invoke>
