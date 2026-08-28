@@ -54,7 +54,7 @@ liquidation threshold. The master-of-sub relationship is recorded in a side map.
 no sub can act. See the [TL;DR warning](#tldr).
 
 Hard cap: **32 subs** per master. Hitting the cap returns
-`{"error":"sub_account_cap"}` on `create_sub_account`.
+`PRECONDITION_FAILED` on `create_sub_account`.
 
 ## Transfers {#transfers}
 
@@ -132,7 +132,7 @@ Response:
 
 For spot assets use `sub_account_spot_transfer` (adds an `asset` field).
 
-**Transfer must leave the sub in Safe tier** — a withdrawal that would push the sub into T0+ is rejected with `{"error":"insufficient sub balance"}`. Top up first, then withdraw the excess.
+**Transfer must leave the sub in Safe tier** — a withdrawal that would push the sub into T0+ is rejected with `MARGIN_INSUFFICIENT`. Top up first, then withdraw the excess.
 
 ## Trading from a sub {#trading-from-a-sub}
 

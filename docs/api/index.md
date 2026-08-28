@@ -27,7 +27,7 @@ One MTF-native protocol, served by the gateway front door
 
 ## Cross-cutting {#cross-cutting}
 
-- [Errors](./errors.md) — complete error catalog with remediation
+- [Errors](./errors.md) — the one response envelope, every error code, and what to do about each
 - [Rate limits](./rate-limits.md) — per-IP weight + per-account request budgets
 
 ## See also {#see-also}

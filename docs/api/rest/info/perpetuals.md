@@ -12,7 +12,7 @@ Read queries for **perpetual** markets. Same `POST /info` endpoint, envelope, an
 `active_asset_data`, …) resolves the market by its **`coin`
 symbol** (`"BTC"`, `"ETH"`, …). The legacy numeric `asset_id` / `market_id`
 request arguments have been **removed** — a request that supplies them (and omits
-`coin`) is rejected with `400 {"error":"missing field coin"}`. These market reads
+`coin`) is rejected with `400 INVALID_REQUEST`. These market reads
 echo the `coin` symbol in their responses.
 
 The signed `/exchange` write path still addresses a market by a **number**, and
@@ -48,7 +48,7 @@ every section, every market):
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only |
-| `coin` | string | no | Market filter — keep only the row for this symbol. Unknown symbol → `404 {"error":"market not found"}` |
+| `coin` | string | no | Market filter — keep only the row for this symbol. Unknown symbol → `404 MARKET_NOT_FOUND` |
 
 **Response**
 
@@ -60,8 +60,8 @@ Response (truncated to one entry per list):
 
 ```json
 {
-  "type": "markets",
   "data": {
+    "type": "markets",
     "perp": [
       {
         "coin":            "BTC",
@@ -162,7 +162,7 @@ Same optional `kind` and `coin` filters.
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only |
-| `coin` | string | no | Market filter — keep only the row for this symbol. Unknown symbol → `404 {"error":"market not found"}` |
+| `coin` | string | no | Market filter — keep only the row for this symbol. Unknown symbol → `404 MARKET_NOT_FOUND` |
 
 **Response**
 
@@ -175,8 +175,8 @@ Response (perp truncated to one entry; the `spot` section is identical to
 
 ```json
 {
-  "type": "markets_meta",
   "data": {
+    "type": "markets_meta",
     "perp": [
       {
         "coin":               "BTC",
@@ -305,8 +305,8 @@ Grouped to a coarser grid:
 
 ```json
 {
-  "type": "l2_book",
   "data": {
+    "type": "l2_book",
     "coin": "BTC",
     "bids": [ { "px": "61663.1", "sz": "0.04862", "n_orders": 1 } ],
     "asks": [ { "px": "61675.7", "sz": "0.04862", "n_orders": 1 } ]
@@ -327,7 +327,7 @@ market returns empty `bids` / `asks` arrays.
 
 **Errors**
 
-- Missing `coin` → `400 {"error":"missing field coin"}`.
+- Missing `coin` → `400 INVALID_REQUEST`.
 
 **Rules**
 
@@ -353,7 +353,7 @@ for the recent window, or add `start_time` / `end_time` for a time window.
 > ⬆️ **Upgrade notice — not live yet.** Today the node answers this tape under
 > two older names, `recent_trades` (un-ranged) and `trades_by_time` (ranged).
 > Both go away at the release that ships `trades`; until then a
-> `{"type":"trades"}` request answers `400 {"error":"unknown info type: trades"}`.
+> `{"type":"trades"}` request answers `400 UNKNOWN_TYPE`.
 
 **Request**
 
@@ -373,8 +373,8 @@ for the recent window, or add `start_time` / `end_time` for a time window.
 
 ```json
 {
-  "type": "trades",
   "data": {
+    "type": "trades",
     "coin":        "BTC",
     "last_trade":  1783001424768,
     "start_time":  null,
@@ -485,8 +485,8 @@ count, while a trade bar carries real volume and a real trade count.
 
 ```json
 {
-  "type": "candle_snapshot",
   "data": {
+    "type": "candle_snapshot",
     "candles": [
       {
         "t": 1783000020000,
@@ -519,9 +519,9 @@ count, while a trade bar carries real volume and a real trade count.
 
 **Errors**
 
-- Missing `coin` → `400 {"error":"missing field coin"}`; missing `interval` →
-  `400 {"error":"missing field interval"}`. An unknown `candle_type` →
-  ``400 {"error":"invalid candle_type: <token> (expected `mark`, `oracle` or `trade`)"}``.
+- Missing `coin` → `400 INVALID_REQUEST`; missing `interval` →
+  `400 INVALID_REQUEST`. An unknown `candle_type` →
+  ``400 INVALID_REQUEST``.
   A rejected value is never served as another series.
 
 **Rules**
@@ -597,8 +597,8 @@ Market-scoped funding premium samples (the premium ring).
 
 ```json
 {
-  "type": "funding_history",
   "data": {
+    "type": "funding_history",
     "coin": "BTC",
     "samples": [
       { "ts_ms": 1783008579269, "premium": "0.00027179", "funding_rate": "0.00027179" },
@@ -617,7 +617,7 @@ Market-scoped funding premium samples (the premium ring).
 
 **Errors**
 
-- Missing `coin` → `400 {"error":"missing field coin"}`.
+- Missing `coin` → `400 INVALID_REQUEST`.
 
 **Rules**
 
@@ -644,8 +644,8 @@ No parameters.
 
 ```json
 {
-  "type": "mip3_active_bids",
   "data": {
+    "type": "mip3_active_bids",
     "auction_round":   2,
     "current_bid":     "12345",
     "current_winner":  "0x<bidder>",
@@ -691,8 +691,7 @@ No parameters.
 
 ```json
 {
-  "type": "liquidatable",
-  "data": { "accounts": [ { "address": "0x<addr>", "tier": "PartialMarket50" } ] }
+  "data": { "type": "liquidatable", "accounts": [ { "address": "0x<addr>", "tier": "PartialMarket50" } ] }
 }
 ```
 
@@ -728,8 +727,8 @@ A user's per-market leverage / margin-mode / max trade size.
 
 ```json
 {
-  "type": "active_asset_data",
   "data": {
+    "type": "active_asset_data",
     "address": "0x<addr>", "coin": "BTC", "leverage": 50,
     "margin_mode": "cross", "mark_px": "61550.29664777",
     "max_trade_size": null, "max_trade_szs": ["0", "0"],
@@ -751,8 +750,8 @@ A user's per-market leverage / margin-mode / max trade size.
 
 **Errors**
 
-- Missing `address` → `400 {"error":"missing field: address"}`; missing `coin`
-  → `400 {"error":"missing field coin"}`.
+- Missing `address` → `400 INVALID_REQUEST`; missing `coin`
+  → `400 INVALID_REQUEST`.
 
 #### `max_trade_size` is market-wide, not yours {#max-trade-size}
 
@@ -793,7 +792,7 @@ each market record as `margin_tiers` — read it from
 [`markets_meta`](#markets_meta). Each tier is `{max_open_interest: string|null, max_leverage: u8,
 maint_margin_ratio: bps-string}`: ascending upper-bound bands, `null` = unbounded
 top tier. A `margin_table` request now returns
-`400 {"error":"unknown info type: margin_table"}`.
+`400 UNKNOWN_TYPE`.
 :::
 
 ### List perp DEXs and their limits {#perp_dexs}
@@ -814,8 +813,8 @@ No parameters.
 
 ```json
 {
-  "type": "perp_dexs",
   "data": {
+    "type": "perp_dexs",
     "dexs": [ { "index": 0, "n_assets": 1, "assets": [0] } ],
     "limits": {
       "mip3_enabled":            true,

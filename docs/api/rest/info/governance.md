@@ -62,8 +62,8 @@ with no arguments the read returns the most recent window it can serve.
 
 ```json
 {
-  "type": "validator_votes",
   "data": {
+    "type": "validator_votes",
     "votes": [
       {
         "round":          2000000,
@@ -188,8 +188,18 @@ replaced by [`validator_votes`](#validator_votes).
 `410 Gone`:
 
 ```json
-{ "error": "gov_state is retired on the public gateway; use validator_votes (time-ranged, served from the archive)", "use": "validator_votes" }
+{
+  "error": {
+    "code":    "UNKNOWN_TYPE",
+    "message": "gov_state is retired; use validator_votes (time-ranged, served from the archive)",
+    "details": { "field": "type", "use": "validator_votes" }
+  }
+}
 ```
+
+`details.use` names the read to call instead. This is the one place `410` is
+answered: a retired read is well formed and it did exist, so neither `400` nor
+`404` describes it.
 
 Use [`validator_votes`](#validator_votes). See the table above for where the
 current parameter values now live.

@@ -124,14 +124,14 @@ the digest is built.
 { "statuses": [ { "resting": { "oid": 12345, "cloid": "0x0000000000000000000000000000ab01" } } ] }
 ```
 
-An order action waits for commit, then returns `200 OK`, so the `oid` is real. You
-get one entry per order placed. The union is:
+An order action waits for commit, then returns `200 OK`, so the `oid` is real.
+The entries are at `body.data.statuses` — one per order placed. The union is:
 
 | Entry | Meaning |
 |-------|---------|
 | `{"resting":{"oid":N,"cloid":"0x…"}}` | On the book |
 | `{"filled":{"oid":N,"total_sz":"…","avg_px":"…"}}` | Matched |
-| `{"error":"<reason>"}` | Rejected at commit |
+| `{"error":{"code":"…","message":"…"}}` | Rejected. The **same error object** the envelope carries — match on `code`, never on `message` |
 | `{"pending":{"action_hash":"0x…","nonce":N}}` | Admitted, no commit inside the wait window (5 s by default) |
 
 `pending` is not a failure. The action may still commit. Track it on the
@@ -238,11 +238,11 @@ By default the signer is the trader. A spot order also accepts an optional
 List what is open with
 [`open_orders`](../api/rest/info.md#open_orders). Its rows carry `oid` and a
 symbol `coin`, so map the symbol back to the numeric id from step 1 before you
-cancel. A cancel of an order that already filled or already cancelled returns
-`{"error":"order not found"}` and is harmless.
+cancel. A cancel of an order that already filled or already cancelled is refused with
+`ORDER_NOT_FOUND` and is harmless.
 
-A cancel is not an order action: it returns the admission envelope
-(`{"accepted":true, …}`), not a `statuses` array. `accepted: true` reports
+A cancel is not an order action: it returns the admission payload
+(`{"data":{"accepted":true, …}}`), not a `statuses` array. `accepted: true` reports
 MEMPOOL admission only — a cancel that fails at commit is reported on no channel,
 so confirm it by the order's absence from `open_orders`. See
 [`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed).

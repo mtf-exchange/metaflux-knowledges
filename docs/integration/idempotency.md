@@ -64,8 +64,8 @@ The server returns:
 | Server response | What it means |
 |-----------------|---------------|
 | `{"resting":{"oid":N,"cloid":"0x..."}}` | Order placed, dedup confirmed |
-| `{"error":"duplicate cloid"}` | A prior request with the same cloid was admitted; **the order is already on the book**. Look it up by cloid. |
-| `{"error":"<other>"}` | This entry failed; you can retry with a fresh cloid or the same one |
+| `{"error":{"code":"ORDER_DUPLICATE_CLOID", …}}` | A prior request with the same cloid was admitted; **the order is already on the book**. Look it up by cloid |
+| `{"error":{"code":"<other>", …}}` | This entry failed; you can retry with a fresh cloid or the same one. Match on `code`, never on `message` |
 
 Retry rule for orders: **same cloid + same params** is idempotent end-to-end. If the first try landed, the second sees `duplicate cloid` and you know the original is in place.
 
@@ -88,7 +88,7 @@ Most non-order actions are idempotent at the state-machine level:
 
 | Action | Idempotent? | Why |
 |--------|:-----------:|-----|
-| `Cancel` | yes | Cancelling a non-existent / already-cancelled order returns `{"error":"order not found"}` — harmless |
+| `Cancel` | yes | Cancelling a non-existent / already-cancelled order is refused with `ORDER_NOT_FOUND` — harmless |
 | `CancelByCloid` | yes | Same |
 | `UpdateLeverage` | yes | Setting leverage to the current value is a no-op |
 | `UpdateMarginMode` | yes | Same |

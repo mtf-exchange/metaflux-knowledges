@@ -31,20 +31,61 @@ native `/info` is served directly at `http://localhost:8080`.
 
 ## Envelope {#envelope}
 
+Every `/info` response is one envelope. A success carries `data`. A failure
+carries `error`. The two keys never appear together.
+
 **Request**
 
 ```json
 { "type": "<query_type>", /* type-specific args */ }
 ```
 
-**Response**
+**Success** — `200 OK`. The `type` discriminator is echoed INSIDE `data`:
 
 ```json
-{ "type": "<query_type>", "data": { /* type-specific */ } }
+{
+  "data": {
+    "type": "<query_type>",
+    /* type-specific payload */
+  }
+}
 ```
 
-On unknown `type`: `400 Bad Request` with `{"error":"unknown info type: <X>"}`.
-On unknown resource (e.g. unknown vault id): `404 Not Found` with `{"error":"<resource> not found"}`.
+The payload fields keep their old path. A field you read at `body.data.fills`
+before is still at `body.data.fills`. Only `type` moved: it was a sibling of
+`data`, and it is now the first key of `data`.
+
+A success has **no** `error` key. Do not test `error === null` — test whether
+the key is present.
+
+**A `data` of `null` is a SUCCESS.** A read can succeed with no content. That
+answers `{"data": null}` with status `200`. Treat it as an empty result, not as
+a failure.
+
+**Failure** — no `data` key, and the HTTP status that the code maps to:
+
+```json
+{
+  "error": {
+    "code":    "UNKNOWN_TYPE",
+    "message": "unknown info type: markest"
+  }
+}
+```
+
+| Field | Presence | Meaning |
+|-------|----------|---------|
+| `code` | always | The stable contract. **Match on this.** |
+| `message` | always | Prose for a human. It can change in any release. **Never match on it.** |
+| `details` | optional | The bound the request broke: `{"field","limit","actual"}`. It is **omitted** when the rejection carries no bound — never sent as `{}` |
+
+The HTTP status keeps its normal meaning. One code always answers with one
+status. Every code, its status, and the caller action for it are in the
+[error reference](../errors.md).
+
+Two common `/info` failures: an unknown `type` answers `400` with
+`UNKNOWN_TYPE`; an unknown named resource, such as a vault id, answers `404`
+with `NOT_FOUND`.
 
 ## Query types {#query-types}
 
@@ -71,8 +112,8 @@ disagree.
 
 ```json
 {
-  "type": "account_state",
   "data": {
+    "type": "account_state",
     "address":                       "0x00000000000000000000000000000000000ca11e",
     "account_value":                 "3000",
     "total_raw_usd":                 "3000",
@@ -117,8 +158,8 @@ Response (a faucet-funded account, no positions):
 
 ```json
 {
-  "type": "account_state",
   "data": {
+    "type": "account_state",
     "address":         "0x00000000000000000000000000000000000ca11e",
     "account_value":     "3000",
     "total_raw_usd":     "3000",
@@ -340,8 +381,8 @@ An **unknown address** answers **200** with every sub-object honest-empty, NOT a
 
 ```json
 {
-  "type": "account_state",
   "data": {
+    "type": "account_state",
     "address": "0x<addr>",
     "role":    "user",
     "vault": {
@@ -504,8 +545,8 @@ Returns a snapshot of one vault: TVL, share price, and strategy.
 
 ```json
 {
-  "type": "vault_state",
   "data": {
+    "type": "vault_state",
     "vault":              "0x<addr>",
     "name":               "MFlux Conservative",
     "tvl":             "10000000000",
@@ -555,8 +596,8 @@ Returns one account's staking, delegation, and unbonding state.
 
 ```json
 {
-  "type": "staking_state",
   "data": {
+    "type": "staking_state",
     "address":                  "0x<addr>",
     "total_staked":             "1000000000",
     "undelegated_pool_balance": "250000000",
@@ -619,8 +660,8 @@ No parameters.
 
 ```json
 {
-  "type": "fee_schedule",
   "data": {
+    "type": "fee_schedule",
     "tiers": [
       { "volume_30d": "0",         "maker_bps": "2.0", "taker_bps": "5.0" },
       { "volume_30d": "100000000", "maker_bps": "1.5", "taker_bps": "4.5" },
@@ -667,8 +708,8 @@ Returns an account's resting orders, across every perp book and every spot book.
 
 ```json
 {
-  "type": "open_orders",
   "data": {
+    "type": "open_orders",
     "address":    "0x<addr>",
     "orders": [
       {
@@ -706,7 +747,7 @@ Returns an account's resting orders, across every perp book and every spot book.
 
 **Errors**
 
-- Missing `address` → `400 {"error":"missing field address"}`.
+- Missing `address` → `400 INVALID_REQUEST`.
 
 **Rules**
 
@@ -770,7 +811,7 @@ close, realized PnL and funding folded over the whole life — use
 
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
-| `address` | hex address | yes | Account address. Missing `address` returns `400 {"error":"missing field address"}` |
+| `address` | hex address | yes | Account address. Missing `address` returns `400 INVALID_REQUEST` |
 | `limit` | uint32 | no | Cap on the number of most-recent records returned. Absent or `0` returns the full ring |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive), filtered on the fill `time`. Absent is an open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent is an open upper bound |
@@ -784,8 +825,8 @@ is identical either way.
 
 ```json
 {
-  "type": "user_fills",
   "data": {
+    "type": "user_fills",
     "address":    "0x<addr>",
     "start_time": null,
     "end_time":   null,
@@ -874,7 +915,7 @@ Or by client order id:
 | `oid` | uint64 | one of `oid` / `cloid` | Server order id |
 | `cloid` | hex string | one of `oid` / `cloid` | Client order id — `0x` + 32 hex chars |
 
-Neither field present returns `400 {"error":"missing field oid or cloid"}`. A
+Neither field present returns `400 INVALID_REQUEST`. A
 malformed `cloid` returns `400`. Resolution stops at the first hit, in this
 order: live resting order, then parked trigger, then terminal fill, then
 unknown.
@@ -887,8 +928,8 @@ The `data.status` field discriminates which shape follows.
 
 ```json
 {
-  "type": "order_status",
   "data": {
+    "type": "order_status",
     "status": "resting",
     "order": {
       "oid":         12345,
@@ -907,8 +948,8 @@ The `data.status` field discriminates which shape follows.
 
 ```json
 {
-  "type": "order_status",
   "data": {
+    "type": "order_status",
     "status": "triggered",
     "trigger": {
       "oid":           12345,
@@ -933,8 +974,8 @@ carries neither:
 
 ```json
 {
-  "type": "order_status",
   "data": {
+    "type": "order_status",
     "status": "triggered",
     "trigger": {
       "oid":           12346,
@@ -959,8 +1000,8 @@ object is the same shape as one [`user_fills`](#user_fills) record):
 
 ```json
 {
-  "type": "order_status",
   "data": {
+    "type": "order_status",
     "status": "filled",
     "fill": { /* same shape as a user_fills fill record */ }
   }
@@ -972,7 +1013,7 @@ query that matched no resting/triggered order also resolves here, since the
 trigger registry and fill ring are keyed by `oid`):
 
 ```json
-{ "type": "order_status", "data": { "status": "unknown" } }
+{ "data": { "type": "order_status", "status": "unknown" } }
 ```
 
 | Field | Type | Meaning |
@@ -998,8 +1039,8 @@ No parameters.
 
 ```json
 {
-  "type": "option_series",
   "data": {
+    "type": "option_series",
     "series": [
       {
         "signing_id":      2147483649,
@@ -1072,8 +1113,8 @@ questions.
 
 ```json
 {
-  "type": "option_positions",
   "data": {
+    "type": "option_positions",
     "address": "0x0000000000000000000000000000000000000000",
     "positions": [
       {
@@ -1184,8 +1225,8 @@ per-account funding payments today, subscribe to the
 
 ```json
 {
-  "type": "user_funding",
   "data": {
+    "type": "user_funding",
     "address":    "0x<addr>",
     "start_time": 1700000000000,
     "end_time":   1700003600000,
@@ -1248,8 +1289,8 @@ feed, subscribe to the WS channel instead.
 
 ```json
 {
-  "type": "user_ledger_updates",
   "data": {
+    "type": "user_ledger_updates",
     "address":    "0x<addr>",
     "start_time": 1700000000000,
     "end_time":   1700003600000,
@@ -1295,8 +1336,8 @@ order's fills.
 
 ```json
 {
-  "type": "historical_orders",
   "data": {
+    "type": "historical_orders",
     "address": "0x<addr>",
     "orders": [
       {
@@ -1389,7 +1430,7 @@ No parameters beyond `address`, which is required (hex address).
 **Response**
 
 ```json
-{ "type": "user_twap_slice_fills", "data": { "address": "0x<addr>", "fills": [] } }
+{ "data": { "type": "user_twap_slice_fills", "address": "0x<addr>", "fills": [] } }
 ```
 
 | Field | Type | Meaning |
@@ -1418,8 +1459,8 @@ No parameters beyond `address`, which is required (hex address).
 
 ```json
 {
-  "type": "delegator_rewards",
   "data": {
+    "type": "delegator_rewards",
     "address":           "0x<addr>",
     "claimable_rewards": "9",
     "rewards": [
@@ -1488,8 +1529,8 @@ Global trading status. No parameters.
 
 ```json
 {
-  "type": "exchange_status",
   "data": {
+    "type": "exchange_status",
     "spot_disabled": false,
     "post_only": false,
     "mip3_enabled": true,
@@ -1515,7 +1556,7 @@ not give a date.
 
 :::warning
 `frontend_open_orders` is removed (folded into `open_orders`, wire-v2 phase 2).
-A request now returns `400 {"error":"unknown info type: frontend_open_orders"}`.
+A request now returns `400 UNKNOWN_TYPE`.
 The TIF / `cloid` / trigger detail it used to carry is on every
 [`open_orders`](#open_orders) row already — see that entry.
 :::
@@ -1535,8 +1576,8 @@ is the live set, not history. For slice-fill history, use
 
 ```json
 {
-  "type": "user_twaps",
   "data": {
+    "type": "user_twaps",
     "address": "0x<addr>",
     "twaps": [
       {
@@ -1585,8 +1626,8 @@ All vaults summary. No parameters.
 
 ```json
 {
-  "type": "vault_summaries",
   "data": {
+    "type": "vault_summaries",
     "vaults": [
       { "id": 7, "address": "0x<vault>", "leader": "0x<leader>", "tvl": "10000000000", "follower_count": 2, "kind": "user" }
     ]
@@ -1621,8 +1662,7 @@ budget — track your own spend against [rate limits](../rate-limits.md).
 
 ```json
 {
-  "type": "user_rate_limit",
-  "data": { "address": "0x<addr>", "last_nonce": 9, "pending_count": 2, "lifetime_count": 123 }
+  "data": { "type": "user_rate_limit", "address": "0x<addr>", "last_nonce": 9, "pending_count": 2, "lifetime_count": 123 }
 }
 ```
 
@@ -1649,8 +1689,8 @@ the same answer as a `"0"` ceiling.
 
 ```json
 {
-  "type": "approved_builders",
   "data": {
+    "type": "approved_builders",
     "address": "0x<addr>",
     "builders": [
       { "builder": "0x<builder_a>", "max_fee_bps": "25" },
@@ -1687,8 +1727,8 @@ Current validator L1 votes. No parameters.
 
 ```json
 {
-  "type": "validator_l1_votes",
   "data": {
+    "type": "validator_l1_votes",
     "latest_round": 5,
     "votes": [ { "round": 5, "validator": "0x<validator>", "submitted_at": 1700000000000 } ]
   }
@@ -1721,8 +1761,8 @@ to every row; it changes nothing else.
 
 ```json
 {
-  "type": "validator_summaries",
   "data": {
+    "type": "validator_summaries",
     "total_stake": "1400",
     "n_active": 1,
     "validators": [
@@ -1798,8 +1838,8 @@ before the release.
 
 ```json
 {
-  "type": "gossip_root_ips",
   "data": {
+    "type": "gossip_root_ips",
     "peers": [
       {
         "id": 3,
@@ -1841,10 +1881,19 @@ state and is not folded into the AppHash.
 
 ## Removed reads {#retired-reads}
 
-Each name here answers `400 {"error":"unknown info type: <name>"}`. The read
-surface is cut so that **each question has exactly one read**: two reads for one
-question force a choice, and a wrong choice is silent. For the release a removal
-landed in, see [migration](../migration.md).
+Each name here answers `UNKNOWN_TYPE`. The read surface is cut so that **each
+question has exactly one read**: two reads for one question force a choice, and
+a wrong choice is silent. For the release a removal landed in, see
+[migration](../migration.md).
+
+The status splits the two kinds of removal:
+
+- **`400`** — the name never named a read on this API, or its answer is gone.
+- **`410`** — the name was public and its answer MOVED. Eight names get this:
+  `account_overview`, `bridge_chain_configs`, `bridge_user_outbox`,
+  `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state` and
+  `pm_summary`. The error carries `details.use`, naming the read to call
+  instead, so a client can follow the move without reading this table.
 
 | Removed | Call this instead |
 |---|---|
@@ -1899,17 +1948,22 @@ capability does.
 
 ## Errors {#errors}
 
-| HTTP | Body | Cause |
-|------|------|-------|
-| 200 | normal response | success (an **unknown address** on `account_state` etc. is a **200** with a zeroed record, NOT a 404) |
-| 400 | `{"error":"missing field \`type\`"}` | No `type` discriminator |
-| 400 | `{"error":"unknown info type: <X>"}` | Misspelled or unsupported `type` |
-| 400 | `{"error":"missing field: address"}` / `{"error":"missing field coin"}` | Required type-specific arg omitted (casing varies by reader) |
-| 400 | `{"error":"invalid hex"}` | Address arg malformed |
-| 404 | `{"error":"market not found"}` | `coin` symbol unknown (`markets`, `l2_book` etc.) |
-| 404 | `{"error":"vault not found"}` | Vault address unknown (`vault_state` only) |
-| 405 | (no body) | Not POST |
-| 429 | `{"status":"err","response":"rate limit exceeded"}` | No retry hint is sent — see [rate limits](../rate-limits.md) |
+Read the full list, with the caller action for each code, in the
+[error reference](../errors.md). These are the codes `/info` produces:
+
+| HTTP | `error.code` | Cause |
+|------|--------------|-------|
+| 200 | — | Success. An **unknown address** on `account_state` and its siblings is a **200** with a zeroed record, NOT a 404 |
+| 400 | `INVALID_REQUEST` | No `type` discriminator, a required type-specific argument omitted, or a malformed address |
+| 400 | `UNKNOWN_TYPE` | The `type` names no read. It is misspelled, or the read is removed |
+| 410 | `UNKNOWN_TYPE` | The `type` names a read whose answer MOVED. `details.use` names the read to call instead — see [removed reads](#retired-reads) |
+| 404 | `MARKET_NOT_FOUND` | The `coin` symbol is unknown (`markets`, `l2_book` and other market reads) |
+| 404 | `NOT_FOUND` | A named resource is unknown, such as a vault address on `vault_state` |
+| 429 | `RATE_LIMITED` | No retry hint is sent — see [rate limits](../rate-limits.md) |
+| 500 | `INTERNAL` | Our defect, not your request. Retry, then report it |
+
+A `405` carries no envelope: the endpoint is POST-only, and the router refuses
+another method before the envelope exists.
 
 :::warning
 There is **no `account not found`** error: account-keyed readers (`account_state`,

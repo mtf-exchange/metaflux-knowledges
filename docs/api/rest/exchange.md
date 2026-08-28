@@ -19,7 +19,7 @@ confirmation arriving through the [WS feed](../ws/subscriptions.md) or by pollin
 `SystemSpotSend`, validator votes — are **never** on `/exchange`. They inject via
 node-local queues gated by validator authority (see the
 [non-bridged table](#non-bridged-actions) and the [faucet](./faucet.md#why-this-is-not-on-exchange)).
-Posting a system action's native tag returns `400 unsupported action`.
+Posting a system action's native tag returns `400` with `ACTION_UNSUPPORTED`.
 :::
 
 ## URL {#url}
@@ -441,7 +441,7 @@ shape your client already has.
 These are draft / legacy action names from earlier docs. Most are **not bridged
 on the MTF-native `/exchange` handler** — they are either privileged / system
 writes that must never transit the public user path, or recognized-but-unmapped
-schema stubs, and posting them returns `400 unsupported action`. The one
+schema stubs, and posting them returns `400` with `ACTION_UNSUPPORTED`. The one
 exception below is `MultiSig`, which **is** bridged (its native tag is
 `multi_sig`). See [the table below](#non-bridged-actions) for the disposition of
 each.
@@ -457,7 +457,7 @@ each.
 | (BOLE pool) | `borrow_lend` | **Bridged and live** — `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` are open to any account; `"Borrow"` is refused unless the sender is an approved liquidator |
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit; see [vaults](../../concepts/vaults.md#depositing) |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag — enroll via [`user_portfolio_margin`](#user_portfolio_margin). `pm_unenroll` **is** a bridged alias (no params) for the same action's `enroll:false` form. `pm_rebalance` has been **removed** — rejected as an unknown action |
-| (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` |
+| (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `ACTION_UNSUPPORTED` |
 
 ---
 
@@ -512,7 +512,7 @@ approved agent). To place many orders under one signature, use
 | `builder` | object \| null | — | Optional [broker fee](../../concepts/broker-codes.md), charged on top of the taker fee: `{ "fee": <bps u16>, "user": <0x-hex address> }`. The field keeps the `builder` name |
 | `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../concepts/hedge-mode.md) only.** Target leg for the order. **Omit on a one-way account** (the default) and **send it on a hedge account** — a one-way account that sends it, or a hedge account that omits it, is rejected. `reduce_only` is evaluated against the named leg only. See [hedge mode](#position_side-hedge-mode) below |
 
-**Idempotency**: a duplicate `cloid` on the same account is rejected at admission with `error: "duplicate cloid"`. Use `cloid` as your client-side dedup key.
+**Idempotency**: a duplicate `cloid` on the same account is rejected at admission with `ORDER_DUPLICATE_CLOID`. Use `cloid` as your client-side dedup key.
 
 **Common errors**: `px` not tick-aligned, `size` below market minimum, `reduce_only` would grow position, `stp` rejected via STP, account in T1+ liquidation tier.
 
@@ -522,9 +522,14 @@ approved agent). To place many orders under one signature, use
 ```json
 {"resting": {"oid": 12345, "cloid": "0x..."}}                       // posted to book
 {"filled":  {"oid": 12345, "total_sz": "100000000", "avg_px": "10050000000"}}
-{"error":   "<reason>"}                                             // commit/admission rejected this entry
+{"error":   {"code": "ORDER_INVALID_PRICE", "message": "..."}}      // this entry was rejected
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
+
+A failed leg's `error` is the **same error object** the envelope carries —
+`code`, `message`, and `details` when the rejection names a bound. Match on
+`code`, never on `message`. See
+[per-order statuses](#per-order-statuses).
 
 #### `position_side` (hedge mode) {#position_side-hedge-mode}
 
@@ -780,10 +785,28 @@ it does not authorize anything. Set the account you act for at `params.owner`.
 :::
 
 Returns an array of per-leg statuses (same union as `submit_order`) — **one entry
-per placed leg**, in input order, each echoing its own `cloid`. Legs are
-**independent**: each runs the full order gate on its own, so one rejected leg
-does not roll back the others. A batch carries at most **1000** orders; an empty
-`orders` array is rejected (`empty batch`).
+per placed leg**, in input order, each echoing its own `cloid`. A batch carries
+at most **1000** orders; an empty `orders` array is rejected with
+`INVALID_REQUEST`.
+
+:::danger
+**`grouping` decides whether the batch is atomic. Read this before you send
+one.**
+
+- **`grouping: "na"` — UNGROUPED, per-leg.** Each leg runs the full order gate
+  on its own. A rejected leg does **not** roll back the others: the good legs
+  rest, and the bad leg reports its failure in its own `statuses` entry, as an
+  [error object](#per-order-statuses). Walk every entry.
+- **`grouping` not `"na"` — GROUPED, ATOMIC.** `"normalTpsl"` and
+  `"positionTpsl"` are all-or-nothing. If **any** leg cannot be admitted —
+  including a protective leg that cannot park — the **whole action is
+  rejected and nothing is placed**. The rejection is at the ACTION level: the
+  response carries one `error` object and **no** `statuses` array to walk.
+
+The grouped rule exists because the old per-leg behaviour could fill the entry
+leg and fail the protective leg, and leave the position with no stop. A grouped
+batch now either places the whole family or places nothing.
+:::
 
 #### `positionTpsl` — protective legs, and the scaled ladder {#position-tpsl-ladder}
 
@@ -810,9 +833,10 @@ that position is gone — by any close path, including a liquidation — every l
 of the ladder retires together on the next block. You do not have to cancel the
 survivors yourself.
 
-**A tpsl group is NOT leg-independent.** Group validation runs before any state
-change, so a bad group rejects the WHOLE action and parks nothing. That is the
-opposite of `grouping: "na"`, where one bad leg leaves the others resting.
+**A tpsl group is NOT leg-independent.** It is grouped, so it is atomic: one
+leg that cannot park rejects the WHOLE action, at the action level, and parks
+nothing. That is the opposite of `grouping: "na"`, where one bad leg leaves the
+others resting.
 
 Admission rules a ladder adds:
 
@@ -824,8 +848,9 @@ Admission rules a ladder adds:
   two directions off the two leg prices and needs no mark; a lone leg and every
   ladder leg need an effective mark, and are rejected `Precondition` (`no mark
   price to infer the trigger direction`) without one.
-- **The per-account parked-trigger cap still applies per leg.** A ladder that
-  crosses the governed cap gets a per-leg error, not a whole-batch one.
+- **The per-account parked-trigger cap still applies to every leg.** A ladder
+  that crosses the governed cap is rejected whole, like any other grouped
+  batch. No part of it parks.
 
 One or two legs behave exactly as before. A caller that never sends three legs
 sees no change at all.
@@ -856,7 +881,7 @@ For many cancels under one signature, use [`batch_cancel`](#batch_cancel).
 | `oid` | uint64 | Server order id (returned in the `submit_order` response). **Required** — a cancel with only `cloid` is rejected (`cancel requires an oid`); use [`cancel_by_cloid`](#cancel_by_cloid) instead |
 | `cloid` | hex string \| null | Accepted on the wire but **not** used to cancel here |
 
-**Idempotent**: cancel of an already-cancelled / already-filled order returns `{"error":"order not found"}` and is harmless.
+**Idempotent**: cancel of an already-cancelled / already-filled order is refused with `ORDER_NOT_FOUND` and is harmless.
 
 ---
 
@@ -1023,7 +1048,7 @@ you act for at `params.owner`.
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
 
 ```json
-{ "accepted": true, "mempool_depth": 3, "nonce": 1735689600001, "action_hash": "0x..." }
+{ "data": { "accepted": true, "mempool_depth": 3, "nonce": 1735689600001, "action_hash": "0x..." } }
 ```
 
 **At commit** the entries are applied **in input order** and are **not
@@ -1184,7 +1209,7 @@ later governance retune never rewrites a TWAP already in flight.
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
 
 ```json
-{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+{ "data": { "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." } }
 ```
 
 **`accepted: true` is not a placed TWAP** — it means the action entered the
@@ -1499,7 +1524,7 @@ running on the remaining size.
 `statuses` array. The success entry is a single-key `chase` object:
 
 ```json
-{ "statuses": [ { "chase": { "chase_oid": 12345, "leg_oid": 12346, "leg_px": "6800000000", "cloid": "0x5c000000000000000000000000000002" } } ] }
+{ "data": { "statuses": [ { "chase": { "chase_oid": 12345, "leg_oid": 12346, "leg_px": "6800000000", "cloid": "0x5c000000000000000000000000000002" } } ] } }
 ```
 
 - `chase_oid` (uint64) — the stable **cancel handle**. Pass it to [`cancel_chase`](#cancel_chase). It is **not** the leg's `oid`.
@@ -1507,7 +1532,7 @@ running on the remaining size.
 - `leg_px` — the leg's placed price, a fixed-point integer string on the `1e8` plane.
 - `cloid` — echoed only when the chase carried one.
 
-A rejected chase returns `{ "accepted": false, "error": "<reason>", "mempool_depth": N }`.
+A rejected chase returns the [rejection envelope](#rejection-envelope) — an `error` object, and no `data` key.
 
 #### A spot pair, once the lane activates {#chase_order-spot}
 
@@ -2243,10 +2268,15 @@ Both `asset` and `px` sit **inside** the digest on purpose. The signature
 therefore binds one exact (market, price) pair, so a replayed signature cannot be
 re-aimed at another market or spliced onto another price.
 
-**Validation, in the order the node applies it.** The reason text is exact.
+**Validation, in the order the node applies it.**
 
-| Check | Reason text on rejection |
-|-------|--------------------------|
+The right-hand column is `error.message`, listed so you can read a log. Its
+`code` is `PRECONDITION_FAILED`, `AUTH_UNAUTHORIZED` for `unauthorized`, or
+`INVALID_REQUEST` for an `invalid parameters` sentence. **Never match on the
+text.**
+
+| Check | `error.message` on rejection |
+|-------|------------------------------|
 | Protocol feature active on this chain | `precondition failed: mip3_deployer_oracle feature not active` |
 | Target is a MIP-3 market | `precondition failed: asset <id> is not a MIP-3 perp market` |
 | Signer is the deployer or a registered sub-deployer | `unauthorized` |
@@ -2609,7 +2639,12 @@ margin. An option position can never be liquidated. See
 
 Every check runs before anything moves, so a refused accept changes no state.
 
-| Body | Cause |
+The column below is `error.message`. Its `code` is `PRECONDITION_FAILED`,
+`AUTH_UNAUTHORIZED` for `unauthorized`, or `INVALID_REQUEST` for an
+`invalid parameters` sentence. **Match on the code, not on this text** — the
+text is prose and it can change. It is listed so you can read a log.
+
+| `error.message` | Cause |
 |---|---|
 | `precondition failed: rfq is options-only: market <n> is not an option series` | The session's market is not a live series |
 | `precondition failed: option series expired` | The series is at or past its `expiry` |
@@ -2720,7 +2755,7 @@ Approve an agent wallet to sign on the account's behalf. See [agent wallets](../
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
 
 ```json
-{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+{ "data": { "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." } }
 ```
 
 There is no synchronous approval confirmation in the HTTP body — track the
@@ -2766,7 +2801,7 @@ Bind the account to a referrer **address** (not a code).
 |-------|------|-------------|
 | `referrer` | hex address | 20-byte referrer address |
 
-Settable **once** per account; subsequent attempts return `{"error":"referrer already set"}`.
+Settable **once** per account. A later attempt is refused with `PRECONDITION_FAILED`, whose `message` names the reason.
 
 ---
 
@@ -3099,7 +3134,7 @@ Alias a staking target address to the sender.
 :::danger
 **Removed. Do not send this action.** `user_dex_abstraction` was deleted at the
 `0.7.0` re-genesis and has no handler. A submit returns
-`400 unsupported action`.
+`400` with `ACTION_UNSUPPORTED`.
 
 MetaFlux runs one unified account with portfolio margin, so there are no separate
 DEXes to abstract over. There is no replacement action and none is planned. The
@@ -3499,7 +3534,7 @@ the queued credit is fully backed.
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
 
 ```json
-{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+{ "data": { "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." } }
 ```
 
 The EVM-side mint is asynchronous: the Core debit is immediate at commit, the
@@ -3696,7 +3731,7 @@ the two that can move USDC out of the perp collateral pool.
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
 
 ```json
-{ "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." }
+{ "data": { "accepted": true, "mempool_depth": 1, "nonce": 1735689600001, "action_hash": "0x..." } }
 ```
 
 The EVM-side credit is asynchronous: the Core debit is immediate at commit, the
@@ -3836,7 +3871,7 @@ the release pipeline and its dispute window.
 [`202 Accepted` admission envelope](#202-accepted--non-order-admission):
 
 ```json
-{ "accepted": true, "mempool_depth": 2, "nonce": 1735689600001, "action_hash": "0x..." }
+{ "data": { "accepted": true, "mempool_depth": 2, "nonce": 1735689600001, "action_hash": "0x..." } }
 ```
 
 The HTTP response does **not** carry the `withdrawal_id`; track the commit via
@@ -3861,8 +3896,8 @@ collateral for withdrawal`.
 ### Non-bridged actions {#non-bridged-actions}
 
 The following draft action names are **not** wired on the MTF-native `/exchange`
-handler. Posting them returns `400 unsupported action` (recognized-but-unmapped
-stubs) or `400 action: unknown type` (no native tag at all). They are documented
+handler. Posting them returns `400` with `ACTION_UNSUPPORTED` (recognized-but-unmapped
+stubs) or `INVALID_REQUEST` (no native tag at all). They are documented
 here only to redirect integrators to the supported path.
 
 | Draft name | Native tag | Disposition | Use instead |
@@ -3877,26 +3912,55 @@ here only to redirect integrators to the supported path.
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit | [vaults](../../concepts/vaults.md#depositing) |
 | (Earn pool config) | `create_earn_pool` | **Validator governance, never a user action.** `createEarnPool` (201) is a ⅔-stake vote submitted through node governance. It is the **only** way an Earn pool gets a non-zero borrow rate — see [why that matters](#spot-margin--earn) | [`earn_deposit`](#earn_deposit) auto-creates a pool at rate `0` |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` **is** a bridged alias (no params) for the canonical action's `enroll:false` form; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
-| (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `unsupported action` | — |
+| (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `ACTION_UNSUPPORTED` | — |
 | (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
-| `UserDexAbstraction` | `user_dex_abstraction` | **Removed** at the `0.7.0` re-genesis → `unsupported action`. One unified account, so nothing to abstract | — (no replacement) |
+| `UserDexAbstraction` | `user_dex_abstraction` | **Removed** at the `0.7.0` re-genesis → `ACTION_UNSUPPORTED`. One unified account, so nothing to abstract | — (no replacement) |
 
 ---
 
 ## Response {#response}
 
-The response shape depends on the action class:
+### The envelope {#response-envelope}
+
+Every `/exchange` response is one envelope, the same one
+[`/info`](./info.md#envelope) answers. A success carries `data`. A failure
+carries `error`. **The two keys never appear together.**
+
+```json
+{ "data": { /* payload */ } }
+```
+
+```json
+{
+  "error": {
+    "code":    "ORDER_INVALID_PRICE",
+    "message": "price off grid: 12345 is not a multiple of tick_size 100",
+    "details": { "field": "px", "limit": "100", "actual": "12345" }
+  }
+}
+```
+
+`code` is the stable contract — **match on it**. `message` is prose and can
+change in any release — **never match on it**. `details` is present only when
+the rejection names a bound, and is omitted rather than sent as `{}`. Every
+code, its status and the action to take are in the
+[error reference](../errors.md).
+
+The HTTP status keeps its normal meaning. It does not replace the envelope, and
+the envelope does not replace it.
+
+The payload inside `data` depends on the action class:
 
 - **Order-type actions** — [`submit_order`](#submit_order),
   [`batch_order`](#batch_order), [`spot_order`](#spot_order),
   [`scale_order`](#scale_order), [`chase_order`](#chase_order) → `200 OK` with a
   `statuses` array (the handler **waits** for commit + dispatch and returns the
   real assigned `oid`).
-- **All other actions** → the admission envelope: `200 OK` when the commit is
+- **All other actions** → the admission payload: `200 OK` when the commit is
   observed inside the wait window, `202 Accepted` when it is not. Treat both as
-  admitted and branch on `accepted` / `error`, not on the status code.
-- **Any admission-time rejection** → the rejection envelope (`accepted:false`),
-  with the documented HTTP status.
+  admitted, and read `committed`.
+- **Any admission-time rejection** → the `error` envelope, at the status its
+  code maps to.
 
 ### `200 OK` — order path (synchronous oid) {#200-ok--order-path-synchronous-oid}
 
@@ -3907,36 +3971,82 @@ returns a `pending` entry — **never a fabricated oid**. A
 single order to one entry.
 
 ```json
-{ "statuses": [ { "resting": { "oid": 12345, "cloid": "0x..." } } ] }
+{ "data": { "statuses": [ { "resting": { "oid": 12345, "cloid": "0x..." } } ] } }
 ```
 
-Per-order status union (one entry, in order):
+### Per-order `statuses` {#per-order-statuses}
+
+`statuses` holds one entry per leg, in input order. Each entry is a single-key
+object naming the leg's outcome:
 
 ```json
 { "resting": { "oid": 12345, "cloid": "0x..." } }                       // posted to book (cloid echoed only here, only if sent)
 { "filled":  { "oid": 12345, "total_sz": "100000000", "avg_px": "10050000000" } }  // matched
-{ "error":   "<reason>" }                                               // commit/admission rejected this entry
+{ "error":   { "code": "MARGIN_INSUFFICIENT", "message": "..." } }     // this leg was rejected
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
 
-A `pending` entry means the action was admitted and may still commit later. There
-is **no `/info` query that takes an `action_hash`** — track the order on the
-[`order_updates`](../ws/subscriptions.md#order_updates) WS channel, which carries
-the committed outcome including a `rejected` status.
+**A failed leg carries the SAME error object as the envelope** — the same
+`code`, the same prose `message`, and the same optional `details`. There is one
+error shape on this API, at both levels. So the leg handler and the envelope
+handler are the same function:
+
+```json
+{
+  "data": {
+    "statuses": [
+      { "resting": { "oid": 12345, "cloid": "0x...aa" } },
+      { "error": {
+          "code":    "ORDER_INVALID_PRICE",
+          "message": "price off grid: 12345 is not a multiple of tick_size 100",
+          "details": { "field": "px", "limit": "100", "actual": "12345" }
+      } }
+    ]
+  }
+}
+```
+
+Note where that response sits: it is a **success** envelope. The action was
+admitted and ran, so the top level carries `data` and status `200`. One leg
+failed inside it. **A `200` does not mean every leg rested** — walk the array.
+
+#### Per-leg failures happen only in an UNGROUPED batch {#statuses-grouping}
+
+| `grouping` | Behaviour | Where a failure appears |
+|------------|-----------|-------------------------|
+| `"na"` (default), and every single-order action | **Per-leg.** Each leg runs its own gate. A bad leg does not roll back the good ones | Inside `statuses`, as that leg's `error` entry. The envelope is still a success |
+| `"normalTpsl"`, `"positionTpsl"` | **ATOMIC.** All-or-nothing. If any leg cannot be admitted — including a protective leg that cannot park — the whole action is rejected and **nothing is placed** | At the ACTION level: the envelope carries `error`, and there is **no** `statuses` array |
+
+:::danger
+**A grouped batch never reports a per-leg failure.** Do not write a handler that
+looks for one — on a grouped batch there is no `statuses` array to walk when it
+fails. Read `error.code` on the envelope instead.
+
+The reason the grouped batch is atomic: per-leg behaviour could fill the entry
+leg and fail the protective leg, and leave a position with no stop. A grouped
+batch places the whole family or places nothing.
+:::
+
+A `pending` entry means the action was admitted and may still commit later.
+There is **no `/info` query that takes an `action_hash`** — track the order on
+the [`order_updates`](../ws/subscriptions.md#order_updates) WS channel, which
+carries the committed outcome including a `rejected` status.
 
 ### `202 Accepted` — non-order admission {#202-accepted--non-order-admission}
 
 Every non-order action (cancel, margin, vault, staking, governance, …) returns
-the admission envelope. The status code is `200 OK` when the action commits
+the admission payload. The status code is `200 OK` when the action commits
 inside the wait window and `202 Accepted` when it does not; the body is the same
 either way:
 
 ```json
 {
-  "accepted":      true,
-  "mempool_depth": 3,
-  "nonce":         1735689600001,
-  "action_hash":   "0x<action_hash>"
+  "data": {
+    "accepted":      true,
+    "mempool_depth": 3,
+    "nonce":         1735689600001,
+    "action_hash":   "0x<action_hash>"
+  }
 }
 ```
 
@@ -3950,18 +4060,17 @@ action ran.** Admission checks the signature, the agent approval and the nonce
 shape — nothing else. Every business rule (position mode, collateral, feature
 gates, parameter bounds, ownership) runs later, when the block commits.
 
-**A commit-time rejection of a non-order action pushes on no channel.** The HTTP
-reply already said `accepted: true`, and no WS channel carries the failure. This
-is not specific to one action — it is how every non-order action behaves. You
-must ASK for the verdict; nothing tells you.
+**A commit-time rejection of a non-order action pushes on no channel.** No WS
+channel carries the failure. This is not specific to one action — it is how
+every non-order action behaves. You must ASK for the verdict; nothing tells you.
 :::
 
 The two classes differ, so treat them differently:
 
 | Action class | Commit-time rejection | How to confirm |
 |--------------|----------------------|----------------|
-| **Order-type** — [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`spot_order`](#spot_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order) | **Reported.** The `200 OK` body carries a per-leg `{"error": "<reason>"}`, and [`order_updates`](../ws/subscriptions.md#order_updates) pushes a `rejected` status | Read the `statuses` array; a `pending` entry means read `order_updates` |
-| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Reported in this response.** The call waits for the commit, so a rejection returns as `200 OK` with an `error` body, and success returns `committed: true` | Read `committed` on the envelope. A `202` means the wait expired, not that the action failed — read the EFFECT the action was supposed to have |
+| **Order-type** — [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`spot_order`](#spot_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order) | **Reported.** The `200 OK` body carries a per-leg `error` object in `statuses`, and [`order_updates`](../ws/subscriptions.md#order_updates) pushes a `rejected` status | Read the `statuses` array; a `pending` entry means read `order_updates` |
+| **Every other action** — [`twap_order`](#twap_order), cancels, margin, vault, staking, governance, … | **Reported in this response.** The call waits for the commit, so a rejection returns the `error` envelope, and success returns `committed: true` | Read `committed` on the payload. A `202` means the wait expired, not that the action failed — read the EFFECT the action was supposed to have |
 
 **Confirm by effect.** Each action's own section names the read that proves it
 landed — a TWAP parent on [`user_twaps`](./info.md#user_twaps), a leverage change
@@ -3996,65 +4105,97 @@ order body from it.
 
 ### Rejection envelope {#rejection-envelope}
 
-Every admission-time rejection (4xx) carries the same flat body — `accepted:false`,
-the `error` reason, and the `mempool_depth` at the time:
+An admission-time rejection carries **no `data` key**. The body is the `error`
+object and nothing else:
 
 ```json
-{ "accepted": false, "error": "signature: expected 130 hex chars, got 4", "mempool_depth": 0 }
+{
+  "error": {
+    "code":    "AUTH_BAD_SIGNATURE",
+    "message": "signature: expected 130 hex chars, got 4"
+  }
+}
 ```
+
+There is no `accepted: false` field any more. The presence of `error` **is** the
+rejection.
 
 ### `400 Bad Request` — malformed {#400-bad-request--malformed}
 
-| `error` value | Cause | Remediation |
-|---------------|-------|-------------|
-| `signature: expected 130 hex chars, got N` | Wrong signature length / forgot the recovery byte (`v`) | Send 65 bytes `r‖s‖v` |
-| `owner: expected 40 hex chars, got N` | In-action `owner` length wrong | Drop `0x`, count hex chars |
-| `action: <parse error>` | `action` not valid JSON / unknown `type` (parse happens **after** signature recovery — a bad sig 401s first) | Check the catalog above; send valid JSON |
-| `unsupported action: <Variant>` | Action variant recognised but not bridged on `/exchange` | See the [non-bridged table](#non-bridged-actions) |
-| `unsupported time-in-force` / `unsupported stp_mode` | Order carried `aon` (no core all-or-none) / `reject` (no core STP equivalent) | Use a supported value |
-| `unsupported order kind` | `stop_loss` / `take_profit` **without** a `trigger` block | Add a [`trigger`](#trigger-orders-stop_loss--take_profit) block, or use `limit` / `market` |
-| `trailing callback must be > 0` | The `trigger` block carried `trail_px: 0`. Presence selects the trailing signing type, so an explicit `0` is a present trail, not an absent one | Omit the `trail_px` key entirely — see [trailing stops](#trailing-stops) |
-| `a trailing trigger leg must be the stop-loss, not the take-profit` | The trailing leg fires on the wrong side of the mark for the position it guards. The ratchet follows a winning position, so only the stop-loss may trail | Put `trail_px` on the protective leg, not the profit-taking one |
-| `action carries no owner` | An owner-less action that is not sender-authorized | Use a supported action |
-| `duplicate cloid` | `submit_order` reused a client order id on the same account | Use a fresh `cloid` |
+Match on `code`. The `message` column shows a representative sentence only — it
+is prose and it can change.
+
+| `error.code` | Cause | Remediation |
+|--------------|-------|-------------|
+| `INVALID_REQUEST` | A field is missing, mis-sized or unparseable — a signature that is not 130 hex chars, an `owner` that is not 40 hex chars, an `action` that fails to parse, an empty `orders` / `cancels` array, a number above `2^128 - 1` | Fix the field the `message` names. Do not retry the same bytes |
+| `ACTION_UNSUPPORTED` | The action variant is recognised but not bridged on `/exchange`, or a field selects a behaviour with no core equivalent — `tif: "aon"`, `stp_mode: "reject"`, a `stop_loss` / `take_profit` with no `trigger` block | See the [non-bridged table](#non-bridged-actions) and use a supported value |
+| `ORDER_DUPLICATE_CLOID` | `submit_order` reused a client order id on the same account | Use a fresh `cloid`. Check first whether the earlier submission rested |
+| `ORDER_INVALID_PRICE` | `px` is off the tick grid. Carries `details` | Round to a multiple of `details.limit` |
+| `ORDER_INVALID_SIZE` | `size` is off the lot grid. Carries `details` | Round to a multiple of `details.limit` |
+| `ORDER_ZERO_SIZE` | Size is zero or negative | Send a positive size |
+| `ORDER_BELOW_MIN_NOTIONAL` | Price × size is under the market minimum | Increase the size |
+| `MARGIN_INSUFFICIENT` | The account cannot fund the requirement. Carries `details` | `details.limit` is free collateral, `details.actual` is what is needed |
+| `MARKET_INACTIVE` | The market is disabled, closed or reduce-only | Send a closing order, or wait |
+| `MARKET_OI_CAP` | Open interest is at the market cap | Nothing in the request is wrong. Wait, or trade elsewhere |
+| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer or sell | Check the free balance; a held balance is not spendable |
+| `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |
+
+Two `PRECONDITION_FAILED` cases are worth naming, because the fix is not obvious
+from the sentence:
+
+- **`trail_px: 0`** on a `trigger` block. Presence of the key selects the
+  trailing signing type, so an explicit `0` is a *present* trail, not an absent
+  one. **Omit the key entirely** — see [trailing stops](#trailing-stops).
+- **A trailing leg on the take-profit side.** The ratchet follows a winning
+  position, so only the stop-loss may trail. Put `trail_px` on the protective
+  leg.
 
 ### `401 Unauthorized` — signature / authorization failed {#401-unauthorized--signature--authorization-failed}
 
-| `error` value | Cause |
-|---------------|-------|
-| `recover: <detail>` | Signature could not be recovered (malformed bytes, bad recovery id `v`, wrong `chainId` → phantom address) |
-| `signer is neither the owner nor an approved agent` | Recovered address ≠ the action's `owner` AND not an active approved agent of it |
+| `error.code` | Cause |
+|--------------|-------|
+| `AUTH_BAD_SIGNATURE` | The signature does not recover — malformed bytes, a bad recovery id `v`, or the wrong signing-domain `chainId`, which recovers a phantom address |
+| `AUTH_UNAUTHORIZED` | The recovered address is neither the action's `owner` nor an approved agent of it |
+| `AUTH_AGENT_FORBIDDEN` | The signer IS an agent of the owner, but the approval has expired or does not cover this action |
 
 :::info
 **Recovery runs first.** The handler recovers the signer over the raw `action`
-bytes **before** parsing the typed action. So a request with both a bad signature
-and an unknown action type returns the `401 recover:` error, not a `400`.
-Anti-replay (nonce uniqueness) is enforced in **committed state** (a 64-wide
-per-account sliding window), not at admission — a reused nonce is admitted at the
-HTTP edge and dropped at commit, so there is no synchronous `nonce` rejection here.
+bytes **before** parsing the typed action. So a request with both a bad
+signature and an unknown action type answers `401 AUTH_BAD_SIGNATURE`, not a
+`400`. Anti-replay (nonce uniqueness) is enforced in **committed state** (a
+64-wide per-account sliding window), not at admission — a reused nonce is
+admitted at the HTTP edge and dropped at commit, so there is no synchronous
+nonce rejection here.
 :::
 
 ### `429 Too Many Requests` — rate-limited {#429-too-many-requests--rate-limited}
 
 ```json
-{ "status": "err", "response": "rate limit exceeded" }
+{
+  "error": {
+    "code":    "RATE_LIMITED",
+    "message": "rate limit exceeded"
+  }
+}
 ```
 
 **No retry hint is sent.** Derive the wait from the refill rate — `/exchange`
 costs 5 weight and the per-IP bucket refills at 20 weight per second, so 250 ms
 buys back one request. See [rate limits](../rate-limits.md).
 
-### `503 Service Unavailable` — gateway overloaded {#503-service-unavailable--mempool-full}
+### `500` and `503` — not your request {#500-503-server-side}
 
 ```json
-{ "error": "gateway overloaded" }
+{ "error": { "code": "UNAVAILABLE", "message": "gateway overloaded" } }
 ```
 
-The gateway's in-flight request pool is full. Back off and retry. Sustained 503
-indicates network congestion; bidirectional WS keep-alive will reflect this.
+| `error.code` | HTTP | Meaning |
+|--------------|------|---------|
+| `INTERNAL` | 500 | Our defect — arithmetic overflow or a broken invariant. `message` is always the literal `internal error`. **Retry, then report it.** There is nothing to fix in the request |
+| `UNAVAILABLE` | 503 | An upstream is down or the gateway's in-flight pool is full. Back off from 200 ms. Sustained `UNAVAILABLE` is an operator incident |
 
-**A full mempool is never a 503.** The node's pending-action queue does not
-refuse a new action — it drops the OLDEST pending one. See
+**A full mempool is never an `UNAVAILABLE`.** The node's pending-action queue
+does not refuse a new action — it drops the OLDEST pending one. See
 [Admission ≠ commit](#admission--commit) below.
 
 ---
@@ -4105,9 +4246,9 @@ sequenceDiagram
 
 - **Race between `ApproveAgent` and first agent-signed order.** Submit `ApproveAgent`, await its commit via [`order_updates`](../ws/subscriptions.md#order_updates) or by polling `/info`, then start agent traffic. Or, accept that the first 1–2 requests will `401` and retry with linear backoff for a couple of committed blocks.
 - **Cancel arrives after fill commits.** Returns `"order not found"`. Harmless. Watch fills first if accuracy matters.
-- **Order admits but fails at commit** (e.g. reduce-only violation discovered post-admit because of intervening fills). The commit event carries `{"error":"<reason>"}`; the order is not on the book.
-- **Numeric overflow on fixed-point fields.** Anything fitting in `u128` is accepted. The server rejects with `400 invalid numeric` if your encoded string exceeds `2^128 - 1`.
-- **Empty `batch_order.orders` / `batch_cancel.cancels`.** Rejected at admission with `400 empty batch`.
+- **Order admits but fails at commit** (e.g. reduce-only violation discovered post-admit because of intervening fills). The `statuses` entry carries an `error` object; the order is not on the book.
+- **Numeric overflow on fixed-point fields.** Anything fitting in `u128` is accepted. An encoded string above `2^128 - 1` is rejected `400` with `INVALID_REQUEST`.
+- **Empty `batch_order.orders` / `batch_cancel.cancels`.** Rejected at admission `400` with `INVALID_REQUEST`.
 - **Cross-block atomicity.** A `batch_order` with multiple legs is **block-atomic** — all legs see the same begin-block state. They are NOT cross-block atomic (a second order action in a later block sees the result of the first).
 
 </details>

@@ -67,10 +67,16 @@ history for what you already closed.
 **The request field is `address`, not `user`.** Sending `user` is rejected:
 
 ```json
-{ "error": "missing field: address" }
+{
+  "error": {
+    "code":    "INVALID_REQUEST",
+    "message": "missing field: address"
+  }
+}
 ```
 
-An unparseable address is rejected with `{"error":"invalid user address: <x>"}`.
+An unparseable address is rejected the same way, with `INVALID_REQUEST` and a
+`message` naming the address. Match on `code`; the `message` can change.
 :::
 
 There is **no per-market filter**. This read is account-scoped only; `coin` is
@@ -83,8 +89,8 @@ Response:
 
 ```json
 {
-  "type": "user_position_history",
   "data": {
+    "type": "user_position_history",
     "address": "0x662971350e886a0a5631d3e9133d33f767f80611",
     "positions": [
       {

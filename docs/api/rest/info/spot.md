@@ -22,7 +22,7 @@ Every spot pair and every spot token in the market and token registry.
 :::warning
 The `spot_meta` query type is removed. Query
 [`markets_meta`](./perpetuals.md#markets_meta) with `kind: "spot"` instead. A
-`spot_meta` request now returns `400 {"error":"unknown info type: spot_meta"}`.
+`spot_meta` request now returns `400 UNKNOWN_TYPE`.
 :::
 
 **Request**
@@ -41,8 +41,8 @@ The `spot` section of the `markets_meta` response:
 
 ```json
 {
-  "type": "markets_meta",
   "data": {
+    "type": "markets_meta",
     "spot": {
       "pairs": [
         {
@@ -141,8 +141,8 @@ Every spot-margin position held by one account.
 
 ```json
 {
-  "type": "spot_margin_state",
   "data": {
+    "type": "spot_margin_state",
     "user": "0x<addr>",
     "accounts": [
       {
@@ -196,8 +196,8 @@ Every Earn lending pool, plus one account's stake when `user` is supplied.
 
 ```json
 {
-  "type": "earn_state",
   "data": {
+    "type": "earn_state",
     "pools": [
       {
         "name": "USDC",
@@ -253,7 +253,7 @@ MIP-1 spot-pair-deploy gas-auction state.
 old name `spot_deploy_state`. That old name still works; the rename lands at
 a future release, and `spot_deploy_state` goes away then. Until the rename
 ships, a `spot_deploy_auction` request returns
-`400 {"error":"unknown info type: spot_deploy_auction"}`.
+`400 UNKNOWN_TYPE`.
 :::
 
 **Request**
@@ -268,8 +268,8 @@ No parameters.
 
 ```json
 {
-  "type": "spot_deploy_auction",
   "data": {
+    "type": "spot_deploy_auction",
     "auction_round": 3, "current_bid": "999", "current_winner": "0x<bidder>",
     "auction_end_ms": 0, "started_at_ms": 0, "total_burned": "4200", "deposit": "0"
   }

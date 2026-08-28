@@ -4,7 +4,7 @@
 **Stable.**
 :::
 
-A decision tree for production clients. The full catalog of error strings is in [errors](../api/errors.md); this page tells you what to **do** about each class.
+A decision tree for production clients. Every error code, and the status it answers with, is in [errors](../api/errors.md); this page tells you what to **do** about each class.
 
 ## Three failure layers {#three-failure-layers}
 
@@ -35,65 +35,84 @@ flowchart TD
     G -->|yes| S{"status code?"}
     G -->|no| U["unknown outcome<br/>&rarr — RECONCILE"]
     S -->|2xx| R2xx["admitted — track via WS"]
-    S -->|4xx| R4xx["check parse error for cause"]
+    S -->|4xx| R4xx["switch on error.code"]
     S -->|5xx| R5xx["retry with expo backoff"]
     S -->|429| R429["backoff on the refill rate<br/>no retry hint is sent"]
 ```
 
 ## Layer 1 — admission errors {#layer-1--admission-errors}
 
-The request was parsed, but rejected at admission. Status `400`, `401`, `404`, `405`, `422`.
+The request was parsed, but rejected at admission. The body is the failure
+envelope: an `error` object, and **no `data` key**.
 
-| Class | Examples | Retry rule |
-|-------|----------|------------|
-| **Client bug** | `400 action: <parse error>`, `400 unsupported action`, `400 action: unknown type` | DO NOT retry — fix code |
-| **Signing bug** | `401 signer_not_sender`, `401 unknown_chainId` | DO NOT retry — verify chainId / key / agent state |
-| **Nonce bug** | `400 nonce_must_increase` | Bump nonce; retry |
-| **Logical** | `422 price_not_tick_aligned`, `422 reduce_only_would_grow` | Compute the right value; retry |
-| **State** | `422 liquidation_tier_blocks_action`, `422 insufficient_balance` | Top up / wait for tier transition; retry |
-| **Auth state** | `401 agent_not_yet_effective` | Wait one block; retry |
-| **Not found** | `404 order_not_found`, `404 account_not_found` | Don't retry; check the resource |
+```json
+{ "error": { "code": "ORDER_INVALID_PRICE", "message": "...", "details": { "field": "px", "limit": "100", "actual": "12345" } } }
+```
+
+:::danger
+**Branch on `error.code`, never on `error.message`.** `code` is the stable
+contract. `message` is prose for a human and it can be reworded in any release —
+a handler keyed off the sentence breaks silently, and it breaks in the direction
+where a known rejection reads as an unknown one.
+
+**And do not treat a null `data` as a failure.** A read can succeed with no
+content and answer `{"data": null}`. Test whether `error` is PRESENT.
+:::
+
+| Class | `error.code` | Retry rule |
+|-------|--------------|------------|
+| **Client bug** | `INVALID_REQUEST`, `UNKNOWN_TYPE`, `ACTION_UNSUPPORTED` | DO NOT retry — fix the code |
+| **Signing bug** | `AUTH_BAD_SIGNATURE`, `AUTH_UNAUTHORIZED` | DO NOT retry — verify chainId / key / owner |
+| **Auth state** | `AUTH_AGENT_FORBIDDEN` | The approval is missing or expired. Re-approve, then retry |
+| **Order shape** | `ORDER_INVALID_PRICE`, `ORDER_INVALID_SIZE`, `ORDER_ZERO_SIZE`, `ORDER_BELOW_MIN_NOTIONAL` | Compute the right value from `details.limit`; retry |
+| **State** | `MARGIN_INSUFFICIENT`, `ASSET_INSUFFICIENT_BALANCE`, `MARKET_INACTIVE`, `MARKET_OI_CAP`, `PRECONDITION_FAILED` | Top up, or wait for the state to change; then retry |
+| **Not found** | `ORDER_NOT_FOUND`, `MARKET_NOT_FOUND`, `NOT_FOUND` | Don't retry; check the resource |
+| **Ours, not yours** | `INTERNAL`, `UNAVAILABLE` | Retry with backoff, then report |
+
+The full list, with the status each code answers and the action for each, is in
+[errors](../api/errors.md#catalog).
 
 The classes below (`ClientBugError`, `AuthError`, …) are an example taxonomy for
 a hand-rolled client working directly against `fetch`. The TypeScript SDK does
-not export them — it throws one class, `MetaFluxApiError`, and you branch on
-its `.status` yourself (see [TypeScript SDK](./typescript-sdk.md#error-handling)).
+not export them — it throws one class, `MetaFluxApiError`, carrying the error
+code, and you branch on that yourself (see
+[TypeScript SDK](./typescript-sdk.md#error-handling)).
 
 ```typescript
 async function handleAdmissionResponse(r: Response) {
-  if (r.status === 202) return { admitted: true };
-
   const body = await r.json();
-  switch (r.status) {
-    case 400:
-      // client bug — log loudly, do not retry
-      throw new ClientBugError(body.error);
 
-    case 401:
-      // signing — depends on the cause
-      if (body.error === 'agent not yet effective') {
-        // wait + retry
-        await sleep(200);
-        return { admitted: false, retry: true };
-      }
-      throw new AuthError(body.error);
+  // The PRESENCE of `error` is the failure. `data` can be null on a success.
+  if (!('error' in body)) return { admitted: true, data: body.data };
 
-    case 422:
-      // logical — caller can correct and retry
-      throw new LogicalError(body.error);
+  const { code, message, details } = body.error;
 
-    case 429:
-      // No retry hint on the response. 20 weight/s refill, so 250 ms buys back
-      // one weight-5 `/exchange`.
+  switch (code) {
+    case 'RATE_LIMITED':
+      // No retry hint is sent. 20 weight/s refill, so 250 ms buys back one
+      // weight-5 `/exchange`.
       await sleep(250);
       return { admitted: false, retry: true };
 
-    case 503:
+    case 'INTERNAL':
+    case 'UNAVAILABLE':
       await sleep(200);
       return { admitted: false, retry: true };
 
+    case 'ORDER_INVALID_PRICE':
+    case 'ORDER_INVALID_SIZE':
+      // `details.limit` is the grid to round to.
+      throw new LogicalError(code, message, details);
+
     default:
-      throw new UnknownError(`${r.status}: ${body.error}`);
+      // Group by prefix so a code added in a later release lands in the right
+      // arm instead of the unknown one.
+      if (code.startsWith('AUTH_')) throw new AuthError(code, message);
+      if (code.startsWith('ORDER_') || code.startsWith('MARGIN_') ||
+          code.startsWith('MARKET_') || code.startsWith('ASSET_')) {
+        throw new LogicalError(code, message, details);
+      }
+      throw new ClientBugError(code, message);
   }
 }
 ```

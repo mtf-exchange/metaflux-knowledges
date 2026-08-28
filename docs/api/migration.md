@@ -5,10 +5,66 @@ description: Breaking API changes on the MetaFlux read API — the account-scala
 # API migrations
 
 :::warning
-**Breaking changes.** Three migrations are on this page, newest first. Signed
-`/exchange` actions are **unchanged** by all three. Work through the checklists
-before upgrading a client.
+**Breaking changes.** Four migrations are on this page, newest first. Signed
+`/exchange` actions are **unchanged** by all four — only the RESPONSE shape and
+the read surface move. Work through the checklists before upgrading a client.
 :::
+
+# The one response envelope {#response-envelope}
+
+:::info
+**`/info` and `/exchange` now answer ONE envelope.** A success carries `data`. A
+failure carries a structured `error` object with a stable `code`. This replaces
+the per-endpoint response and rejection shapes.
+:::
+
+**The new shape.**
+
+```json
+{ "data": { /* payload */ } }
+```
+
+```json
+{ "error": { "code": "ORDER_INVALID_PRICE", "message": "...", "details": { "field": "px", "limit": "100", "actual": "12345" } } }
+```
+
+The two keys are asymmetric on purpose. `error` appears only on a failure, so a
+hot market-data read carries no dead field. `data` appears on every success and
+may itself be `null`, because a read can succeed with no content.
+
+**What changed, by call site.**
+
+| Was | Is now | What breaks |
+|---|---|---|
+| `/info`: `{"type": "<t>", "data": {…}}` | `{"data": {"type": "<t>", …}}` | Only the `type` READ moves, from `body.type` to `body.data.type`. **Every payload field keeps its path** — `body.data.fills` is still `body.data.fills` |
+| `/exchange` order path: `{"statuses": […]}` | `{"data": {"statuses": […]}}` | One level of unwrap |
+| `/exchange` admission: `{"accepted": true, …}` | `{"data": {"accepted": true, …}}` | One level of unwrap |
+| Any rejection: `{"error": "<string>"}` | `{"error": {"code", "message", "details"?}}` | `error` is an OBJECT now. A client that prints `body.error` prints `[object Object]` |
+| Rejection: `{"accepted": false, …}` | (gone) | The PRESENCE of `error` is the rejection. There is no `accepted: false` |
+| Per-leg: `{"error": "<reason>"}` in `statuses` | `{"error": {"code", "message", "details"?}}` | Same object as the envelope, at leg level |
+| `429`: `{"status":"err","response":"…"}` | `{"error": {"code": "RATE_LIMITED", …}}` | One shape for every failure now |
+
+**Checklist.**
+
+1. **Unwrap `data`.** Read the payload at `body.data`, not at `body`.
+2. **Move the `/info` discriminator read** from `body.type` to `body.data.type`.
+3. **Stop reading `error` as a string.** It is an object. Read `error.code`.
+4. **Replace every `message` match with a `code` match.** `code` is the stable
+   contract; `message` is prose and can be reworded in any release. This is the
+   change most likely to break a client silently — grep for every comparison
+   against an error sentence.
+5. **Stop reading `accepted: false`.** Test whether `error` is PRESENT.
+6. **Do not treat `data: null` as a failure.** It is a success with no content.
+   Test for the presence of `error`, not for a null `data`.
+7. **Drop any `422` branch.** No code answers `422`. A logically invalid request
+   answers `400` with the code that names it.
+8. **Walk `statuses` on a grouped batch — there is none.** A batch with
+   `grouping` other than `"na"` is atomic: it rejects at the action level with
+   one `error` and no `statuses` array. Only an UNGROUPED batch reports per-leg
+   failures.
+
+The full code list, with the status each answers and the caller action for each,
+is in [errors](./errors.md).
 
 # The account-scalar rename {#account-scalar-rename}
 
@@ -139,7 +195,7 @@ cut's table for the current name.
 Every market-scoped read now resolves the market by its **`coin` symbol**. The
 numeric `asset_id` / `market_id` request arguments are **removed** — a request
 that supplies them (and omits `coin`) is rejected with
-`400 {"error":"missing field coin"}`.
+`400` with `INVALID_REQUEST`.
 
 Affected reads: `markets`, `markets_meta`, `l2_book`, `trades`,
 `funding_history`, `active_asset_data`.

@@ -146,9 +146,10 @@ flowchart LR
     B -->|"refill +20/s"| A
 ```
 
-A `429` tells you the bucket is dry and nothing more. The body is
-`{"status":"err","response":"rate limit exceeded"}`, with no `Retry-After` header
-and no `retry_after_ms` field. Compute the wait yourself: at 20 weight/second a
+A `429` tells you the bucket is dry and nothing more. The body is the standard
+[failure envelope](./errors.md#envelope) with `error.code` `RATE_LIMITED`, and
+it names no wait: there is no `Retry-After` header and no `retry_after_ms`
+field. Compute the wait yourself: at 20 weight/second a
 weight-1 request is affordable again 50 ms later, and a weight-5 `/exchange` 250
 ms later. For batch jobs prefer pacing client-side; for interactive workloads use
 exponential backoff.

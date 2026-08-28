@@ -1,174 +1,273 @@
-# Error catalog
+---
+description: The one error reference for the MetaFlux API — the response envelope, every error code, the status it answers with, and what a caller does about it.
+---
+
+# Errors
 
 :::info
-**Status.** **stable** for the codes listed. New error strings may be added; existing ones are stable.
+**Status.** **stable.** `code` is the contract and does not change. `message` is
+prose and may change in any release. New codes may be added.
 :::
 
-A complete enumeration of HTTP status codes, error-string conventions, root causes, and remediation. When in doubt about how to handle a non-`202`, look here first.
+This is the single error reference for the API. [`POST /info`](./rest/info.md)
+and [`POST /exchange`](./rest/exchange.md) answer the same envelope and draw
+from the same code list.
 
-## TL;DR {#tldr}
+## The envelope {#envelope}
 
-- **2xx** — success. MTF-native endpoints use proper HTTP status codes for errors, not in-body error flags.
-- **400** — client-side bug: malformed request, bad signature shape, unknown action variant. Do not retry without fixing.
-- **401** — signature failed authentication. Recover the address locally and check.
-- **404** — resource doesn't exist. Common on `/info` when the queried account / market / vault has never been seen.
-- **405** — wrong HTTP method (most endpoints are POST).
-- **422** — request well-formed but logically invalid (e.g. zero size, leverage above cap). Do not retry; correct and resubmit.
-- **429** — rate limited. There is **no** retry hint on the response; derive the wait from the refill rate (see [rate limits](./rate-limits.md)).
-- **5xx** — server-side. Retry with exponential backoff; persistent failures indicate operator-side incident.
+Every response is one envelope. A success carries `data`. A failure carries
+`error`. **The two keys never appear together.**
 
-## Body shape {#body-shape}
+**Success**
 
-All non-2xx responses on MTF-native endpoints use:
+```json
+{ "data": { /* payload */ } }
+```
+
+**Failure**
 
 ```json
 {
-  "error":  "<short_string>",
-  "detail": "<optional human-readable elaboration>"
+  "error": {
+    "code":    "ORDER_INVALID_PRICE",
+    "message": "price off grid: 12345 is not a multiple of tick_size 100",
+    "details": { "field": "px", "limit": "100", "actual": "12345" }
+  }
 }
 ```
 
-`detail` is present only when applicable. The `error` field is the stable identifier — keep your error handler keyed off it.
+| Field | Presence | Meaning |
+|-------|----------|---------|
+| `code` | always | The stable machine-readable identifier. **Match on this.** |
+| `message` | always | One human sentence. **Never match on it.** |
+| `details` | optional | The bound the request broke. **Omitted** when the rejection names no bound — never sent as `{}` |
 
-**No error body carries a retry hint.** There is no `retry_after_ms` field and no
-`Retry-After` header on any status, `429` included. A handler that sleeps on a
-value read from the body sleeps on `undefined`. Compute every backoff from the
-published refill rate instead.
+## The two rules callers get wrong {#two-rules}
 
-## Catalog {#catalog}
+:::danger
+**1. `code` is the contract. `message` is not.**
 
-### 400 — bad request {#400--bad-request}
+`message` is prose written for a person reading a log. It can be reworded in any
+release, and rewording it is not a breaking change. A handler that branches on
+`message`, or on a substring of it, breaks silently on a release that changes
+one word — and it breaks in the direction where a rejection reads as an
+unrecognised one. Key every branch off `code`.
 
-| `error` | Triggered when | Remediation |
-|---------|----------------|-------------|
-| `sender: expected 40 hex chars, got N` | `sender` field length wrong | Strip `0x` prefix; verify 20-byte address |
-| `signature: expected 130 hex chars, got N` | Signature missing `v` byte | Append recovery byte |
-| `invalid hex` | Non-hex characters in `sender` / `signature` | Sanitize input |
-| `unknown action variant: <X>` | `action.type` misspelled or unsupported | Check the [action catalog](./rest/exchange.md#action-catalog) |
-| `missing field: params.<X>` | Required field omitted from a variant | Check the variant's table |
-| `action: <parse error>` | The `action` object failed JSON parsing or schema validation | Check the field names and types against the action's catalog entry |
-| `nonce must increase` | Reused or out-of-order `nonce` | Use a monotonic counter (e.g. `Date.now()`) |
-| `duplicate cloid` | `Order`/`ModifyOrder` reused a client order id | Use a fresh `cloid` |
-| `empty batch` | `orders[]` or `cancels[]` empty | Send at least one entry |
-| `invalid numeric` | fixed-point field not parseable as `u128` | Send as a JSON string, base-10, no leading `+` or whitespace |
-| `unknown info type: <X>` | `/info` `type` not recognised | Check the [info reference](./rest/info.md) |
-| `chain_id mismatch` | The chainId field of a multi-sig wrapper doesn't match the network | Match the network's `chainId` |
+Print `message`. Match `code`.
+:::
 
-### 401 — unauthorized (signature failed) {#401--unauthorized-signature-failed}
+:::danger
+**2. `data` present and `null` is a SUCCESS.**
 
-| `error` | Triggered when | Remediation |
-|---------|----------------|-------------|
-| `signer is not the sender and not an approved agent` | Recovered address ≠ sender AND not in agent set | Verify private key + address; check `ApproveAgent` committed |
-| `agent expired` | Recovered address is an agent of sender, but `expires_at_ms` has passed | Re-approve or rotate agent |
-| `agent not yet effective` | `ApproveAgent` is still in propagation (≤1 block) | Wait one block, retry |
-| `unknown chainId` | Wrong `chainId` in signing domain → phantom recovered address | Match the [network's chainId](../networks.md) |
-| `signature parse failed` | Malformed signature bytes | Verify `r ‖ s ‖ v` encoding (65 bytes) |
-| `multisig threshold not met` | Inner action has < `threshold` valid signatures | Collect more signatures |
-| `multisig duplicate signer` | Same address signs twice in a multi-sig wrap | Each signer must be distinct |
+A read can succeed with no content. That answers `200` with `{"data": null}`.
+There is **no** `error` key on it, because there is no error.
 
-### 404 — not found {#404--not-found}
+Test for the PRESENCE of `error`, not for a null `data`. A client that reads
+"`data` is null, so this failed" reports an empty result as a failure. A client
+that reads `error === null` on a success gets `undefined`, because the key is
+absent — and `undefined` is falsy, so that test works by accident and stops
+working the moment it is inverted.
+:::
 
-| `error` | Triggered when |
-|---------|----------------|
-| `account not found` | `/info` queried with an address that has no on-chain state |
-| `market not found` | `coin` symbol not in the registry |
-| `vault not found` | `vault_id` not present |
-| `order not found` | `Cancel` against an oid that was already cancelled / filled / never existed |
+## `details` — the bound that was broken {#details}
 
-For `/info` queries, MTF-native returns `404` when the queried resource is unknown.
+`details` appears only on the rejections that carry a numeric bound. Its shape
+is:
 
-### 405 — method not allowed {#405--method-not-allowed}
+| Key | Meaning |
+|-----|---------|
+| `field` | The request field the bound applies to |
+| `limit` | **The bound.** The value you must respect |
+| `actual` | **The value that broke it.** What the request asked for |
 
-| `error` | Triggered when |
-|---------|----------------|
-| (no body) | Used `GET` on a `POST` endpoint (or vice versa) |
-
-### 422 — unprocessable entity {#422--unprocessable-entity}
-
-Request was well-formed and the signature was valid, but the action itself is logically invalid.
-
-| `error` | Triggered when | Remediation |
-|---------|----------------|-------------|
-| `price not tick-aligned` | `px` is not a multiple of the market's tick size | Round to the nearest valid tick |
-| `size below market minimum` | `size` < market min | Increase size or hit a different market |
-| `reduce_only would grow position` | Reduce-only set, but the order would open or extend position | Drop `reduce_only` or check current position |
-| `leverage above asset cap` | Requested leverage > `max_leverage` for asset | Use `≤ max_leverage` (see `meta` info) |
-| `pm_min_equity_not_met` | `user_portfolio_margin{enroll:true}` but account below threshold | Increase equity or stay on classical |
-| `liquidation tier blocks action` | Account in T1+; further trades blocked | Top up margin, exit tier first |
-| `insufficient balance` | Withdrawal / transfer exceeds free balance | Check [`account_state`](./rest/info.md#account_state) first |
-| `out of bounds: <param>` | Governance bound violated (e.g. a funding cap, or a `submit_gas_auction_bid` outside the published range) | Use a value within the published bound |
-
-### 429 — rate limited {#429--rate-limited}
+Worked example — `MARGIN_INSUFFICIENT` on an order that needs more collateral
+than the account has free:
 
 ```json
-{ "status": "err", "response": "rate limit exceeded" }
+{ "field": "margin", "limit": "2.0", "actual": "15.0" }
 ```
 
-The `429` body is the one that does not use the `error` envelope, and it carries
-**nothing else**: no retry hint, and no field naming which of the two budgets ran
-out. Treat any `429` as "back off on both".
+`limit` is the free collateral (`2.0`) and `actual` is the requirement
+(`15.0`). Read it as "the bound, and the value that broke the bound" — not as
+"minimum, maximum". On `ORDER_INVALID_PRICE` the same pair reads as the tick
+size and the price sent.
 
-Derive the wait from the refill rate: 20 weight per second, so a weight-1 request
-is affordable again after 50 ms and a weight-5 `/exchange` after 250 ms. See
-[rate limits](./rate-limits.md) for budgets and burst handling.
+Three rejections carry `details` today: `ORDER_INVALID_PRICE`,
+`ORDER_INVALID_SIZE` and `MARGIN_INSUFFICIENT`. A retired `/info` read also
+carries a `details` naming its replacement — see
+[`UNKNOWN_TYPE`](#unknown_type-410) below.
 
-### 503 — service unavailable {#503--service-unavailable}
+**Do not require `details`.** Read it when it is there and fall back to `code`
+plus `message` when it is not.
 
-| `error` | Cause | Remediation |
-|---------|-------|-------------|
-| `gateway overloaded` | The gateway's in-flight request pool is full | Exponential backoff from 200 ms |
-| `gateway not ready` | Gateway is starting up / failing health checks | Retry with backoff; check [status](../networks.md#status) |
-| `node downstream unreachable` | Gateway lost the node connection | Operator-side; backoff and watch status |
+## The code catalog {#catalog}
 
-**A full mempool is not a 503.** The node's pending-action queue never refuses a
-new action: when it is full it drops the OLDEST pending one. That drop is silent,
-because the caller already holds a `202`. See
-[mempool bound](./rate-limits.md#mempool-cap).
+Codes are namespaced by prefix. One code always answers with one status, with
+the single documented exception on `UNKNOWN_TYPE`.
 
-### Commit-time errors (not HTTP, in event stream) {#commit-time-errors-not-http-in-event-stream}
+### `ORDER_*` — the order body {#order}
 
-Some order failures happen after `202 Accepted` because they're only knowable
-in the block-execution context (a self-trade at match time, a reduce-only leg
-that closed between admit and dispatch, a margin check that fails once other
-fills landed first). These surface on the
-[`order_updates`](./ws/subscriptions.md#order_updates) WS channel as
-`{"status":"rejected", "reason":"<free-text reason>"}` (or `"cancel_rejected"`
-for a cancel). `order_updates` carries **no `action_hash` field** — correlate
-by `cloid`, per [error handling](../integration/error-handling.md#reconciliation-pattern).
-`reason` is a free-text string, not a fixed enum — treat it as
-human-readable, not a machine-matched code.
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `ORDER_NOT_FOUND` | 404 | — | The `oid`, `cloid` or TWAP names no live order. It filled, it was cancelled, or it never existed. **A cancel that gets this is harmless** — the order is already gone. Do not retry |
+| `ORDER_ZERO_SIZE` | 400 | — | Size is zero or negative. Send a positive size |
+| `ORDER_INVALID_PRICE` | 400 | ✅ | The price is off the tick grid. Round to a multiple of `details.limit` and resend |
+| `ORDER_INVALID_SIZE` | 400 | ✅ | The size is off the lot grid. Round to a multiple of `details.limit` and resend |
+| `ORDER_BELOW_MIN_NOTIONAL` | 400 | — | Price × size is under the market minimum. Increase the size |
+| `ORDER_SELF_TRADE` | 400 | — | Self-trade prevention cancelled the order rather than let it match your own resting order. Move the price, or change `stp_mode` |
+| `ORDER_DUPLICATE_CLOID` | 400 | — | The `cloid` is already in use on this account. Use a fresh one. **Do not** treat this as a failure to place — check whether the first submission rested |
+
+### `MARGIN_*` — collateral {#margin}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `MARGIN_INSUFFICIENT` | 400 | ✅ | The account cannot fund the requirement. `details.limit` is what is free, `details.actual` is what is needed. Reduce the size, cut the leverage, or add collateral |
+
+### `AUTH_*` — signature and authorization {#auth}
+
+All three answer `401`. None carries `details`.
+
+| `code` | Cause and caller action |
+|--------|-------------------------|
+| `AUTH_UNAUTHORIZED` | The signer is not allowed to act for this account. Check the `owner` you sent and the key you signed with |
+| `AUTH_BAD_SIGNATURE` | The signature does not recover. The bytes are malformed, the recovery byte is wrong, or the signing-domain `chainId` is wrong — a wrong `chainId` recovers a valid but different address. Match the [network `chainId`](../networks.md) and re-sign |
+| `AUTH_AGENT_FORBIDDEN` | The signer is an agent of the account, but this action is not one an agent may take, or the approval has expired. Sign with the owner key, or re-approve the agent |
+
+:::tip
+**An `AUTH_*` failure is never fixed by a retry.** The same bytes recover the
+same address. Correct the signing input first.
+:::
+
+### `MARKET_*` — the market {#market}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `MARKET_NOT_FOUND` | 404 | — | The `coin` symbol or asset index names no market. Read the market list and use a symbol from it |
+| `MARKET_INACTIVE` | 400 | — | The market exists but does not accept this order: trading is disabled, the pair is closed, or the market is reduce-only. Only a closing order is admitted while a market is reduce-only |
+| `MARKET_OI_CAP` | 400 | — | Open interest is at the market cap. Nothing about your request is wrong. Wait, or trade another market |
+
+### `ASSET_*` — spot balance {#asset}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `ASSET_INSUFFICIENT_BALANCE` | 400 | — | The spot balance cannot fund the transfer, withdrawal or sell. Check the free balance — a held balance is not spendable |
+
+### `RATE_LIMITED` {#rate_limited}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `RATE_LIMITED` | 429 | — | The request budget is spent. **No retry hint is sent** — there is no `retry_after_ms` field and no `Retry-After` header. Compute the wait from the published refill rate |
+
+The bucket refills at 20 weight per second. An `/info` read costs 1 weight, so
+it is affordable again after 50 ms; an `/exchange` write costs 5 weight, so
+250 ms. See [rate limits](./rate-limits.md).
+
+### Request-shape codes {#request-shape}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `INVALID_REQUEST` | 400 | sometimes | A field is missing, unparseable, or out of range. `message` names the field. Fix the body — a retry of the same bytes gets the same answer |
+| `UNKNOWN_TYPE` | 400 / 410 | on 410 | The `/info` `type` names no read. See below |
+| `NOT_FOUND` | 404 | — | A named resource does not exist — a vault, a sub-account. Check the identifier. **An unknown ACCOUNT is not this**: an address never seen on-chain answers `200` with a zeroed record |
+| `ACTION_UNSUPPORTED` | 400 | — | The action decodes, but this build has no path for it. It is a system-only action, or a capability that is not open yet. Do not retry — see the [action catalog](./rest/exchange.md#action-catalog) |
+| `PRECONDITION_FAILED` | 400 | — | A state rule refused the action, and the rule has no code of its own. `message` carries the reason. This is the catch-all: read `message` to learn what happened, then fix the state or the request. **Do not** match on that `message` — if you need the rule as a branch, ask for a code for it |
+
+#### `UNKNOWN_TYPE` and the one `410` {#unknown_type-410}
+
+`UNKNOWN_TYPE` answers two statuses, and they mean different things:
+
+- **`400`** — the `type` names no read on this API. It is misspelled, or the
+  read was removed and its answer is gone. Fix the request.
+- **`410`** — the `type` named a public read whose answer **moved** to another
+  read. The error carries `details.use`, naming the read to call instead:
+
+  ```json
+  {
+    "error": {
+      "code":    "UNKNOWN_TYPE",
+      "message": "gov_state is retired; use validator_votes (time-ranged, served from the archive)",
+      "details": { "field": "type", "use": "validator_votes" }
+    }
+  }
+  ```
+
+  A client can follow the move from `details.use` alone. The full list of moved
+  reads is in [removed reads](./rest/info.md#retired-reads).
+
+`410` is used because neither alternative is true: `400` claims the request is
+malformed, and it is well formed; `404` claims the read never existed, and it
+did.
+
+### Server-side codes {#server-side}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `INTERNAL` | 500 | — | **Our defect, not your request.** Arithmetic overflow or a broken invariant. The `message` is always the literal string `internal error` — the internal sentence never reaches you. **Retry, then report it.** There is nothing to fix in the request |
+| `UNAVAILABLE` | 503 | — | An upstream the request needs is down or not configured. The gateway mints this; a node never does. Back off from 200 ms and retry. A sustained `UNAVAILABLE` is an operator incident, not a client bug |
+
+:::info
+**Neither of these is caused by your request, so neither is fixed by changing
+it.** Retry with backoff. Do not burn a new nonce per attempt on a write — see
+[idempotency](../integration/idempotency.md).
+:::
+
+## Statuses that carry no envelope {#no-envelope}
+
+| HTTP | When |
+|------|------|
+| `405` | The method is wrong. Every endpoint here is `POST`. The router refuses the request before an envelope exists, so there is no `error` object to read |
+
+## Commit-time rejections {#commit-time-errors-not-http-in-event-stream}
+
+Some order failures happen **after** the HTTP reply, because they are only
+knowable in block-execution context — a self-trade at match time, a reduce-only
+leg that closed between admission and dispatch, a margin check that fails once
+other fills landed first.
+
+For an **order-type** action, the per-leg entry in `statuses` carries the same
+error object as the envelope, with the same `code`. See
+[per-order statuses](./rest/exchange.md#per-order-statuses).
+
+The [`order_updates`](./ws/subscriptions.md#order_updates) WS channel also
+pushes a `{"status":"rejected","reason":"<free text>"}` event. `reason` there is
+**free text, not a code** — treat it as human-readable only. `order_updates`
+carries no `action_hash`, so correlate by `cloid`, per
+[error handling](../integration/error-handling.md#reconciliation-pattern).
 
 :::danger
 **Only ORDER-type actions get that channel.** For every other action — a
-`twap_order`, a cancel, a margin or vault or staking write — a commit-time
-rejection is reported **nowhere**: not in the HTTP body (it already said
-`accepted: true`), not on any WS channel, and not by any `/info` query, because
-none takes an `action_hash`. The action silently never happens.
-
-Confirm those actions by their EFFECT instead — poll the read that serves the
-state the action was meant to change, for a few blocks. The full rule and a
-per-class table are in
+`twap_order`, a cancel, a margin, vault or staking write — a commit-time
+rejection reaches you in the HTTP response or nowhere. The `/exchange` call
+waits for the commit, so read the verdict there. If you got a `202`, the wait
+expired: **re-read the state the action was meant to change.** The full rule and
+a per-class table are in
 [`accepted` is not `committed`](./rest/exchange.md#accepted-is-not-committed).
 :::
 
-## Decision tree {#decision-tree}
+## How to write the handler {#handler}
+
+1. **Branch on the presence of `error`.** Present means failure. Absent means
+   success, `data: null` included.
+2. **Switch on `error.code`.** Never on `error.message`.
+3. **Group by prefix for the default arm.** An unrecognised `ORDER_*` is an
+   order problem; an unrecognised `AUTH_*` is a signing problem. A new code
+   added in a later release then lands in the right arm instead of the unknown
+   one.
+4. **Read `details` when it is there.** `details.limit` is the value to round
+   to, or the balance to respect.
+5. **Retry only `RATE_LIMITED`, `INTERNAL` and `UNAVAILABLE`.** Every other code
+   returns the same answer to the same bytes.
 
 ```mermaid
 flowchart TD
-    Q["got non-202?"]
-    Q --> C4["4xx"]
-    Q --> C5["5xx"]
-    Q --> CT["commit-time error<br/>(in event stream)"]
-
-    C4 --> E400["400"]
-    C4 --> E401["401"]
-
-    E400 --> B400["client bug —<br/>fix request, do<br/>not retry blindly"]
-    E401 --> B401["check signing<br/>/ chainId<br/>/ agent state"]
-
-    C5 --> B5["backoff & retry<br/>— operator side<br/>recovers, do not<br/>burn nonces<br/>on retry"]
-
-    CT --> BCT["do NOT retry — the<br/>mempool already<br/>accepted — the failure<br/>is at execution"]
+    R["response body"]
+    R --> H{"is 'error' present?"}
+    H -- "no" --> S["SUCCESS — use data<br/>(data may be null)"]
+    H -- "yes" --> C{"switch on error.code"}
+    C --> A["AUTH_* — fix signing,<br/>never retry"]
+    C --> V["ORDER_* / MARGIN_* /<br/>MARKET_* / ASSET_* /<br/>INVALID_REQUEST —<br/>fix the request"]
+    C --> T["RATE_LIMITED — back off<br/>from the refill rate"]
+    C --> I["INTERNAL / UNAVAILABLE —<br/>retry with backoff,<br/>then report"]
 ```
 
 ## See also {#see-also}
@@ -176,5 +275,5 @@ flowchart TD
 - [`POST /exchange`](./rest/exchange.md) — write path
 - [`POST /info`](./rest/info.md) — read path
 - [Rate limits](./rate-limits.md)
-- [Idempotency](../integration/idempotency.md) — how to retry safely
-- [Error handling guide](../integration/error-handling.md) — patterns for production clients
+- [Idempotency](../integration/idempotency.md) — how to retry a write safely
+- [Error handling guide](../integration/error-handling.md) — patterns for a production client

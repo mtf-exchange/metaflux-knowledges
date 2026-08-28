@@ -185,19 +185,23 @@ cannot replace a broker agreement.
 `priority_bid` is validated **on-chain**, not at admission. The endpoint accepts
 the signed action, the chain commits it, and the handler then rejects it.
 
-When that happens inside the endpoint's wait window you get `200 OK` with a body
-carrying `accepted: false` and the reason:
+When that happens inside the endpoint's wait window you get the
+[failure envelope](../api/errors.md#envelope):
 
 ```json
 {
-  "accepted": false,
-  "error": "invalid parameters: bid 9 exceeds cap 8",
-  "mempool_depth": 3
+  "error": {
+    "code":    "INVALID_REQUEST",
+    "message": "invalid parameters: bid 9 exceeds cap 8"
+  }
 }
 ```
 
-| Bid | `error` |
-|-----|---------|
+The `message` column below is prose, listed so you can read a log. Match on
+`code`.
+
+| Bid | `error.message` |
+|-----|-----------------|
 | `bid_bps` above the cap | `invalid parameters: bid <n> exceeds cap <cap>` |
 | `bid_bps` of `0` | `invalid parameters: zero bid` |
 

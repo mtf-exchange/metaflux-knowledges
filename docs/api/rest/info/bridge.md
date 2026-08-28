@@ -17,8 +17,8 @@ One public query:
   each chain.
 
 :::warning
-**`bridge_chain_configs` is removed.** A request now returns
-`400 {"error":"unknown info type: bridge_chain_configs"}`. Read
+**`bridge_chain_configs` is removed.** A request now returns `410` with
+`error.code` `UNKNOWN_TYPE` and `details.use` naming the replacement. Read
 [`bridge_withdrawal_history`](#bridge_withdrawal_history) instead —
 `withdrawals_halted` and `configs` are on it, unchanged.
 :::
@@ -156,8 +156,8 @@ for every configured chain, served by the archive rather than a validator.
 
 ```json
 {
-  "type": "bridge_withdrawal_history",
   "data": {
+    "type": "bridge_withdrawal_history",
     "withdrawals_halted": false,
     "configs": [
       {

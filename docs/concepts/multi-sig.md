@@ -51,7 +51,7 @@ Signed by the **current** master key (single-sig, the last solo signature this a
 
 After commit:
 - The account's `is_multisig: true` and `multisig_set: { threshold, signers }` are stored.
-- Subsequent direct (non-wrapped) actions signed by anyone (including the old master key) are rejected with `{"error":"account is multisig"}`.
+- Subsequent direct (non-wrapped) actions signed by anyone (including the old master key) are rejected with `PRECONDITION_FAILED`.
 
 **Irreversible**: there is no revert to a single-master key. The signer set can be **rotated** — or the multi-sig requirement retired — via a multi-sig-wrapped `convert_to_multi_sig_user` (see [Updating the signer set](#updating-the-signer-set)), but the account cannot return to plain single-key control.
 
@@ -102,8 +102,8 @@ Server checks:
 4. If all checks pass, the inner action is dispatched as if `user` had signed it
    directly, and `user`'s nonce advances to the wrapper `nonce`.
 
-If a check fails: `{"error":"multisig threshold not met"}`,
-`{"error":"multisig duplicate signer"}`, or `{"error":"signer not in set"}`.
+A failed check answers `AUTH_UNAUTHORIZED`, whose `message` names which one:
+threshold not met, duplicate signer, or signer not in set.
 
 ### Signing the inner action {#signing-the-inner-action}
 
@@ -236,7 +236,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 
 - **Lost keys**: M-of-N tolerates up to `N - M` losses. Plan key custody to spread the loss surface (different jurisdictions, different HSMs, different humans).
 - **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — watch [`order_updates`](../api/ws/subscriptions.md#order_updates) and [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) for the multi-sig account for any action you didn't originate.
-- **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other returns `{"error":"nonce_too_small"}`. Coordinator should assign nonces.
+- **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other is refused with `INVALID_REQUEST`. Coordinator should assign nonces.
 - **Signature expiry**: roster signatures over the inner blob don't expire on their own — a signature collected today is valid until the bundle is submitted. Some integrators add their own off-chain TTL. (The optional [action `expiresAfter`](../integration/typed-data-signing.md#action-expiry-expiresafter) applies to the **outer** `/exchange` envelope, not to the inner roster signatures.)
 
 </details>
@@ -302,7 +302,7 @@ sequenceDiagram
 A: Yes — `threshold: 1`. Useful for redundancy without coordination. Functionally equivalent to having N separate accounts with shared withdrawal authority, but cheaper on-chain.
 
 **Q: Are inner-action signatures shareable across different inner actions?**
-A: No. Each signature is over a specific inner action + nonce. Trying to reuse a signature on a different inner action returns `{"error":"multisig threshold not met"}`.
+A: No. Each signature is over a specific inner action + nonce. Trying to reuse a signature on a different inner action is refused with `AUTH_UNAUTHORIZED`.
 
 **Q: Is the multi-sig wrapping recursive?**
 A: No. A `multi_sig` whose inner blob is itself a `multi_sig` is rejected. One layer only.
