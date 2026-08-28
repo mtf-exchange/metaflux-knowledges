@@ -1960,7 +1960,7 @@ Nothing is lost. Each row names the read that carries the same data.
 | `web_data`, `account_overview` | [`account_state`](#account_state) with `detail: "overview"` — the same body, now a depth on the one account read |
 | `pm_summary` | [`account_state`](#account_state) — the default depth carries `pm_maint_margin`, `pm_net_value` and `pm_concentration_penalty`, and `abstraction: "portfolio"` is the enrolment flag. Its `height` / `time` stamp tells you how fresh the figures are, which `pm_summary` never did |
 | `evm_contract_bindings` | [`markets_meta`](./info/perpetuals.md#markets_meta) with `kind: "spot"` — the per-token `evm_contract` object |
-| `bridge_chain_configs` | [`bridge_user_outbox`](./info/bridge.md#bridge_user_outbox) — it carries `withdrawals_halted` and `configs` alongside your own entries |
+| `bridge_chain_configs` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) — it carries `withdrawals_halted` and `configs` alongside your own entries |
 | `staking_apr` | [`staking_state`](#staking_state) — `reward_pool`. It never served an APR; see that entry |
 | `user_fills_by_time` | [`user_fills`](#user_fills) with `start_time` / `end_time` |
 | `recent_trades`, `trades_by_time` | [`trades`](./info/perpetuals.md#trades) — un-ranged for the recent window, ranged for a time window |
@@ -1992,7 +1992,7 @@ answer on the public API with the same error an unknown type gets.
 | `protocol_metrics` | Every public fact it carried is on [`markets`](./info/perpetuals.md#markets), [`markets_meta`](./info/perpetuals.md#markets_meta) and [`staking_state`](#staking_state). The rest — value-conservation sums, the EVM full-account sum, the buyback executor's `buyback_status` — are operator diagnostics |
 | `position_size_signed_sum_by_asset` | A fork detector for one-sided position writes, not a trading read |
 | [`node_info`](#node_info), [`block_info`](#block_info) | Per-node identity and replay progress. Take the block head from the [`explorer_block`](../ws/subscriptions.md#explorer_block) WS channel |
-| `bridge_outbox`, `bridge_finalized_cosignatures` | Whole-chain withdrawal queue and cosignature detail. One account's own withdrawals are on [`bridge_user_outbox`](./info/bridge.md#bridge_user_outbox) |
+| `bridge_outbound_queue`, `bridge_finalized_cosignatures` | Whole-chain withdrawal queue and cosignature detail. One account's own withdrawals are on [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) |
 | `mip3_deployer_oracle` | Deployer-oracle liveness for one MIP-3 market — a read for the deployer who operates the feed |
 | `fba_batch_state` | The FBA engine is not reachable from `/exchange` yet. The read ships publicly WITH the capability, not before |
 | `gov_state`, `gov_proposals`, `gov_history` | Replaced by [`validator_votes`](./info/governance.md#validator_votes) — see [governance queries](./info/governance.md#retired-reads) |

@@ -12,14 +12,14 @@ bridge-specific `type`s.
 
 One public query:
 
-- [`bridge_user_outbox`](#bridge_user_outbox) — your own pending withdrawals,
+- [`bridge_withdrawal_history`](#bridge_withdrawal_history) — your own pending withdrawals,
   each with a status, plus the committed [deployment row](#chain-configs) for
   each chain.
 
 Two operator queries, listed here for completeness. **The public API refuses
 both**, exactly as it refuses `node_info`:
 
-- [`bridge_outbox`](#bridge_outbox) — every pending withdrawal, plus the
+- [`bridge_outbound_queue`](#bridge_outbound_queue) — every pending withdrawal, plus the
   per-chain rotation verdict.
 - [`bridge_finalized_cosignatures`](#bridge_finalized_cosignatures) — the
   validator multisig retained for one message id.
@@ -29,7 +29,7 @@ both**, exactly as it refuses `node_info`:
 above, so a caller had to pick, and picking the config read alone hid the
 entries whose ids that config defines. A request now returns
 `400 {"error":"unknown info type: bridge_chain_configs"}`. Read
-[`bridge_user_outbox`](#bridge_user_outbox) — `withdrawals_halted` and `configs`
+[`bridge_withdrawal_history`](#bridge_withdrawal_history) — `withdrawals_halted` and `configs`
 are on it, unchanged.
 :::
 
@@ -132,7 +132,22 @@ release timestamp; it is `null` for every other status.
 - Timestamps and nonces are JSON numbers.
 - Entries keep queue order, oldest first.
 
-## `bridge_user_outbox` {#bridge_user_outbox}
+:::info
+**Renamed at the 0.8.x swap.** This read was `bridge_user_outbox`, and the
+operator read was `bridge_outbox`. The archive answers BOTH names through the
+swap window, so a client built against either keeps working; the old names are
+retired in a later release. A pre-swap node still answers only the old ones.
+:::
+
+**In-flight withdrawals also ride `account_state`**, under `bridge_withdrawals`.
+That field answers "is my withdrawal moving". THIS read answers "where did it
+go" — it is served by the archive, because a validator prunes an entry once its
+retention window expires after release and can never answer the second question.
+
+Neither carries `economic_id`. It is not a signing digest, and pairing it with
+`message_id` on a public read is the confusion that stranded a live withdrawal.
+
+## `bridge_withdrawal_history` {#bridge_withdrawal_history}
 
 One user's pending bridge withdrawals, plus the committed deployment row for
 every chain.
@@ -165,7 +180,7 @@ Request:
 | `chain` | number | no | Restrict `entries` to `1` or `2`. `400` on any other value. |
 
 ```json
-{ "type": "bridge_user_outbox", "address": "0x6629…0611", "chain": 1 }
+{ "type": "bridge_withdrawal_history", "address": "0x6629…0611", "chain": 1 }
 ```
 
 Response `data`:
@@ -276,7 +291,7 @@ Two config fields are **not served here**: the backfill-acknowledgement pair is
 internal node-instance identity with no caller value, and it appears on the
 operator read instead. A retired always-zero field is omitted entirely.
 
-## `bridge_outbox` {#bridge_outbox}
+## `bridge_outbound_queue` {#bridge_outbound_queue}
 
 :::warning
 **Operator lane only — this query is REFUSED on the public API.** It answers
@@ -311,7 +326,7 @@ Response `data`:
       "safe_to_rotate": true }
   ],
   "configs": [ /* the public config rows, plus the backfill-ack pair */ ],
-  "entries": [ /* bridge_user_outbox rows, plus user / economic_id / pending_cosigners */ ],
+  "entries": [ /* bridge_withdrawal_history rows, plus user / economic_id / pending_cosigners */ ],
   "start": 0, "limit": 256, "returned": 3, "truncated": false
 }
 ```
