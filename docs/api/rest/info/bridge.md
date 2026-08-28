@@ -139,10 +139,13 @@ swap window, so a client built against either keeps working; the old names are
 retired in a later release. A pre-swap node still answers only the old ones.
 :::
 
-**In-flight withdrawals also ride `account_state`**, under `bridge_withdrawals`.
-That field answers "is my withdrawal moving". THIS read answers "where did it
-go" — it is served by the archive, because a validator prunes an entry once its
-retention window expires after release and can never answer the second question.
+**This read is the whole answer**, in flight and finished alike. It is served by
+the archive rather than a validator for exactly that reason: a validator prunes
+an entry once its retention window expires after release, so it can only ever say
+what is moving right now, never where a withdrawal went.
+
+Read `open` to tell the two apart. `released_at_ms` cannot do it alone — an entry
+pruned by retention also leaves the queue and carries no release stamp.
 
 Neither carries `economic_id`. It is not a signing digest, and pairing it with
 `message_id` on a public read is the confusion that stranded a live withdrawal.
@@ -221,7 +224,8 @@ Response `data`:
       "message_id": "0x8565…",
       "status": "stranded_on_retired_domain",
       "pending_cosigner_count": 0,
-      "released_at_ms": null
+      "released_at_ms": null,
+      "open": true
     }
   ],
   "truncated": false
