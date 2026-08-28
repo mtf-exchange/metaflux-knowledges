@@ -2631,9 +2631,32 @@ The accept settles one option fill. It moves three amounts and nothing else.
 3. A closing writer's escrow comes **out** of the pot, exactly. The chain nets
    each account's own legs first, so a round trip returns what it locked.
 
-The fill opens no perpetual position, charges **no trading fee**, and reserves no
-margin. An option position can never be liquidated. See
-[options](../../products/options.md).
+The fill charges the TAKER a fee — the account that sent the request, whichever
+leg it took. The quoting maker pays none. The fee is the smaller of a rate on the
+option's maximum payout and a fraction of the premium, and both rates start unset,
+which charges nothing. See [the option fee](../../products/options.md#option-fee).
+
+The affordability check covers the premium AND the fee, so a taker that can fund
+the premium alone is refused before anything moves. The request is checked the
+same way, so an `rfq_request` you could not afford to accept is refused up front.
+
+**The response does not carry the fee, so compute it.** Read
+`option_taker_bps` and `option_premium_cap_ppm` from the `option` row of
+`products` on [`/info fee_schedule`](./info.md#fee_schedule), then:
+
+```text
+max_payout = (strike, or cap - strike for a capped call) x size
+premium    = price x size
+fee        = min( max_payout x option_taker_bps / 10000 ,
+                  premium x option_premium_cap_ppm / 1000000 )
+```
+
+Both terms truncate toward zero and the smaller wins. Your balance moves by the
+premium plus this fee if you are the taker on a buy, or by the escrow plus this
+fee less the premium if you are the taker on a sell.
+
+The fill opens no perpetual position and reserves no margin. An option position
+can never be liquidated. See [options](../../products/options.md).
 
 #### Refusals {#rfq_accept-refusals}
 

@@ -45,14 +45,15 @@ the row serves the number.
 
 ## What a fill moves {#what-a-fill-moves}
 
-An option fill moves three things and nothing else.
+An option fill moves four things and nothing else.
 
 1. The premium goes from the holder to the writer, in USDC.
 2. The writer's escrow goes from the writer's balance into the series pot.
 3. A closing writer's escrow comes back out of the pot.
+4. The taker pays a trading fee. See [the option fee](#option-fee).
 
-An option fill opens no perpetual position, charges no trading fee, and touches no
-margin figure. See [what an option position is not](#what-an-option-position-is-not).
+An option fill opens no perpetual position and touches no margin figure. See
+[what an option position is not](#what-an-option-position-is-not).
 
 **Closing releases the escrow exactly.** The strike and the cap sit on an escrow
 grid that the listing rule enforces, so the escrow per unit is a whole number of
@@ -63,6 +64,39 @@ rounding residue can build up on the trading path.
 account before it locks anything: an account that holds long units and then writes
 gives up long units instead of opening a short. So a round trip returns exactly
 what it locked.
+
+## The option fee {#option-fee}
+
+Only the TAKER pays. The taker is whoever sent the RFQ request, so it can be the
+holder or the writer depending on which side they asked for. The quoting maker
+has no fee leg at all.
+
+The fee is the SMALLER of two terms:
+
+```text
+fee = min( max_payout x taker_rate ,  premium x premium_cap )
+```
+
+**`max_payout` is the notional, not the strike.** For a put it is the strike; for
+a capped call it is `cap - strike`. That is what the writer actually risks, and it
+is the same number the escrow uses. A narrow capped call is a spread, so it is
+priced as a spread: a call struck at 100 with a cap at 105 has a notional of 5,
+not 100.
+
+**The premium term is the tail guard.** A far out-of-the-money option can have a
+premium far below its max payout, and the notional term alone would then charge a
+fee larger than the option itself. The cap holds the fee to a fraction of the
+premium the taker actually paid. It binds rarely — only when the premium is a
+sliver of the max payout — but that is exactly the case it exists for.
+
+Both terms truncate toward zero, and the smaller one wins, so the fee never rounds
+up.
+
+Both rates are governance parameters and both start UNSET, which charges nothing.
+The taker rate is capped at 1% of the notional by the same ceiling every other fee
+rate uses. Read the live values on
+[`/info fee_schedule`](../api/rest/info.md#fee_schedule), in the `option` row of
+`products`.
 
 ## The size plane {#the-size-plane}
 
@@ -136,7 +170,7 @@ series on a thinly fed underlying is a different risk from a series on a busy on
 | Margin requirement | The holder paid the premium. The writer locked the worst case |
 | Mark price | The chain never prices an option |
 | Order book | The lane is RFQ only. See [RFQ](../concepts/rfq.md) |
-| Trading fee | An option fill charges none today |
+| Maker fee | Only the taker pays. The quoting maker has no fee leg. See [the option fee](#option-fee) |
 | Portfolio-margin offset | Options are outside [portfolio margin](../concepts/portfolio-margin.md) |
 | Early exercise | The style is European. A position closes early by trading, not by exercise |
 

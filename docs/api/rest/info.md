@@ -718,7 +718,7 @@ carries a `user` block:
         { "product": "spot",        "taker_bps": "9.0",  "maker_bps": "2.0",
           "taker_volume_30d": "12500000", "maker_volume_30d": "3100000" },
         { "product": "spot_margin", "taker_bps": "9.0",  "taker_volume_30d": "12500000" },
-        { "product": "option",      "taker_bps": "9.0",  "taker_volume_30d": "12500000" }
+        { "product": "option",      "option_taker_bps": "0.5", "option_premium_cap_ppm": 150000 }
       ],
       "daily_volume": []
     }
@@ -740,11 +740,20 @@ carries a `user` block:
 | `user.products[*].maker_bps` | Decimal string | The rate a fill on THIS product charges, rebate subtracted. ABSENT on a product with no maker leg |
 | `user.products[*].taker_volume_30d` | Decimal string | The volume THIS product's tier reads |
 | `user.products[*].maker_volume_30d` | Decimal string | The volume THIS product's maker tier reads. ABSENT on a product with no maker leg |
+| `user.products[*].option_taker_bps` | Decimal string | OPTION ROW ONLY. The rate charged on the option's maximum payout |
+| `user.products[*].option_premium_cap_ppm` | uint32 | OPTION ROW ONLY. The fee ceiling as a fraction of the premium, in ppm |
 
 **The four products price apart. Read `products`, not the top-level pair.** The
 top-level `effective_*_bps` fields are the PERP rate, which is what they have
 always meant. A spot or an option fill can charge a different rate. See
 [Each product has its own fee table](../../concepts/fees.md#per-product-fees).
+
+**The `option` row has a DIFFERENT shape, because an option does not price on a
+volume ladder.** It carries no `taker_bps` and no volume; instead it carries
+`option_taker_bps` and `option_premium_cap_ppm`, and the fee charged is the
+SMALLER of a rate on the option's maximum payout and that fraction of the
+premium. Both start unset, which charges nothing. See
+[the option fee](../../products/options.md#option-fee).
 
 **A row with no `maker_bps` has no maker leg.** A maker rests on the shared spot
 book and never carries a lane, so a maker is always priced as `spot`. That leaves

@@ -130,7 +130,7 @@ An option fill moves three amounts and nothing else.
 | Closing | A closing writer's escrow leaves the pot **exactly**. Each account's own legs net first |
 | Counter-party | One maker only — the chosen quote's signer |
 | Book impact | None. The trade matches against no resting order |
-| Fees | **None.** An option fill charges no trading fee today |
+| Fees | The TAKER pays; the quoting maker has no fee leg. See [the option fee](../products/options.md#option-fee) |
 | Margin | **None.** The buyer paid the premium; the writer locked the worst case |
 | Liquidation | **Impossible.** Both sides are fully funded at the fill |
 | Public visibility | None. It is not on the public trade tape or `fills` |
@@ -245,7 +245,10 @@ A: None. Once the taker accepts, the fill is direct between the taker and the
 chosen maker. The CLOB engine is not involved.
 
 **Q: What does a fill cost?**
-A: The premium, plus the escrow if you are the writer. There is no trading fee on
-an option fill today.
+A: The premium, plus the escrow if you are the writer, plus a taker fee if you
+sent the request. The maker who quoted you pays nothing. The fee is the smaller of
+a rate on the option's maximum payout and a fraction of the premium — see
+[the option fee](../products/options.md#option-fee). Both rates start unset, which
+charges nothing.
 
 </details>

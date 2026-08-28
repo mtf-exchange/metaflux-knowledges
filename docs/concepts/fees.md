@@ -100,7 +100,7 @@ trailing 30-day volume counters.
 | `perp` | Every perpetual fill |
 | `spot` | An ordinary spot order |
 | `spot_margin` | The TAKER of a leveraged spot open or close |
-| `option` | Reserved. Nothing charges an option fee yet |
+| `option` | The TAKER of an RFQ option fill. Priced apart — see [the option fee](../products/options.md#option-fee) |
 
 **Only the taker carries a product.** A maker rests on the shared spot book and
 never knows which lane crossed it, so a maker is always priced and counted as
@@ -130,9 +130,11 @@ product FREE. Removing a table — so the product returns to the chain-wide
 schedule — is a separate explicit flag on the vote, and a vote that carries it
 must carry no rates.
 
-**The `option` rates are not votable yet.** Nothing charges an option fee, so the
-chain refuses a proposal that sets one. The batch that wires the charge opens the
-vote.
+**The `option` rates do not follow the shape above.** Every other product prices
+on notional against a volume ladder. An option prices on the smaller of its
+maximum payout and a fraction of its premium, and its two rates are set on the
+option product's table rather than by a ladder. Both start UNSET, which charges
+nothing. See [the option fee](../products/options.md#option-fee).
 
 ### The pooled window, and the day it closes {#pooled-volume-sunset}
 
