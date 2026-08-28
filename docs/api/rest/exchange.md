@@ -196,7 +196,7 @@ For a `master / agent` action the node compares the recovered signer against
 agent's own account.**
 
 The node sets the account to the recovered signer. So an agent-signed
-[`mb_withdraw`](#mb_withdraw) debits the **agent's** balance, not the master's,
+[`bridge_withdraw`](#bridge_withdraw) debits the **agent's** balance, not the master's,
 and an agent-signed [`approve_agent`](#approve_agent) approves an agent of the
 **agent**. You get no `401` and no error — you get the wrong account. Sign every
 `master only` action with the master key.
@@ -430,7 +430,7 @@ own account, never the master's.
 |--------|---------|-----------|
 | [`core_evm_transfer`](#core_evm_transfer) | Move a spot asset from the Core ledger to MetaFluxEVM, optionally with an EVM payload | master only |
 | [`send_to_evm_with_data`](#send_to_evm_with_data) ⚠️ | The same Core → EVM move in the Hyperliquid-compatible field shape. **Live.** It refuses five things Hyperliquid accepts and ignores — see the section | master only |
-| [`mb_withdraw`](#mb_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
+| [`bridge_withdraw`](#bridge_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
 
 Both Core → EVM rows reach the same lane and land the same credit.
 [Which one to use](#core-evm-which-action) is decided by one thing: the field
@@ -452,8 +452,8 @@ each.
 | `MultiSig` | `multi_sig` | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts (post it as a normal `multi_sig` `/exchange` envelope). See [multi-sig](../../concepts/multi-sig.md#acting-as-multi-sig). (A non-wrapped action from a multi-sig account is still rejected.) |
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
-| `WithdrawUsdc` | — | Draft name; external withdrawal is [`mb_withdraw`](#mb_withdraw) |
-| (legacy CCTP withdraw) | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use mb_withdraw"`) — use [`mb_withdraw`](#mb_withdraw) |
+| `WithdrawUsdc` | — | Draft name; external withdrawal is [`bridge_withdraw`](#bridge_withdraw) |
+| (legacy CCTP withdraw) | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use bridge_withdraw"`) — use [`bridge_withdraw`](#bridge_withdraw) |
 | (BOLE pool) | `borrow_lend` | **Bridged and live** — `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` are open to any account; `"Borrow"` is refused unless the sender is an approved liquidator |
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit; see [vaults](../../concepts/vaults.md#depositing) |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag — enroll via [`user_portfolio_margin`](#user_portfolio_margin). `pm_unenroll` **is** a bridged alias (no params) for the same action's `enroll:false` form. `pm_rebalance` has been **removed** — rejected as an unknown action |
@@ -3481,7 +3481,7 @@ so the queued EVM credit is always fully backed (zero-sum).
 
 **Funding check.** The move is gated on **free collateral** (equity minus margin
 held by open positions), not raw equity — collateral backing open positions is
-not transferable, mirroring the [`mb_withdraw`](#mb_withdraw) /
+not transferable, mirroring the [`bridge_withdraw`](#bridge_withdraw) /
 withdrawable-collateral gate. An underfunded transfer errors at commit
 (`insufficient free collateral for core->evm transfer`).
 
@@ -3618,7 +3618,7 @@ omitted — `data` may be an empty array, but the key must be there.
 | `source_dex` | uint32 | `0` only | **Any other value is refused.** ⚠️ **This is the row an existing client hits** — a payload written for Hyperliquid carries `source_dex: 1`. This action debits exactly one ledger, the spot ledger, so no other source exists to name. The field used to be accepted and ignored; it now fails closed rather than quietly debiting a ledger you did not ask for |
 | `destination_recipient` | hex address | 40 hex chars (`0x` optional) | EVM-side recipient (20-byte). **The zero address is refused** (`zero destination`), as on [`core_evm_transfer`](#core_evm_transfer). Every other well-formed address is accepted: the credit is a **mint to this address, with no owner check** — read the [gotchas](#send_to_evm_with_data-gotchas) before you send |
 | `to_perp` | bool | `false` only | **`true` is refused.** The EVM side has no perp account — the credit is an EVM mint — so `true` selects nothing that exists. The field used to be accepted and ignored |
-| `destination_chain_id` | uint32 | `0` or the local EVM chain id | Delivery chain. **Any other value is refused.** Delivery to a remote chain is not built on this lane. The field used to be signed and then ignored, so a caller who named a remote chain had the value delivered **locally, in silence**. It now refuses instead. To reach another chain use [`mb_withdraw`](#mb_withdraw) |
+| `destination_chain_id` | uint32 | `0` or the local EVM chain id | Delivery chain. **Any other value is refused.** Delivery to a remote chain is not built on this lane. The field used to be signed and then ignored, so a caller who named a remote chain had the value delivered **locally, in silence**. It now refuses instead. To reach another chain use [`bridge_withdraw`](#bridge_withdraw) |
 | `data` | byte array | up to **4096** bytes | EVM calldata, as an array of byte integers. Send `[]` for none. It runs against `destination_recipient` **after** the credit lands, as a real transaction with its own receipt. Over 4096 bytes is refused — the same bound [`core_evm_transfer`](#core_evm_transfer) carries, because both actions stage onto the one lane |
 | `nonce` | uint64 | — | A transfer nonce carried **with the transfer**, distinct from the envelope `nonce`. It signs as `transferNonce`. The envelope `nonce` is still the value that orders and de-duplicates your actions |
 
@@ -3789,7 +3789,7 @@ unrecoverable.**
 
 ---
 
-### Withdraw USDC to an external chain {#mb_withdraw}
+### Withdraw USDC to an external chain {#bridge_withdraw}
 
 External withdrawal over [MetaBridge](../../bridge/index.md): debits the
 sender's USDC cross-collateral and queues an **Outbound** bridge message for
@@ -3802,7 +3802,7 @@ effectively master only (consistent with the
 
 ```json
 {
-  "type": "mb_withdraw",
+  "type": "bridge_withdraw",
   "params": {
     "chain":    "Base",
     "asset":    0,
@@ -3854,7 +3854,7 @@ collateral for withdrawal`.
   ownership check. Funds released to a wrong-but-well-formed address are
   unrecoverable; double-check the destination.
 - A duplicate submission is a **second withdrawal**, not a retry — idempotency
-  is per-nonce, and each committed `mb_withdraw` debits again.
+  is per-nonce, and each committed `bridge_withdraw` debits again.
 
 ---
 
@@ -3872,7 +3872,7 @@ here only to redirect integrators to the supported path.
 | `MultiSig` | `multi_sig` | **Bridged and executing.** Post it as a normal `multi_sig` envelope | [`multi_sig`](../../concepts/multi-sig.md#acting-as-multi-sig) acts; [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
-| `WithdrawUsdc` | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use mb_withdraw"`) | [`mb_withdraw`](#mb_withdraw) withdraws USDC cross-collateral externally |
+| `WithdrawUsdc` | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use bridge_withdraw"`) | [`bridge_withdraw`](#bridge_withdraw) withdraws USDC cross-collateral externally |
 | (BOLE pool) | `borrow_lend` | **Bridged and live.** `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` open to any account; `"Borrow"` refused unless the sender is an approved liquidator | — |
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit | [vaults](../../concepts/vaults.md#depositing) |
 | (Earn pool config) | `create_earn_pool` | **Validator governance, never a user action.** `createEarnPool` (201) is a ⅔-stake vote submitted through node governance. It is the **only** way an Earn pool gets a non-zero borrow rate — see [why that matters](#spot-margin--earn) | [`earn_deposit`](#earn_deposit) auto-creates a pool at rate `0` |

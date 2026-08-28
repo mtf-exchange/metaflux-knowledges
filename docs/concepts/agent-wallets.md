@@ -61,7 +61,7 @@ if action has an `owner` field:                 # e.g. submit_order, batch_order
          unexpired agent of owner:         admit    # agent signed for master
     else:                                  401
 
-else:                                           # e.g. mb_withdraw, approve_agent
+else:                                           # e.g. bridge_withdraw, approve_agent
     account = recovered_addr                    # the signer IS the account
 ```
 
@@ -234,7 +234,7 @@ Battle-tested patterns for running an agent-key fleet in production:
 
 | Item | Why |
 |------|-----|
-| Master in cold storage (hardware wallet / HSM) | The master signs `approve_agent` and withdrawals (`mb_withdraw`) — rare events |
+| Master in cold storage (hardware wallet / HSM) | The master signs `approve_agent` and withdrawals (`bridge_withdraw`) — rare events |
 | One agent per host / container | If a host is compromised, only that agent's authority is exposed; revoke without touching others |
 | `expires_at_ms` set to ≤ 30 days from approval | Forces a renewal cadence; missed renewals are auto-revoke |
 | Agent name encodes the host + start time | Makes audit forensics trivial: `mm-host-3 / 2026-Q2` |
@@ -274,7 +274,7 @@ That is the whole rule. It gives agents the trading surface and nothing else.
 | Specialist venues | `rfq_request`, `rfq_quote`, `rfq_accept`, `fba_submit` |
 
 **Everything else is master-key work**, including every withdrawal and transfer
-(`mb_withdraw`, `core_evm_transfer`, `send_asset`, `usd_class_transfer`), every
+(`bridge_withdraw`, `core_evm_transfer`, `send_asset`, `usd_class_transfer`), every
 vault action, Earn and spot-margin, staking, sub-accounts, multi-sig conversion,
 `approve_broker_fee`, `set_referrer`, `set_display_name`, portfolio-margin
 enrolment, and `approve_agent` itself. There is no agent-of-agent recursion.
@@ -284,7 +284,7 @@ enrolment, and `approve_agent` itself. There is no agent-of-agent recursion.
 the agent's own account.**
 
 Those actions have no `owner` field, so the chain treats the recovered signer as
-the account. An agent-signed `mb_withdraw` tries to withdraw the **agent's**
+the account. An agent-signed `bridge_withdraw` tries to withdraw the **agent's**
 balance — normally zero, so it fails for the wrong reason or moves the wrong
 funds. An agent-signed `approve_agent` approves a sub-agent **of the agent**, and
 grants nothing over the master.

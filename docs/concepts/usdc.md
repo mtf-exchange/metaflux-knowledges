@@ -17,7 +17,7 @@ the spendable spot-USDC balance are the same number.
   surfaces, `asset: 100` on spot market and balance surfaces, an ERC-20 on the
   EVM, and a separate contract on every external chain.
 - Two number planes. `/info` and most `/exchange` fields are **whole-USDC decimal
-  strings**. [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) and the EVM
+  strings**. [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) and the EVM
   token are **6-decimal integers**. Mixing them is an error of 10⁶.
 - [`usd_class_transfer`](#moving-usdc) is **rejected**. There is no second pool
   to move to.
@@ -29,7 +29,7 @@ any code that names USDC.
 
 | Surface | How USDC is addressed | Number plane |
 |---------|----------------------|--------------|
-| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `withdrawable`. Bridge deposits, [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) and [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
+| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `withdrawable`. Bridge deposits, [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) and [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
 | **Spot token** | Asset id **`100`** — the `quote` of every `*/USDC` pair and the id of the `USDC` row in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `tokens[]` and in `account_state.balances[]` | whole-USDC decimal string |
 | **EVM token** | ERC-20 at the fixed predeploy `0x0000000000000000000000000000000000010000` | **6-decimal integer** |
 | **External chains** | Each chain's own USDC contract, held in [MetaBridge](../bridge/index.md) custody | 6-decimal integer on the MTF wire |
@@ -41,7 +41,7 @@ bridge and withdraw paths use; `100` is the spot-ledger token id the market and
 balance surfaces use. Which id an action wants is **fixed per action** — it is
 not a free choice:
 
-- [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) and
+- [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) and
   [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) take **`0`**.
   On `core_evm_transfer`, `asset: 100` is rejected with
   `asset not linked to an EVM contract` — the spot USDC token id carries **no EVM
@@ -86,7 +86,7 @@ All of them spend the pool. What differs is the **gate**.
 | Place a **spot sell** | the base token on the spot ledger | you must own the base |
 | Deposit to [Earn](./earn.md) | the pool | amount ≤ free collateral |
 | Open a [spot-margin](../products/spot-margin.md) position | the pool | its initial margin is held against the pool |
-| [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) / [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) / a send | the pool | amount ≤ free collateral |
+| [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) / [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) / a send | the pool | amount ≤ free collateral |
 
 **Free collateral** is the one budget every debit above is measured against:
 
@@ -135,7 +135,7 @@ Cancel the bid and the escrow returns to the pool.
 | Parent ↔ sub-account | [`sub_account_transfer`](../api/rest/exchange.md#sub_account_transfer) / [`sub_account_spot_transfer`](../api/rest/exchange.md#sub_account_spot_transfer) | No protocol fee |
 | Core → EVM | [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) | No protocol fee; the amount is rescaled ×10⁶ |
 | EVM → Core | An EVM **burn** transaction — **not** an `/exchange` action | EVM gas |
-| Off the network | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) | A bridge withdraw fee, withheld from the released amount |
+| Off the network | [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) | A bridge withdraw fee, withheld from the released amount |
 
 :::warning
 **`usd_class_transfer` is rejected**, with
@@ -167,7 +167,7 @@ client and compare gross against released.
 | `POST /info` reads | `account_value`, `withdrawable`, `balances[*].total` / `.hold` | whole-USDC **decimal string** | `"1"` |
 | `POST /exchange` `send_asset` | `amount` | whole-USDC **decimal string** | `"1"` |
 | `POST /exchange` `core_evm_transfer` | `amount` | whole-USDC **decimal string** | `"1"` |
-| `POST /exchange` `mb_withdraw` | `amount` | **6-decimal integer** (`uint64`) | `1000000` |
+| `POST /exchange` `bridge_withdraw` | `amount` | **6-decimal integer** (`uint64`) | `1000000` |
 | EVM ERC-20 at `0x…010000` | `balanceOf`, `transfer` | **6-decimal integer** | `1000000` |
 | Bridge deposit attestations | amount | **6-decimal integer** | `1000000` |
 
@@ -178,7 +178,7 @@ evm_or_bridge_units = whole_usdc × 1_000_000
 ```
 
 :::warning
-**`mb_withdraw` is the exception, and it is a 10⁶ trap.** It is the only
+**`bridge_withdraw` is the exception, and it is a 10⁶ trap.** It is the only
 MTF-native USDC field that is a **bare integer in base units** rather than a
 decimal string. `"amount": 1000000` there is **1 USDC**. The same literal on
 `send_asset` or `core_evm_transfer` is **1,000,000 USDC** — those fields are
@@ -269,7 +269,7 @@ active validator stake. There is no Circle CCTP path.
 
 - A **deposit** credits the pool directly — it lands as collateral, ready to
   margin a perp or fund a spot buy, with no second step.
-- A **withdrawal** is [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) with
+- A **withdrawal** is [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) with
   `asset: 0`. Only USDC is bridgeable today; any other asset id is rejected.
 - The destination-chain release is asynchronous: the Core debit is immediate at
   commit, the payout follows co-signing and relay.

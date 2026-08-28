@@ -219,7 +219,7 @@ Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are al
 | `cancelByCloid` | [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
 | `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
 | `usdSend` / spot transfers | native spot transfer actions |
-| `withdraw3` | [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) |
+| `withdraw3` | [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) |
 | `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) (same field names) — or [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer). Both are live. **Read the note below.** |
 | `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
 | `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
@@ -238,7 +238,7 @@ payload across unchanged. **Do not.** Three fields that HL accepts and ignores a
 - **`to_perp` must be `false`.** The EVM side has no perp account to credit.
 - **`destination_chain_id` must be `0` or the local EVM chain id.** Any other
   value is refused. It is **not** a cross-chain lane — use
-  [`mb_withdraw`](../api/rest/exchange.md#mb_withdraw) to leave the chain.
+  [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) to leave the chain.
 
 Two more things before you port it:
 
