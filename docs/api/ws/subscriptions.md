@@ -396,7 +396,7 @@ Per-account margin / liquidation notices, derived by diffing consecutive committ
 
 ### Per-account money movement history {#ledger_updates}
 
-Per-account money movement, attributed to its **cause** (read from the committed block payload — a record appears only when the action applied). Requires `user`. The on-subscribe snapshot is an **array** of the account's most-recent ledger records, **newest-first**, bounded to the last **100** (`[]` when the account has no recent records); each subsequent push is an array holding the new record(s) for the just-committed block.
+Per-account money movement, attributed to its **cause**. A record appears only when the action applied. It does NOT matter how the action reached the chain: a transfer, an asset send, a vault transfer and a bridge withdrawal all emit their record whether they arrived as a signed action or from a contract call on MetaFluxEVM. Until this release the EVM route emitted nothing, so a balance rebuilt from this channel was short by any move made that way. Requires `user`. The on-subscribe snapshot is an **array** of the account's most-recent ledger records, **newest-first**, bounded to the last **100** (`[]` when the account has no recent records); each subsequent push is an array holding the new record(s) for the just-committed block.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "ledger_updates", "user": "0x<address>" } }
@@ -407,7 +407,7 @@ Per-account money movement, attributed to its **cause** (read from the committed
 ```
 
 - `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver). Two more kinds arrive next release — see [Two record sources arrive next release](#ledger_updates-incoming).
-- **Every `amount` is a whole-token decimal string**, `withdraw` included — there is no raw base-unit field on any record. `amount` is UNSIGNED on every kind listed above; read the direction from the `kind` (the incoming `liquidation` kind below is the one signed exception). Inbound bridge credit amounts and CoreWriter-delayed actions (which dispatch in a later block) are not yet attributed.
+- **Every `amount` is a whole-token decimal string**, `withdraw` included — there is no raw base-unit field on any record. `amount` is UNSIGNED on every kind listed above; read the direction from the `kind` (the incoming `liquidation` kind below is the one signed exception). Inbound bridge credit amounts and delayed contract calls (which dispatch in a later block) are not yet attributed. The ORDER of records inside one block's array is not part of the contract and it changed this release; correlate on `time` and `kind`, never on position.
 
 #### Two record sources arrive next release {#ledger_updates-incoming}
 
