@@ -667,6 +667,9 @@ No parameters.
       { "volume_30d": "100000000", "maker_bps": "1.5", "taker_bps": "4.5" },
       { "volume_30d": "1000000000","maker_bps": "1.0", "taker_bps": "4.0" }
     ],
+    "pooled_volume_sunset_day": 20340,
+    "pooled_volume_sunset_ms":  "1757376000000",
+    "pooled_volume_counts":     true,
     "builder_rebate_bps": "0.2",
     "burn_ratio":         "0.30",
     "referrer_share_bps": "1.0"
@@ -679,6 +682,9 @@ No parameters.
 | `tiers[*].volume_30d` | Decimal string | 30-day trailing volume threshold for this tier |
 | `tiers[*].maker_bps` | Decimal string | Maker fee rate at this tier, in basis points |
 | `tiers[*].taker_bps` | Decimal string | Taker fee rate at this tier, in basis points |
+| `pooled_volume_sunset_day` | uint64 | The day the pooled volume counter stops buying a discount. `0` = not armed yet |
+| `pooled_volume_sunset_ms` | Decimal string | The same instant in milliseconds. `"0"` = not armed yet |
+| `pooled_volume_counts` | bool | `true` while pooled volume still feeds a tier |
 | `builder_rebate_bps` | Decimal string | Builder rebate, in basis points |
 | `burn_ratio` | Decimal string | Fraction of fees burned |
 | `referrer_share_bps` | Decimal string | Referrer's share of fees, in basis points |
@@ -687,6 +693,70 @@ No parameters.
 
 - Fee rates are decimal basis points as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), for sub-basis-point precision.
 - `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned).
+
+**Send an `address` to get that account's resolved rates.** The response then also
+carries a `user` block:
+
+```json
+{
+  "data": {
+    "type": "fee_schedule",
+    "tiers": [],
+    "user": {
+      "address":                   "0x<addr>",
+      "taker_volume_30d":          "12500000",
+      "maker_volume_30d":          "3100000",
+      "taker_bps":                 "4.5",
+      "maker_bps":                 "1.5",
+      "effective_taker_bps":       "4.05",
+      "effective_maker_bps":       "1.2",
+      "staking_discount_permille": 100,
+      "maker_rebate_bps":          "0.3",
+      "products": [
+        { "product": "perp",        "taker_bps": "4.05", "maker_bps": "1.2",
+          "taker_volume_30d": "12500000", "maker_volume_30d": "3100000" },
+        { "product": "spot",        "taker_bps": "9.0",  "maker_bps": "2.0",
+          "taker_volume_30d": "12500000", "maker_volume_30d": "3100000" },
+        { "product": "spot_margin", "taker_bps": "9.0",  "taker_volume_30d": "12500000" },
+        { "product": "option",      "taker_bps": "9.0",  "taker_volume_30d": "12500000" }
+      ],
+      "daily_volume": []
+    }
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `user.taker_volume_30d` | Decimal string | Pooled trailing 30-day taker volume, every product together |
+| `user.maker_volume_30d` | Decimal string | Pooled trailing 30-day maker volume |
+| `user.taker_bps` / `maker_bps` | Decimal string | The PERP base rate, before the discount and the rebate |
+| `user.effective_taker_bps` | Decimal string | The PERP rate a fill charges, discount applied |
+| `user.effective_maker_bps` | Decimal string | The PERP rate a fill charges, rebate subtracted. Negative = a credit |
+| `user.staking_discount_permille` | uint32 | Taker-only staking discount, per mille (`100` = 10%) |
+| `user.maker_rebate_bps` | Decimal string | The PERP maker rebate, before it is subtracted |
+| `user.products[*].product` | string | `perp`, `spot`, `spot_margin` or `option` |
+| `user.products[*].taker_bps` | Decimal string | The rate a fill on THIS product charges, discount applied |
+| `user.products[*].maker_bps` | Decimal string | The rate a fill on THIS product charges, rebate subtracted. ABSENT on a product with no maker leg |
+| `user.products[*].taker_volume_30d` | Decimal string | The volume THIS product's tier reads |
+| `user.products[*].maker_volume_30d` | Decimal string | The volume THIS product's maker tier reads. ABSENT on a product with no maker leg |
+
+**The four products price apart. Read `products`, not the top-level pair.** The
+top-level `effective_*_bps` fields are the PERP rate, which is what they have
+always meant. A spot or an option fill can charge a different rate. See
+[Each product has its own fee table](../../concepts/fees.md#per-product-fees).
+
+**A row with no `maker_bps` has no maker leg.** A maker rests on the shared spot
+book and never carries a lane, so a maker is always priced as `spot`. That leaves
+`spot_margin` and `option` with a taker leg only, and those two rows omit both
+maker keys rather than render a rate nothing can charge.
+
+**Every `products[*]` row can carry the same volume today, and later cannot.**
+Until the pooled window sunsets, a product's tier reads the LARGER of your pooled
+volume and the volume you traded on that product, so the rows agree. After the
+sunset each row reads only its own product. `pooled_volume_sunset_ms` in the same
+response is the date; the rule is in
+[the pooled window](../../concepts/fees.md#pooled-volume-sunset).
 
 See [fees](../../concepts/fees.md).
 

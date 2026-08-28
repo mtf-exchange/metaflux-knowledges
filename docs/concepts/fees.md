@@ -89,6 +89,87 @@ nearest 0.1 basis point *before* it prices a fee. The dollar fee it then compute
 — taker, maker, or rebate — is truncated toward zero again, independently, to the
 nearest 1e-6 USDC. Two truncations, both toward zero, never a round-up.
 
+### Each product has its own fee table {#per-product-fees}
+
+MetaFlux prices four products apart. Each one carries its own ladder, its own
+base rates, its own maker-rebate ladder, its own broker-fee ceiling, and its own
+trailing 30-day volume counters.
+
+| Product | What takes this rate |
+|---|---|
+| `perp` | Every perpetual fill |
+| `spot` | An ordinary spot order |
+| `spot_margin` | The TAKER of a leveraged spot open or close |
+| `option` | Reserved. Nothing charges an option fee yet |
+
+**Only the taker carries a product.** A maker rests on the shared spot book and
+never knows which lane crossed it, so a maker is always priced and counted as
+`spot`. A leveraged taker that crosses a resting spot maker pays the
+`spot_margin` rate; the maker it hit pays the `spot` rate on the same fill.
+
+So `spot_margin` and `option` have **no maker leg at all**, and their rows on
+[`/info fee_schedule`](../api/rest/info.md#fee_schedule) carry no maker fields.
+
+**A forced liquidation is `spot`, not `spot_margin`.** The owner of a forced
+close did not choose to take, and their history is not on the margin counter, so
+pricing them there would charge the worst rung — and that fee comes out of the
+proceeds that repay the lending pool.
+
+**A product with no table set prices exactly as before**, off the chain-wide
+ladder. Governance sets a product table by a ⅔-stake vote.
+
+**A product table REPLACES the chain-wide one; it does not merge into it.** Once
+a product has a table, every rate for that product comes from it. An empty
+volume ladder inside a product table means every account falls through to that
+table's two base rates — it does NOT fall back to the chain-wide ladder. An empty
+maker-rebate ladder inside a product table means NO rebate on that product. To
+keep a rebate, restate the ladder in the vote.
+
+**Zero is a rate, not a removal.** A table voted with zero base rates makes that
+product FREE. Removing a table — so the product returns to the chain-wide
+schedule — is a separate explicit flag on the vote, and a vote that carries it
+must carry no rates.
+
+**The `option` rates are not votable yet.** Nothing charges an option fee, so the
+chain refuses a proposal that sets one. The batch that wires the charge opens the
+vote.
+
+### The pooled window, and the day it closes {#pooled-volume-sunset}
+
+Before this change one pooled counter fed every tier, so volume traded anywhere
+bought a discount everywhere. That is what per-product counters close.
+
+Closing it instantly would drop accounts a tier with no notice, so the two run in
+parallel for one full 30-day window:
+
+- **During the window**, a product's tier reads the LARGER of your pooled volume
+  and your volume on that product. At the start the per-product counters are
+  empty, so this is exactly your old rate. Nobody drops a tier on day one.
+- **On the sunset day**, the pooled counter stops buying a discount. Each product
+  reads only the volume you traded on it.
+
+The window opens on the first fill after the upgrade and closes 30 days later.
+**Read the date, do not assume it.**
+[`/info fee_schedule`](../api/rest/info.md#fee_schedule) serves it directly as
+`pooled_volume_sunset_ms`, with `pooled_volume_counts` telling you whether the
+window is still open.
+
+The same response shows what the change will cost you:
+`products[*].taker_volume_30d` is the per-product number a tier will read once
+the window closes. Compare it with the pooled `taker_volume_30d` in the `user`
+block — while the two differ, part of your current tier rests on volume that will
+stop counting.
+
+**This is a rate change on a date, and it needs no vote.** If your tier today
+rests on volume from more than one product, your rate rises on the sunset day
+even if governance sets no product table at all.
+
+**The maker rebate reads ONE plane, never the better of two.** The rebate is a
+share of total maker volume, so a young per-product denominator would make a
+small maker look large. During the window the rebate therefore reads the pooled
+plane alone, exactly as before. It switches to per-product on the sunset day
+together with the tiers.
+
 **Where to read it.** [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
 called with your `address` returns `taker_volume_30d`, `maker_volume_30d`,
 `effective_taker_bps`, `effective_maker_bps`, `staking_discount_permille`, and
