@@ -227,7 +227,7 @@ vote first.
 
 A **scale ladder** is `n` resting limit rungs spread evenly across `[px_low,
 px_high]` on one perpetual market, placed from **one signature**. A spot pair is
-refused today — see [The three on a spot pair](#synth-on-spot). You sign a
+also accepted — see [The three on a spot pair](#synth-on-spot). You sign a
 compact request — the range, the rung count, the total size, and a distribution —
 and the node expands it into the rungs. Every rung shares the one `cloid` you
 supply, which is the ladder handle.
@@ -288,7 +288,7 @@ re-prices to stay one tick inside the top of the book. You sign one compact requ
 — the market, side, size, a reprice cadence, a time-to-live, and a reprice budget —
 and the node keeps the leg pegged to the best price with **no client round-trip**.
 Because the leg is post-only and always rests strictly inside the spread, a chase
-never takes liquidity and never pays a taker fee. A spot pair is refused today —
+never takes liquidity and never pays a taker fee. A spot pair is also accepted —
 see [The three on a spot pair](#synth-on-spot).
 
 ```json
@@ -350,7 +350,7 @@ has one net leg, so naming it is refused.
 A **TWAP** splits one parent order into `slice_count` equal child slices, fired
 `delay_ms` apart. Each slice is an IOC that crosses the book for its share of the
 size. The node fires them; there is nothing for the client to do after the
-parent is accepted. A spot pair is refused today — see
+parent is accepted. A spot pair is also accepted — see
 [The three on a spot pair](#synth-on-spot).
 
 [`twap_order`](../api/rest/exchange.md#twap_order) carries six required fields —
@@ -391,25 +391,13 @@ TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange.md#twap_can
 
 ## The three on a spot pair {#synth-on-spot}
 
-:::caution
-**Not live yet, and no activation height is chosen.** Today `twap_order`,
-`scale_order` and `chase_order` accept a PERP market only. Sending a spot pair id
-in `market` is refused at commit, on no channel:
-
-| Action | What you get today |
-|---|---|
-| `twap_order` | `no perp market for asset` |
-| `chase_order` | `chase market has no tick/lot grid` |
-| `scale_order` | Every rung is refused. Nothing rests, and the ladder reports a per-rung error |
-
-Build against the rules below, but keep slicing spot orders yourself with
-ordinary [`spot_order`](../api/rest/exchange.md#spot_order) legs until this notice
-is gone.
+:::info
+**Live.** `twap_order`, `scale_order` and `chase_order` accept a spot pair id in
+`market`. The order runs on the spot book under the rules below.
 :::
 
-At and above the activation height, `market` on all three accepts a **spot pair
-id** and the order runs on the spot book. Perp behaviour is unchanged at every
-height.
+`market` on all three accepts a **spot pair id** and the order runs on the spot
+book. Perp behaviour is unchanged.
 
 **Every leg runs the ordinary spot order path.** The spot kill switch, the pair's
 price and size grid, the resting-order cap, the affordability clamp and the escrow
@@ -434,8 +422,7 @@ you did not sign, so the chain refuses instead. Clear the field, then re-sign.
 
 **One live-parent budget covers both homes.** The governed cap on live TWAP
 parents (default `100`) counts your perp parents and your spot parents **together**
-— it is one allowance per account, not one per market class. Nothing changes below
-the activation height, where an account can hold no spot parents at all.
+— it is one allowance per account, not one per market class.
 
 [`twap_cancel`](../api/rest/exchange.md#twap_cancel) takes a spot parent's id with
 no change to the wire: the id is looked up in both homes. So one cancel path

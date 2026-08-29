@@ -355,11 +355,6 @@ MTF (or delegate to a validator) to receive a larger slice — see [Staking](./s
 
 ### The buyback needs a bound MTF asset id {#buyback-asset-binding}
 
-:::caution
-**Both votes on this page are LIVE** since node 0.8.9. `set_mtf_asset_id` is
-additionally refused below block 13,350,001 — see the sequencing rule below.
-:::
-
 The buyback executor buys ONE asset, and it must be told which one. That binding
 is a single asset id. **Until it is bound the buyback cannot fire at all**, and the
 accrued USDC keeps growing behind it. The chain records the unbound state as
@@ -370,7 +365,7 @@ Genesis binds the id by name. A chain whose MTF token was registered AFTER genes
 therefore starts with nothing bound, which is the state of the hosted sandbox
 today. A two-thirds-stake vote, `set_mtf_asset_id`, binds it at runtime.
 
-Four rules govern that vote:
+Three rules govern that vote:
 
 - **The voted value is `asset_id + 1`, not the asset id.** The offset is what keeps
   `0` meaning "no vote". A vote of `1` binds asset `0`. There is no way to express
@@ -380,49 +375,17 @@ Four rules govern that vote:
   the old id with no migration. Only an idempotent re-vote of the SAME id enacts;
   a vote for a different id is refused.
 - **The asset must already be registered, and it may not be the USDC quote asset.**
-- **The vote is REFUSED until the drip is live** — see the sequencing rule below.
 
 The enactment appears on
 [`validator_votes`](../api/rest/info/governance.md#validator_votes) as
 `changes[*].field: "mtf_asset_id"`.
 
-:::danger
-**The chain REFUSES this vote until the drip is live. The order is enforced, not
-advised.**
-
-Below the drip activation height ONE fire spends the WHOLE available balance. On a
-chain that has accrued for months, binding the asset id first would make the very
-next fire sweep the entire pool onto the MTF/USDC book as a single aggressive buy —
-exactly what the drip exists to prevent. So the enactment refuses, and the reason
-it gives says so:
-
-```
-… binding mtf_asset_id now would let the next buyback spend the whole pool in one buy
-```
-
-**A quorum reached too early does not bank the result.** The stake tallies, the
-enactment is rejected, and no state is written. The row on
-[`validator_votes`](../api/rest/info/governance.md#validator_votes) never reaches
-`"enacted"` — it reads `"voting"`, then `"expired"` once its lifetime elapses. The
-validator that cast the deciding vote sees the reason on its own action outcome;
-nobody watching the public read sees an error at all, only a vote that never
-enacted.
-
-**Wait for `buyback_status.drip_active` to read `true`, then cast again.**
-:::
-
 ### The buyback drips, it does not sweep {#buyback-drip}
 
-:::caution
-**LIVE since block 13,350,001.** Below that height one fire spent the whole
-available balance. Read `buyback_status.drip_active` to confirm on any node.
-:::
-
-Today a fire spends everything available in one buy. At and above the activation
-height a fire spends **one slice**: `min(available, slice_usdc)`, default 250 USDC.
-The rest is realized at the [assistance fund](./system-addresses.md) and the next
-fire continues from there, so a large pool reaches the book over many blocks
-instead of in one order.
+A fire spends **one slice**: `min(available, slice_usdc)`, default 250 USDC. The
+rest is realized at the [assistance fund](./system-addresses.md) and the next fire
+continues from there, so a large pool reaches the book over many blocks instead of
+in one order.
 
 Two rules follow:
 
@@ -457,10 +420,6 @@ The enactment appears on
 [`validator_votes`](../api/rest/info/governance.md#validator_votes) as
 `changes[*].field: "fee.buyback_slice_usdc"`.
 
-**A slice vote enacts at any height; the buyback only READS it above the
-activation height.** So a slice voted early is recorded and does nothing until the
-boundary is crossed.
-
 ## Spot fees {#spot-fees}
 
 The same maker/taker shape applies to spot fills, but spot fees are charged on a
@@ -480,10 +439,10 @@ model.
 
 ### A spot BUY pays its fee in the BASE token {#spot-buy-fee-in-base}
 
-:::caution LIVE since block 6,565,000 — read this before you reconcile balances
-Below that height a spot buyer paid its fee in the quote token. There is no field
-on the wire that flips with the change, so the block height is the only boundary
-you can key on.
+:::note Historical fills — before block 6,565,000
+Below that height a spot buyer paid its fee in the quote token. No field on the
+wire records the change. Key on the block height when you process fills from
+before that boundary.
 :::
 
 **Each side pays out of the leg it RECEIVES.** A sell receives USDC and already

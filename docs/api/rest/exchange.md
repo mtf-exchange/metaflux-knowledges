@@ -212,7 +212,7 @@ complete.
 
 | Group | Actions |
 |-------|---------|
-| Perp orders | [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order), [`twap_order`](#twap_order) — the last three take a spot pair too, once the [spot lane](../../concepts/order-types.md#synth-on-spot) activates |
+| Perp orders | [`submit_order`](#submit_order), [`batch_order`](#batch_order), [`scale_order`](#scale_order), [`chase_order`](#chase_order), [`twap_order`](#twap_order) — the last three take a spot pair too, see [the spot lane](../../concepts/order-types.md#synth-on-spot) |
 | Cancels | [`cancel_order`](#cancel_order), [`batch_cancel`](#batch_cancel), [`cancel_by_cloid`](#cancel_by_cloid), [`cancel_all_orders`](#cancel_all_orders), [`cancel_scale`](#cancel_scale), [`cancel_chase`](#cancel_chase), [`twap_cancel`](#twap_cancel), [`schedule_cancel`](#schedule_cancel) |
 | Amends | [`modify`](#modify), [`batch_modify`](#batch_modify) |
 | Spot | [`spot_order`](#spot_order), [`spot_cancel`](#spot_cancel) |
@@ -1128,7 +1128,7 @@ approved agent may schedule it **as** an `owner` it acts for.
 | Field | Type | Description |
 |-------|------|-------------|
 | `owner` | hex address \| omitted | Optional: schedule **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
-| `market` | uint32 | Perp market id. A spot pair id is **refused today** — see [the spot lane](#twap_order-spot) |
+| `market` | uint32 | Perp market id or spot pair id — see [the spot lane](#twap_order-spot) |
 | `side` | enum | `"bid"` / `"ask"` |
 | `total_size` | uint64 | Total size in fixed-point tick units (widened to `u128`) |
 | `slice_count` | uint32 | Number of child slices (`> 0`, and at most the governed slice ceiling — default `10000`) |
@@ -1137,13 +1137,11 @@ approved agent may schedule it **as** an `owner` it acts for.
 | `position_side` | enum \| omitted | `"long"` / `"short"`. **[Hedge mode](../../concepts/hedge-mode.md) only** — required there, refused on a one-way account. Every child slice inherits it |
 | `randomize` | bool \| omitted | Randomize the slice schedule. Omit or `false` keeps the fixed schedule, byte for byte — see below |
 
-#### A spot pair, once the lane activates {#twap_order-spot}
+#### A spot pair {#twap_order-spot}
 
-Today `market` must be a perp market. A spot pair id is refused at commit with
-`no perp market for asset`, on no channel. At and above an activation height that
-is **not yet chosen**, a spot pair id runs the TWAP on the spot book: each slice is
-an IOC through the ordinary spot order path, priced off the base token's oracle
-mark rather than off the touch.
+A spot pair id runs the TWAP on the spot book: each slice is an IOC through the
+ordinary spot order path, priced off the base token's oracle mark rather than off
+the touch.
 
 **Three fields are REFUSED on a spot pair, not ignored:**
 
@@ -1202,7 +1200,7 @@ as defaults, not constants:
 |-------|---------|-----------|
 | Minimum `delay_ms` | `10000` (hard floor `1000`) | **Clamped up** at registration. A smaller `delay_ms` is accepted and the parent runs at the floor, so the TWAP takes longer than you asked |
 | Maximum `slice_count` | `10000` | Rejected at commit |
-| Concurrent parents per account | `100` | Rejected at commit (throttled). ONE allowance: once the [spot lane](#twap_order-spot) is live, perp and spot parents count against the same number |
+| Concurrent parents per account | `100` | Rejected at commit (throttled). ONE allowance: perp and spot parents count against the same number — see [the spot lane](#twap_order-spot) |
 
 The clamp is a **snapshot**: the parent keeps the delay it was clamped to, so a
 later governance retune never rewrites a TWAP already in flight.
@@ -1248,8 +1246,8 @@ it acts for.
 | `owner` | hex address \| omitted | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 | `twap_id` | uint64 | The TWAP parent id returned by `twap_order` |
 
-**One cancel covers both order homes.** The id is enough: once the
-[spot lane](#twap_order-spot) is live, a spot parent cancels through this same
+**One cancel covers both order homes.** The id is enough: a
+[spot parent](#twap_order-spot) cancels through this same
 action with the same fields. There is no separate spot cancel and no market field
 to get wrong.
 
@@ -1294,7 +1292,7 @@ Every rung shares the one `cloid` you supply, which is the ladder handle for
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`). A spot pair id is **refused today** — see [the spot lane](#scale_order-spot) |
+| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`), or a spot pair id — see [the spot lane](#scale_order-spot) |
 | `side` | enum | `"bid"` / `"ask"` | Ladder side. Rung `0` sits at `px_low` for **both** sides |
 | `n` | uint32 | `2 … 100` | Rung count |
 | `px_low` | uint64 | `> 0`, on-tick, `< px_high` | Low end of the ladder, in the `1e8` price plane |
@@ -1352,17 +1350,15 @@ from [`open_orders`](./info.md#open_orders) filtered by the shared `cloid`.
   net position over-rests: once the position closes, the extra rungs can open the
   opposite side. Size the ladder to your position.
 
-#### A spot pair, once the lane activates {#scale_order-spot}
+#### A spot pair {#scale_order-spot}
 
-Today `market` must be a perp market. A spot pair id is refused at commit: every
-rung is refused in its own slot and nothing rests. At and above an activation
-height that is **not yet chosen**, a spot pair id builds the ladder on the spot
-book. Rung prices floor onto the pair's tick grid and rung sizes onto its lot
-grid, each rung runs the ordinary spot admission on its own, and `reduce_only:
-true` and `position_side` are both refused. The shared-`cloid` seam above applies
-on the spot book too, and [`cancel_scale`](#cancel_scale) then sweeps a spot pair.
-Read [The three on a spot pair](../../concepts/order-types.md#synth-on-spot)
-before you build for it.
+A spot pair id builds the ladder on the spot book. Rung prices floor onto the
+pair's tick grid and rung sizes onto its lot grid. Each rung runs the ordinary
+spot admission on its own. `reduce_only: true` and `position_side` are both
+refused. The shared-`cloid` seam above applies on the spot book too, and
+[`cancel_scale`](#cancel_scale) then sweeps a spot pair. Read
+[The three on a spot pair](../../concepts/order-types.md#synth-on-spot) before you
+build for it.
 
 **A halt refuses the action.** While the pair is delisted or the global spot
 switch is on, `scale_order` is REFUSED (`spot trading disabled` or `spot pair
@@ -1396,7 +1392,7 @@ Cancel a **whole ladder** in one action — every one of your resting orders on
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | Perpetual market id the ladder rests on. A spot pair id sweeps a spot ladder only once the [spot lane](#scale_order-spot) activates; below that height a spot pair sweeps nothing |
+| `market` | uint32 | `[0, market_count)` | Perpetual market id or spot pair id the ladder rests on. A spot pair id sweeps a spot ladder — see [the spot lane](#scale_order-spot) |
 | `cloid` | hex string | `0x` + 32 hex chars (16 bytes), **required** | The ladder handle to sweep |
 | `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
@@ -1447,7 +1443,7 @@ approved agent / operator routes for the named account).
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`). A spot pair id is **refused today** — see [the spot lane](#chase_order-spot) |
+| `market` | uint32 | `[0, market_count)` | Perpetual market id (identity-mapped to `AssetId`), or a spot pair id — see [the spot lane](#chase_order-spot) |
 | `side` | enum | `"bid"` / `"ask"` | `bid` = buy chase, `ask` = sell chase |
 | `size` | uint64 | `> 0`, on-lot | Leg size in raw lots (`10^sz_decimals` per whole unit). A partial fill shrinks the leg; the next reprice re-places the remainder |
 | `cloid` | hex string \| null | `0x` + 32 hex chars (16 bytes) | Optional client handle. It is **re-stamped on every reprice** — correlate the leg across reprices by `cloid` |
@@ -1499,9 +1495,9 @@ the gap between reprices, never as a guarantee.
 > block count to **consensus time**. The floor becomes **500 ms of consensus
 > time** per chase, and the shared per-block work budget is derived from a
 > per-second intent, so the reprice rate a user gets stops moving when the
-> chain's cadence moves. The change is written and gated; it is **not on the live
-> chain**, and the gate has **no activation height yet**. Until it is armed, the
-> block-count rules above are what the chain enforces. `interval_blocks` keeps
+> chain's cadence moves. The change is **not on the live chain** and has **no
+> activation height yet**. Until it activates, the block-count rules above are
+> what the chain enforces. `interval_blocks` keeps
 > its name and its `2 … 28800` range across the change — an existing signed
 > request stays valid.
 
@@ -1536,15 +1532,13 @@ running on the remaining size.
 
 A rejected chase returns the [rejection envelope](#rejection-envelope) — an `error` object, and no `data` key.
 
-#### A spot pair, once the lane activates {#chase_order-spot}
+#### A spot pair {#chase_order-spot}
 
-Today `market` must be a perp market. A spot pair id is refused at commit with
-`chase market has no tick/lot grid`. At and above an activation height that is
-**not yet chosen**, a spot pair id runs the chase on the spot book, pegged one tick
-inside the touch the same way, with `position_side` refused. Two outcomes are
-spot-only: a reprice that would need more quote balance than you have free is
-**skipped without cancelling** the current leg, and a failed re-place **retires**
-the chase instead of restoring the old leg. Read
+A spot pair id runs the chase on the spot book, pegged one tick inside the touch
+the same way, with `position_side` refused. Two outcomes are spot-only: a reprice
+that needs more free quote balance than you have is skipped without cancelling the
+current leg, and a failed re-place retires the chase instead of restoring the old
+leg. Read
 [The three on a spot pair](../../concepts/order-types.md#synth-on-spot) before you
 build for it.
 
@@ -1594,7 +1588,7 @@ optional (agent / operator routing).
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `market` | uint32 | `[0, market_count)` | The market the chase runs on — a perp market, or a spot pair once the [spot lane](#chase_order-spot) activates. Must match the chase's market |
+| `market` | uint32 | `[0, market_count)` | The market the chase runs on — a perp market, or a spot pair — see [the spot lane](#chase_order-spot). Must match the chase's market |
 | `chase_oid` | uint64 | a live chase handle | The **handle** from the `chase_order` response (the cancel key) — **not** the leg's `oid` |
 | `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
@@ -1844,14 +1838,6 @@ account. The body goes under `action.params`.
 **Governance off-switch.** `mip1_enabled` closes the whole lane. When governance
 sets it `false`, every action here rejects with
 `MIP-1 spot deployment disabled by governance`.
-
-:::info
-**Two new rejection rules ship in the next release.** They are written here
-ahead of activation and are **not live yet** — the network accepts the current
-behaviour until the release activates. (1) `wei_decimals` of `0` becomes
-invalid; see [`spot_register_token`](#spot_register_token). (2) A per-epoch cap
-on new registrations begins to bind; see [Deploy rate limits](#deploy-rate-limits).
-:::
 
 ### Deploy rate limits {#deploy-rate-limits}
 

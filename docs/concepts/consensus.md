@@ -145,11 +145,6 @@ flowchart LR
 
 ## Block cadence {#block-cadence}
 
-:::caution
-**`set_target_block_interval_ms` is LIVE** since node 0.8.9. Before it, each node
-read only its own configured value.
-:::
-
 The chain has a **target** block interval, in milliseconds. It is a target, not a
 guarantee: it paces how often a validator proposes, and the rate you observe
 depends on load and network conditions as well. **Never size a deadline off the

@@ -75,7 +75,7 @@ existed.
 |---|---|
 | `set_funding_ema_decay` | The funding EMA decay. The fold keeps reading the compiled default until this height. |
 | `set_target_block_interval_ms` | The proposer's own pacing period. Needs no activation height of its own. |
-| `set_mtf_asset_id` | Binds the canonical MTF spot asset. **Refused below this height** — see the sequencing note in [Fees](../concepts/fees.md). |
+| `set_mtf_asset_id` | Binds the canonical MTF spot asset. **Refused below this height**, because one fire below it spends the whole accrued pool in a single buy. |
 | `set_buyback_slice_usdc` | The per-fire buyback slice. |
 
 ## Read surface {#read-surface}
@@ -87,6 +87,4 @@ read serves that record; see [deleted reads](./rest/info.md#retired-reads).
 ## What does NOT change {#unchanged}
 
 The spot lane for `twap_order`, `scale_order` and `chase_order` stays OFF. Those
-three still refuse a spot pair id at every height in this release, and the
-[order types](../concepts/order-types.md) page still describes that lane as not
-live.
+three still refuse a spot pair id at every height in this release.

@@ -41,14 +41,11 @@ trader); both also take an **optional** `owner` so an approved
 [agent wallet](../concepts/agent-wallets.md) can trade for the account it is
 approved for.
 
-**One order per signature, today.** The three orders the node runs FOR you —
+The three orders the node runs FOR you —
 [TWAP](../concepts/order-types.md#twap), the
 [scale ladder](../concepts/order-types.md#scale-orders) and the
-[chase](../concepts/order-types.md#chase-orders) — take a perp market only. Sending
-a spot pair id to any of them is refused. That lane is built and waits for an
-activation height; see
-[The three on a spot pair](../concepts/order-types.md#synth-on-spot). Until it is
-live, slice and ladder spot orders yourself with ordinary `spot_order` legs.
+[chase](../concepts/order-types.md#chase-orders) — also accept a spot pair id. See
+[The three on a spot pair](../concepts/order-types.md#synth-on-spot).
 
 ## What a spot pair is {#what-a-spot-pair-is}
 

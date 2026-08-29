@@ -349,51 +349,19 @@ One signature buys a behaviour that would otherwise cost a client loop.
 | [`scale_order`](../api/rest/exchange.md#scale_order) · [`cancel_scale`](../api/rest/exchange.md#cancel_scale) | You want N rungs across a price band from one signature | live |
 | [`chase_order`](../api/rest/exchange.md#chase_order) · [`cancel_chase`](../api/rest/exchange.md#cancel_chase) | You want one post-only leg the node re-prices to the touch | live |
 
-## Upgrade notice — a TWAP slice and a MARKET stop cannot fill today {#deferred-fill-notice}
+## Grid snapping on a synthesized fire {#deferred-fill-notice}
 
-:::danger
-**A market-kind stop-loss and take-profit cannot fill on the live chain today,
-and neither can a TWAP slice. A fix is written and NOT yet active.** Read this
-before you rely on either for protection.
+The chain rounds a synthesized fire price onto the tick grid, always toward the
+mark, so the fire cannot leave its slippage band. It floors a TWAP slice size onto
+the lot grid. A parent whose whole remainder is smaller than one lot retires
+instead of running out its schedule. A schedule that ends with no fill reports
+`Terminated`, not `Finished`.
 
-**What happens now.** The node builds the fire price for a TWAP slice and for a
-MARKET-kind trigger from the mark, and hands it to the ordinary admission path.
-Admission REJECTS a price that is not a whole multiple of the market's tick — it
-does not round it — so the fire is refused unless the mark happens to land
-exactly on the grid. A TWAP slice size is also derived by division, so it is
-almost never a whole multiple of the lot.
-
-Measured across the whole committed history of chain 114514: **no TWAP slice has
-ever filled.**
-
-**The two consequences you can observe:**
-
-1. A TWAP parent still reports `Finished` when its schedule ends, even if every
-   slice was refused and nothing executed. Read the FILLS, not the parent
-   status.
-2. A MARKET-kind stop stays armed and retries on every block. It never fills and
-   it never retires.
-
-**A LIMIT-kind trigger is unaffected** — you supply its price yourself, so it is
-already on the grid. Until the notice below is removed, use a LIMIT stop with a
-price you choose, and slice a large order yourself with ordinary `submit_order`
-legs.
-
-**What changes at the activation height**, which is not yet chosen:
-
-- A synthesized fire price is rounded onto the tick grid, always TOWARD the mark,
-  so the fire cannot leave its slippage band. A TWAP slice size is floored onto
-  the lot grid.
-- A parent whose whole remainder is smaller than one lot RETIRES instead of
-  running out its schedule.
-- A schedule that ends having filled nothing reports `Terminated`, not
-  `Finished`. Treat `Finished` as "the schedule ended", never as "it executed".
-- **A parent that is part-way through its schedule at the activation height
-  starts filling from its REMAINDER.** The portion that was refused before the
-  height is permanent. There is no retroactive credit, and no order is replayed.
-
-Nothing above is live yet. Build against it, but do not remove your own
-protection until this notice is gone.
+:::note Historical parents — before block 13,350,001
+A parent that ended below that height reports `Finished` even when no slice ever
+filled. Read `Finished` on a historical parent as "the schedule ended", never as
+"it executed". The size refused below the height is permanent: nothing is
+credited back and no order is replayed.
 :::
 
 :::danger

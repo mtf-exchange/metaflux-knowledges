@@ -104,21 +104,7 @@ The acting account is the calling contract (`msg.sender`):
 These are subject to CoreWriter's atomicity rule: the call burns gas + emits
 `RawAction`; any L1-side failure afterwards is **silent** (no EVM revert).
 
-:::danger
-**A CONTRACT's CoreWriter call does not reach Core BELOW BLOCK 7,400,000.** Below
-that height `0x3333…3333` holds no code, and only a TOP-LEVEL transaction sent
-directly to that address reaches L1. A call made from inside a contract emits
-nothing and changes nothing on Core — and because the atomicity rule above means
-no revert, it looks like it worked.
-
-**The contract lane opens at block 7,400,000 on devnet (chain 114514).** At and
-above that height a contract's CoreWriter call reaches Core. Below it, send the
-CoreWriter transaction top-level from an EOA, or move value through the
-[withdraw sink](#evm--core-value) above, which is live at every height.
-
-Read the live height before you rely on this —
-`{"type":"account_state","address":"0x…"}` carries it as `height`.
-:::
+A contract's CoreWriter call reaches Core, subject to the atomicity rule above.
 
 ## Moving VALUE from Core to EVM {#core--evm-value}
 

@@ -1493,12 +1493,10 @@ Every open [option](../../products/options.md) leg one account holds. Each row
 carries the series terms beside the position, so one call answers both
 questions.
 
-:::warning Renamed, and not live yet
+:::warning Renamed
 **This read was called `option_positions`.** The old name is **not an alias** —
-it answers `unknown info type`, the same as a name that never existed. The new
-name, and its [WS channel](../ws/subscriptions.md#option_state), land with the
-release that reshapes [`account_state`](#account_state); a live node answers
-`unknown info type` for both names until then.
+it answers `unknown info type`, the same as a name that never existed. Send the
+new name.
 :::
 
 For the account-wide totals — escrow, leg count and nearest expiry — read the

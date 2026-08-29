@@ -412,11 +412,10 @@ Per-account money movement, attributed to its **cause**. A record appears only w
 - `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver). Two more kinds arrive next release — see [Two record sources arrive next release](#ledger_updates-incoming).
 - **Every `amount` is a whole-token decimal string**, `withdraw` included — there is no raw base-unit field on any record. `amount` is UNSIGNED on every kind listed above; read the direction from the `kind` (the incoming `liquidation` kind below is the one signed exception). Inbound bridge credit amounts and delayed contract calls (which dispatch in a later block) are not yet attributed. The ORDER of records inside one block's array is not part of the contract and it changed this release; correlate on `time` and `kind`, never on position.
 
-#### Two record sources arrive next release {#ledger_updates-incoming}
+#### Two more record sources {#ledger_updates-incoming}
 
-> ⬆️ **Upgrade notice — not live yet.** The two records below are written but
-> **not on the live chain**. They start with the next node release. Accept them
-> now: a client that rejects an unknown `kind` breaks on the day of that release.
+> The two records below are LIVE. A client that rejects an unknown `kind` must
+> accept them.
 
 Both close a gap the bullet above names. Neither renames or removes an existing
 `kind`, and neither changes the shape of a record you already receive.
@@ -633,11 +632,15 @@ Requires `user`; a subscribe without one is refused with
 `{"channel":"error","data":{"error":"option_state requires a `user`"}}`. Same
 builder as the REST [`option_state`](../rest/info.md#option_state) read.
 
-:::warning Renamed, and not live yet
+:::warning Renamed, and the public gateway lags the node
 This channel was going to be called `option_positions`. That name is **not an
-alias** and is not accepted. The channel lands with the release that reshapes
-`account_state`; until then a subscribe returns
-`{"channel":"error","data":{"error":"unknown channel: option_state"}}`.
+alias** and is not accepted.
+
+The channel is live on the node. The PUBLIC gateway serves it from gateway
+release 0.8.14; an earlier gateway answers
+`{"channel":"error","data":{"error":"unknown channel: option_state"}}`. The same
+applies to `clearinghouse_state`. The REST reads behind both are already
+reachable, because the gateway passes `/info` through.
 :::
 
 ```json
