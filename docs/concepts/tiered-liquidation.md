@@ -61,8 +61,8 @@ else                                                  → PartialMarket50 { size
 
 Every open leg carries a `liq` price: the mark at which that leg's own health
 crosses `1.0` and the tier ladder above puts the account into T0. Read it on
-[`account_state`](../api/rest/info.md#account_state), on the position row
-(`clearinghouse_state["<dex>"].positions[*].liq`).
+[`clearinghouse_state`](../api/rest/info.md#clearinghouse_state), on the
+position row (`clearinghouse_state["<dex>"].positions[*].liq`).
 
 The formula differs by margin mode, because each mode measures maintenance
 against a different equity pool. Both formulas solve the same question: at

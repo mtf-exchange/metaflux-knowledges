@@ -89,9 +89,36 @@ with `NOT_FOUND`.
 
 ## Query types {#query-types}
 
-### Per-account margin, positions, and balances {#account_state}
+### Per-account collateral and margin health {#account_state}
 
-Per-account snapshot.
+One account, one snapshot: the cross-account money figures at the top level, then
+one summary per **lane** — `perp`, `spot`, `margin`, `option`.
+
+:::warning Not live yet
+The shape on this page is the target state. The release that carries it has not
+fired. Until it does a live node answers `account_state` in the previous FLAT
+shape, and answers [`clearinghouse_state`](#clearinghouse_state) and
+[`option_state`](#option_state) with `unknown info type`. Read
+[where every field went](#account-state-lane-split) first, then ship your client
+change with the release, not before it.
+:::
+
+**The rule behind the shape.** `account_state` answers one question: what the
+account is worth, and how close it is to liquidation. Every figure in it is
+rendered from one committed block, so the set is internally consistent. Position
+DETAIL is a different question, so it has its own read —
+[`clearinghouse_state`](#clearinghouse_state) for perp legs,
+[`option_state`](#option_state) for option legs.
+
+:::danger
+**Do not join two frames to compute one number.** A summary and a detail frame
+can be rendered a commit apart, so a health figure built from both was never true
+at any single block. Every frame carries `height`; compare it before you combine
+anything. If you need one consistent set, take it from `account_state` alone —
+each lane summary is WHOLE inside that one body for exactly this reason.
+:::
+
+**Request**
 
 ```json
 { "type": "account_state", "address": "0x<addr>" }
@@ -100,14 +127,126 @@ Per-account snapshot.
 | Arg | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `address` | hex address | yes | Account address |
-| `detail` | `"full"` \| `"margin"` \| `"overview"` \| `"adl"` | no | Response depth. Absent ⇒ `"full"` |
+| `detail` | `"full"` \| `"margin"` \| `"overview"` | no | Response depth. Absent ⇒ `"full"` |
+
+**`detail: "adl"` is REFUSED**, with `400` / `INVALID_REQUEST`. The body carries
+no position rows to widen. The rejection message names
+[`clearinghouse_state`](#clearinghouse_state), which takes the same `detail`.
+
+**Response** (a faucet-funded account, no positions):
+
+```json
+{
+  "data": {
+    "type": "account_state",
+    "address":        "0x00000000000000000000000000000000000ca11e",
+    "account_value":  "3000",
+    "total_raw_usd":  "3000",
+    "withdrawable":   "3000",
+    "health":         "3000",
+    "tier":           "Safe",
+    "abstraction":    "unified",
+    "pm_net_value":   "0",
+    "perp": {
+      "init_margin":              "0",
+      "total_ntl_pos":            "0",
+      "pm_maint_margin":          "0",
+      "pm_concentration_penalty": "0"
+    },
+    "spot": {
+      "balances": [
+        { "name": "USDC", "signing_id": 100, "total": "3000", "hold": "0", "avg_entry_px": null }
+      ]
+    },
+    "margin": { "collateral": "0", "debt": "0", "pairs": 0 },
+    "option": { "escrow": "0", "legs": 0 },
+    "position_mode": "one_way",
+    "height": 562,
+    "time":   1700000000555
+  }
+}
+```
+
+An **unknown address** (never seen on-chain) returns **200** with this zeroed
+record, NOT a `404`.
+
+#### Where every field went {#account-state-lane-split}
+
+A working client finds its field here. `account_state` is the only read that
+moved; every field still exists somewhere.
+
+| Was, at the top level | Is now | Note |
+|---|---|---|
+| `address` | `address` | unchanged |
+| `height`, `time` | `height`, `time` | unchanged, and on **every** frame of both new reads too |
+| `abstraction` | `abstraction` | unchanged — an ACCOUNT setting, not a lane |
+| `position_mode` | `position_mode` | unchanged — an ACCOUNT setting, not a lane |
+| `account_value` | `account_value` | unchanged — folds perp AND spot-margin unrealised PnL |
+| `total_raw_usd` | `total_raw_usd` | unchanged |
+| `withdrawable` | `withdrawable` | unchanged — subtracts BOTH lanes' held initial margin |
+| `health` | `health` | unchanged — derives from `account_value` |
+| `tier` | `tier` | unchanged — derives from `health` |
+| `health_deferred` | `health_deferred` | unchanged, still present only when `true` |
+| `pm_net_value` | `pm_net_value` | **unchanged — it stays at the top level.** See the warning below |
+| `total_margin_used` | `perp.init_margin` | **renamed as well as moved.** The name `total_margin_used` survives only on `detail: "margin"` |
+| `total_ntl_pos` | `perp.total_ntl_pos` | |
+| `pm_maint_margin` | `perp.pm_maint_margin` | |
+| `pm_concentration_penalty` | `perp.pm_concentration_penalty` | |
+| `balances` | `spot.balances` | the ROWS are unchanged, field for field |
+| `clearinghouse_state` | its own read: [`clearinghouse_state`](#clearinghouse_state) | same wire name, same row shape. Also a WS channel |
+| `cross_maintenance_margin_used` | `detail: "margin"` only | it was already only on that depth, and it stays there |
+
+Two more names moved outside this body:
+
+- `option_positions` is renamed [`option_state`](#option_state). The old name
+  answers `unknown info type`; it is not an alias.
+- `detail: "adl"` moves from `account_state` to
+  [`clearinghouse_state`](#clearinghouse_state).
+
+:::warning
+**`pm_net_value` is NOT under `perp`, and that is deliberate.** Its cash term is
+the whole unified USDC pool, and under multi-collateral it also folds
+haircut-valued spot balances. It is the portfolio-margin twin of `account_value`,
+so a client that sums the lanes would count the same USDC twice. The other three
+`pm_*` figures ARE perp-scoped and do sit under `perp`.
+:::
+
+**There is no transition window.** One builder serves one shape. The old flat
+names are not merely dropped — they are refused at the top level, so a
+half-migrated body cannot ship.
+
+#### Every lane key is always present {#account-state-lanes}
+
+`perp`, `spot`, `margin` and `option` are **always** in the body, zeroed when the
+lane is empty. A client never has to test for a missing lane key. Per lane, an
+account with nothing in it reads:
+
+| Lane | Empty-account value |
+|---|---|
+| `perp` | `{"init_margin":"0","total_ntl_pos":"0","pm_maint_margin":"0","pm_concentration_penalty":"0"}` |
+| `spot` | `{"balances":[ <the USDC row, all zeros> ]}` — **never an empty array** |
+| `margin` | `{"collateral":"0","debt":"0","pairs":0}` |
+| `option` | `{"escrow":"0","legs":0}` — `next_expiry` is **absent** |
+
+Two shapes to code against:
+
+- **`spot.balances` is never `[]`.** The USDC row is unconditional, even for an
+  account that has never been funded. An empty array is a shape no real account
+  returns — if you see one, you are reading a placeholder, not an account. Check
+  the `height` stamp: a placeholder stamps `0`.
+- **`option.next_expiry` is absent when `legs` is `0`.** It is the one
+  non-uniform key in the body. A zero timestamp would read as 1970, so the key is
+  omitted instead of zeroed. Test `legs > 0`, or test for the key.
+
+#### The two depths do not carry the same names {#account-state-detail-margin}
 
 `detail: "margin"` answers with the **margin scalars only** — `address`,
 `account_value`, `total_raw_usd`, `withdrawable`, `total_margin_used`,
-`cross_maintenance_margin_used`, `health`, `tier`, `abstraction`. It skips the
+`cross_maintenance_margin_used`, `health`, `tier`, `abstraction`, plus
+`health_deferred` when true and the `height` / `time` stamp. It skips the
 position walk and the balance scan, so it is the right call for a frequent
 liquidation-health poll (a risk-watcher bot, an automated margin top-up). Both
-depths compute the scalars with one shared helper, so the two can never
+depths compute the scalars with one shared helper, so the numbers can never
 disagree.
 
 ```json
@@ -129,74 +268,77 @@ disagree.
 }
 ```
 
-The two depths do NOT carry the same scalar set, in both directions:
+:::caution
+**The held initial margin has two names, one per depth.** `detail: "margin"`
+calls it `total_margin_used` at the top level. The full depth calls it
+`init_margin` and files it under `perp`. Same number, same helper — two names.
+Read the one your depth serves; neither depth serves the other's name.
+:::
+
+The rest of the two depths differ in both directions:
 
 - **`cross_maintenance_margin_used` is served only at `detail: "margin"`.** The
-  full depth carries the per-leg `maint_margin` on each position row instead.
-  The two are different quantities — one is the account aggregate, one is a
-  single leg's contribution.
-- **`total_ntl_pos` is served only at the full depth.** It is a sum over the
+  full depth carries the per-leg `maint_margin` on each
+  [`clearinghouse_state`](#clearinghouse_state) position row instead. The two are
+  different quantities — one is the account aggregate, one is a single leg's
+  contribution.
+- **`perp.total_ntl_pos` is served only at the full depth.** It is a sum over the
   position walk, and `detail: "margin"` is defined by skipping that walk.
 
-`detail: "overview"` answers with the account's **non-trading** state instead —
-vaults, staking, sub-accounts, multisig, agents and the derived role. One
-account has one state, so it has one read; `detail` chooses which half of that
-state you want. `"full"` and `"margin"` both answer the trading half — `margin`
-is the scalar-only subset of it — while `"overview"` answers the other half. The
-only fields all three share are `address` and the `height` / `time` stamp. See
+`detail: "overview"` answers the account's **non-trading** state instead — vaults,
+staking, sub-accounts, multisig, agents and the derived role. One account has one
+state, so it has one read; `detail` chooses which half of that state you want.
+`"full"` and `"margin"` both answer the trading half — `margin` is the scalar-only
+subset of it — while `"overview"` answers the other half. The only fields all
+three share are `address` and the `height` / `time` stamp. See
 [`detail: "overview"`](#account_state-overview) below.
 
-`detail: "adl"` answers the **full body widened**, not a different body: every
-field of `"full"` plus `adl_lamps` on each position row. See
-[`detail: "adl"`](#account_state-adl) below.
+#### Field reference {#account-state-fields}
 
-An **unknown address** (never seen on-chain) returns **200** with a fully zeroed
-record (`account_value:"0"`, empty `clearinghouse_state` / `balances`), NOT a
-`404`.
+**Top level — the cross-account figures.**
 
-Response (a faucet-funded account, no positions):
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `address` | hex address | The account this body describes |
+| `account_value` | Decimal string | Equity incl. settled PnL, **whole-USDC plane** (`"3000"` = 3000 USDC, NOT base units). Cross-lane: it folds perp AND spot-margin unrealised PnL over the one unified pool |
+| `total_raw_usd` | Decimal string | **Settled cash equity**, whole-USDC. Realized USDC only — deposits, closed-position PnL, fees already paid. It **excludes unrealised PnL**, which is the one difference from `account_value`. It is the `settled cash` term the `withdrawable` formula starts from, so a caller can reconcile that formula from the read alone |
+| `withdrawable` | Decimal string | Cash you can take out, **clamped at zero**. `total_raw_usd` minus funding you owe minus held initial margin — **both lanes' held margin**, not the perp lane's alone. It does NOT count unrealised profit, so a healthy account funded by open profit reads `"0"` — see [account value](../../concepts/account-value.md#withdrawable). The admission gate uses the raw signed figure, which can be negative; the read never is |
+| `health` | Decimal string | `account_value − cross_maintenance_margin_used` (signed dollar figure; can be negative) — **not a ratio** |
+| `health_deferred` | `true` \| absent | Present, and only ever `true`, when the risk engine cannot price a leg. **The risk numbers are then not a solvency statement** — see [account value](../../concepts/account-value.md). Absent is the normal case; treat absent as `false` |
+| `tier` | enum **string** | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md). It is a STRING, never a number |
+| `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (per-product reservations — see [`user_set_abstraction`](../rest/exchange.md#user_set_abstraction)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
+| `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled. **Account-scoped, so it is NOT under `perp`** — see the warning above |
+| `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) — see [hedge mode](../../concepts/hedge-mode.md) |
+| `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
+| `time` | uint64 | Consensus block time in **milliseconds**. A **bare integer**. Advances on every commit, from the same consensus clock as `height` |
 
-```json
-{
-  "data": {
-    "type": "account_state",
-    "address":         "0x00000000000000000000000000000000000ca11e",
-    "account_value":     "3000",
-    "total_raw_usd":     "3000",
-    "total_ntl_pos":     "0",
-    "withdrawable":      "3000",
-    "total_margin_used": "0",
-    "health":            "3000",
-    "tier":              "Safe",
-    "abstraction":       "unified",
-    "clearinghouse_state": { "": { "positions": [] } },
-    "balances": [
-      { "name": "USDC", "signing_id": 100, "total": "3000", "hold": "0", "avg_entry_px": null }
-    ],
-    "pm_maint_margin":          "0",
-    "pm_net_value":             "0",
-    "pm_concentration_penalty": "0",
-    "position_mode":            "one_way",
-    "height": 562,
-    "time":   1700000000555
-  }
-}
-```
+**`perp` — the perp lane summary.** Always present. It holds no position rows;
+read [`clearinghouse_state`](#clearinghouse_state) for those.
 
-`abstraction` is `"unified"` (default cross-collateral account), `"standard"`
-(per-product reservations — see
-[`user_set_abstraction`](../rest/exchange.md#user_set_abstraction)) or
-`"portfolio"` (portfolio-margin enrolled) — derive PM enrollment as
-`abstraction == "portfolio"`. A caller that switches on this field must handle
-the third value: `"standard"` was reserved and is now emitted. `pm_maint_margin` / `pm_net_value` /
-`pm_concentration_penalty` are always present (whole-USDC strings, `"0"` when
-not PM-enrolled) — see [portfolio margin](../../concepts/portfolio-margin.md).
-`position_mode` is `"one_way"` or `"hedge"` — see [hedge mode](../../concepts/hedge-mode.md).
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `perp.init_margin` | Decimal string | Held initial-margin requirement, whole-USDC. Called `total_margin_used` on `detail: "margin"` |
+| `perp.total_ntl_pos` | Decimal string | Mark notional of the account's **CROSS** perp positions, summed: `Σ \|real size\| × mark_px`, whole-USDC, unsigned. **Isolated legs are excluded** — they are margined and liquidated on their own. Equal to the sum of `notional` over every `clearinghouse_state` position row whose `isolated` is `false`. Full depth only |
+| `perp.pm_maint_margin` | Decimal string | PM engine's maintenance requirement, whole-USDC; `"0"` when not PM-enrolled |
+| `perp.pm_concentration_penalty` | Decimal string | PM single-asset concentration penalty, whole-USDC; `"0"` when not PM-enrolled |
 
-Each `balances[*]` row is `{asset, name, total, hold, avg_entry_px}`: `total` is
-the full balance and `hold` is the part locked behind a resting spot order
-(escrow). Row 0 is always USDC (asset id `100`); a token that is entirely held
-still appears.
+The three `pm_*` figures are always present and are **meaningful only when
+`abstraction` is `"portfolio"`** — see [portfolio margin](../../concepts/portfolio-margin.md).
+
+**`spot` — the spot lane summary.** Always present.
+
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `spot.balances` | array | The **whole** spot token ledger, one row per token held. Never empty: row 0 is USDC unconditionally |
+| `spot.balances[*].name` | string | Token symbol (`"USDC"` for row 0). Rows are keyed and joined by `name` |
+| `spot.balances[*].signing_id` | uint32 | The number you place in the `token` field of a signed [`spot_send`](../rest/exchange.md), and in `asset` of an `earn_deposit`. `100` for USDC. It has no other meaning on the read plane |
+| `spot.balances[*].total` | Decimal string | Full balance. **Not** the spendable amount — perp margin sits inside it. Use `withdrawable` |
+| `spot.balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). Spot escrow only; it never holds perp margin |
+| `spot.balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset). See [cost basis](#avg-entry-px) |
+
+**A spot balance IS the spot position**, so nothing split off the way the perp
+positions did. This lane answers the spot-balance question in full; there is no
+separate spot-balance read.
 
 :::warning
 **`total − hold` is NOT the spendable amount.** `hold` counts spot order escrow
@@ -211,102 +353,51 @@ number the admission gate uses, clamped at zero. See
 and a worked example.
 :::
 
-**`balances` is the whole spot ledger.** Every token the account holds appears
-here, so this read answers the spot-balance question as well as the margin one.
-There is no separate spot-balance read.
-
-A positioned account adds entries under `clearinghouse_state["<dex>"].positions`
-— the empty-string key `""` is the core dex; a MIP-3 deployer dex keys by the
-deployer's lowercase `0x` address:
-
-```json
-{
-  "coin":              "BTC",
-  "size":              "1.00000",
-  "entry":             "67000.00",
-  "upnl":              "5.00",
-  "isolated":          false,
-  "lev":               10,
-  "liq":               "61000.00",
-  "roe":               "0.0075",
-  "funding":           "-0.12",
-  "margin":            "201.00",
-  "maint_margin":      "670.00",
-  "notional":          "6705.00"
-}
-```
+**`margin` — the spot-margin lane summary.** Always present. The per-pair detail
+is [`spot_margin_state`](./info/spot.md#spot_margin_state).
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `account_value` | Decimal string | Equity incl. settled PnL, **whole-USDC plane** (`"3000"` = 3000 USDC, NOT base units) |
-| `total_raw_usd` | Decimal string | **Settled cash equity**, whole-USDC. Realized USDC only — deposits, closed-position PnL, fees already paid. It **excludes unrealised PnL**, which is the one difference from `account_value`. It is the `settled cash` term the `withdrawable` formula starts from, so a caller can now reconcile that formula from the read alone |
-| `withdrawable` | Decimal string | Cash you can take out, **clamped at zero**. `total_raw_usd` minus funding you owe minus `total_margin_used`. It does NOT count unrealised profit, so a healthy account funded by open profit reads `"0"` — see [account value](../../concepts/account-value.md#withdrawable). The admission gate still uses the raw signed figure, which can be negative; the read never is |
-| `total_margin_used` | Decimal string | Held initial-margin requirement |
-| `total_ntl_pos` | Decimal string | Mark notional of the account's **CROSS** positions, summed: `Σ \|real size\| × mark_px`, whole-USDC, unsigned. **Isolated legs are excluded** — they are margined and liquidated on their own. Equal to the sum of the `notional` of every position row whose `isolated` is `false`. **Full depth only**: `detail: "margin"` skips the position walk that produces it |
-| `cross_maintenance_margin_used` | Decimal string | The **CROSS** account's maintenance requirement, whole-USDC — the figure the liquidation engine judges the cross bucket against. **`detail: "margin"` only**; the full depth omits it. **The scope is why the name says `cross`:** an isolated position posts its own margin bucket and is liquidated per leg, so it contributes nothing here. An account holding only isolated legs reports `"0"` and can still be liquidated. To size an isolated position, read that leg's own `maint_margin` row instead |
-| `health` | Decimal string | `account_value − cross_maintenance_margin_used` (signed dollar figure; can be negative) — **not a ratio** |
-| `tier` | enum | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md) |
-| `abstraction` | enum | `"unified"` or `"portfolio"` (PM-enrolled) |
-| `clearinghouse_state` | object | Keyed by dex (`""` = core dex, else a MIP-3 deployer's `0x` address); each value is `{positions: [...]}` |
-| `clearinghouse_state["<dex>"].positions[*].coin` | string | Market symbol (e.g. `"BTC"`), not a numeric id |
-| `clearinghouse_state["<dex>"].positions[*].size` | Decimal string | Signed **real** size (`raw lots / 10^sz_decimals`); negative = short |
-| `clearinghouse_state["<dex>"].positions[*].entry` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
-| `clearinghouse_state["<dex>"].positions[*].upnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
-| `clearinghouse_state["<dex>"].positions[*].isolated` | bool | `true` unless the position is cross-margined |
-| `clearinghouse_state["<dex>"].positions[*].lev` | uint8 | Position's chosen leverage |
-| `clearinghouse_state["<dex>"].positions[*].liq` | Decimal string \| null | Mark price (whole-USDC) at which this leg reaches maintenance. **Solved on the leg's own margin plane**: a cross leg against the cross account, an isolated leg against its posted `isolated_margin` alone. `null` when no non-negative price breaches maintenance, and when size is zero — see below |
-| `clearinghouse_state["<dex>"].positions[*].roe` | Decimal string | `upnl / initial_margin` as a decimal fraction; `"0"` at zero leverage / notional |
-| `clearinghouse_state["<dex>"].positions[*].funding` | Decimal string | Accrued-but-unsettled funding for **this leg**, **whole-USDC** (signed; negative = you owe). Includes the accrual built up since the last funding charge, so it stays non-zero between funding periods — the same accrual `account_value` and `withdrawable` already fold in |
-| `clearinghouse_state["<dex>"].positions[*].margin` | Decimal string | This leg's INITIAL margin, **whole-USDC** |
-| `clearinghouse_state["<dex>"].positions[*].maint_margin` | Decimal string | This leg's maintenance-margin contribution, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
-| `clearinghouse_state["<dex>"].positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
-| `clearinghouse_state["<dex>"].positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side. |
-| `clearinghouse_state["<dex>"].positions[*].adl_lamps` | uint8 \| absent | **`detail: "adl"` only** — the ADL queue indicator, `0` to `4`. More lamps = sooner deleveraged. Omitted at every other depth, and on the WS frame. See [`detail: "adl"`](#account_state-adl) |
-| `balances[*].asset` | uint32 | Asset id (`100` for USDC) |
-| `balances[*].name` | string | Token symbol (`"USDC"` for row 0) |
-| `balances[*].total` | Decimal string | Full balance. **Not** the spendable amount — perp margin sits inside it. Use `withdrawable` |
-| `balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). Spot escrow only; it never holds perp margin |
-| `balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset) |
-| `pm_maint_margin` | Decimal string | PM engine's maintenance requirement, whole-USDC; `"0"` when not PM-enrolled |
-| `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled |
-| `pm_concentration_penalty` | Decimal string | PM single-asset concentration penalty, whole-USDC; `"0"` when not PM-enrolled |
-| `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) |
-| `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
-| `time` | uint64 | Consensus block time in **milliseconds**. A **bare integer**. Advances on every commit, from the same consensus clock as `height` |
+| `margin.collateral` | Decimal string | **Vestigial, and reads `"0"`.** Spot margin is cross-collateralized against the one unified USDC account, so there is no per-pair collateral bucket to sum. It is the sum of the equally vestigial per-pair [`spot_margin_state`](./info/spot.md#spot_margin_state) `collateral` field, kept for wire-shape compatibility |
+| `margin.debt` | Decimal string | Borrowed principal **accrued to now**, summed across pairs, whole-USDC. It uses the same accrual the `spot_margin_state` rows report, so the summary can never disagree with the detail |
+| `margin.pairs` | uint32 | Number of open spot-margin pairs. A **bare integer**, not a Decimal string |
 
-#### Reading `liq` {#reading-liq}
+`debt` adds up across pairs because the quote asset of every spot pair is USDC by
+construction. **`base_held` is deliberately not folded in**: it is per-pair BASE
+units with no common unit, and turning it into a notional needs a mark this read
+must not fetch. Read `spot_margin_state` for it.
 
-`liq` is solved on the plane that actually liquidates the leg. A **cross** leg
-shares one margin pool with every other cross leg, so its `liq` moves when any
-other cross position moves. An **isolated** leg is backed only by its own posted
-`isolated_margin`; the cross balance never rescues it, and a large cross balance
-never pushes its `liq` away.
+**`option` — the option lane summary.** Always present. The per-leg detail is
+[`option_state`](#option_state).
 
-`liq` is **`null`, never `"0"`**, when the leg has no liquidation price. Two
-cases produce it: a zero-size leg, and a long whose solved price is negative —
-that long cannot be price-liquidated, because no non-negative mark breaches its
-maintenance requirement. Treat `null` as "no price triggers this leg", and treat
-`"0"` — should you ever see it — as a real price of zero. A client that renders
-`null` as `0` tells the user the position is at the brink when it is the
-opposite.
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `option.escrow` | Decimal string | Total USDC this account has locked as a **writer**, whole-USDC. What it takes back if every series it wrote settles worthless |
+| `option.legs` | uint32 | Number of series the account is party to. A **bare integer** |
+| `option.next_expiry` | uint64 \| **absent** | Nearest expiry among those legs, consensus ms. **Absent when `legs` is `0`** — a zero timestamp reads as 1970 |
 
-`liq` answers "what price liquidates THIS leg". It is not a promise about the
-account: a cross account can still be liquidated by a move on a different market.
+The chain never prices an option, so this lane carries no mark-priced figure. See
+[options](../../products/options.md).
 
-`height` / `time` are an **as-of stamp**: they tell you which committed block the
-snapshot was rendered against, and they advance on every commit regardless of
-whether any monetary field moved. This lets a client tell a **fresh-but-quiet**
-account (constant `account_value`, but `height`/`time` still climbing) apart from
-a **stalled** read path (`height`/`time` frozen — the node or your connection has
-stopped advancing). The same stamp appears on the WS
+#### The as-of stamp {#account-state-as-of}
+
+`height` / `time` tell you which committed block the snapshot was rendered
+against, and they advance on every commit regardless of whether any monetary
+field moved. This lets a client tell a **fresh-but-quiet** account (constant
+`account_value`, but `height` / `time` still climbing) apart from a **stalled**
+read path (`height` / `time` frozen — the node or your connection has stopped
+advancing). The same stamp appears on the WS
 [`account_state`](../ws/subscriptions.md#account_state) channel with identical
 values, so a client can cross-check or de-duplicate REST and WS against it.
+
+It is also how you check that a detail frame belongs with a summary frame: equal
+`height` means one commit, and only then do the two describe the same instant.
 
 #### Cost basis and spot PnL {#avg-entry-px}
 
 :::caution
 **Treat a missing key exactly like `null`** — no basis known. An older node
-serves `balances` rows carrying `name`, `total` and `hold` only.
+serves `spot.balances` rows carrying `name`, `total` and `hold` only.
 :::
 
 `avg_entry_px` is what the account paid, per token, for what it holds. It is the
@@ -346,11 +437,12 @@ quantity YOU mean.
   notional reported as gain.
 
 **Perp positions are unaffected.** They carry their own `entry` price on the
-`clearinghouse_state` rows above; `avg_entry_px` is the spot ledger's equivalent.
+[`clearinghouse_state`](#clearinghouse_state) rows; `avg_entry_px` is the spot
+ledger's equivalent.
 
 :::info
 **No basis on the USDC row.** USDC is the quote asset — its cost basis in USDC
-is meaningless — so `balances[0].avg_entry_px` is always `null`. See
+is meaningless — so `spot.balances[0].avg_entry_px` is always `null`. See
 [USDC unification](../../concepts/usdc.md).
 :::
 
@@ -358,8 +450,8 @@ is meaningless — so `balances[0].avg_entry_px` is always `null`. See
 #### `detail: "overview"` — everything that is not trading {#account_state-overview}
 
 The account's full **non-trading** state: vaults, staking, sub-accounts,
-multisig, agent wallets, and the derived role. The default depth owns margin,
-positions and balances. This depth owns everything else.
+multisig, agent wallets, and the derived role. The default depth owns the
+account's collateral and margin health. This depth owns everything else.
 
 The facets in this depth change rarely — a vault deposit, a delegation, an
 agent approval — unlike margin and positions, which change every commit. Ask
@@ -460,15 +552,128 @@ holder can under-ask, never over-burn.
 no stake, no sub-accounts, no multisig and no agents still answers with all six
 keys present and each one empty or zeroed.
 
+### The account's perp positions {#clearinghouse_state}
+
+The perp position DETAIL for one account, keyed by dex. This is the table that
+used to sit inside `account_state`; the row shape is unchanged.
+
+:::warning Not live yet
+This read and its WS channel land with the release that reshapes
+[`account_state`](#account_state). A live node answers `unknown info type` until
+then.
+:::
+
+**Request**
+
+```json
+{ "type": "clearinghouse_state", "address": "0x<addr>" }
+```
+
+| Arg | Type | Required | Meaning |
+|-----|------|----------|-------------|
+| `address` | hex address | yes | Account address |
+| `detail` | `"adl"` | no | Widen every row with `adl_lamps`. See [`detail: "adl"`](#account_state-adl) |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "clearinghouse_state",
+    "address": "0x00000000000000000000000000000000000ca11e",
+    "clearinghouse_state": {
+      "": {
+        "positions": [
+          {
+            "coin":         "BTC",
+            "size":         "1.00000",
+            "entry":        "67000.00",
+            "upnl":         "5.00",
+            "isolated":     false,
+            "lev":          10,
+            "liq":          "61000.00",
+            "roe":          "0.0075",
+            "funding":      "-0.12",
+            "margin":       "201.00",
+            "maint_margin": "670.00",
+            "notional":     "6705.00"
+          }
+        ]
+      }
+    },
+    "height": 562,
+    "time":   1700000000555
+  }
+}
+```
+
+An **unknown address** returns **200** with `{"": {"positions": []}}`, NOT a
+`404`. The core-dex key `""` is **always present**, even for an account with no
+positions, so a client can index it without a guard.
+
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `address` | hex address | The account these positions belong to |
+| `clearinghouse_state` | object | Keyed by dex (`""` = core dex, else a MIP-3 deployer's lowercase `0x` address); each value is `{positions: [...]}` |
+| `positions[*].coin` | string | Market symbol (e.g. `"BTC"`), not a numeric id |
+| `positions[*].size` | Decimal string | Signed **real** size (`raw lots / 10^sz_decimals`); negative = short |
+| `positions[*].entry` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
+| `positions[*].upnl` | Decimal string | Mark-to-market PnL = `real size × mark − signed entry_notional`, **whole-USDC plane** (signed) |
+| `positions[*].isolated` | bool | `true` unless the position is cross-margined |
+| `positions[*].lev` | uint8 | Position's chosen leverage |
+| `positions[*].liq` | Decimal string \| null | Mark price (whole-USDC) at which this leg reaches maintenance. **Solved on the leg's own margin plane**: a cross leg against the cross account, an isolated leg against its posted `isolated_margin` alone. `null` when no non-negative price breaches maintenance, and when size is zero — see below |
+| `positions[*].roe` | Decimal string | `upnl / initial_margin` as a decimal fraction; `"0"` at zero leverage / notional |
+| `positions[*].funding` | Decimal string | Accrued-but-unsettled funding for **this leg**, **whole-USDC** (signed; negative = you owe). Includes the accrual built up since the last funding charge, so it stays non-zero between funding periods — the same accrual `account_value` and `withdrawable` already fold in |
+| `positions[*].margin` | Decimal string | This leg's INITIAL margin, **whole-USDC** |
+| `positions[*].maint_margin` | Decimal string | This leg's maintenance-margin contribution, **whole-USDC**: `\|entry_notional\| × maint_margin_ratio` |
+| `positions[*].notional` | Decimal string | Position notional at mark, **whole-USDC** (signed): `real_size × mark_px` |
+| `positions[*].side` | enum \| absent | **[Hedge mode](../../concepts/hedge-mode.md) only** — `"long"` / `"short"`, the leg this object reports. **Omitted on a one-way account** (a single *net* position whose `size` may be negative). A hedge account holding both legs on one asset returns **two** objects, one per side |
+| `positions[*].adl_lamps` | uint8 \| absent | **`detail: "adl"` only** — the ADL queue indicator, `0` to `4`. More lamps = sooner deleveraged. Omitted otherwise, and always omitted on the WS frame. See [`detail: "adl"`](#account_state-adl) |
+| `height` | uint64 | Committed block height this snapshot reflects. A **bare integer** |
+| `time` | uint64 | Consensus block time in **milliseconds**. A **bare integer** |
+
+:::danger
+**This read carries no account figures, on purpose.** There is no
+`account_value`, no `withdrawable`, no `health`, no `balances` here. Read those
+from [`account_state`](#account_state), and do not compute an account-level
+number by combining the two frames — they can be rendered a commit apart. Compare
+the `height` of both frames before you treat them as one instant.
+:::
+
+#### Reading `liq` {#reading-liq}
+
+`liq` is solved on the plane that actually liquidates the leg. A **cross** leg
+shares one margin pool with every other cross leg, so its `liq` moves when any
+other cross position moves. An **isolated** leg is backed only by its own posted
+`isolated_margin`; the cross balance never rescues it, and a large cross balance
+never pushes its `liq` away.
+
+`liq` is **`null`, never `"0"`**, when the leg has no liquidation price. Two
+cases produce it: a zero-size leg, and a long whose solved price is negative —
+that long cannot be price-liquidated, because no non-negative mark breaches its
+maintenance requirement. Treat `null` as "no price triggers this leg", and treat
+`"0"` — should you ever see it — as a real price of zero. A client that renders
+`null` as `0` tells the user the position is at the brink when it is the
+opposite.
+
+`liq` answers "what price liquidates THIS leg". It is not a promise about the
+account: a cross account can still be liquidated by a move on a different market.
+
 #### `detail: "adl"` — the ADL queue indicator {#account_state-adl}
 
 `detail: "adl"` returns the DEFAULT body with one extra key on every position
 row: `adl_lamps`, an integer from `0` to `4`. More lamps means the position sits
 sooner in the auto-deleveraging queue. Nothing else changes, so a caller can
-switch a screen from `"full"` to `"adl"` without touching any other field.
+switch a screen from the default depth to `"adl"` without touching any other
+field.
+
+**It moved read.** `detail: "adl"` was a depth of `account_state`. It is a
+parameter of `clearinghouse_state` now, because that is where the rows it widens
+live. `account_state` refuses it with `400` rather than answering a body with no
+rows in it.
 
 ```json
-{ "type": "account_state", "address": "0x<addr>", "detail": "adl" }
+{ "type": "clearinghouse_state", "address": "0x<addr>", "detail": "adl" }
 ```
 
 ```json
@@ -494,10 +699,11 @@ position in that market, so the node pays one extra pass over the market per
 row. Ask for `"adl"` only on a screen that shows the column; poll the default
 depth otherwise.
 
-**It is REST-only.** The [WS `account_state`](../ws/subscriptions.md#account_state)
-frame always carries the default shape and never `adl_lamps` — the lamp ranks
-your seat against OTHER accounts, so a stranger's PnL crossing a quartile edge
-would re-emit your frame.
+**It is REST-only.** The WS
+[`clearinghouse_state`](../ws/subscriptions.md#clearinghouse_state) frame always
+carries the default shape and never `adl_lamps` — the lamp ranks your seat
+against OTHER accounts, so a stranger's PnL crossing a quartile edge would
+re-emit your frame.
 
 :::warning
 **Two rules a caller gets wrong.**
@@ -527,6 +733,7 @@ leg: a long leg is only ever ranked against other longs.
 This is the **netting-at-mark** queue — who gets deleveraged. It is a different
 question from who pays the [deficit haircut](../../concepts/adl.md#2-allocation--deterministic-capacity-pro-rata),
 which is allocated pro-rata by capacity and has no ranking at all.
+
 ### Per-vault TVL, share price, and strategy {#vault_state}
 
 Returns a snapshot of one vault: TVL, share price, and strategy.
@@ -1278,18 +1485,30 @@ An empty registry returns `200` with `"series": []`.
 - The row carries no option price, implied volatility, or open interest. The
   chain never prices an option: the premium is what two accounts agree on in
   an [RFQ](../../concepts/rfq.md). For your own holding in a series, read
-  [`option_positions`](#option_positions).
+  [`option_state`](#option_state).
 
-### An account's open option positions {#option_positions}
+### An account's open option legs {#option_state}
 
 Every open [option](../../products/options.md) leg one account holds. Each row
 carries the series terms beside the position, so one call answers both
 questions.
 
+:::warning Renamed, and not live yet
+**This read was called `option_positions`.** The old name is **not an alias** —
+it answers `unknown info type`, the same as a name that never existed. The new
+name, and its [WS channel](../ws/subscriptions.md#option_state), land with the
+release that reshapes [`account_state`](#account_state); a live node answers
+`unknown info type` for both names until then.
+:::
+
+For the account-wide totals — escrow, leg count and nearest expiry — read the
+`option` lane of [`account_state`](#account_state) instead. This read is the
+per-leg detail behind that summary.
+
 **Request**
 
 ```json
-{ "type": "option_positions", "address": "0x0000000000000000000000000000000000000000" }
+{ "type": "option_state", "address": "0x0000000000000000000000000000000000000000" }
 ```
 
 | Field | Type | Required | Meaning |
@@ -1301,7 +1520,7 @@ questions.
 ```json
 {
   "data": {
-    "type": "option_positions",
+    "type": "option_state",
     "address": "0x0000000000000000000000000000000000000000",
     "positions": [
       {
@@ -2104,11 +2323,11 @@ The status splits the two kinds of removal:
 | `node_info` | Nothing on this API. Per-node identity is not consensus state, so two honest nodes answer differently. The chain id is fixed per network — see [networks](../../networks.md#summary) |
 | `oracle_sources` | Nothing. The per-market bitmask it served is not read by the price aggregator. The static source facts are prose — see [oracle prices](../../concepts/oracle-prices.md#source-table) |
 | `perp_dex_limits` | [`perp_dexs`](./info/perpetuals.md#perp_dexs) — `limits` |
-| `pm_summary` | [`account_state`](#account_state) — `pm_maint_margin`, `pm_net_value` and `pm_concentration_penalty`, with `abstraction: "portfolio"` as the enrolment flag |
+| `pm_summary` | [`account_state`](#account_state) — `perp.pm_maint_margin`, `perp.pm_concentration_penalty` and the top-level `pm_net_value`, with `abstraction: "portfolio"` as the enrolment flag |
 | `predicted_fundings` | [`markets`](./info/perpetuals.md#markets) — each row's `funding` block carries the charged rate and the next boundary |
 | `protocol_metrics` | [`markets`](./info/perpetuals.md#markets), [`markets_meta`](./info/perpetuals.md#markets_meta) and [`staking_state`](#staking_state) carry every public fact it held. The rest was node diagnostics |
 | `recent_trades`, `trades_by_time` | [`trades`](./info/perpetuals.md#trades) — un-ranged for the recent window, ranged for a time window |
-| `spot_clearinghouse_state` | [`account_state`](#account_state) — `balances` is the whole token ledger |
+| `spot_clearinghouse_state` | [`account_state`](#account_state) — `spot.balances` is the whole token ledger |
 | `spot_deploy_state` | [`spot_deploy_auction`](./info/spot.md#spot_deploy_auction) — the same read, renamed |
 | `staking_apr` | [`staking_state`](#staking_state) — `reward_pool`. It never served an APR |
 | `sub_accounts` | [`account_state`](#account_state) with `detail: "overview"` — `sub_accounts` |
@@ -2118,7 +2337,7 @@ The status splits the two kinds of removal:
 | `user_role` | [`account_state`](#account_state) with `detail: "overview"` — `role` |
 | `user_to_multi_sig_signers` | [`account_state`](#account_state) with `detail: "overview"` — `multisig` |
 | `user_vault_equities` | [`account_state`](#account_state) with `detail: "overview"` — `vault.equities` |
-| `web_data2` | [`account_state`](#account_state) for margin, positions, balances and vault equities; [`open_orders`](#open_orders) for resting orders; [`exchange_status`](#exchange_status) for status. The WS channel is removed too, and answers `{"channel":"error","data":{"error":"unknown channel: web_data2"}}` |
+| `web_data2` | [`account_state`](#account_state) for margin and balances, [`clearinghouse_state`](#clearinghouse_state) for positions, `detail: "overview"` for vault equities; [`open_orders`](#open_orders) for resting orders; [`exchange_status`](#exchange_status) for status. The WS channel is removed too, and answers `{"channel":"error","data":{"error":"unknown channel: web_data2"}}` |
 
 ## Reads gated by their capability {#operator-reads}
 

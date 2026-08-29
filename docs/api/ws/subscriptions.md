@@ -1,12 +1,13 @@
 # WS subscription channels
 
 ::::info
-Channels are **change-driven**: a channel emits a frame only when its state actually changed since the last commit. The exception is `account_state` and `spot_margin_state`, which additionally re-send an unchanged snapshot every 4 committed blocks as a commit-count liveness heartbeat — not a wall-clock interval. Anything under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md).
+Channels are **change-driven**: a channel emits a frame only when its state actually changed since the last commit. The exception is the four account-state channels — `account_state`, `clearinghouse_state`, `option_state` and `spot_margin_state` — which additionally re-send an unchanged snapshot every 4 committed blocks as a commit-count liveness heartbeat, not a wall-clock interval. Anything under [Roadmap](#roadmap--not-yet-available) is not wired. The connection lifecycle and frame format are in the [WS README](./index.md).
 
 :::warning
 **`web_data2` (REST + WS) has been REMOVED.** Compose the equivalent from
-[`account_state`](#account_state) + [`spot_margin_state`](#spot_margin_state) + `order_updates`
-(or the REST focused reads). Subscribing to `web_data2` now returns
+[`account_state`](#account_state) + [`clearinghouse_state`](#clearinghouse_state) +
+[`spot_margin_state`](#spot_margin_state) + `order_updates` (or the REST focused
+reads). Subscribing to `web_data2` now returns
 `{"channel":"error","data":{"error":"unknown channel: web_data2"}}`.
 :::
 
@@ -56,7 +57,9 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `user_fundings` | `user`/`address` (required) | per-account realized funding payments, on change |
 | `user_twap_slice_fills` | `user`/`address` (required) | per-account TWAP slice fills (`{fill, twapId}`), on change |
 | `user_twap_history` | `user`/`address` (required) | per-account TWAP lifecycle (`{time, state, status}`; `state.twapId` is the parent id to pass to `twap_cancel`, alongside coin/side/sz/executedSz/minutes/reduceOnly: activated / finished / terminated), on change |
-| `account_state` | `user`/`address` (required) | per-account PERP clearinghouse state — margin scalars, positions, balances — on change + heartbeat every 4 committed blocks |
+| `account_state` | `user`/`address` (required) | per-account collateral and margin health — cross-account scalars plus the `perp` / `spot` / `margin` / `option` lane summaries — on change + heartbeat every 4 committed blocks |
+| `clearinghouse_state` | `user`/`address` (required) | per-account PERP position detail, keyed by dex — on change + heartbeat every 4 committed blocks |
+| `option_state` | `user`/`address` (required) | per-account OPTION leg detail — on change + heartbeat every 4 committed blocks |
 | `spot_margin_state` | `user`/`address` (required) | per-account spot-margin positions — on change + heartbeat every 4 committed blocks |
 | `explorer_block` | none | latest committed block header, on each new block |
 | `explorer_txs` | none | transactions in the latest committed block, on each new block |
@@ -462,14 +465,20 @@ re-emits it only when that context changes.
   uncapped. Size an order against `max_trade_szs`. See
   [`max_trade_size` is market-wide](../rest/info/perpetuals.md#max-trade-size).
 
-### Per-account perp clearinghouse state {#account_state}
+### Per-account collateral and margin health {#account_state}
 
-Per-account **PERP** clearinghouse state — the margin summary, open positions,
-and balances for one account — pushed when it changes. Requires `user` (the 0x
+Per-account **collateral and margin health** — the cross-account money figures
+and the four lane summaries — pushed when they change. Requires `user` (the 0x
 address; `address` is also accepted) — NOT a `coin`. The body is built from the
-same record builder as the REST focused account read, so a WS push never drifts
-from that read. The initial snapshot is the live state (zeroed for an account
-with no funds), not an empty array.
+same builder as the REST [`account_state`](../rest/info.md#account_state) read,
+so a push never drifts from that read. The initial snapshot is the live state
+(zeroed for an account with no funds), not an empty array.
+
+:::warning Not live yet
+The frame below is the target state. Until the release fires, a live node pushes
+the previous FLAT body, with the position table and the balance array inside it.
+See [where every field went](../rest/info.md#account-state-lane-split).
+:::
 
 ```json
 { "method": "subscribe", "subscription": { "type": "account_state", "user": "0x<address>" } }
@@ -481,20 +490,19 @@ with no funds), not an empty array.
   "data": {
     "address": "0x<addr>",
     "account_value": "10000", "total_raw_usd": "9559", "withdrawable": "8500",
-    "total_margin_used": "1500", "total_ntl_pos": "372.60",
     "health": "9700", "tier": "Safe",
     "abstraction": "unified",
-    "clearinghouse_state": { "": { "positions": [
-      { "coin": "BTC", "size": "0.00600", "entry": "62000", "upnl": "441",
-        "isolated": false, "lev": 7, "liq": null, "roe": "0.35",
-        "funding": "-0.02", "margin": "53.14", "maint_margin": "11.16",
-        "notional": "372.60" }
-    ] } },
-    "balances": [
-      { "asset": 100, "name": "USDC", "total": "10000", "hold": "0", "avg_entry_px": null },
-      { "asset": 3, "name": "MTF", "total": "12.5", "hold": "0", "avg_entry_px": "1.98" }
-    ],
-    "pm_maint_margin": "0", "pm_net_value": "0", "pm_concentration_penalty": "0",
+    "pm_net_value": "0",
+    "perp": {
+      "init_margin": "1500", "total_ntl_pos": "372.60",
+      "pm_maint_margin": "0", "pm_concentration_penalty": "0"
+    },
+    "spot": { "balances": [
+      { "name": "USDC", "signing_id": 100, "total": "10000", "hold": "0", "avg_entry_px": null },
+      { "name": "MTF",  "signing_id": 3,   "total": "12.5",  "hold": "0", "avg_entry_px": "1.98" }
+    ] },
+    "margin": { "collateral": "0", "debt": "0", "pairs": 0 },
+    "option": { "escrow": "0", "legs": 0 },
     "position_mode": "one_way",
     "height": 562,
     "time": 1700000000555
@@ -502,49 +510,42 @@ with no funds), not an empty array.
 }
 ```
 
-- Margin scalars (`account_value` / `total_raw_usd` / `withdrawable` /
-  `total_margin_used` / `total_ntl_pos`) are **whole-USDC** decimal strings,
-  identical to the REST account read's. `total_raw_usd` is settled cash equity
-  and excludes unrealised PnL, which is the one difference from `account_value`.
-  `total_ntl_pos` is the mark notional of the **CROSS** legs only — add up the
-  `notional` of every position row whose `isolated` is `false` and you get the
-  same figure. `health` is `account_value − cross_maintenance_margin_used`, a
-  **signed whole-USDC dollar figure, not a ratio**. `tier` is the liquidation
-  tier name (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`). `abstraction` is
-  `"unified"` or `"portfolio"` (PM-enrolled) — there is no account-level
-  `cross_maintenance_margin_used` or `mode`/`pm_enabled` field on this frame;
-  poll [`account_state` with `detail: "margin"`](../rest/info.md#account_state)
-  for `cross_maintenance_margin_used`. Its scope is the cross bucket: an
-  isolated leg is margined and liquidated on its own and contributes nothing to
-  it.
-- **This frame never carries `adl_lamps`.** `detail` is a REST parameter only,
-  so the push always renders the default shape. The lamp ranks your seat against
-  OTHER accounts, so an always-on lamp would re-emit your frame whenever a
-  stranger's PnL crossed a quartile edge. Poll
-  [`account_state` with `detail: "adl"`](../rest/info.md#account_state-adl) for it.
-- `clearinghouse_state` — keyed by dex (`""` = core dex, else a MIP-3
-  deployer's `0x` address); each value is `{positions: [...]}`. A position row
-  carries `coin` (market symbol, not a numeric id), `size` (signed **real**
-  size, decimal string — negative is short), `entry` / `upnl` / `margin` /
-  `maint_margin` / `notional` (whole-USDC), `isolated`, `lev`, `liq`, `roe`,
-  `funding`, and `side` (`long` / `short`, present only in hedge mode).
-  **`liq` is nullable** — `null` means no non-negative price liquidates the leg,
-  and it is never rendered as `"0"`. See
-  [reading `liq`](../rest/info.md#reading-liq).
-- `balances` — an array of `{asset, name, total, hold, avg_entry_px}` rows; row 0
-  is always USDC (asset id `100`). `total − hold` is **not** the spendable
-  amount: `hold` is spot escrow only and never holds perp margin. Read
-  `withdrawable`.
-- `pm_maint_margin` / `pm_net_value` / `pm_concentration_penalty` — the folded
-  portfolio-margin figures (whole-USDC), always present, `"0"` when not
-  PM-enrolled. `position_mode` is `"one_way"` or `"hedge"`.
+- **The position table and the option legs are NOT on this frame.** They moved to
+  [`clearinghouse_state`](#clearinghouse_state) and [`option_state`](#option_state),
+  each its own channel. Subscribe to the lane you render.
+- Every field, its plane and its rule are in the REST
+  [field reference](../rest/info.md#account-state-fields) — the two are one body.
+  In short: the money figures are **whole-USDC** decimal strings; `tier` is a
+  **string** (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`), never a number;
+  `health` is a **signed dollar figure, not a ratio**; `height` / `time` are bare
+  integers.
+- **The four lane keys are always present**, zeroed when the lane is empty, and
+  `spot.balances` always carries at least the USDC row. `option.next_expiry` is
+  the one key that can be absent — it is omitted when `option.legs` is `0`.
+- There is no account-level `cross_maintenance_margin_used` on this frame. Poll
+  [`account_state` with `detail: "margin"`](../rest/info.md#account-state-detail-margin)
+  for it. Its scope is the cross bucket: an isolated leg is margined and
+  liquidated on its own and contributes nothing to it. That depth also names the
+  held initial margin `total_margin_used`, where this frame calls it
+  `perp.init_margin`.
 - `height` / `time` — the **as-of stamp**: `height` is the committed block height
   the frame was rendered against and `time` the consensus block time in ms. Both
   are **bare integers** (not Decimal strings) and advance on **every** commit,
-  even when nothing else in the record moved. Identical values to the REST
-  [`account_state`](../rest/info.md#account_state) read. They are **excluded from
-  the change-gate** below (the stamp advancing never by itself triggers a push),
-  so a client can use them to tell a fresh-but-quiet account from a stalled feed.
+  even when nothing else in the record moved. Identical values to the REST read.
+  They are **excluded from the change-gate** below (the stamp advancing never by
+  itself triggers a push), so a client can use them to tell a fresh-but-quiet
+  account from a stalled feed.
+
+:::warning
+**A zero stamp means "no view yet", not "an account worth nothing".** If the
+serving layer has no body for your account at the moment you subscribe, the first
+frame is a **placeholder**: every figure zero, `spot.balances` empty, and
+`height` / `time` both `0`. A real account never reads that way — the USDC row is
+unconditional and the stamp is a live block height. **Test `height != 0` before
+you render or store the first frame**, and wait for the next push. The same rule
+holds on [`clearinghouse_state`](#clearinghouse_state) and
+[`option_state`](#option_state).
+:::
 
 Frequency: change-driven, **plus a liveness heartbeat**. A frame is sent when the
 account's state changes since the last commit. The current full snapshot
@@ -559,8 +560,116 @@ from a stalled connection.
 :::warning
 `account_state` is per-account data but currently has **no authentication** — any
 connection can subscribe to any address. Do not treat it as private until the
-auth-at-subscribe gate lands.
+auth-at-subscribe gate lands. The same holds for
+[`clearinghouse_state`](#clearinghouse_state) and [`option_state`](#option_state).
 :::
+
+### Per-account perp positions {#clearinghouse_state}
+
+Per-account **perp position detail** — the dex-keyed position table that left the
+`account_state` body. Requires `user`; a subscribe without one is refused with
+`{"channel":"error","data":{"error":"clearinghouse_state requires a `user`"}}`.
+Same builder as the REST
+[`clearinghouse_state`](../rest/info.md#clearinghouse_state) read, so the push and
+the read never drift.
+
+:::warning Not live yet
+This channel lands with the release that reshapes `account_state`. Subscribing
+before that returns `{"channel":"error","data":{"error":"unknown channel: clearinghouse_state"}}`.
+:::
+
+```json
+{ "method": "subscribe", "subscription": { "type": "clearinghouse_state", "user": "0x<address>" } }
+```
+
+```json
+{
+  "channel": "clearinghouse_state",
+  "data": {
+    "address": "0x<addr>",
+    "clearinghouse_state": { "": { "positions": [
+      { "coin": "BTC", "size": "0.00600", "entry": "62000", "upnl": "441",
+        "isolated": false, "lev": 7, "liq": null, "roe": "0.35",
+        "funding": "-0.02", "margin": "53.14", "maint_margin": "11.16",
+        "notional": "372.60" }
+    ] } },
+    "height": 562,
+    "time": 1700000000555
+  }
+}
+```
+
+- `clearinghouse_state` is keyed by dex — `""` is the core dex and is **always
+  present**, else a MIP-3 deployer's lowercase `0x` address. Every row field is
+  in the REST [row table](../rest/info.md#clearinghouse_state). **`liq` is
+  nullable** — `null` means no non-negative price liquidates the leg, and it is
+  never rendered as `"0"`. See [reading `liq`](../rest/info.md#reading-liq).
+- **This frame never carries `adl_lamps`.** `detail` is a REST parameter only, so
+  the push always renders the default shape. The lamp ranks your seat against
+  OTHER accounts, so an always-on lamp would re-emit your frame whenever a
+  stranger's PnL crossed a quartile edge. Poll
+  [`clearinghouse_state` with `detail: "adl"`](../rest/info.md#account_state-adl)
+  for it.
+- **The frame carries no account figures.** No `account_value`, no
+  `withdrawable`, no `health`, no `balances`. Read those from
+  [`account_state`](#account_state).
+
+:::danger
+**Do not join this frame with an `account_state` frame to compute one number.**
+The two channels are published from the same commit and carry the same
+`height` / `time` stamp, but they arrive as separate messages and your client can
+hold two different vintages. **Compare `height` before you combine them**, and
+take any single consistent number set from `account_state` alone.
+:::
+
+Frequency: change-driven, plus the same 4-commit liveness heartbeat as
+`account_state`, from the same commit — so a summary and its detail are rendered
+against one block even though they arrive as two frames.
+
+### Per-account option legs {#option_state}
+
+Per-account **option leg detail** — one row per series the account is party to.
+Requires `user`; a subscribe without one is refused with
+`{"channel":"error","data":{"error":"option_state requires a `user`"}}`. Same
+builder as the REST [`option_state`](../rest/info.md#option_state) read.
+
+:::warning Renamed, and not live yet
+This channel was going to be called `option_positions`. That name is **not an
+alias** and is not accepted. The channel lands with the release that reshapes
+`account_state`; until then a subscribe returns
+`{"channel":"error","data":{"error":"unknown channel: option_state"}}`.
+:::
+
+```json
+{ "method": "subscribe", "subscription": { "type": "option_state", "user": "0x<address>" } }
+```
+
+```json
+{
+  "channel": "option_state",
+  "data": {
+    "address": "0x<addr>",
+    "positions": [
+      { "signing_id": 2147483649, "underlying": "BTC", "kind": "put",
+        "strike": "100000", "expiry": 1735689600000,
+        "long": "2.5", "short": "0", "escrow": "0" }
+    ],
+    "height": 562,
+    "time": 1700000000555
+  }
+}
+```
+
+- `positions` is `[]` for an account party to nothing — that is the snapshot, not
+  an error. Every row field is in the REST
+  [`option_state`](../rest/info.md#option_state) table. `signing_id` is served
+  whole; never compute it.
+- For the account totals — escrow, leg count, nearest expiry — read the `option`
+  lane of [`account_state`](#account_state). This channel is the detail behind
+  that summary.
+
+Frequency: change-driven, plus the same 4-commit liveness heartbeat as
+`account_state`, from the same commit.
 
 ### Per-account spot-margin positions {#spot_margin_state}
 
@@ -568,9 +677,8 @@ Per-account **spot-margin** positions — the leveraged spot-margin book for one
 account (see [spot margin](../../products/spot-margin.md)) — pushed when it
 changes. Requires `user`. The initial snapshot is the live position set (`[]`
 for an account with no spot-margin positions). This is **not** a plain
-spot-token-balance feed — there is no live WS channel for that today; poll
-the REST [`account_state`](../rest/info.md#account_state) `balances` array
-read for plain per-token spot balances instead.
+spot-token-balance feed. Plain per-token spot balances ride the
+[`account_state`](#account_state) channel instead, in its `spot.balances` array.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "spot_margin_state", "user": "0x<address>" } }

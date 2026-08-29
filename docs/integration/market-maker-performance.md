@@ -62,7 +62,7 @@ Subscribe to the per-account channels and react to deltas instead of polling `/i
 
 - `order_updates` — resting/fill/cancel transitions (correlate by `cloid` or `action_hash`).
 - `fills` / `user_fills` — your executions.
-- `account_state` — perp margin, positions, and the whole token ledger (`balances`). `spot_margin_state` — spot-margin positions.
+- `account_state` — margin health and the whole token ledger (`spot.balances`). `clearinghouse_state` — perp positions. `spot_margin_state` — spot-margin positions.
 
 Subscriptions are free — a subscribe costs 0 weight and so does every pushed message. `/exchange`
 is weight 5 per request and `/info` polling burns your rate budget. See

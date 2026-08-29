@@ -169,8 +169,9 @@ fill, but they carry **no live public event** today: they do not appear on
 [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills),
 and there is no
 `/info` read that lists past fills for a closed window. Observe a settlement
-by diffing [`account_state`](../api/ws/subscriptions.md#account_state) before
-and after.
+by diffing [`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state)
+before and after, and [`account_state`](../api/ws/subscriptions.md#account_state)
+for the balance side.
 
 ## Querying {#querying}
 

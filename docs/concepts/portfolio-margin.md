@@ -232,7 +232,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 The native [`account_state`](../api/rest/info.md#account_state) read exposes
 `abstraction: "portfolio"` (whether PM is active for the account) alongside
-`total_margin_used`, `health`, and `tier`; the account-level
+`perp.init_margin`, `health`, and `tier`; the account-level
 `cross_maintenance_margin_used` figure — which already reflects the PM-derived
 maintenance when enrolled — lives on the lighter
 [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state):
@@ -255,6 +255,15 @@ maintenance when enrolled — lives on the lighter
 > engine computes them internally, but only the final
 > `cross_maintenance_margin_used` is surfaced today. A future read (a per-scenario PM-details field on `account_state`) will
 > expose the breakdown.
+
+**Where the four PM figures sit, and why they are not together.**
+`perp.pm_maint_margin` and `perp.pm_concentration_penalty` are perp-scoped, so
+they ride the `perp` lane. **`pm_net_value` stays at the TOP level**: its cash
+term is the whole unified USDC pool, and under multi-collateral it also folds
+haircut-valued spot balances, so it is the PM twin of `account_value`. A client
+that sums the lanes to rebuild the account would count the same USDC twice. The
+fourth figure, `cross_maintenance_margin_used`, is on `detail: "margin"` only.
+See the [lane split](../api/migration.md#account-state-lane-split).
 
 ## Edge cases {#edge-cases}
 

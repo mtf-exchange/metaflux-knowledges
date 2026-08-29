@@ -5,10 +5,124 @@ description: Breaking API changes on the MetaFlux read API — the account-scala
 # API migrations
 
 :::warning
-**Breaking changes.** Four migrations are on this page, newest first. Signed
-`/exchange` actions are **unchanged** by all four — only the RESPONSE shape and
+**Breaking changes.** Five migrations are on this page, newest first. Signed
+`/exchange` actions are **unchanged** by all five — only the RESPONSE shape and
 the read surface move. Work through the checklists before upgrading a client.
 :::
+
+## The account-state lane split {#account-state-lane-split}
+
+:::warning Not live yet
+This migration is written ahead of the release that carries it. A live node still
+answers the OLD flat shape, and answers `clearinghouse_state` and `option_state`
+with `unknown info type`. Prepare your client against this page, then switch when
+the release fires.
+:::
+
+:::info
+**`account_state` is now four lane summaries, and position detail has its own
+read.** The flat body carried perp margin scalars, a spot balance array and a
+dex-keyed position table side by side, with nothing saying which lane a field
+belonged to. It is now the account's cross-lane money figures plus one summary
+per lane — `perp`, `spot`, `margin`, `option` — and the position table has left
+the body.
+:::
+
+**The rule behind the split.** `account_state` answers ONE question: what the
+account is worth and how close it is to liquidation. Every figure in it is
+rendered from one committed block, so the set is internally consistent. Position
+DETAIL is a different question, so it gets its own read. Each lane SUMMARY stays
+whole inside `account_state`, so no caller has to join two frames to get one
+consistent number set.
+
+:::danger
+**Never join two frames to compute one number.** A summary frame and a detail
+frame can be rendered a commit apart. A health figure built from both was true at
+no single block. Every frame carries `height` — compare it before you combine
+anything.
+:::
+
+### Where every field went {#lane-split-field-map}
+
+| Was, at the top level of `account_state` | Is now |
+|---|---|
+| `address`, `height`, `time` | unchanged |
+| `abstraction`, `position_mode` | unchanged — account settings, not lanes |
+| `account_value`, `total_raw_usd`, `withdrawable`, `health`, `tier` | unchanged — each is cross-lane |
+| `health_deferred` | unchanged, still present only when `true` |
+| `pm_net_value` | **unchanged — it stays at the top level** |
+| `total_margin_used` | `perp.init_margin` — **renamed as well as moved** |
+| `total_ntl_pos` | `perp.total_ntl_pos` |
+| `pm_maint_margin` | `perp.pm_maint_margin` |
+| `pm_concentration_penalty` | `perp.pm_concentration_penalty` |
+| `balances` | `spot.balances` — the rows are unchanged, field for field |
+| `clearinghouse_state` | its own read, [`clearinghouse_state`](./rest/info.md#clearinghouse_state), same wire name and same row shape |
+| `cross_maintenance_margin_used` | `detail: "margin"` only — it was already only there |
+
+Two names moved outside the body:
+
+| Was | Is now |
+|---|---|
+| `option_positions` (read) | [`option_state`](./rest/info.md#option_state) — a rename, **not an alias**. The old name answers `unknown info type` |
+| `account_state` with `detail: "adl"` | [`clearinghouse_state`](./rest/info.md#account_state-adl) with `detail: "adl"`. On `account_state` it is now refused with `400` |
+
+Two new lanes have no old field to map from: `margin` (spot-margin collateral,
+debt and pair count) and `option` (writer escrow, leg count, nearest expiry).
+Both were previously reachable only through their own detail reads.
+
+### The traps {#lane-split-traps}
+
+**1. `pm_net_value` is NOT under `perp`.** Three of the four `pm_*` figures moved
+into the `perp` lane; this one did not. Its cash term is the whole unified USDC
+pool, and under multi-collateral it also folds haircut-valued spot balances. It
+is the portfolio-margin twin of `account_value`. A client that sums the lanes
+would count the same USDC twice.
+
+**2. The held initial margin has two names, one per depth.** The full body calls
+it `perp.init_margin`. `detail: "margin"` calls it `total_margin_used`, at the
+top level, exactly as before. Same number, same helper — two names. Neither depth
+serves the other's name.
+
+**3. `spot.balances` is never an empty array.** The USDC row is unconditional,
+even on an account that has never been funded. An empty array is a shape no real
+account returns. If you see one you are reading a placeholder, not an account —
+check `height`, which a placeholder stamps `0`.
+
+**4. `option.next_expiry` is absent, not zero, when `option.legs` is `0`.** A
+zero timestamp reads as 1970. It is the one non-uniform key in the body.
+
+**5. `tier` is a string.** `"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`. It has
+always been a string. Type it as one, and do not accept a number in its place.
+
+**6. There is no transition window.** One builder serves one shape. The old flat
+names are not merely dropped — they are refused at the top level, so a
+half-migrated body cannot ship. Prepare the client before the release, not after.
+
+### Checklist {#lane-split-checklist}
+
+1. **Re-type your account DTO.** This is the urgent step. A stale account type
+   fails to DECODE, so every account read stops working — it does not silently
+   lag. Both client SDKs carry the new type; an older build cannot parse the new
+   body.
+2. **Move four reads into `perp`**: `init_margin` (from `total_margin_used`),
+   `total_ntl_pos`, `pm_maint_margin`, `pm_concentration_penalty`.
+3. **Move `balances` to `spot.balances`.** Row fields are unchanged.
+4. **Leave `pm_net_value` at the top level.** Do not move it with the other
+   `pm_*` fields.
+5. **Subscribe to, or poll, [`clearinghouse_state`](./rest/info.md#clearinghouse_state)
+   for positions.** Same wire name, same rows, its own read and its own WS
+   channel. Both require a `user` on subscribe.
+6. **Rename `option_positions` to `option_state`**, in REST calls and as a WS
+   channel name.
+7. **Move `detail: "adl"` onto `clearinghouse_state`.** On `account_state` it now
+   answers `400`.
+8. **Delete any code that joins a summary and a detail frame.** Take a consistent
+   number set from `account_state` alone, or compare `height` first.
+9. **Handle the two new lanes** — `margin` and `option` — or ignore them safely:
+   both are always present and zeroed.
+
+See [`account_state`](./rest/info.md#account_state) for the full field table, and
+[WS subscriptions](./ws/subscriptions.md#account_state) for the three channels.
 
 # The one response envelope {#response-envelope}
 
@@ -68,6 +182,12 @@ is in [errors](./errors.md).
 
 # The account-scalar rename {#account-scalar-rename}
 
+:::note
+**Read [the lane split](#account-state-lane-split) first.** It is newer and it
+moves three of the fields named below into the `perp` lane. This section records
+the RENAME; the lane split records where each renamed field now sits.
+:::
+
 :::info
 **`account_state` now uses institution-standard names for its account-level
 scalars.** Two fields are renamed and two are new. Only the ACCOUNT object
@@ -92,7 +212,7 @@ share the word and NONE of them changed:
 | Field | Where | Status |
 |---|---|---|
 | `clearinghouse_state["<dex>"].positions[*].maint_margin` | position row | **unchanged** — this leg's maintenance contribution |
-| `pm_maint_margin` | account object | **unchanged** — the portfolio-margin figure |
+| `pm_maint_margin` | account object | **unchanged by this rename** — the portfolio-margin figure. The [lane split](#account-state-lane-split) later moved it to `perp.pm_maint_margin` |
 | `maint_margin_ratio` / `init_margin_ratio` | `markets_meta` | **unchanged** — per-market ratios, in bps |
 
 **The two new fields.**

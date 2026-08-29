@@ -61,7 +61,9 @@ await client.info.nodeInfo();
 await client.info.markets();                 // { perp: MarketDynamic[], spot: SpotMeta }
 await client.info.marketsMeta();              // { perp: MarketStatic[], spot: SpotMeta } — precision grids, leverage ladders
 await client.info.l2Book('BTC', { nLevels: 20 });
-await client.info.accountState(address);      // full account snapshot: positions, balances, margin
+await client.info.accountState(address);      // collateral + margin health, four lane summaries
+await client.info.clearinghouseState(address); // perp position rows, keyed by dex
+await client.info.optionState(address);       // open option legs
 await client.info.openOrders(address);
 await client.info.userFills(address, 1000);
 await client.info.fundingHistory('BTC');

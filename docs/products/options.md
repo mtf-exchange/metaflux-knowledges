@@ -199,10 +199,10 @@ Two public reads cover the lane.
 | Read | Answers |
 |---|---|
 | [`option_series`](../api/rest/info.md#option_series) | Which series are live, the `signing_id` to sign against, and the `escrow_per_unit` a writer locks |
-| [`option_positions`](../api/rest/info.md#option_positions) | What one account holds: units long, units written, and the USDC it has locked |
+| [`option_state`](../api/rest/info.md#option_state) | What one account holds: units long, units written, and the USDC it has locked |
 
 A fill writes no ledger row of its own. Between the fill and expiry,
-[`option_positions`](../api/rest/info.md#option_positions) is the only read where
+[`option_state`](../api/rest/info.md#option_state) is the only read where
 a writer sees the escrow it locked and a holder sees its units.
 
 :::danger[A position row carries TWO planes]
@@ -219,7 +219,7 @@ There is still no public read for a series pot. The pot moves the same USDC that
 
 - [RFQ](../concepts/rfq.md) — the only way to trade an option
 - [`option_series`](../api/rest/info.md#option_series) — the live series registry
-- [`option_positions`](../api/rest/info.md#option_positions) — what one account holds in a series
+- [`option_state`](../api/rest/info.md#option_state) — what one account holds in a series
 - [`/exchange` RFQ actions](../api/rest/exchange.md#rfq-fba--utility-actions) — the field tables and the typed-data primary types
 - [Oracle prices](../concepts/oracle-prices.md) — the price source settlement reads
 - [MIP-4](../mip/mip-4.md) — the proposal this product came from

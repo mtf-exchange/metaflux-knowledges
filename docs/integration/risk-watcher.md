@@ -29,7 +29,7 @@ The watcher is a separate logical process even when co-located — its decisions
 ## Inputs {#inputs}
 
 - [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`) — the immediate signal that a tier changed.
-- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `total_raw_usd`, `total_ntl_pos`, `tier`. The account-level `cross_maintenance_margin_used` is NOT on this push — poll `detail: "margin"` for it. Derive your own health ratio from `account_value` and `cross_maintenance_margin_used` — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
+- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `total_raw_usd`, `perp.total_ntl_pos`, `tier`. The account-level `cross_maintenance_margin_used` is NOT on this push — poll `detail: "margin"` for it. Derive your own health ratio from `account_value` and `cross_maintenance_margin_used` — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
 - [`markets`](../api/ws/subscriptions.md#markets) WS push: `mark_px` for forward-looking estimation, and `funding.rate_per_hr` / `funding.next_payment_ts` per market to anticipate the next funding charge before it settles.
 - [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments — one record per settlement, AFTER it applies. This channel cannot anticipate the next charge; use the `markets` row's `funding` block for that.
 
@@ -117,7 +117,10 @@ async function deposit(c: Client, usdcDelta: string) {
 }
 
 async function emergencyUnwind(c: Client) {
-  const state = await c.info.accountState(traderAddr);
+  // Positions live on their own read now, not inside accountState. Never mix a
+  // number from this frame with one from an accountState frame: the two can be
+  // rendered a commit apart. Compare `height` if you must combine them.
+  const state = await c.info.clearinghouseState(traderAddr);
   const positions = state.clearinghouse_state['']?.positions ?? [];
   for (const pos of positions) {
     // close the largest-loss position first — pick pos by unrealised PnL yourself
@@ -191,6 +194,7 @@ sequenceDiagram
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — the ladder you're defending against
 - [`notifications` WS](../api/ws/subscriptions.md#notifications) — tier transitions ride this channel
 - [`account_state` WS](../api/ws/subscriptions.md#account_state) — continuous margin values
+- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state) — the position rows an unwind needs
 - [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin)
 - [Agent wallets](../concepts/agent-wallets.md) — watcher needs its own approved agent
 - [Error handling](./error-handling.md) — for the deposit submission retry logic

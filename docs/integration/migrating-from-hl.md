@@ -31,11 +31,22 @@ There is one MTF-native surface; you call it through the SDK or build the envelo
 | `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
 | `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
 | `POST /info` `meta` | [`markets`](../api/rest/info/perpetuals.md#markets) |
-| `POST /info` `clearinghouseState` | [`account_state`](../api/rest/info.md#account_state) |
+| `POST /info` `clearinghouseState` | **Two reads, not one.** [`account_state`](../api/rest/info.md#account_state) for the collateral and margin health, [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) for the position rows. HL keeps positions inside the account read; MetaFlux does not — see below |
+| `POST /info` `spotClearinghouseState` | [`account_state`](../api/rest/info.md#account_state) — the `spot.balances` array. There is no separate spot read |
 | `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) — **one kind for both**. There is no separate "frontend" variant; the time-in-force, `cloid` and trigger detail is folded into every `open_orders` row. |
 | `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
 | `POST /info` `candleSnapshot` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) (the standalone `candle` type is removed). **Bars carry a price series, not executions** — `candle_type` is `mark` (default) or `oracle`, and `v` / `q` are always `"0"` |
 | WS `userEvents`, `l2Book`, `candle` | `fills` / `order_updates` / `ledger_updates` (there is no grab-bag events channel), `l2_book`, `candles` — see [WS subscriptions](../api/ws/subscriptions.md) |
+
+**The account read splits differently from HL's.** HL splits per PRODUCT —
+`clearinghouseState` and `spotClearinghouseState` — and keeps position rows
+inside the perp one. MetaFlux splits the same way per lane, but it also moves
+position DETAIL out to its own read. So `account_state` gives you one internally
+consistent set of money figures for the whole account, and
+`clearinghouse_state` gives you the rows. **Do not rebuild HL's single object by
+joining the two frames**: they can be rendered a commit apart, and the joined
+result was true at no single block. Compare the `height` both frames carry if you
+must combine them.
 
 The full catalogs are [`POST /exchange`](../api/rest/exchange.md) and [`POST /info`](../api/rest/info.md).
 

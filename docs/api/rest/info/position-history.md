@@ -26,8 +26,9 @@ want, not this one.
 :::info
 **An OPEN position is never returned.** A life enters this history only when it
 closes. An open position is not lost — the live position is served by
-[`account_state`](../info.md#account_state) from the node's clearinghouse state.
-The two reads are complements: `account_state` for what you hold now, position
+[`clearinghouse_state`](../info.md#clearinghouse_state) from the node's
+clearinghouse state. The two reads are complements: `clearinghouse_state` for
+what you hold now, position
 history for what you already closed.
 :::
 
@@ -300,5 +301,6 @@ the life that was seen, not as whole-life totals.
 ## See also {#see-also}
 
 - [`user_fills`](../info.md#user_fills) — per-fill history, one row per execution
-- [`account_state`](../info.md#account_state) — live positions, margin and balances
+- [`account_state`](../info.md#account_state) — live margin health and balances
+- [`clearinghouse_state`](../info.md#clearinghouse_state) — live perp positions
 - [`POST /info` base page](../info.md) — envelope and shared conventions

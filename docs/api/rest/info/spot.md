@@ -8,7 +8,7 @@ Read queries for [spot](../../../products/spot.md) markets, leveraged [spot marg
 
 :::info
 **Plain spot token balances are on [`account_state`](../info.md#account_state).**
-Its `balances` array carries every token the account holds — USDC and spot
+Its `spot.balances` array carries every token the account holds — USDC and spot
 tokens alike — with `avg_entry_px` per row. There is no separate spot-balance
 read.
 :::

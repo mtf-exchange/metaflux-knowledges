@@ -224,7 +224,7 @@ An account party to nothing returns a 200 with both lists empty.
 
 - [Options](../products/options.md) — the product RFQ clears
 - [`option_series`](../api/rest/info.md#option_series) — the series registry, and the `signing_id` to sign
-- [`option_positions`](../api/rest/info.md#option_positions) — the units and escrow a fill leaves behind
+- [`option_state`](../api/rest/info.md#option_state) — the units and escrow a fill leaves behind
 - [`/exchange` action catalog](../api/rest/exchange.md#rfq-fba--utility-actions) — the full parameter tables and typed-data primary types
 
 ## FAQ {#faq}

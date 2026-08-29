@@ -82,7 +82,9 @@ let info = client.rest().info();
 info.markets().await?;                          // Vec<MarketDynamic> — live px/funding/OI
 info.markets_meta().await?;                      // Vec<MarketInfo> — precision grids, leverage ladders
 info.l2_book("BTC", None).await?;
-info.account_state(wallet.address()).await?;     // full account snapshot
+info.account_state(wallet.address()).await?;     // collateral + margin health, four lane summaries
+info.clearinghouse_state(wallet.address()).await?; // perp position rows, keyed by dex
+info.option_state(wallet.address()).await?;      // open option legs
 info.open_orders(wallet.address()).await?;
 info.user_fills(wallet.address(), None).await?;
 info.funding_history("BTC").await?;

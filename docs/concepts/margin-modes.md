@@ -48,7 +48,8 @@ inside the engine's reach. A position you later grow pays the cushion once, at
 the open. A hedged account holds two positions on one asset, so it pays two.
 
 So each cross position contributes `ceil(notional / effective_lev) + 1` to the
-account's `total_margin_used`.
+account's held initial margin (`perp.init_margin`, or `total_margin_used` on
+`detail: "margin"`).
 
 Free collateral here is the **raw signed gate value**, which goes negative when
 open profit funds the held margin. The account read publishes it clamped, as
@@ -139,7 +140,7 @@ position, so free collateral is the full 15,000. `10499.00 <= 15000`, so the
 order is admitted.
 
 **After the fill**, the leg's own row under
-[`account_state`](../api/rest/info.md#account_state) reads:
+[`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) reads:
 
 | Field | Value | What it is |
 |---|---|---|
@@ -151,7 +152,7 @@ and the account-wide scalars:
 
 | Field | Value | Depth |
 |---|---|---|
-| `total_margin_used` | `"10499"` | both — this is the account's only position |
+| `perp.init_margin` (`total_margin_used` on `detail: "margin"`) | `"10499"` | both, under two names — this is the account's only position |
 | `cross_maintenance_margin_used` | `"5248"` | `detail: "margin"` only — `5248.75` rounded DOWN to whole USDC |
 | `withdrawable` | `"4501"` | both — `15000 − 10499`; entry equals mark, so `account_value` has not moved |
 | `health` | `"9752"` | `account_value − cross_maintenance_margin_used` = `15000 − 5248` |
@@ -171,7 +172,7 @@ is never tested.
 with a positive `delta` moves USDC out of cross balance into this asset's
 bucket. That transfer debits
 `cross_account_value` directly, so it has already left `withdrawable` before
-the order arrives — it never shows up as a `total_margin_used` subtrahend,
+the order arrives — it never shows up as a held-initial-margin subtrahend,
 because [`held_initial_margin`](#initial-margin-pre-trade-gate) sums CROSS legs
 only. Open the same 209,950 notional position isolated instead of cross, and
 the account read differs on exactly this leg:
@@ -181,11 +182,11 @@ the account read differs on exactly this leg:
   balance.
 - `maint_margin` is the SAME `"5248.75"` — the ratio and the notional it
   applies to do not depend on margin mode.
-- `total_margin_used` and `cross_maintenance_margin_used` carry **nothing**
+- The held initial margin and `cross_maintenance_margin_used` carry **nothing**
   for this leg. An account holding only this isolated position reports
-  `total_margin_used: "0"` and `cross_maintenance_margin_used: "0"` and can
+  `perp.init_margin: "0"` and `cross_maintenance_margin_used: "0"` and can
   still be liquidated — its own `margin` and `maint_margin` are the only
-  fields that size it. See [total_margin_used and
+  fields that size it. See [held initial margin and
   cross_maintenance_margin_used](./account-value.md#margins).
 
 ## Cross — the default {#cross--the-default}

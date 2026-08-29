@@ -127,12 +127,12 @@ when it lands, liquidating one leg will not touch the other.
 
 ## Reporting {#reporting}
 
-When hedge mode is on, the account state and `/info` position reads return **one
-position object per non-zero leg** for a market that has both legs, each labelled
-with its `position_side` (`"long"` / `"short"`). A one-way account returns a
-single *net* position with **no** `position_side` field, exactly as today.
-Market-level open interest stays a single net figure. See
-[`account_state` positions](../api/rest/info.md#account_state).
+When hedge mode is on, the `/info` position reads return **one position object
+per non-zero leg** for a market that has both legs, each labelled with its `side`
+(`"long"` / `"short"`). A one-way account returns a single *net* position with
+**no** `side` field. Market-level open interest stays a single net figure.
+Position rows live on [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state);
+`position_mode` itself stays on [`account_state`](../api/rest/info.md#account_state).
 
 ## See also {#see-also}
 

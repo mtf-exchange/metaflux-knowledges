@@ -17,14 +17,21 @@ Two reads carry these scalars:
 { "type": "account_state", "address": "0x…", "detail": "margin" }
 ```
 
-`detail: "margin"` is the cheap one. It returns the scalars alone — no positions
-and no balances. `account_state` returns the scalars plus positions and
-balances, but it **omits `cross_maintenance_margin_used`**. To compute `health`
+`detail: "margin"` is the cheap one. It returns the scalars alone — no lane
+summaries and no balances. The full read returns the scalars plus the four lane
+summaries, but it **omits `cross_maintenance_margin_used`**. To compute `health`
 yourself, read `detail: "margin"`.
 
-The two reads do not carry the same scalar set, and the reason is cost.
+The two depths do not carry the same scalar set, and the reason is cost.
 `total_ntl_pos` needs the position walk, and `detail: "margin"` is defined by
-skipping that walk — so `total_ntl_pos` is on the full read only.
+skipping that walk — so it is on the full read only, as `perp.total_ntl_pos`.
+
+:::caution
+**The held initial margin has two names, one per depth.** `detail: "margin"`
+serves it as `total_margin_used` at the top level. The full read serves it as
+`perp.init_margin`. Same number; read the name your depth serves. See the
+[lane split](../api/migration.md#account-state-lane-split).
+:::
 
 ## The scalars {#the-scalars}
 
@@ -33,12 +40,12 @@ skipping that walk — so `total_ntl_pos` is on the full read only.
 | `account_value` | both | Everything the account is worth right now, unrealized profit included |
 | `total_raw_usd` | both | **Settled cash equity.** Realized USDC only — it does NOT count unrealized PnL. This is the `settled cash` term both formulas below start from |
 | `withdrawable` | both | Cash you can take out. **Clamped at zero** |
-| `total_margin_used` | both | Margin currently committed to open CROSS positions |
-| `total_ntl_pos` | full read only | Mark notional of the account's CROSS positions, summed. Isolated legs are NOT in it |
+| `total_margin_used` / `perp.init_margin` | both, under two names | Margin currently committed to open CROSS positions |
+| `perp.total_ntl_pos` | full read only | Mark notional of the account's CROSS positions, summed. Isolated legs are NOT in it |
 | `cross_maintenance_margin_used` | `detail: "margin"` only | Margin below which the CROSS account is liquidated. **The scope is cross, and the name says so on purpose** — see the caution below |
 | `health` | both | `account_value - cross_maintenance_margin_used`. The cushion above liquidation |
 | `tier` | both | The liquidation band the engine has you in |
-| `abstraction` | both | `"unified"` (default) or `"portfolio"` (portfolio margin enrolled) |
+| `abstraction` | both | `"unified"` (default), `"standard"` (per-product reservations) or `"portfolio"` (portfolio margin enrolled) |
 | `health_deferred` | both, when true | The risk engine cannot price a leg. See below |
 
 :::caution
@@ -53,8 +60,8 @@ maintenance here does NOT mean the account carries no requirement. Do not read
 :::caution
 **Do not size an isolated position off `cross_maintenance_margin_used`.**
 Isolated positions are outside every scalar on this page. `account_value`,
-`total_margin_used`, `total_ntl_pos`, `cross_maintenance_margin_used` and
-`health` cover the CROSS bucket only. An isolated position posts its own margin
+the held initial margin, `perp.total_ntl_pos`,
+`cross_maintenance_margin_used` and `health` cover the CROSS bucket only. An isolated position posts its own margin
 bucket when it opens, that margin already left settled cash, and the engine
 judges the position against that bucket alone. For an isolated leg, read that
 position's own `margin` and `maint_margin` fields instead.
@@ -151,9 +158,10 @@ correct while their total is a cent away from the field the chain returns.
 To free cash, close a position. Realizing that 807.93 turns it into settled cash
 and releases the margin behind it at the same time.
 
-## total_margin_used and cross_maintenance_margin_used {#margins}
+## Held initial margin and cross_maintenance_margin_used {#margins}
 
-`total_margin_used` is the sum, over every open position, of what admission
+The held initial margin (`total_margin_used` on `detail: "margin"`,
+`perp.init_margin` on the full read) is the sum, over every open position, of what admission
 reserved when it opened. Per position:
 
 ```
@@ -205,11 +213,12 @@ in.
 
 ## balances, and what `hold` really is {#balances-and-hold}
 
-Each row of `balances`:
+Each row of `spot.balances`:
 
 | Field | Meaning |
 |---|---|
-| `asset` / `name` | The spot token |
+| `name` | The spot token symbol. Rows are keyed and joined by it |
+| `signing_id` | The uint32 you sign against for that token |
 | `total` | Everything you hold of it |
 | `hold` | The part locked in **resting spot orders** |
 | `avg_entry_px` | Your average cost basis; `null` when there is none |
@@ -224,8 +233,9 @@ Use `withdrawable` for withdrawable. It is the only field that answers that
 question.
 :::
 
-`account_state.balances` is the whole token ledger — the unified USDC pool and
-every spot token, one row shape throughout.
+`account_state`'s `spot.balances` is the whole token ledger — the unified USDC
+pool and every spot token, one row shape throughout. It is never an empty array:
+the USDC row is always there, even on an unfunded account.
 
 ## Per-market sizing {#per-market-sizing}
 

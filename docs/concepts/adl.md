@@ -117,16 +117,16 @@ ADL execution carries **no dedicated event on any channel today** — no
 `fills` entry, and no `ledger_updates` record. The haircut is a direct
 state mutation, so the only live signal is your position itself: the
 affected account's position size and unrealised PnL change on the next
-[`account_state`](../api/ws/subscriptions.md#account_state) push (it is
-change-driven — any position or PnL move triggers a frame).
+[`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state) push (it
+is change-driven — any position or PnL move triggers a frame).
 
-For automated bots, subscribe to `account_state` and diff your position set
+For automated bots, subscribe to `clearinghouse_state` and diff your position set
 between pushes; treat a shrink you did not order yourself as a forced event
 (ADL haircut or liquidation) and re-evaluate your strategy.
 
 ## Predicting ADL exposure {#predicting-adl-exposure}
 
-Read [`account_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl).
+Read [`clearinghouse_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl).
 Each position row then carries `adl_lamps`, an integer from `0` to `4`. More
 lamps means the position sits sooner in the queue.
 
@@ -156,8 +156,9 @@ account against itself.
 
 The depth is opt-in: each lamp costs one pass over the market's positions, so
 ask for `detail: "adl"` only on a screen that shows the column, and poll the
-default depth otherwise. The [WS `account_state`](../api/ws/subscriptions.md#account_state)
-frame always carries the default shape and never `adl_lamps`.
+default shape otherwise. The
+[WS `clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state) frame
+always carries the default shape and never `adl_lamps`.
 
 For market makers running large books, the headline risk is still concentration
 — one big winning position dominating the asset's profitable side; diversifying
@@ -201,8 +202,8 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 - [Tiered liquidation](./tiered-liquidation.md) — full ladder
 - [Insurance pool](./vaults.md#insurance-pool) — T3 mechanism
 - [Portfolio margin](./portfolio-margin.md) — how PM interacts with ADL
-- [`account_state` WS](../api/ws/subscriptions.md#account_state) — the only live signal that an ADL haircut changed your position
-- [`account_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl) — the `adl_lamps` queue indicator
+- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state) — the only live signal that an ADL haircut changed your position
+- [`clearinghouse_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl) — the `adl_lamps` queue indicator
 
 ## FAQ {#faq}
 

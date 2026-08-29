@@ -83,7 +83,13 @@ later to see the balance:
 
 ```json
 // account_state after the credit commits:
-{ "account_value": "3000", "balances": { "usdc": "3000", "spot": { "MTF": "10" } }, ... }
+{
+  "account_value": "3000",
+  "spot": { "balances": [
+    { "name": "USDC", "signing_id": 100, "total": "3000", "hold": "0", "avg_entry_px": null },
+    { "name": "MTF",  "signing_id": 3,   "total": "10",   "hold": "0", "avg_entry_px": null }
+  ] }
+}
 ```
 
 ### Errors {#errors}
