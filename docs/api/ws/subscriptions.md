@@ -655,7 +655,8 @@ reachable, because the gateway passes `/info` through.
     "positions": [
       { "signing_id": 2147483649, "underlying": "BTC", "kind": "put",
         "strike": "100000", "expiry": 1735689600000,
-        "long": "2.5", "short": "0", "escrow": "0" }
+        "long": "2.5", "short": "0",
+        "settle_asset": "USDC", "escrow": "0" }
     ],
     "height": 562,
     "time": 1700000000555
@@ -667,9 +668,15 @@ reachable, because the gateway passes `/info` through.
   an error. Every row field is in the REST
   [`option_state`](../rest/info.md#option_state) table. `signing_id` is served
   whole; never compute it.
+- **`escrow` is denominated in that row's `settle_asset`** — USDC on a put, the
+  underlying COIN on a call, because a
+  [call escrows one coin](../../products/options.md#why-a-call-escrows-one-coin)
+  per unit. `settle_asset` lands with the standard European option release; it is
+  absent, and every `escrow` is USDC, until that release fires.
 - For the account totals — escrow, leg count, nearest expiry — read the `option`
-  lane of [`account_state`](#account_state). This channel is the detail behind
-  that summary.
+  lane of [`account_state`](#account_state). That summary's `escrow` counts PUT
+  legs only, because coins cannot be added to dollars, so this channel is the only
+  place a call leg's escrow carries a currency.
 
 Frequency: change-driven, plus the same 4-commit liveness heartbeat as
 `account_state`, from the same commit.

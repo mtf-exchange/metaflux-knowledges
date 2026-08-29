@@ -132,9 +132,12 @@ must carry no rates.
 
 **The `option` rates do not follow the shape above.** Every other product prices
 on notional against a volume ladder. An option prices on the smaller of its
-maximum payout and a fraction of its premium, and its two rates are set on the
-option product's table rather than by a ladder. Both start UNSET, which charges
-nothing. See [the option fee](../products/options.md#option-fee).
+STRIKE FACE (`strike` x `size`) and a fraction of its premium, and its two rates
+are set on the option product's table rather than by a ladder. The strike face is
+the notional on a call as well as on a put: a call escrows one coin, whose dollar
+worth the chain cannot read without a price. The fee is USDC on both kinds. Both
+rates start UNSET, which charges nothing. See
+[the option fee](../products/options.md#option-fee).
 
 ### The pooled window, and the day it closes {#pooled-volume-sunset}
 

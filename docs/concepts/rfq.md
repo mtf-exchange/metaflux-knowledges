@@ -133,19 +133,54 @@ An option fill moves three amounts and nothing else.
 
 | Property | RFQ option fill |
 |----------|-----------------|
-| Premium | Quoted `price` × whole units, from the buyer to the writer, truncated toward zero to micro-USDC |
-| Escrow | [`escrow_per_unit`](../api/rest/info.md#option_series) × whole units, from the writer's balance into the series pot |
+| Premium | Quoted `price` × whole units, from the buyer to the writer, **in USDC on both kinds**, truncated toward zero to micro-USDC |
+| Escrow | [`escrow_per_unit`](../api/rest/info.md#option_series) × whole units, from the writer's balance into the series pot, **in the row's [`settle_asset`](../api/rest/info.md#option_series)** |
 | Closing | A closing writer's escrow leaves the pot **exactly**. Each account's own legs net first |
 | Counter-party | One maker only — the chosen quote's signer |
 | Book impact | None. The trade matches against no resting order |
-| Fees | The TAKER pays; the quoting maker has no fee leg. See [the option fee](../products/options.md#option-fee) |
+| Fees | The TAKER pays, in USDC; the quoting maker has no fee leg. See [the option fee](../products/options.md#option-fee) |
 | Margin | **None.** The buyer paid the premium; the writer locked the worst case |
 | Liquidation | **Impossible.** Both sides are fully funded at the fill |
 | Public visibility | None. It is not on the public trade tape or `fills` |
 
+### The escrow rule {#the-escrow-rule}
+
+:::warning Not live yet
+The coin escrow lands with the **standard European** option release, which has not
+fired. Until it does, every series escrows and pays USDC, no series row carries
+`settle_asset`, and the two coin-lane refusals below cannot be reached. See
+[what changed](../products/options.md#what-changed).
+:::
+
+**A put writer escrows USDC. A call writer escrows the underlying COIN — one coin
+per whole unit, whatever the strike.** The currency is on the series row as
+[`settle_asset`](../api/rest/info.md#option_series).
+
+The call's denomination is forced, not chosen. A cash call pays `max(S* − K, 0)`,
+the price has no ceiling, so no finite cash escrow covers it. Read in the coin the
+same payoff is `max(1 − K / S*, 0)`, which is below one at every price. One coin
+per contract therefore funds the worst case — which is why nothing on this lane
+needs margin or liquidation. See
+[why a call escrows one coin](../products/options.md#why-a-call-escrows-one-coin).
+
+Two consequences a maker must plan for:
+
+- **A call writer must hold the coin on its spot balance.** The escrow leaves that
+  balance, and a spot balance cannot go negative, so holding the coin IS the whole
+  collateral test. Short of it, the quote's accept is refused with `insufficient
+  underlying balance for the escrow` — and `rfq_request` refuses the same way up
+  front when the taker writes with a `limit_px`.
+- **The coin escrow cannot net the USDC premium.** On a put the incoming premium
+  reduces the escrow the writer must fund, so one net number is checked. On a call
+  the two are different assets, so the coin and the USDC fee are checked
+  separately. A call writer holding every coin it needs can still be refused with
+  `insufficient free collateral for the fee`.
+
 At expiry the chain settles the series from a price window and pays from the
-series pot. Settlement can defer, and past a bound it can abandon — read
-[settlement](../products/options.md#settlement) before writing an option.
+series pot, **in `settle_asset`** — USDC to the account balance on a put, coin to
+the spot balance on a call. Settlement can defer, and past a bound it can
+abandon — read [settlement](../products/options.md#settlement) before writing an
+option.
 
 ## Expiry of a session {#auto-expire}
 
@@ -256,7 +291,14 @@ An account party to nothing returns a 200 with both lists empty.
   truncates to zero`. Raise the size or the premium.
 - **Either side is short of collateral at accept time.** Refused with
   `insufficient free collateral for premium` (buyer) or `insufficient free
-  collateral for escrow` (writer). Nothing moves, and the other quotes stay open.
+  collateral for escrow` (writer on a USDC series). Nothing moves, and the other
+  quotes stay open.
+- **A call writer is short of the coin.** Refused with `insufficient underlying
+  balance for the escrow`. The escrow is one coin per unit and it leaves the
+  writer's spot balance.
+- **A call writer cannot pay the USDC fee.** Refused with `insufficient free
+  collateral for the fee`, even with every coin the escrow needs. The coin escrow
+  and the USDC fee are checked as separate assets.
 - **Maker and taker are the same account, or share an STP group.** Refused with
   `precondition failed: self-trade blocked`.
 
@@ -287,10 +329,12 @@ A: None. Once the taker accepts, the fill is direct between the taker and the
 chosen maker. The CLOB engine is not involved.
 
 **Q: What does a fill cost?**
-A: The premium, plus the escrow if you are the writer, plus a taker fee if you
-sent the request. The maker who quoted you pays nothing. The fee is the smaller of
-a rate on the option's maximum payout and a fraction of the premium — see
-[the option fee](../products/options.md#option-fee). Both rates start unset, which
-charges nothing.
+A: The premium in USDC, plus the escrow if you are the writer, plus a taker fee in
+USDC if you sent the request. The maker who quoted you pays nothing. On a call the
+escrow is ONE COIN per unit, not dollars — read
+[`settle_asset`](../api/rest/info.md#option_series). The fee is the smaller of a
+rate on the option's strike face (`strike` x `size`) and a fraction of the
+premium — see [the option fee](../products/options.md#option-fee). Both rates
+start unset, which charges nothing.
 
 </details>

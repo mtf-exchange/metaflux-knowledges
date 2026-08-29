@@ -1,9 +1,10 @@
 # MIP-4 — Options
 
 :::info
-**A first release is live, and it is deliberately narrow.** European,
-cash-settled, **fully collateralized** puts and capped calls, cleared through
-[RFQ](../concepts/rfq.md) only. Read
+**A first release is live, and it is deliberately narrow.** Standard European,
+**fully collateralized** puts and calls, cleared through
+[RFQ](../concepts/rfq.md) only. A put settles in USDC; a call settles in the
+underlying coin and escrows one coin per contract. Read
 [Options](../products/options.md) for the product, and
 [`option_series`](../api/rest/info.md#option_series) for the wire.
 
@@ -37,8 +38,9 @@ sum of its legs.
 
 **What the first release shipped:**
 
-- Cash-settled puts and **capped** calls on assets that already carry a live
-  MetaFlux price feed.
+- Standard European puts and calls on assets that already carry a live MetaFlux
+  price feed. A put is cash-settled. A **call is coin-settled**: it escrows and
+  pays ONE unit of the underlying, so its underlying needs a spot token.
 - Full collateralization. The holder pays the premium; the writer escrows the
   worst case. Neither leg can be liquidated.
 - RFQ clearing. There is no option order book, and the chain computes no premium.
@@ -51,8 +53,11 @@ rather than merely shipped:
 - Margined options. An option position holds its own collateral and does not
   offset a perpetual.
 - Portfolio margin across options and perpetuals together.
-- Uncapped calls. An uncapped call has no finite worst case, so cash cannot fully
-  collateralize it.
+- **Cash-settled** calls. `max(S* - K, 0)` in USDC has no finite worst case, so no
+  cash escrow can fully collateralize it. The lane sidesteps that rather than
+  bounding the payoff: the same call read in the underlying is worth at most one
+  coin, so a call escrows one coin and settles in coin. See
+  [why a call escrows one coin](../products/options.md#why-a-call-escrows-one-coin).
 - Physical settlement, and exotic payoffs.
 - Permissionless options deployment. A series is listed by validator ⅔-stake vote.
   The MIP-3 pattern can follow, but a permissionless options market is a risk

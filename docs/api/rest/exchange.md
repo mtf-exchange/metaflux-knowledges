@@ -2529,6 +2529,13 @@ or the escrow the premium does not fund on an `"Ask"`. It refuses with
 `limit_px` the worst case is unbounded, so the binding check waits for the
 [accept](#rfq_accept), which gates both sides at the real price.
 
+**On a coin-settled series that check reads a COIN balance.** A call escrows one
+unit of the underlying per whole unit, out of the writer's spot balance, so an
+`"Ask"` with a `limit_px` on such a series is refused with `precondition failed:
+insufficient underlying balance for the escrow` when the sender does not hold the
+coin. Read [`settle_asset`](./info.md#option_series) on the series row to know
+which asset the request will be measured in.
+
 `expiry_ms` is an absolute consensus-ms stamp, not a duration. `0` takes the
 governed default window. There is no expiry sweep: an expired request is refused
 by every later action, but it stays in the book until the open-request cap
@@ -2609,39 +2616,62 @@ session — this binding is why the RFQ `owner` is part of the signed digest.
 
 #### What the fill moves {#rfq_accept-effects}
 
+:::warning Not live yet
+The coin-settled call lane below lands with the **standard European** option
+release, which has not fired. Until it does, every series escrows and pays USDC,
+the series row carries no `settle_asset`, the fee notional on a call is its
+strike-to-ceiling width, and the two coin-lane refusals cannot be reached. See
+[what changed](../../products/options.md#what-changed).
+:::
+
 The accept settles one option fill. It moves three amounts and nothing else.
 
 1. The **premium** goes from the buyer to the writer. Premium in USDC = quoted
-   `price` × whole units, truncated toward zero to micro-USDC.
-2. The **escrow** goes from the writer's balance into the series pot. Escrow in
-   USDC = [`escrow_per_unit`](./info.md#option_series) × whole units. It is the
-   strike for a put, and the **cap minus the strike** for a capped call.
-3. A closing writer's escrow comes **out** of the pot, exactly. The chain nets
-   each account's own legs first, so a round trip returns what it locked.
+   `price` × whole units, truncated toward zero to micro-USDC. **The premium is
+   USDC on both kinds.**
+2. The **escrow** goes from the writer's balance into the series pot. Escrow =
+   [`escrow_per_unit`](./info.md#option_series) × whole units, **denominated in
+   the row's [`settle_asset`](./info.md#option_series)**. It is the strike in USDC
+   for a put, and **ONE COIN of the underlying** for a call.
+3. A closing writer's escrow comes **out** of the pot, exactly, in the same asset.
+   The chain nets each account's own legs first, so a round trip returns what it
+   locked.
 
-The fill charges the TAKER a fee — the account that sent the request, whichever
-leg it took. The quoting maker pays none. The fee is the smaller of a rate on the
-option's maximum payout and a fraction of the premium, and both rates start unset,
-which charges nothing. See [the option fee](../../products/options.md#option-fee).
+The fill charges the TAKER a fee, in USDC — the account that sent the request,
+whichever leg it took. The quoting maker pays none. The fee is the smaller of a
+rate on the option's strike face and a fraction of the premium, and both rates
+start unset, which charges nothing. See
+[the option fee](../../products/options.md#option-fee).
 
 The affordability check covers the premium AND the fee, so a taker that can fund
 the premium alone is refused before anything moves. The request is checked the
 same way, so an `rfq_request` you could not afford to accept is refused up front.
+
+**On a coin-settled series the writer is checked TWICE, once per asset.** A USDC
+escrow nets the premium it receives, so one number covers it. A coin escrow cannot
+net a USDC premium, so the chain tests the coin balance for the escrow and the
+USDC balance for the fee, separately. That is why a call writer holding every coin
+it needs can still be refused for the fee.
 
 **The response does not carry the fee, so compute it.** Read
 `option_taker_bps` and `option_premium_cap_ppm` from the `option` row of
 `products` on [`/info fee_schedule`](./info.md#fee_schedule), then:
 
 ```text
-max_payout = (strike, or cap - strike for a capped call) x size
-premium    = price x size
-fee        = min( max_payout x option_taker_bps / 10000 ,
-                  premium x option_premium_cap_ppm / 1000000 )
+strike_face = strike x size          # BOTH kinds, in USDC
+premium     = price x size           # USDC
+fee         = min( strike_face x option_taker_bps / 10000 ,
+                   premium x option_premium_cap_ppm / 1000000 )
 ```
+
+**The notional is the strike face on a call too, not the coin escrow.** The chain
+would need a price to value one coin in dollars, and it never prices an option, so
+the strike is the notional it can read.
 
 Both terms truncate toward zero and the smaller wins. Your balance moves by the
 premium plus this fee if you are the taker on a buy, or by the escrow plus this
-fee less the premium if you are the taker on a sell.
+fee less the premium if you are the taker on a sell — and on a call the escrow
+leg moves your COIN balance, not your USDC.
 
 The fill opens no perpetual position and reserves no margin. An option position
 can never be liquidated. See [options](../../products/options.md).
@@ -2665,7 +2695,9 @@ text is prose and it can change. It is listed so you can read a log.
 | `precondition failed: self-trade blocked` | Buyer and writer are the same account, or share an STP group |
 | `precondition failed: premium truncates to zero` | `price` × units is below one micro-USDC. Raise the size or the price |
 | `precondition failed: insufficient free collateral for premium` | The buyer cannot pay the premium |
-| `precondition failed: insufficient free collateral for escrow` | The writer cannot fund the escrow the premium does not cover |
+| `precondition failed: insufficient free collateral for escrow` | USDC series only. The writer cannot fund the escrow the premium does not cover |
+| `precondition failed: insufficient underlying balance for the escrow` | Coin series only. The writer does not hold the coin the escrow takes — one unit of the underlying per whole unit |
+| `precondition failed: insufficient free collateral for the fee` | Coin series only. The writer holds the coin but cannot pay the USDC fee. The two assets are gated separately |
 | `precondition failed: option series holds the maximum number of positions` | The series holds 2,048 position rows. Closing an existing row is still allowed |
 | `precondition failed: option position registry is full` | The chain holds 32,768 option position rows |
 | `precondition failed: series escrow would exceed the ceiling` | The series pot is at its ceiling |
