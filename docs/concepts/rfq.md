@@ -99,6 +99,14 @@ committed effect: read it back from [`rfq_user`](#querying-open-rfqs).
 }
 ```
 
+**`valid_until_ms` may not exceed the request's own `expiry_ms`.** A quote that
+outlives its session is refused with `invalid parameters: valid_until_ms exceeds
+request expiry`. Read the session's `expiry` from
+[`rfq_open`](#querying-open-rfqs) and use that number. Do NOT compute the
+validity from a second local clock reading: the request round-trip sits between
+the two reads, and the chain stamps the request on its own clock, so two
+"now + 60s" values taken seconds apart are not the same ceiling.
+
 `price` is the premium per whole unit. `rfq_id` is the numeric session id from
 [`rfq_open`](#querying-open-rfqs) — not a hex string. A maker can submit several
 quotes over the session's life; each is appended to the session's quote list and
@@ -188,6 +196,40 @@ curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open"}'
 ```
+
+```json
+{
+  "data": {
+    "type": "rfq_open",
+    "rfqs": [
+      {
+        "rfq_id":               1,
+        "signing_id":           2147483649,
+        "underlying":           "BTC",
+        "requester":            "0x<addr>",
+        "side":                 "B",
+        "sz":                   "0.001",
+        "limit_px":             null,
+        "requester_stp_group":  null,
+        "created_at":           1788005490809,
+        "expiry":               1788005550535,
+        "quotes":               []
+      }
+    ]
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `rfq_id` | uint64 | Session id. This is the number `rfq_quote` and `rfq_accept` take |
+| `signing_id` | uint32 | The option series, from [`option_series`](../api/rest/info.md#option_series) |
+| `side` | `"B"` / `"A"` | **The READ token, not the one you sent.** `rfq_request` takes `"Bid"` / `"Ask"`; this read answers `"B"` / `"A"`, the same token every other read uses for a side |
+| `sz` | Decimal string | Requested size in whole underlying units. The action takes a RAW `u64` on the series' `sz_decimals` plane; this read serves the human number |
+| `limit_px` | Decimal string \| null | The taker's worst acceptable price, `null` when it sent none |
+| `created_at` | uint64 | Consensus ms the session opened |
+| `expiry` | uint64 | Consensus ms the session closes. **This is the ceiling for a quote's `valid_until_ms`** |
+| `quotes` | array | Quotes posted so far, in the order that fixes each one's `quote_idx` |
 
 `rfq_user` takes `address` (0x hex) and splits the result into `requested`
 (sessions the account opened) and `quoted` (sessions it quoted on):
