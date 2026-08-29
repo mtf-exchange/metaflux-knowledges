@@ -670,7 +670,6 @@ No parameters.
     "pooled_volume_sunset_day": 20340,
     "pooled_volume_sunset_ms":  "1757376000000",
     "pooled_volume_counts":     true,
-    "builder_rebate_bps": "0.2",
     "burn_ratio":         "0.30",
     "referrer_share_bps": "1.0"
   }
@@ -685,7 +684,6 @@ No parameters.
 | `pooled_volume_sunset_day` | uint64 | The day the pooled volume counter stops buying a discount. `0` = not armed yet |
 | `pooled_volume_sunset_ms` | Decimal string | The same instant in milliseconds. `"0"` = not armed yet |
 | `pooled_volume_counts` | bool | `true` while pooled volume still feeds a tier |
-| `builder_rebate_bps` | Decimal string | Builder rebate, in basis points |
 | `burn_ratio` | Decimal string | Fraction of fees burned |
 | `referrer_share_bps` | Decimal string | Referrer's share of fees, in basis points |
 
@@ -693,6 +691,12 @@ No parameters.
 
 - Fee rates are decimal basis points as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), for sub-basis-point precision.
 - `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned).
+- **There is no builder-rebate field on this read, and there is no protocol rebate to a broker.**
+  A broker is paid the `builder.fee` it sets on each order, and that rate is capped by the
+  ceiling the trader granted it — read the ceiling from
+  [`approved_builders`](#approved_builders) `max_fee_bps`. The broker fee is charged ON TOP of
+  the schedule above, so no field here changes when a broker is paid. See
+  [broker codes](../../concepts/broker-codes.md#claiming).
 
 **Send an `address` to get that account's resolved rates.** The response then also
 carries a `user` block:
@@ -768,6 +772,110 @@ response is the date; the rule is in
 [the pooled window](../../concepts/fees.md#pooled-volume-sunset).
 
 See [fees](../../concepts/fees.md).
+
+### Accrued referral credit for one account {#referral_state}
+
+One account's claimable referral credit, and the referrer it is bound to.
+
+**The parameter is `user`, not `address`.** Most reads on this page take
+`address`. These two fee-credit reads take `user`. Sending `address` answers
+`400 INVALID_REQUEST`, with `details.field` set to `user`.
+
+**Request**
+
+```json
+{ "type": "referral_state", "user": "0x<addr>" }
+```
+
+| Arg | Type | Required | Meaning |
+|-----|------|----------|---------|
+| `user` | hex address | yes | The account to read |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "referral_state",
+    "user":              "0x00000000000000000000000000000000000ca11e",
+    "claimable_rewards": "12.451",
+    "referrer":          "0x00000000000000000000000000000000000000bb"
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `user` | hex address | The account read, echoed back |
+| `claimable_rewards` | Decimal string | USDC credit this account can claim right now |
+| `referrer` | hex address \| null | The referrer this account is bound to. `null` = never bound |
+
+**Rules**
+
+- **Read the credit here before you claim it. The claim action reports no
+  amount.** [`claim_referral_rewards`](./exchange.md#claim_referral_rewards)
+  drains the whole balance and answers with no figure, so this read is the only
+  way to show a claimable balance or to decide whether a claim is worth sending.
+- **`claimable_rewards` of `"0"` is normal, not an error state.** Claiming with
+  nothing accrued claims `0` and succeeds. Do not block the button on it.
+- **`referrer: null` means the account never bound one.** It does not mean the
+  node is old and it does not mean the referrer is unknown. A referrer is bound
+  once with [`set_referrer`](./exchange.md#set_referrer) and is immutable after
+  that, so `null` is a durable answer until the account sends that action.
+- **This read cannot list the accounts YOU referred.** The referral graph is
+  address-based and one-directional: the chain stores each referee's referrer,
+  and no reverse map. There is no read that enumerates a referrer's referees,
+  and no referral code to enumerate them by. Track your own referees off-chain.
+- **`claimable_rewards` can under-report what a referrer earned.** A referrer
+  share on a spot BUY arrives in the base token, paid at the fill, and a base
+  amount cannot join this USDC-denominated credit. Only the USDC shares
+  accumulate here. See
+  [in-kind fees](../../concepts/fees.md#referrer-credit).
+
+### Accrued broker credit for one account {#builder_state}
+
+One broker's claimable broker-code fee credit.
+
+**Request**
+
+```json
+{ "type": "builder_state", "user": "0x<addr>" }
+```
+
+| Arg | Type | Required | Meaning |
+|-----|------|----------|---------|
+| `user` | hex address | yes | The broker account to read |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "builder_state",
+    "user":              "0x00000000000000000000000000000000000000aa",
+    "claimable_rewards": "308.9"
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `user` | hex address | The account read, echoed back |
+| `claimable_rewards` | Decimal string | USDC credit this broker can claim right now |
+
+**Rules**
+
+- **Read the credit here before you claim it. The claim action reports no
+  amount.** [`claim_builder_rewards`](../../concepts/broker-codes.md#claiming)
+  drains the whole balance and answers with no figure.
+- **The read keeps the `builder` spelling.** The wire type is `builder_state`.
+  There is no `broker_state` read.
+- **A broker credit and a referral credit are separate balances with separate
+  claims.** One fill can pay both. Reading one tells you nothing about the
+  other. See [broker credit is not referrer credit](../../concepts/fees.md#referrer-credit).
+- **This is a credit balance, not a fee rate.** The rate a broker charges is the
+  `builder.fee` on each order, capped by its
+  [`approved_builders`](#approved_builders) grant.
 
 ### Account's resting orders across all books {#open_orders}
 
@@ -1992,7 +2100,7 @@ The status splits the two kinds of removal:
 | `margin_summary` | [`account_state`](#account_state) with `detail: "margin"` |
 | `market_info` | [`markets`](./info/perpetuals.md#markets) with `coin`, plus [`markets_meta`](./info/perpetuals.md#markets_meta) with `coin` |
 | `max_builder_fee` | [`approved_builders`](#approved_builders) — look the builder up in the list |
-| `max_market_order_ntls`, `perps_at_open_interest_cap` | [`markets`](./info/perpetuals.md#markets) `open_interest` with [`markets_meta`](./info/perpetuals.md#markets_meta) `oi_cap` |
+| `max_market_order_ntls`, `perps_at_open_interest_cap` | [`markets_meta`](./info/perpetuals.md#markets_meta) — `max_market_order_ntl` is the served headroom, one row per market. `null` = uncapped, `"0"` = at the cap. Do not rebuild it from `open_interest` and `oi_cap`: an uncapped row OMITS `oi_cap`, so that arithmetic reads uncapped as zero headroom |
 | `node_info` | Nothing on this API. Per-node identity is not consensus state, so two honest nodes answer differently. The chain id is fixed per network — see [networks](../../networks.md#summary) |
 | `oracle_sources` | Nothing. The per-market bitmask it served is not read by the price aggregator. The static source facts are prose — see [oracle prices](../../concepts/oracle-prices.md#source-table) |
 | `perp_dex_limits` | [`perp_dexs`](./info/perpetuals.md#perp_dexs) — `limits` |

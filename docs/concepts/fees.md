@@ -287,6 +287,15 @@ thereafter; setting yourself as your own referrer is rejected.
 A broker credit and a referrer credit can both apply to the same fill — they pay
 out independently.
 
+**Where to read each balance.** They are two separate accumulators with two
+separate claims. Read the referrer balance with
+[`referral_state`](../api/rest/info.md#referral_state) and claim it with
+[`claim_referral_rewards`](../api/rest/exchange.md#claim_referral_rewards); read
+the broker balance with [`builder_state`](../api/rest/info.md#builder_state) and
+claim it with
+[`claim_builder_rewards`](../api/rest/exchange.md#claim_builder_rewards).
+Neither claim action reports an amount, so read the balance first.
+
 ## Where fees go {#where-fees-go}
 
 Collected fees flow through one value-accrual pipeline:

@@ -196,7 +196,9 @@ Response (perp truncated to one entry; the `spot` section is identical to
         ],
         "strict_isolated": false,
         "open":            true,
-        "disable_close":   false,
+        "close":           true,
+        "oi_cap":          "1000000",
+        "max_market_order_ntl": "400000",
         "mark_source":     "oracle_median",
         "fba_enabled":     false,
         "signing_id":      0,
@@ -223,6 +225,7 @@ Response (perp truncated to one entry; the `spot` section is identical to
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
 | `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden |
 | `perp[*].oi_cap` | Decimal string | Governance open-interest cap, in the market's size units; **OMITTED** entirely when the market is uncapped (never a fabricated `"0"`) |
+| `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. See below |
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].signing_id` | uint32 | **The number you put in the EIP-712 `market` field when you sign an order for this market.** It has no other meaning on the read plane — do not use it as a sort key, a join key, or a market identity. See below |
@@ -236,7 +239,34 @@ Response (perp truncated to one entry; the `spot` section is identical to
   fields (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`, `premium`, `funding`,
   `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`) appear
   here.
+- **`max_market_order_ntl` is the one exception, and it MOVES.** It is derived
+  from live open interest, so it changes on every fill. Do not cache it with the
+  rest of the row. See below.
 - For the spot pair / token field semantics see [the spot registry](./spot.md#spot_meta).
+
+#### `max_market_order_ntl` is served — do not reconstruct it {#max_market_order_ntl}
+
+The chain already computes the headroom. Read the field. Do **not** subtract
+[`markets`](#markets) `open_interest` from `oi_cap` yourself: that arithmetic
+loses the two conventions the served field carries.
+
+- **`null` means UNCAPPED, not zero headroom.** The reconstruction cannot
+  produce it, because `oi_cap` is OMITTED from an uncapped row. A client that
+  reads a missing `oi_cap` as `0` computes a negative headroom and blocks every
+  order on a market that has no limit at all. This is the inverse mistake, and it
+  is the worse one.
+- **`"0"` means the market sits AT its cap.** The value is floored at `0` and
+  never goes negative.
+- **The name says notional; the value is a SIZE.** It is in the same units as
+  `oi_cap` and `open_interest`, on the market's `sz_decimals` grid. Do not
+  divide it by a price.
+- **It is market-wide, not yours.** It is the room left in the whole market, not
+  a limit on your order. For your own per-order limit read `max_trade_szs` on
+  [`active_asset_data`](#active_asset_data).
+
+**`active_asset_data.max_trade_size` is the SAME number under another name.**
+Both fields are the one headroom figure. Read whichever response you already
+have; never expect the two to differ.
 
 #### `signing_id` is the write handle, and nothing else {#signing_id}
 
@@ -743,7 +773,7 @@ A user's per-market leverage / margin-mode / max trade size.
 | `leverage` | uint32 | Position leverage if open, else account default, else market max |
 | `margin_mode` | `"cross" \| "isolated" \| "strict_iso"` | Effective margin mode |
 | `mark_px` | decimal string | Current mark, human-decimal plane |
-| `max_trade_size` | decimal string \| null | Open-interest headroom left on the WHOLE market, in **size** units: `oi_cap − total_open_interest`, floored at `0`. `null` when the market carries no cap. **Not a per-user limit** — see below |
+| `max_trade_size` | decimal string \| null | Open-interest headroom left on the WHOLE market, in **size** units: `oi_cap − total_open_interest`, floored at `0`. `null` when the market carries no cap. **Not a per-user limit** — see below. [`markets_meta`](#markets_meta) serves the same number per market as `max_market_order_ntl` |
 | `max_trade_szs` | [decimal string, decimal string] | Size the CALLER can still trade `[buy, sell]`, from their own margin |
 | `available_to_trade` | [decimal string, decimal string] | Notional the CALLER can still open `[buy, sell]` |
 | `has_position` | bool | Whether the user has a non-zero position on this market |

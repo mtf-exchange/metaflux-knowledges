@@ -384,6 +384,8 @@ refuse every other market. See [options](../../products/options.md).
 | [`set_display_name`](#set_display_name) | Set the account handle | master only |
 | [`set_referrer`](#set_referrer) | Bind to a referrer address | master only |
 | [`approve_broker_fee`](#approve_builder_fee) | Approve a broker fee ceiling | master only |
+| [`claim_referral_rewards`](#claim_referral_rewards) | Claim accrued referral credit | master only |
+| [`claim_builder_rewards`](#claim_builder_rewards) | Claim accrued broker-code credit | master only |
 | [`create_sub_account`](#create_sub_account) | Open a sub-account under the master | master only |
 | [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | master only |
 | [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | master only |
@@ -2854,6 +2856,55 @@ JSON the trader submitted, and replay reads it again. The EIP-712 type string
 stays `ApproveBuilderFee`, which no signature lets you change — see
 [broker codes](../../concepts/broker-codes.md#approval).
 :::
+
+---
+
+### Claim accrued referral credit {#claim_referral_rewards}
+
+Drain the sender's whole accrued referral credit into spendable
+cross-collateral. No parameters.
+
+```json
+{ "type": "claim_referral_rewards", "params": {} }
+```
+
+**The action reports no amount.** Read the balance first with
+[`referral_state`](./info.md#referral_state). After the claim, the credit is `0`
+and the read no longer tells you what moved.
+
+**An agent wallet cannot claim for its owner.** The action is sender-authorized
+and carries no `owner` field, so it always acts on the recovered signer's own
+account. Sign it with the master key.
+
+**The call is idempotent.** Claiming with nothing accrued claims `0` and is not
+an error, so a retry after a timeout is safe.
+
+---
+
+### Claim accrued broker-code credit {#claim_builder_rewards}
+
+Drain the sender's whole accrued broker-code fee credit into spendable
+cross-collateral. No parameters.
+
+```json
+{ "type": "claim_broker_rewards", "params": {} }
+```
+
+**Both names are accepted.** `claim_broker_rewards` is the name to send.
+`claim_builder_rewards` still decodes and always will, for the same reason
+[`approve_broker_fee`](#approve_builder_fee) keeps its second name. The read
+beside it keeps the `builder` spelling and is
+[`builder_state`](./info.md#builder_state).
+
+**The action reports no amount.** Read the balance first with
+[`builder_state`](./info.md#builder_state).
+
+**An agent wallet cannot claim for its owner.** The action is sender-authorized
+and carries no `owner` field, so it always acts on the recovered signer's own
+account. Sign it with the master key.
+
+**The call is idempotent.** Claiming with nothing accrued claims `0` and is not
+an error. See [broker codes](../../concepts/broker-codes.md#claiming).
 
 ---
 

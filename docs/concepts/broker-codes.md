@@ -142,11 +142,18 @@ yours — the trader pays both.
 Fees accrue to a running balance. Claim it with:
 
 ```json
-{ "type": "claim_builder_rewards" }
+{ "type": "claim_broker_rewards" }
 ```
 
-This action keeps the `builder` spelling. Only `approve_broker_fee` has a second
-name today.
+**Both names are accepted.** `claim_broker_rewards` is the name to send, and
+`claim_builder_rewards` still decodes and always will — the same second-name
+rule [`approve_broker_fee`](#approval) follows.
+
+**Read the balance before you claim it. The action reports no amount.** Query
+[`builder_state`](../api/rest/info.md#builder_state) with your address. That
+read keeps the `builder` spelling and is the only way to show a claimable
+figure. After the claim the balance is `0`, so a read afterwards cannot tell you
+what moved.
 
 The whole accrued balance moves into your spendable collateral and the entry is
 removed. The call is **idempotent**: claiming again with nothing accrued claims
