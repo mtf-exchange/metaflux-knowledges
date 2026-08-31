@@ -47,7 +47,7 @@ The `spot` section of the `markets_meta` response:
       "pairs": [
         {
           "signing_id": 113, "name": "MTF/USDC", "base": 104, "quote": 100,
-          "sz_decimals": 2, "taker_fee_bps": "5", "min_notional": "1",
+          "sz_decimals": 2, "taker_fee_bps": "3.5", "min_notional": "1",
           "active": true, "deployer": "0x17c5…d025", "registered_at": 0,
           "mark_px": "0.13787", "mid_px": "0.13787", "day_ntl_vlm": "0",
           "prev_day_px": null, "circulating_supply": "10000010"
@@ -66,6 +66,30 @@ The `spot` section of the `markets_meta` response:
 }
 ```
 
+:::danger
+**`taker_fee_bps` is the OVERRIDE, not the effective fee — and `null` is not
+zero.**
+
+A spot pair's deployer may set a taker override. **If an override exists it
+WINS**, for every account, whatever the volume tier says. If none exists, the
+volume-tiered [`fee_schedule`](../info.md#fee_schedule) applies. That is the
+whole resolution rule, and this row is where it is now written down.
+
+Two encodings used to hide it, and both are fixed:
+
+- **The value was truncated.** The override is stored in deci-bps and rendered by
+  integer division, so `35` deci-bps (3.5 bps) printed as `"3"`. It renders
+  losslessly now — `"3.5"`.
+- **"No override" printed as `"0"`.** Zero reads as "this pair is fee-free" and
+  meant "the schedule applies". It is **`null`** now.
+
+So `null` sends you to `fee_schedule`. A `"0"`, should you see one, is a real
+zero-rate override. Measured live before the fix: a pair served `"5"` while
+`fee_schedule` said `"3.5"`, and nothing on either read explained which one
+charged. See the
+[upgrade notice](../../upgrade-notice-ids-and-shapes.md#spot-taker-fee).
+:::
+
 :::info
 **A pair row keys on `signing_id`, and its price fields can be `null`.** A
 tradable pair has distinct `base` / `quote` (e.g. `"MTF/USDC"`). A per-token
@@ -83,7 +107,7 @@ answer, not as an error.
 | `pairs[*].name` | string | Pair name (e.g. `"MTF/USDC"`) |
 | `pairs[*].base` / `quote` | uint32 | Base / quote asset id (equal for self-pairs) |
 | `pairs[*].sz_decimals` | uint8 | Size precision of the pair's base leg |
-| `pairs[*].taker_fee_bps` | bps string | Taker fee (whole bps); `"0"` if unset |
+| `pairs[*].taker_fee_bps` | bps string \| null | The pair's **deployer taker override**, decimal bps. **`null` means there is no override and the volume-tiered [`fee_schedule`](../info.md#fee_schedule) applies** — see the resolution rule below |
 | `pairs[*].min_notional` | Decimal string | Min notional (whole USDC); `"0"` if unset |
 | `pairs[*].active` | bool | Whether the pair is active for trading |
 | `pairs[*].deployer` | hex address | The account that registered the pair |

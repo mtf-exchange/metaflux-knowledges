@@ -129,6 +129,7 @@ const sidebars = {
             'api/errors',
             'api/rate-limits',
             'api/migration',
+            'api/upgrade-notice-ids-and-shapes',
             'api/activation-notice-13350001',
             'api/activation-notice',
           ],

@@ -151,8 +151,8 @@ depends on load and network conditions as well. **Never size a deadline off the
 configured target** — measure the chain instead. [`account_state`](../api/rest/info.md#account_state) stamps the
 committed `height` and the consensus `time` it answers at — it is the only read that does — so
 sample it twice with
-a gap between, or read the head off the
-[`explorer_block`](../api/ws/subscriptions.md#explorer_block) WS channel.
+a gap between, or read a window of recent heads off
+[`recent_blocks`](../api/rest/info.md#recent_blocks).
 
 The target is set by a two-thirds-stake validator vote,
 `set_target_block_interval_ms`, bounded to `[50, 2000]` ms. Both ends are hard: a

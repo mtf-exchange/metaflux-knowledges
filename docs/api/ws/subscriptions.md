@@ -61,8 +61,6 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `clearinghouse_state` | `user`/`address` (required) | per-account PERP position detail, keyed by dex — on change + heartbeat every 4 committed blocks |
 | `option_state` | `user`/`address` (required) | per-account OPTION leg detail — on change + heartbeat every 4 committed blocks |
 | `spot_margin_state` | `user`/`address` (required) | per-account spot-margin positions — on change + heartbeat every 4 committed blocks |
-| `explorer_block` | none | latest committed block header, on each new block |
-| `explorer_txs` | none | transactions in the latest committed block, on each new block |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
@@ -79,6 +77,31 @@ silent.
 
 Subscribing to a retired name returns
 `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
+:::
+
+:::danger
+**`explorer_block` and `explorer_txs` are REMOVED.**
+
+`explorer_txs` was a per-status firehose that did per-event work **on a
+validator**, once for every watcher. A validator's job is consensus, not serving.
+Both channels are gone rather than moved, because the archive already serves the
+same data.
+
+| Removed channel | Read this instead |
+|---|---|
+| `explorer_block` | [`recent_blocks`](../rest/info.md#recent_blocks) — an `/info` read, archive-backed, optional `limit` |
+| `explorer_txs` | [`recent_transactions`](../rest/info.md#recent_transactions) — the same |
+
+**Two fields do not survive the move**, and both are real losses:
+`recent_blocks` carries no `proposer`, and `recent_transactions` carries no
+`hash`. Correlate a submitted action by `cloid`, or read
+[`action_outcome`](../rest/info.md#action_outcome).
+
+**Size a poll so it cannot gap.** The block cadence is about 100 ms, so 100 rows
+span roughly 10 seconds of chain and a 2-second poll always overlaps. Do not treat
+that cadence as a constant — it moves between releases.
+
+See the [upgrade notice](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed).
 :::
 
 ---
@@ -169,7 +192,7 @@ Frequency: change-driven — a frame is sent only when the top-of-book actually 
 Public trade tape for one market. **Requires `coin`.** Each frame's `data` is an
 **array** of trade records; `px`/`sz` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `side`
 is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (ms);
-`tid` is a deterministic trade id.
+`tid` is a deterministic trade id, served as a **decimal-digit string**.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "trades", "coin": "BTC" } }
@@ -182,7 +205,7 @@ empty only if the market has never traded). Snapshot rows carry **`users: null`*
 
 ```json
 { "channel": "trades", "is_snapshot": true, "data": [
-  { "coin": "BTC", "side": "A", "px": "6164370000000", "sz": "24000", "time": 1735689500000, "tid": 4898317237641214538, "users": null }
+  { "coin": "BTC", "side": "A", "px": "6164370000000", "sz": "24000", "time": 1735689500000, "tid": "4898317237641214538", "users": null }
 ] }
 ```
 
@@ -198,11 +221,14 @@ block; each row's `users` carries the AGGRESSOR ONLY:
 
 ```json
 { "channel": "trades", "is_snapshot": false, "data": [
-  { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": 1234567890, "users": ["0x..taker"] }
+  { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": "1234567890", "users": ["0x..taker"] }
 ] }
 ```
 
-- `tid` may exceed 2⁵³ — parse it as a 64-bit / big integer, not a JS number.
+- `tid` is a **decimal-digit string**, not a number. It is a 64-bit hash-derived
+  value and routinely exceeds 2⁵³, so a JSON number would silently lose its low
+  digits in JavaScript and a join by `tid` would match nothing. Compare it as a
+  string, or convert it with `BigInt`.
 
 ### Global dynamic state for all markets {#markets}
 
@@ -266,7 +292,7 @@ Per-account fill stream. Requires `user` (the 0x address; `address` is also acce
 - the **taker** record — the taker's own `oid`, its `cloid` (or `null`), the taker's side, `crossed: true`;
 - the **maker** record — the maker's own `oid`, `cloid: null` (no cloid is captured for the resting side), the **opposite** side, `crossed: false`.
 
-Both legs of one match share the same `tid` (the same value the public `trades` print carries). `px`/`sz` are **human decimal strings**, the same plane the public `trades` tape uses — not raw 1e8. Per-account fill records carry **no `users` array**. The public [`trades`](#trades) tape names the AGGRESSOR only; no surface discloses the resting maker of a print.
+Both legs of one match share the same `tid` (the same value the public `trades` print carries). `oid` and `tid` are **decimal-digit strings** — see the [`trades`](#trades) note on why. `px`/`sz` are **human decimal strings**, the same plane the public `trades` tape uses — not raw 1e8. Per-account fill records carry **no `users` array**. The public [`trades`](#trades) tape names the AGGRESSOR only; no surface discloses the resting maker of a print.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "fills", "user": "0x<address>" } }
@@ -275,7 +301,7 @@ Both legs of one match share the same `tid` (the same value the public `trades` 
 The initial snapshot is the empty array `[]`; each push is an array holding one fill record:
 
 ```json
-{ "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": 42, "cloid": "0xab..", "tid": 1234567890, "crossed": true } ] }
+{ "channel": "fills", "data": [ { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "oid": "42", "cloid": "0xab..", "tid": "1234567890", "fee_token": "USDC", "crossed": true } ] }
 ```
 
 ### Rolling price bars for one market {#candles}
@@ -346,11 +372,12 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 ```json
 { "channel": "order_updates", "data": [ {
   "order": { "coin": "BTC", "side": "B", "limit_px": "100", "sz": "600", "orig_sz": "1000",
-             "oid": 42, "cloid": "0x..", "tif": "GTC", "reduce_only": false },
+             "oid": "42", "cloid": "0x..", "tif": "GTC", "reduce_only": false },
   "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
 ```
 
 - `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`).
+- `order.oid` is a **decimal-digit string**, or `null` on a rejected placement.
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `time` is consensus-ms; unknown fields are `null`.
 - **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
@@ -368,7 +395,7 @@ The snapshot is an **array** of records, each in the same fixed shape as an [`or
 ```json
 { "channel": "open_orders", "is_snapshot": true, "data": [ {
   "order": { "coin": "BTC", "side": "B", "limit_px": "100", "sz": "600", "orig_sz": null,
-             "oid": 42, "cloid": null, "tif": "GTC", "reduce_only": false },
+             "oid": "42", "cloid": null, "tif": "GTC", "reduce_only": false },
   "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
 ```
 
@@ -797,7 +824,7 @@ records from the just-committed block; the initial snapshot is `[]`.
 
 ```json
 { "channel": "user_twap_slice_fills", "data": [
-  { "fill": { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "1000000", "time": 1735689600123, "oid": 42, "cloid": null, "tid": 1234567890, "crossed": true }, "twapId": 17 }
+  { "fill": { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "1000000", "time": 1735689600123, "oid": "42", "cloid": null, "tid": "1234567890", "fee_token": "USDC", "crossed": true }, "twapId": 17 }
 ] }
 ```
 
@@ -825,52 +852,6 @@ Per-account TWAP parent lifecycle — one record on each state transition
 - `state.twapId` — the parent id to pass to [`twap_cancel`](../rest/exchange.md#twap_cancel) — the id appears nowhere else pre-fill.
 - `state.sz` / `state.executedSz` — total / executed size, size-plane decimal strings.
 - `status.status` ∈ `activated` / `finished` / `terminated`.
-
-### Latest committed block header {#explorer_block}
-
-Latest committed **block header**, pushed on each new block. No `coin` / `user`
-parameter. Each frame's `data` is an array (the newly-committed header(s));
-`is_snapshot: true` on the first frame after subscribe.
-
-```json
-{ "method": "subscribe", "subscription": { "type": "explorer_block" } }
-```
-
-```json
-{ "channel": "explorer_block", "is_snapshot": true, "data": [
-  { "height": 72399, "round": 72399, "epoch": 0, "proposer": 5,
-    "hash": "0x3a0572f514cb6bf4517c40b1511728d460b4f7c9b98a68932c6801f5aee80dfd",
-    "time": 1783009348137, "tx_count": 0 }
-] }
-```
-
-- `height` / `round` — committed block height / consensus round.
-- `epoch` — staking epoch.
-- `proposer` — proposing validator index.
-- `hash` — block hash (`0x`-prefixed).
-- `time` — block timestamp (consensus ms).
-- `tx_count` — number of transactions in the block.
-
-### Transactions in the latest block {#explorer_txs}
-
-Transactions in the latest committed block, pushed on each new block. No
-`coin` / `user` parameter. Each frame's `data` is an array of transaction
-records (empty for a block with no transactions); `is_snapshot: true` on the
-first frame after subscribe.
-
-```json
-{ "method": "subscribe", "subscription": { "type": "explorer_txs" } }
-```
-
-```json
-{ "channel": "explorer_txs", "is_snapshot": false, "data": [
-  { "hash": "0x4660d9ccf52ef1abde5e03d1b3f1c110b948d2f71331f086239666781dbde91c" }
-] }
-```
-
-- Each row carries a `hash` field — the `0x` action hash of the transaction —
-  which is **empty (`""`)** for a **systemic** entry (an engine-internal action
-  with no user-signed hash). A block with no transactions pushes `"data": []`.
 
 ---
 

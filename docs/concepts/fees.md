@@ -443,9 +443,11 @@ model.
 ### A spot BUY pays its fee in the BASE token {#spot-buy-fee-in-base}
 
 :::note Historical fills — before block 6,565,000
-Below that height a spot buyer paid its fee in the quote token. No field on the
-wire records the change. Key on the block height when you process fills from
-before that boundary.
+Below that height a spot buyer paid its fee in the quote token. Every fill now
+carries [`fee_token`](../api/rest/info.md#user_fills), derived per record, so an
+older fill correctly reports `"USDC"` on both sides and a newer one reports the
+base token on the buy leg. Read `fee_token`; do not re-derive the boundary from
+the block height yourself.
 :::
 
 **Each side pays out of the leg it RECEIVES.** A sell receives USDC and already
@@ -481,10 +483,15 @@ Four consequences a caller must handle:
 1. **The fill `sz` is GROSS; the balance credit is NET.** A taker buying `1.0`
    BTC at a `0.035%` rate sees `sz: "1.0"` on the fill and receives
    `0.99965` BTC. **Summing fill sizes over-counts holdings.** Read the balance,
-   not the sum of fills, to know what you own. The fill's `fee` field stays `"0"`
-   for spot at every height and gains **no** fee-token field — the fee is
-   observable as the difference between `sz` and the balance change, and
-   deliberately nowhere else, so the committed trade record is unchanged.
+   not the sum of fills, to know what you own.
+
+   **The base fee is NETTED, not debited, so the fill's `fee` field does not
+   carry it.** The committed trade record is unchanged — the fee is observable as
+   the difference between `sz` and the balance change, and deliberately nowhere
+   else. The read-side [`fee_token`](../api/rest/info.md#user_fills) field names
+   the denomination so a caller knows which case it is in: on a spot BUY it reads
+   the base token, and it is telling you the `fee` number is not the whole story.
+   `fee_token` is derived at read time and changes no committed field.
 2. **A referrer share and a maker rebate on a BUY arrive IN KIND.** They are
    credited as a spot balance in that pair's **base token**, directly at the fill.
    They do **not** enter the claimable USDC

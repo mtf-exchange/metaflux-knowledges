@@ -87,6 +87,35 @@ a duplicate inside the EVM.
   is **not** part of consensus. Risk-bearing actions — bridge mints, withdrawals —
   rely on **final** confirmation only.
 
+## State and history {#state-and-history}
+
+The EVM keeps **state**. It does not keep **history**.
+
+- **State is durable.** Account balances, nonces, contract code and contract
+  storage are committed state. Every node holds the same state and serves it at
+  the tip.
+- **History is not kept.** No node stores a past EVM block body, a past
+  transaction list, or a receipt archive. A block executes once; what survives is
+  the state it produced, not the block.
+- **Block hashes are not kept either.** The state store reserves a number-keyed
+  slot for block hashes, to back the `BLOCKHASH` opcode. Nothing writes that slot
+  today, so `BLOCKHASH` returns `0x0` in a committed transaction, for every
+  number. Do not build on it.
+
+State is what every node must agree on. A past block body is not, so nothing on
+the chain is obliged to carry it. This is a deliberate shape, and it sets what
+the JSON-RPC can serve: reads at the tip, plus a bounded in-memory tail of recent
+receipts and logs. A block reference that is not the tip has no answer, so the
+RPC returns `null` for it rather than serving the tip in its place. **That
+`null` is not live until the next release** — see the
+[upgrade notice](../api/upgrade-notice-ids-and-shapes.md#evm-block-null).
+
+See [Method support](index.md#method-support) for which methods this limits, and
+[Where to get past data](index.md#where-to-get-past-data) for the pattern that
+does work — record the WebSocket stream into your own store.
+
+Whether the chain persists EVM history is an open product decision.
+
 ## See also {#see-also}
 
 - [Interacting with Core](interacting-with-core.md) — precompiles (read) + CoreWriter (write)

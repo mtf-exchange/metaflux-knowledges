@@ -212,10 +212,13 @@ The same params with a new nonce give a different hash. `action_hash` is
 returned synchronously in the `/exchange` admission response — it is **not**
 echoed on any per-account WS event. For a committed order, correlate by
 `cloid` on [`order_updates`](../api/ws/subscriptions.md#order_updates) /
-[`open_orders`](../api/ws/subscriptions.md#open_orders) instead. For a global,
-hash-keyed check, the public
-[`explorer_txs`](../api/ws/subscriptions.md#explorer_txs) feed carries the
-same hash (as `hash`) for every transaction in the latest block.
+[`open_orders`](../api/ws/subscriptions.md#open_orders) instead. **No global, hash-keyed feed answers this any more.** The `explorer_txs` WS
+channel that carried the hash is
+[removed](../api/upgrade-notice-ids-and-shapes.md#explorer-channels-removed), and
+its replacement [`recent_transactions`](../api/rest/info.md#recent_transactions)
+does not carry a hash. Correlate by `cloid`, or read
+[`action_outcome`](../api/rest/info.md#action_outcome) for the commit-time
+verdict on one submitted action.
 
 ## Production recipes {#production-recipes}
 

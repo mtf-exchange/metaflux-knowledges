@@ -578,8 +578,8 @@ approved agent). To place many orders under one signature, use
 [Response → 200 OK](#200-ok--order-path-synchronous-oid)):
 
 ```json
-{"resting": {"oid": 12345, "cloid": "0x..."}}                       // posted to book
-{"filled":  {"oid": 12345, "total_sz": "100000000", "avg_px": "10050000000"}}
+{"resting": {"oid": "12345", "cloid": "0x..."}}                     // posted to book
+{"filled":  {"oid": "12345", "total_sz": "100000000", "avg_px": "10050000000"}}
 {"error":   {"code": "ORDER_INVALID_PRICE", "message": "..."}}      // this entry was rejected
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
@@ -1578,11 +1578,11 @@ running on the remaining size.
 `statuses` array. The success entry is a single-key `chase` object:
 
 ```json
-{ "data": { "statuses": [ { "chase": { "chase_oid": 12345, "leg_oid": 12346, "leg_px": "6800000000", "cloid": "0x5c000000000000000000000000000002" } } ] } }
+{ "data": { "statuses": [ { "chase": { "chase_oid": "12345", "leg_oid": "12346", "leg_px": "6800000000", "cloid": "0x5c000000000000000000000000000002" } } ] } }
 ```
 
-- `chase_oid` (uint64) — the stable **cancel handle**. Pass it to [`cancel_chase`](#cancel_chase). It is **not** the leg's `oid`.
-- `leg_oid` (uint64) — the initial resting leg id. It is re-stamped on every reprice, so do not treat it as stable — correlate the leg by `cloid` instead.
+- `chase_oid` (decimal-digit string) — the stable **cancel handle**. It is **not** the leg's `oid`. **Parse it back to a `uint64` before you sign a [`cancel_chase`](#cancel_chase)**: every id on a RESPONSE is a string, and the signed request field stays a number.
+- `leg_oid` (decimal-digit string) — the initial resting leg id. It is re-stamped on every reprice, so do not treat it as stable — correlate the leg by `cloid` instead.
 - `leg_px` — the leg's placed price, a fixed-point integer string on the `1e8` plane.
 - `cloid` — echoed only when the chase carried one.
 
@@ -1645,7 +1645,7 @@ optional (agent / operator routing).
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `market` | uint32 | `[0, market_count)` | The market the chase runs on — a perp market, or a spot pair — see [the spot lane](#chase_order-spot). Must match the chase's market |
-| `chase_oid` | uint64 | a live chase handle | The **handle** from the `chase_order` response (the cancel key) — **not** the leg's `oid` |
+| `chase_oid` | uint64 | a live chase handle | The **handle** from the `chase_order` response (the cancel key) — **not** the leg's `oid`. This is a SIGNED field, so it stays a number: the response gives you a decimal-digit string, and you parse it back |
 | `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
 **Semantics.** Only the account that owns the chase may cancel it. An unknown
@@ -4159,12 +4159,18 @@ The payload inside `data` depends on the action class:
 
 An order-type action blocks up to the node's order-wait window (default 5 s) so
 the response carries the real `oid` + resting/filled status. On timeout it
-returns a `pending` entry — **never a fabricated oid**. A
+returns a `pending` entry — **never a fabricated oid**.
+
+**The echoed `oid` is a decimal-digit STRING.** Every id on a response is, so a
+JavaScript client cannot lose digits — see the
+[upgrade notice](../upgrade-notice-ids-and-shapes.md#id-strings). The `oid` you
+put inside a SIGNED cancel or modify payload stays a `uint64` number: the typed
+digest binds `uint64 oid` and is consensus-frozen. A
 `batch_order` / `scale_order` resolves to **one entry per placed leg or rung**; a
 single order to one entry.
 
 ```json
-{ "data": { "statuses": [ { "resting": { "oid": 12345, "cloid": "0x..." } } ] } }
+{ "data": { "statuses": [ { "resting": { "oid": "12345", "cloid": "0x..." } } ] } }
 ```
 
 ### Per-order `statuses` {#per-order-statuses}
@@ -4173,8 +4179,8 @@ single order to one entry.
 object naming the leg's outcome:
 
 ```json
-{ "resting": { "oid": 12345, "cloid": "0x..." } }                       // posted to book (cloid echoed only here, only if sent)
-{ "filled":  { "oid": 12345, "total_sz": "100000000", "avg_px": "10050000000" } }  // matched
+{ "resting": { "oid": "12345", "cloid": "0x..." } }                     // posted to book (cloid echoed only here, only if sent)
+{ "filled":  { "oid": "12345", "total_sz": "100000000", "avg_px": "10050000000" } }  // matched
 { "error":   { "code": "MARGIN_INSUFFICIENT", "message": "..." } }     // this leg was rejected
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
@@ -4188,7 +4194,7 @@ handler are the same function:
 {
   "data": {
     "statuses": [
-      { "resting": { "oid": 12345, "cloid": "0x...aa" } },
+      { "resting": { "oid": "12345", "cloid": "0x...aa" } },
       { "error": {
           "code":    "ORDER_INVALID_PRICE",
           "message": "price off grid: 12345 is not a multiple of tick_size 100",
@@ -4410,7 +4416,7 @@ flowchart LR
     D -.-> D2["appears in /info and WS feeds"]
 ```
 
-Track commit status via the [WS feed](../ws/subscriptions.md) — [`order_updates`](../ws/subscriptions.md#order_updates) / [`fills`](../ws/subscriptions.md#fills) — or poll `/info` for `open_orders` / `user_fills`. Correlate by `cloid`: the `action_hash` returned at admission is not echoed on any per-account WS event today. The public [`explorer_txs`](../ws/subscriptions.md#explorer_txs) feed does carry it (as `hash`), for every transaction in the latest block, if you need a hash-keyed check.
+Track commit status via the [WS feed](../ws/subscriptions.md) — [`order_updates`](../ws/subscriptions.md#order_updates) / [`fills`](../ws/subscriptions.md#fills) — or poll `/info` for `open_orders` / `user_fills`. Correlate by `cloid`: the `action_hash` returned at admission is not echoed on any per-account WS event today. **No feed carries it.** The `explorer_txs` channel that used to is [removed](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed), and its replacement [`recent_transactions`](../rest/info.md#recent_transactions) has no `hash` field. For a per-action verdict, read [`action_outcome`](../rest/info.md#action_outcome).
 
 ## Sequence diagram — place an order and see it on the book {#sequence-diagram--place-an-order-and-see-it-on-the-book}
 

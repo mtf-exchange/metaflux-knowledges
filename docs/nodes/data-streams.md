@@ -320,7 +320,7 @@ One fill record, taker leg:
 | `side` | string | — | Side of **this** party: `"B"` buy, `"A"` sell |
 | `oid` | uint64 | id | This party's order id |
 | `cloid` | string \| absent | — | Client order id, `0x` plus 32 hex digits. Present on the taker leg only, and only when the order carried one |
-| `tid` | uint64 | id | Print id. Identical on both legs of one match |
+| `tid` | uint64 | id | Print id. Identical on both legs of one match. **A NUMBER here, deliberately** — this tape is byte-pinned input for the archive and the indexer, not a public API, so it keeps the numeric form the REST and WS surfaces gave up. It exceeds 2⁵³: parse it with a 64-bit reader |
 | `crossed` | bool | — | `true` on the taker leg, `false` on the maker leg |
 | `ts` | uint64 | ms | Fill timestamp. Equals `block_time` |
 | `hash` | string | — | Trace hash of the originating taker action: lowercase hex, **no** `0x`. Empty string on the maker leg, and empty for system-injected actions |

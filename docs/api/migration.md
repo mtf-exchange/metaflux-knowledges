@@ -272,7 +272,7 @@ The four shapes of the change:
 | **A read a change made UNNECESSARY** — `encode_action` | The multisig inner blob now accepts the ordinary `{type, params}` wire action, so there is nothing left to encode. UTF-8 encode the action you would post to `/exchange` and let every member sign those bytes. See [signing the inner action](../concepts/multi-sig.md#signing-the-inner-action) |
 | **A read left the public API** — `mip3_deployer_oracle`, `fba_batch_state` | Operator lane. The FBA read ships publicly with its engine |
 | **A read CAME BACK** — `rfq_open`, `rfq_user` | Both are public again. They shipped with the option lane, because an accept cannot be completed without them: a taker finds its own `rfq_id` and a maker finds a request to answer |
-| **A read was DELETED outright** — `protocol_metrics`, `node_info`, `block_info` | None of the three is served any more. Every public fact `protocol_metrics` carried is on [`markets`](./rest/info/perpetuals.md#markets), [`markets_meta`](./rest/info/perpetuals.md#markets_meta) and [`staking_state`](./rest/info.md#staking_state); the chain id is fixed per network, see [networks](../networks.md#summary); the committed height and consensus time stamp every read, and the block head streams on [`explorer_block`](./ws/subscriptions.md#explorer_block) |
+| **A read was DELETED outright** — `protocol_metrics`, `node_info`, `block_info` | None of the three is served any more. Every public fact `protocol_metrics` carried is on [`markets`](./rest/info/perpetuals.md#markets), [`markets_meta`](./rest/info/perpetuals.md#markets_meta) and [`staking_state`](./rest/info.md#staking_state); the chain id is fixed per network, see [networks](../networks.md#summary); the committed height and consensus time stamp every read, and the block head is on [`recent_blocks`](./rest/info.md#recent_blocks) |
 | **A read was DELETED outright** — `oracle_sources` | It served a per-market source bitmask nothing acts on. Its static facts — the ten source slots and their protocol-fixed weights — are prose on [oracle prices](../concepts/oracle-prices.md#source-table) |
 
 **Two reads gained a field**, and both answer a question that used to need
@@ -410,9 +410,10 @@ Each `perp[]` element carries a market's **dynamic** fields only. The **static**
   pushes carry `users: [taker, maker]`.
 - **`user_fundings`**: records now carry `{coin, payment, szi, fundingRate, time}`
   (`payment` signed whole-USDC: negative = paid, positive = received).
-- **`explorer_txs`** rows carry a **`hash`** field (the `0x` action hash; empty
-  `""` for a systemic entry). **`explorer_block`** streams the committed block
-  header.
+- **`explorer_txs` and `explorer_block` are REMOVED.** Read
+  [`recent_transactions`](./rest/info.md#recent_transactions) and
+  [`recent_blocks`](./rest/info.md#recent_blocks) instead — see the
+  [upgrade notice](./upgrade-notice-ids-and-shapes.md#explorer-channels-removed).
 - **`order_updates`**: on a `filled` record, the `order.sz` is the **FILLED** size
   and `order.orig_sz` the **original** order size.
 - **Active channels**: see the [channels at a glance](./ws/subscriptions.md#channels-at-a-glance)
@@ -443,8 +444,12 @@ See [rate limits](./rate-limits.md).
 
 ## 10. Unchanged {#10-unchanged}
 
-- **Order / trade ids**: `oid`, `tid`, `cloid` are unchanged (`tid` is a `u64` —
-  parse as a big integer, it can exceed 2⁵³).
+- **`cloid`** is unchanged — a `0x`-hex string.
+- **`oid` / `tid` are NO LONGER unchanged.** Both became decimal-digit
+  **strings** on every response, because `tid` exceeds 2⁵³ and a JSON number
+  loses its low digits. A request still accepts either form, and the signed
+  action payload still binds a `uint64` `oid`. See the
+  [upgrade notice](./upgrade-notice-ids-and-shapes.md#id-strings).
 - **Signed `/exchange` actions**: the typed-action digests are
   **consensus-frozen** — `asset` remains a numeric `u32` in signed actions. The
   `coin`/`address` change is a **read-API** change only; it does **not** affect

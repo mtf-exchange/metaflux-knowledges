@@ -51,8 +51,11 @@ ms per block = (time_2 - time_1) / (height_2 - height_1)
 division needs no clock synchronisation and no correction for your network round-trip. Your local
 clock only decides how long you wait between the two reads.
 
-Prefer a stream? The [`explorer_block`](../api/ws/subscriptions.md#explorer_block) WS channel
-pushes the same `height` and `time` on every commit.
+Want a block-by-block view? [`recent_blocks`](../api/rest/info.md#recent_blocks)
+returns the same `height` and timestamp for a window of recent blocks in one
+read, so one call gives many gaps to average. (The `explorer_block` WS channel
+that used to push them is
+[removed](../api/upgrade-notice-ids-and-shapes.md#explorer-channels-removed).)
 
 Sample over at least 30 seconds. A short sample measures jitter, not cadence.
 

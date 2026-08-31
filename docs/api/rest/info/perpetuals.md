@@ -47,7 +47,7 @@ every section, every market):
 
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
-| `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only |
+| `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only. **An unrecognized value is rejected `400`**, naming `perp` and `spot`. It used to be ignored, so a typo quietly returned BOTH sections — a superset, with no diagnostic |
 | `coin` | string | no | Market filter — keep only the row for this symbol. Unknown symbol → `404 MARKET_NOT_FOUND` |
 
 **Response**
@@ -89,7 +89,7 @@ Response (truncated to one entry per list):
         {
           "signing_id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
           "active": true, "mark_px": "50000", "mid_px": "50000", "prev_day_px": null,
-          "day_ntl_vlm": "0", "min_notional": "1", "taker_fee_bps": "5",
+          "day_ntl_vlm": "0", "min_notional": "1", "taker_fee_bps": null,
           "circulating_supply": "0"
         }
       ],
@@ -115,7 +115,7 @@ Response (truncated to one entry per list):
 | `perp[*].mid_px` | Decimal string | Order-book mid `(best_bid + best_ask) / 2`, human-decimal, tick-snapped; **omitted** when one-sided / empty |
 | `perp[*].impact_pxs` | [Decimal string, Decimal string] | Depth-aware impact prices `[bid, ask]` — the book-walk prices for the funding impact notional (the same walk the funding premium samples), human-decimal, tick-snapped; **omitted** entirely when either side of the book cannot fill the impact notional |
 | `perp[*].premium` | Decimal string \| null | Latest committed funding premium sample (signed), an **8-decimal** string (truncated toward zero); `null` when none |
-| `perp[*].funding.rate_per_hr` | bps string | The hourly funding rate that would be **charged** — the derived rate clamped to the per-asset cap (the same clamp settlement applies), decimal bps |
+| `perp[*].funding.rate_per_hr` | bps string | The hourly funding rate that would be **charged** — the derived rate clamped to the per-asset cap (the same clamp settlement applies), decimal bps. It carries **sub-bps precision**: it used to truncate to whole bps, so a rate below one bps served `"0"`, and that `"0"` did NOT mean "no funding". A `"0"` is now a true zero |
 | `perp[*].funding.cap_per_hr` | bps string | Per-hour funding-rate cap, decimal bps |
 | `perp[*].funding.interval_ms` | uint64 | Per-asset funding cadence (1h = `3600000`) |
 | `perp[*].funding.next_payment_ts` | uint64 | Next aligned funding-settlement boundary (epoch-ms); `0` until the first sample |
@@ -161,7 +161,7 @@ Same optional `kind` and `coin` filters.
 
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
-| `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only |
+| `kind` | `"perp"` \| `"spot"` | no | Section filter — absent = both; `"perp"` = the perp array only; `"spot"` = the spot section only. **An unrecognized value is rejected `400`**, naming `perp` and `spot`. It used to be ignored, so a typo quietly returned BOTH sections — a superset, with no diagnostic |
 | `coin` | string | no | Market filter — keep only the row for this symbol. Unknown symbol → `404 MARKET_NOT_FOUND` |
 
 **Response**
@@ -304,14 +304,14 @@ has, `risk_override` is an object naming the replaced values; when it has not,
 ```json
 "risk_override": {
   "max_leverage":       20,
-  "maint_margin_ratio": "0.166",
+  "maint_margin_ratio": "1660",
   "funding_rate_cap":   "0.04",
   "realized_vol_30d":   "0.4",
   "updated_at_block":   8103798,
   "liq_floor_ppm":      null,
   "liq_fee_bps":        null,
   "margin_tiers": [
-    { "lower_bound_notional": "0", "max_leverage": 100, "maint_margin_ratio": "0.005" }
+    { "lower_bound_notional": "0", "max_leverage": 100, "maint_margin_ratio": "50" }
   ]
 }
 ```
@@ -319,34 +319,35 @@ has, `risk_override` is an object naming the replaced values; when it has not,
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `max_leverage` | uint8 | Leverage ceiling the vote set |
-| `maint_margin_ratio` | Decimal string | Maintenance-margin ratio as a **raw fraction** — see the plane warning below |
+| `maint_margin_ratio` | bps string | Maintenance-margin ratio, decimal basis points — the SAME plane as the top-level `perp[*].maint_margin_ratio` |
 | `funding_rate_cap` | Decimal string | Per-interval funding clamp, a raw fraction (`"0.04"` = 4%) |
 | `realized_vol_30d` | Decimal string | The 30-day realized volatility the vote priced the row on, a raw fraction |
 | `updated_at_block` | uint64 | Block height at which the vote wrote this row |
 | `liq_floor_ppm` | uint \| null | Liquidation-price floor in parts per million. `null` = the vote set none |
 | `liq_fee_bps` | Decimal string \| null | Liquidation-fee override, decimal bps. `null` = the vote set none |
-| `margin_tiers` | array | The override ladder — each `{lower_bound_notional, max_leverage, maint_margin_ratio}` |
+| `margin_tiers` | array | The override ladder — each `{lower_bound_notional, max_leverage, maint_margin_ratio}`, `maint_margin_ratio` a bps string on the same plane as everywhere else on this row |
 
-:::danger
-**`maint_margin_ratio` appears twice on this row in TWO DIFFERENT PLANES.**
+:::info
+**`maint_margin_ratio` is decimal basis points EVERYWHERE on this row.** It used
+not to be. `perp[*].maint_margin_ratio` was bps while
+`perp[*].risk_override.maint_margin_ratio` was a raw fraction — the same rung
+under the same name, **10,000x apart**, inside one response. Measured live on
+BTC, the top-level ladder said `"50"` where the override ladder said `"0.005"`.
 
-- `perp[*].maint_margin_ratio` (the top-level field) is **decimal basis
-  points**: `"50"` = 0.5%.
-- `perp[*].risk_override.maint_margin_ratio` is a **raw fraction**: `"0.166"` =
-  16.6%.
-
-Same name, same row, scales about **1000x** apart. A caller that reads the
-override value as bps computes a maintenance margin roughly 1000x too small and
-believes a position is safe when it is not. Convert explicitly at the boundary;
-never copy one field into the other's slot.
+A caller that read the override as bps computed a maintenance margin four orders
+of magnitude too small and believed an unsafe position was safe. One concept now
+has one plane. See the
+[upgrade notice](../../upgrade-notice-ids-and-shapes.md#one-plane) — this row
+changes when that release lands.
 :::
 
-**The two `margin_tiers` ladders band on different keys, too.**
+**The two `margin_tiers` ladders still band on different keys.**
 `perp[*].margin_tiers` bands on `max_open_interest` (an ascending upper bound,
 `null` on the top tier). `risk_override.margin_tiers` bands on
 `lower_bound_notional` (an ascending **lower** bound, `"0"` on the first tier).
-The bound runs the opposite way. A ladder walked with the wrong comparison
-selects the wrong tier.
+The bound runs the opposite way — that is the shape of the committed ladder, and
+it is NOT unified by the plane change above. A ladder walked with the wrong
+comparison selects the wrong tier.
 
 **`init_margin_ratio` and `oi_cap` are NOT override keys.** Neither appears
 inside `risk_override` on any market. Read them from the top level of the same
@@ -504,7 +505,7 @@ Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
         "px":    "61643.70000000",
         "sz":    "0.00024",
         "time":  1783001424768,
-        "tid":   17691615279761551171,
+        "tid":   "17691615279761551171",
         "block": 38997,
         "hash":  "0x4660d9ccf52ef1abde5e03d1b3f1c110b948d2f71331f086239666781dbde91c"
       }
@@ -523,7 +524,7 @@ Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
 | `trades[*].px` | Decimal string | Execution price, **decimal USDC** (human-readable) |
 | `trades[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
 | `trades[*].time` | uint64 | Trade timestamp (consensus ms) |
-| `trades[*].tid` | uint64 | Deterministic trade id (shared by both legs of the print); may exceed 2⁵³ — parse as a 64-bit / big integer, not a JS number |
+| `trades[*].tid` | decimal-digit string | Deterministic trade id, shared by both legs of the print. It is a 64-bit hash-derived value and routinely exceeds 2⁵³, so it is a STRING: a JSON number loses its low digits in JavaScript, and a `user_fills` to `trades` join by `tid` then matches nothing, silently. Compare it as a string, or convert it with `BigInt` |
 | `trades[*].block` | uint64 | Committed block height the trade settled in (on-chain locator) |
 | `trades[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets a print be traced on-chain. **Empty string (`""`) when there is no signed taker action** behind the print (a system / begin-block print, or a maker leg whose submit hash is not carried) |
 
@@ -585,6 +586,18 @@ mean different things — a price bar reports `v` as `"0"` with `n` as the sampl
 count, while a trade bar carries real volume and a real trade count.
 :::
 
+#### A bad input is rejected; a quiet window is not {#candle_snapshot-rejections}
+
+An unknown `coin` and an unknown `interval` are each rejected `400`. They used to
+answer `200` with an empty `candles` array — **the identical answer a genuinely
+quiet window gives** — so a typo in a symbol read as "this market did not trade".
+[`l2_book`](#l2_book) already answered `404` for the same unknown coin, so the
+surface disagreed with itself.
+
+**A quiet window is still `200` with an empty array**, and the `coverage`
+envelope below still says so. The two cases are now different answers: "you asked
+for something that does not exist" is an error, "nothing happened there" is data.
+
 **Request**
 
 ```json
@@ -593,8 +606,8 @@ count, while a trade bar carries real volume and a real trade count.
 
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
-| `coin` | symbol | yes | Market symbol, e.g. `"BTC"` |
-| `interval` | string | yes | Bucket token — one of `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
+| `coin` | symbol | yes | Market symbol, e.g. `"BTC"`. **An unknown coin is rejected `400`** |
+| `interval` | string | yes | Bucket token — one of `1m`, `5m`, `15m`, `1h`, `4h`, `1d`. **An unknown token is rejected `400`**, naming that set |
 | `candle_type` | string | no | Series — `mark` (default), `oracle` or `trade`. Lower-case, exact match |
 | `start_time` | uint64 | no | Window start (ms); filters on bar open. Default `0` |
 | `end_time` | uint64 | no | Window end (ms); filters on bar open. Default unbounded |

@@ -100,8 +100,12 @@ to the envelope above. **It differs in two ways at once.**
 The lane is `portfolio`, `historical_orders`, `user_funding`,
 `user_funding_by_time`, `user_position_history`,
 `user_position_history_by_time`, `user_ledger`, `user_ledger_by_time`,
-`user_non_funding_ledger_updates`, `recent_blocks`, `recent_transactions` and
-`validator_votes`.
+`user_non_funding_ledger_updates`, [`recent_blocks`](#recent_blocks),
+[`recent_transactions`](#recent_transactions) and `validator_votes`.
+
+`portfolio` takes an `interval` alongside `address`, and it accepts exactly one
+value: **`1d`**. Any other value is rejected `400 invalid interval: <value>`,
+and the rejection now names `1d`.
 
 **Difference 1 — `type` sits at the top level, beside `data`, not inside it.**
 
@@ -1267,7 +1271,7 @@ Returns an account's resting orders, across every perp book and every spot book.
     "address":    "0x<addr>",
     "orders": [
       {
-        "oid":         12345,
+        "oid":         "12345",
         "coin":        "BTC",
         "side":        "B",
         "px":          "99000",
@@ -1287,7 +1291,7 @@ Returns an account's resting orders, across every perp book and every spot book.
 | Field | Type | Meaning |
 |-------|------|---------|
 | `address` | hex address | Resolved account address |
-| `orders[*].oid` | uint64 | Server order id — the real resting id, cancellable per-`oid` |
+| `orders[*].oid` | decimal-digit string | Server order id — the real resting id, cancellable per-`oid`. Send it straight back on a cancel: a request takes the string or a number |
 | `orders[*].coin` | string | Market symbol the order rests on (e.g. `"BTC"`, or a pair name like `"BTC/USDC"`) |
 | `orders[*].side` | `"B"` / `"A"` | Order side. `B` = bid, `A` = ask. The `/exchange` order body uses `"bid"` / `"ask"` instead |
 | `orders[*].px` | Decimal string | Resting price, whole units, tick-snapped |
@@ -1391,9 +1395,10 @@ is identical either way.
         "px":             "67042.50",
         "sz":             "0.125",
         "time":           1700000000555,
-        "oid":            12345,
-        "tid":            90123,
+        "oid":            "12345",
+        "tid":            "16613428288414605024",
         "fee":            "4.19",
+        "fee_token":      "USDC",
         "closed_pnl":     "0",
         "cause":          "twap",
         "twap_id":        41,
@@ -1423,9 +1428,10 @@ ring.
 | `fills[*].px` | Decimal string | Execution price, **decimal USDC** (human-readable) |
 | `fills[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
 | `fills[*].time` | uint64 | Fill timestamp (consensus ms) |
-| `fills[*].oid` | uint64 | This party's order id |
-| `fills[*].tid` | uint64 | Deterministic trade id, shared by both legs of the print |
-| `fills[*].fee` | Decimal string | Fee this party paid, **decimal USDC** |
+| `fills[*].oid` | decimal-digit string | This party's order id |
+| `fills[*].tid` | decimal-digit string | Deterministic trade id, shared by both legs of the print. It is a 64-bit hash-derived value and routinely exceeds 2^53, so it is a STRING: a JSON number loses its low digits in JavaScript, and a `user_fills` to `trades` join by `tid` then matches nothing, silently. Compare it as a string, or convert it with `BigInt` |
+| `fills[*].fee` | Decimal string | Fee this party paid. **Read `fee_token` for the denomination — it is not always USDC** |
+| `fills[*].fee_token` | string | Coin symbol the `fee` is charged in. A perp fill and a spot SELL pay `"USDC"`; a **spot BUY pays the BASE token**, so a `BTC/USDC` buy pays its fee in BTC. That rule has been live since block 6,565,000; the field is derived per record, so an older fill correctly reports `"USDC"` on both sides. **Without it, summing `fee` across a spot account adds one token to another.** On a spot BUY it also warns you that `fee` is not the whole story: the base fee is NETTED out of the size delivered, not debited, so `fee` can read `"0"` while the real charge is the gap between `sz` and the balance credit — see [a spot BUY pays its fee in the base token](../../concepts/fees.md#spot-buy-fee-in-base) |
 | `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **decimal USDC** (signed) |
 | `fills[*].dir` | string | Direction label: `"Open Long"`, `"Close Short"`, `"Open Short"`, or `"Close Long"` |
 | `fills[*].start_position` | Decimal string | Signed leg size before the fill, **base units** (whole-unit, signed) |
@@ -1466,13 +1472,18 @@ Or by client order id:
 
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
-| `oid` | uint64 | one of `oid` / `cloid` | Server order id |
+| `oid` | uint64 \| decimal-digit string | one of `oid` / `cloid` | Server order id. A number and a string are both accepted, so an `oid` read back off any response can be sent straight back |
 | `cloid` | hex string | one of `oid` / `cloid` | Client order id — `0x` + 32 hex chars |
 
 Neither field present returns `400 INVALID_REQUEST`. A
 malformed `cloid` returns `400`. Resolution stops at the first hit, in this
-order: live resting order, then parked trigger, then terminal fill, then
-unknown.
+order: live resting order, then parked trigger, then the order's fills, then a
+terminal outcome, then unknown.
+
+**A `cloid` resolves at every one of those stages.** It used to die the moment
+the write completed — the fill ring is keyed by `oid` and carried no cloid, so a
+filled order stopped answering by `cloid`. The node now carries the cloid into
+its read-side rings.
 
 **Response**
 
@@ -1486,7 +1497,7 @@ The `data.status` field discriminates which shape follows.
     "type": "order_status",
     "status": "resting",
     "order": {
-      "oid":         12345,
+      "oid":         "12345",
       "coin":        "BTC",
       "side":        "B",
       "px":          "67000",
@@ -1506,7 +1517,7 @@ The `data.status` field discriminates which shape follows.
     "type": "order_status",
     "status": "triggered",
     "trigger": {
-      "oid":           12345,
+      "oid":           "12345",
       "coin":          "BTC",
       "side":          "A",
       "trigger_px":    "66000",
@@ -1532,7 +1543,7 @@ carries neither:
     "type": "order_status",
     "status": "triggered",
     "trigger": {
-      "oid":           12346,
+      "oid":           "12346",
       "coin":          "BTC",
       "side":          "A",
       "trigger_px":    "65750",
@@ -1549,33 +1560,99 @@ carries neither:
 }
 ```
 
-`"filled"` — the most recent matching fill in the per-account ring (the `fill`
-object is the same shape as one [`user_fills`](#user_fills) record):
+`"filled"` — EVERY matching leg, plus the summed size:
 
 ```json
 {
   "data": {
     "type": "order_status",
     "status": "filled",
-    "fill": { /* same shape as a user_fills fill record */ }
+    "fills": [ /* each leg, oldest first — same shape as a user_fills record */ ],
+    "total_filled_sz": "1.49"
   }
 }
 ```
 
-`"unknown"` — never seen, or evicted from the bounded ring (a `cloid`-only
-query that matched no resting/triggered order also resolves here, since the
-trigger registry and fill ring are keyed by `oid`):
+**`fills` is a LIST because an order fills in more than one print.** The read
+used to serve a single `fill` object holding one arbitrary leg, with nothing to
+mark it partial: measured live, order `32535358` filled `0.62` and then `0.87`,
+and the read answered `0.62` — wrong by 58%. Compare `total_filled_sz` with the
+order's own size to tell a full fill from a partial one. If you want one leg,
+read `fills[0]` and know that is what you chose.
+
+`"canceled"` / `"cancel_rejected"` / `"rejected"` — the order reached a terminal
+state without filling. All three carry the same `outcome` object:
 
 ```json
-{ "data": { "type": "order_status", "status": "unknown" } }
+{
+  "data": {
+    "type": "order_status",
+    "status": "canceled",
+    "outcome": {
+      "oid":    "32535358",
+      "coin":   "BTC",
+      "side":   null,
+      "time":   1788004665371,
+      "reason": null
+    }
+  }
+}
 ```
+
+**There are exactly three terminal tokens.** Branch on `status`. `reason` is
+prose and its wording changes:
+
+| Token | What it means |
+|-------|---------------|
+| `canceled` | The cancel ran and it succeeded. `reason` is `null` |
+| `cancel_rejected` | The CANCEL request failed. The order had already left this node's live view. The ORDER is gone; it is the cancel that did not run. `reason` carries the refusal text |
+| `rejected` | The order itself was refused. It never rested and it never got an id, so it is reachable by `cloid` only, and `outcome.oid` is `null`. `reason` carries the refusal text |
+
+**There is no `expired` token.** No node path writes one. Do not code a branch
+for it.
+
+**`outcome` carries five fields and no others.** It has no `sz`, no `filled_sz`
+and no `cloid`. Two rules put them out of reach, and both are permanent:
+
+- **A fill wins before an outcome does.** Resolution reaches the fill ring
+  BEFORE the terminal window, so an order with even one fill answers `"filled"`
+  and never reaches this branch. An order that does reach it has no fills, so a
+  `filled_sz` here could only ever read `"0"`.
+- **A cancel names the order, not its shape.** The event the node records
+  carries the id, the market and the time — not the size and not the side. That
+  is why `side` is `null` on both cancel outcomes.
+
+`outcome` is a SEPARATE key from the `order` of a resting hit. The two answer
+different questions, and one name over two field sets is how a caller reads the
+wrong one.
+
+`"unknown"` — **outside this node's retention view.** It is not proof the order
+never existed:
+
+```json
+{ "data": { "type": "order_status", "status": "unknown", "outcome_coverage": 42 } }
+```
+
+`outcome_coverage` rides the `unknown` answer alone. It counts the orders the
+terminal window holds right now. **Read it before you trust an `unknown`:** a
+`0` says the window is empty — the node restarted — so the `unknown` carries no
+information about your order at all.
+
+The terminal states above come from a **node-local retention window**, not from
+committed state. A node restart empties that window, so after a restart the node
+answers `unknown` for orders it would have named before. For the archive answer,
+read [`historical_orders`](#historical_orders). This is the same retention
+contract `historical_orders` already carries.
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `status` | `"resting" \| "triggered" \| "filled" \| "unknown"` | Resolved lifecycle state |
-| `order` | object | Present on `"resting"` — `oid`, `coin` (market symbol or spot pair name), `side` (`"B"` = bid / `"A"` = ask), `px` / `sz` (decimal strings), `inserted_at`, `cloid` (hex \| null) |
-| `trigger` | object | Present on `"triggered"` — `oid`, `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
-| `fill` | object | Present on `"filled"` — the matching fill record (see [`user_fills`](#user_fills)) |
+| `status` | `"resting" \| "triggered" \| "filled" \| "canceled" \| "cancel_rejected" \| "rejected" \| "unknown"` | Resolved lifecycle state. These seven tokens are the whole set |
+| `order` | object | Present on `"resting"` — `oid` (decimal-digit string), `coin` (market symbol or spot pair name), `side` (`"B"` = bid / `"A"` = ask), `px` / `sz` (decimal strings), `inserted_at`, `cloid` (hex \| null) |
+| `trigger` | object | Present on `"triggered"` — `oid` (decimal-digit string), `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
+| `fills` | array | Present on `"filled"` — EVERY matching leg, oldest first, each the shape of one [`user_fills`](#user_fills) record |
+| `total_filled_sz` | Decimal string | Present on `"filled"` — the sum of `fills[*].sz` |
+| `outcome` | object | Present on `"canceled"` / `"cancel_rejected"` / `"rejected"` — exactly five fields: `oid` (decimal-digit string \| `null`; `null` when the node holds no id for the record — always on `rejected`, and on a `cancel_rejected` for a `cloid` that never mapped to an order), `coin` (market symbol or spot pair name), `side` (`"B"` / `"A"` \| `null`; `null` on both cancel outcomes — a cancel names the order, not its side), `time` (uint64, consensus ms of the transition), `reason` (string \| `null`; `null` on a successful cancel — **branch on `status`, never on this string**). No `sz`, no `filled_sz`, no `cloid` — see [above](#order_status) |
+| `outcome_coverage` | uint | Present on `"unknown"` ONLY — how many orders the terminal window holds. `0` means the window is empty (a restart), so the `unknown` says nothing about your order |
 
 ### The live option series registry {#option_series}
 
@@ -1792,16 +1869,12 @@ missing or malformed → `400`); an **unknown address is never an error** — it
 returns **200** with the empty shape (the zeroed-default convention used
 elsewhere in this reference).
 
-[`user_funding`](#user_funding) and [`historical_orders`](#historical_orders)
-are live and populated. One type still ships the locked wire contract with an
-**honest-empty** array — [`user_twap_slice_fills`](#user_twap_slice_fills),
-marked **Status: empty (history retention pending)** below. Its backing events
-stream on the live [WS channels](../ws/subscriptions.md) only and are not yet
-retained for REST. The retention backfill fills it **without a wire change** —
-the request and response envelopes below are final.
+[`user_funding`](#user_funding), [`historical_orders`](#historical_orders) and
+[`user_twap_slice_fills`](#user_twap_slice_fills) are live and populated.
 
 An empty array alone does not tell you which case you are in: an account with
-no matching history also reads `[]`. Read the notice on the type itself.
+no matching history also reads `[]`, and a node-local retention window is empty
+right after a restart. Read the notice on the type itself.
 
 [`user_ledger_updates`](#user_ledger_updates) is empty for a different reason:
 its records live in the archive, not on the node. Read its own notice below.
@@ -1969,7 +2042,7 @@ rejected — see [malformed requests](#malformed-request).
     "address": "0x<addr>",
     "orders": [
       {
-        "oid":           32535358,
+        "oid":           "32535358",
         "coin":          "GRAD:000001SH",
         "side":          "A",
         "status":        "filled",
@@ -1995,7 +2068,7 @@ rejected — see [malformed requests](#malformed-request).
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `orders[*].oid` | uint64 | Order id. **Not unique** — see the rules below. `0` on an `"error"` record, which never reached the book |
+| `orders[*].oid` | decimal-digit string | Order id. **Not unique** — see the rules below. `"0"` on an `"error"` record, which never reached the book |
 | `orders[*].coin` | string | Market symbol the order was placed on |
 | `orders[*].side` | `"B"` / `"A"` | Side token — `"B"` = buy/bid, `"A"` = sell/ask. Same token as [`user_fills`](#user_fills) |
 | `orders[*].status` | `"filled"` \| `"resting"` \| `"error"` | The transition this record reports |
@@ -2020,7 +2093,7 @@ rejected — see [malformed requests](#malformed-request).
   this is a recent window, not the full account history.
 - **`oid` is not a unique key. Do not use it to deduplicate.** A record is one
   order transition, so one `oid` can appear more than once. Worse, every
-  `"error"` record carries `oid: 0`, so an account with many rejections holds
+  `"error"` record carries `oid: "0"`, so an account with many rejections holds
   many records sharing that single id. Key on `oid` plus `time` plus `status`,
   or do not key at all.
 - **`"error"` is a real status, and it carries a human-readable `error`
@@ -2069,12 +2142,15 @@ second call times out exactly like the first. Re-read state instead.
 
 ### TWAP slice-fill history {#user_twap_slice_fills}
 
-Fill history for individual TWAP order slices.
+Fill history for individual TWAP order slices — the executions of one TWAP
+parent, so a caller can attribute fills to the order that produced them. The
+account's active TWAP parents are on [`user_twaps`](#user_twaps); live slices
+also stream on the `user_twap_slice_fills`
+[WS channel](../ws/subscriptions.md#user_twap_slice_fills).
 
-**Status: empty (history retention pending).** `fills` returns `[]` until TWAP
-slice fills are retained for REST. For live slice fills today, subscribe to
-the `user_twap_slice_fills` [WS channel](../ws/subscriptions.md); the
-account's active TWAP parents are on [`user_twaps`](#user_twaps).
+**It is a node-local RETENTION WINDOW, not a history.** A node restart empties
+it, so an empty `fills` after a restart is not the same fact as "this account has
+never run a TWAP". Read the coverage envelope to tell the two apart.
 
 **Request**
 
@@ -2087,17 +2163,17 @@ No parameters beyond `address`, which is required (hex address).
 **Response**
 
 ```json
-{ "data": { "type": "user_twap_slice_fills", "address": "0x<addr>", "fills": [] } }
+{ "data": { "type": "user_twap_slice_fills", "address": "0x<addr>", "fills": [
+  { "twap_id": 41, "fill": { /* same shape as a user_fills record */ } }
+] } }
 ```
 
 | Field | Type | Meaning |
 |-------|------|---------|
 | `address` | hex address | Echoes the request address |
-| `fills` | array | Slice-fill records. Empty until REST retention ships |
-
-Locked record shape, for when retention ships: `{twap_id, fill}` —
-`twap_id` (uint64) is the parent TWAP id, and `fill` is a full
-[`user_fills`](#user_fills) record for the slice.
+| `fills` | array | Slice-fill records, oldest first |
+| `fills[*].twap_id` | uint64 | The parent TWAP this slice belongs to. It stays a NUMBER — a small per-account counter, not a derived 64-bit value |
+| `fills[*].fill` | object | A full [`user_fills`](#user_fills) record for the slice, `oid` / `tid` decimal-digit strings included |
 
 ### Per-validator staking reward accruals {#delegator_rewards}
 
@@ -2140,6 +2216,111 @@ No parameters beyond `address`, which is required (hex address).
 - Rows list in ascending validator-address order.
 - An account with no staking state returns `claimable_rewards: "0"` and an
   empty `rewards` array.
+
+## Chain activity query types {#chain-activity-query-types}
+
+Recent blocks and recent order-lifecycle events, served by the gateway from the
+standalone history archive. **They are the replacement for the removed
+`explorer_block` / `explorer_txs` WS channels** — see the
+[upgrade notice](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed)
+for why a validator no longer pushes that firehose.
+
+Both answer in the [history-archive envelope](#archive-lane): `type` sits beside
+`data`, not inside it. A gateway with no archive configured answers an empty
+array with a `flag`, never an error.
+
+### Recent committed blocks {#recent_blocks}
+
+**Request**
+
+```json
+{ "type": "recent_blocks", "limit": 100 }
+```
+
+| Field | Type | Required | Meaning |
+|-------|------|----------|---------|
+| `limit` | uint32 | no | Cap on rows returned, newest first |
+
+**Response**
+
+```json
+{
+  "data": {
+    "blocks": [
+      { "height":       26616908,
+        "block_hash":   "0x3bbcfeea4bcebded111b4407fe46ea2fbda57457fad926e27de9012eceabd583",
+        "ts_ms":        1788169351971,
+        "action_count": 0,
+        "fill_count":   0 }
+    ]
+  },
+  "type": "recent_blocks"
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `blocks[*].height` | uint64 | Committed block height. Each committed block advances exactly one consensus round |
+| `blocks[*].block_hash` | hex string \| null | Block hash |
+| `blocks[*].ts_ms` | uint64 | Block timestamp (consensus ms) |
+| `blocks[*].action_count` | uint32 | Signed actions committed in the block |
+| `blocks[*].fill_count` | uint32 | Fills settled in the block |
+
+**There is no `proposer`.** The removed WS header carried the proposing
+validator index; the archive record does not. Nothing else serves it today.
+
+**Size a poll so it cannot gap.** The block cadence is about 100 ms, so 100 rows
+span roughly 10 seconds of chain and a 2-second poll always overlaps. Measure the
+cadence rather than trusting that figure — it moves between releases.
+
+### Recent order-lifecycle events {#recent_transactions}
+
+One row per order TRANSITION, not per order. A single order emits several rows
+(placed, then filled, then cancelled), so `oid` repeats and cannot key a list.
+
+**Request**
+
+```json
+{ "type": "recent_transactions", "limit": 100 }
+```
+
+| Field | Type | Required | Meaning |
+|-------|------|----------|---------|
+| `limit` | uint32 | no | Cap on rows returned, newest first |
+
+**Response**
+
+```json
+{
+  "data": {
+    "txns": [
+      { "oid":    "34143530",
+        "user":   "0x0c4ec1cba7310669b08145f17a29b1048d9196ab",
+        "coin":   "PUMP",
+        "action": "resting",
+        "status": 1,
+        "side":   0,
+        "time":   1788169342234 }
+    ]
+  },
+  "type": "recent_transactions"
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `txns[*].oid` | decimal-digit string | Order id. **Not unique across rows** — one order emits one row per transition |
+| `txns[*].user` | hex address | Acting account |
+| `txns[*].coin` | string | Market symbol or spot pair name |
+| `txns[*].action` | string | Readable lifecycle label (`"resting"` / `"filled"` / `"canceled"` …). Treat it as an open set |
+| `txns[*].status` | uint8 | The raw status code behind `action` |
+| `txns[*].side` | uint8 | `0` = bid, `1` = ask |
+| `txns[*].time` | uint64 | Event timestamp (consensus ms) |
+
+**There is no `hash`.** The removed WS row carried the originating action hash,
+and [`/exchange`](./exchange.md) pointed at it as the hash-keyed way to check a
+submitted action. Correlate by `cloid` instead, or read
+[`action_outcome`](#action_outcome).
 
 ## Governance query types {#governance-query-types}
 
@@ -2556,7 +2737,7 @@ The status splits the two kinds of removal:
 | `abstraction_state` | Nothing. Its `kind` / `value` pair was per-kind free-form, so a value had no wire-defined meaning |
 | `account_overview`, `web_data` | [`account_state`](#account_state) with `detail: "overview"` — the same body |
 | `agents` | [`account_state`](#account_state) with `detail: "overview"` — `agents` |
-| `block_info` | [`account_state`](#account_state) for the committed `height` / `time` stamp; the [`explorer_block`](../ws/subscriptions.md#explorer_block) WS channel for the full block head |
+| `block_info` | [`account_state`](#account_state) for the committed `height` / `time` stamp; the archive-backed `recent_blocks` read for the block head. (The `explorer_block` WS channel that used to answer this is [removed](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed) — a validator must not serve a per-block firehose) |
 | `bridge_chain_configs` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) — `withdrawals_halted` and `configs` |
 | `bridge_finalized_cosignatures`, `bridge_outbound_queue` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) for one account's own withdrawals. The whole-chain queue and the raw validator cosignature bytes are not part of this API |
 | `delegator_history` | Nothing. No delegation event log is committed |

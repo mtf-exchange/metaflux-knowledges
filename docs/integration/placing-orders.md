@@ -125,7 +125,7 @@ the digest is built.
 ### Step 4 — read the response {#read-the-response}
 
 ```json
-{ "statuses": [ { "resting": { "oid": 12345, "cloid": "0x0000000000000000000000000000ab01" } } ] }
+{ "statuses": [ { "resting": { "oid": "12345", "cloid": "0x0000000000000000000000000000ab01" } } ] }
 ```
 
 An order action waits for commit, then returns `200 OK`, so the `oid` is real.
@@ -173,7 +173,7 @@ order gives:
 
 ```json
 { "statuses": [
-  { "resting": { "oid": 12345 } },
+  { "resting": { "oid": "12345" } },
   { "error": "reduce-only would grow position" }
 ] }
 ```
