@@ -6,8 +6,10 @@ description: The per-block NDJSON streams a MetaFlux node writes to disk — ena
 
 :::info
 **Status.** **stable** shapes. Every stream is **off by default** and is enabled
-one flag at a time. A node in the validator set **refuses** to record unless you
-set an explicit override. Run the streams on a **non-validating node**.
+one flag at a time. Most streams de-anonymize order flow or account value. A node
+in the validator set logs a loud warning for those and records anyway. Only the
+two book-diff streams are refused outright. Run the streams on a **non-validating
+node**.
 :::
 
 ## TL;DR {#tldr}
@@ -19,7 +21,8 @@ Each envelope holds zero or more **records**.
 The node does not serve these files. It only writes them. You read them with your
 own indexer, archiver, or analytics job.
 
-Ten streams exist. Six carry block events. Two sample on a timer. Two carry order-book state.
+Thirteen streams exist. Nine carry block events. Two sample on a timer. Two carry
+order-book state.
 
 | Stream | On-disk root | Content |
 |--------|--------------|---------|
@@ -28,8 +31,11 @@ Ten streams exist. Six carry block events. Two sample on a timer. Two carry orde
 | [`node_order_statuses`](#node_order_statuses) | `<data_dir>/node_order_statuses/` | Order lifecycle transitions |
 | [`node_funding`](#node_funding) | `<data_dir>/node_funding/` | Realized funding payments |
 | [`node_ledger`](#node_ledger) | `<data_dir>/node_ledger/` | Signed non-funding balance deltas |
+| [`node_gov`](#node_gov) | `<data_dir>/node_gov/` | Governance vote casts and enactments |
+| [`node_bridge_outbox`](#node_bridge_outbox) | `<data_dir>/node_bridge_outbox/` | Bridge withdrawal outbox: admissions, status moves, deployment rows |
 | [`node_equity_snapshots`](#node_equity_snapshots) | `<data_dir>/node_equity_snapshots/` | Hourly account-value samples |
 | [`node_asset_ctxs`](#node_asset_ctxs) | `<data_dir>/node_asset_ctxs/` | Per-market mark and oracle price samples, every 5 s |
+| [`node_blocks`](#node_blocks) | `<data_dir>/node_blocks/` | One block head per committed block, including an empty one |
 | [`replica_cmds`](#replica_cmds) | `<data_dir>/replica_cmds/` | One block envelope per block, header plus events |
 | [`l4_book_diffs`](#l4_book_diffs) | `<data_dir>/l4_book_diffs.jsonl` | Per-order book diffs, with owner |
 | [`l2_book_diffs`](#l2_book_diffs) | `<data_dir>/l2_book_diffs.jsonl` | Per-price-level book diffs, anonymous |
@@ -55,7 +61,11 @@ Every flag defaults to `false`.
 | `node_order_statuses` | `write_order_statuses` | `false` |
 | `node_funding` | `write_funding` | `false` |
 | `node_ledger` | `write_ledger` | `false` |
+| `node_gov` | `write_gov` | `false` |
+| `node_bridge_outbox` | `write_bridge_outbox` | `false` |
 | `node_equity_snapshots` | `write_equity_snapshots` | `false` |
+| `node_asset_ctxs` | `write_asset_ctxs` | `false` |
+| `node_blocks` | `write_blocks` | `false` |
 | `replica_cmds` | `write_replica_cmds` | `false` |
 | `l4_book_diffs` | `record_l4` | `false` |
 | `l2_book_diffs` | `record_l2` | `false` |
@@ -72,21 +82,29 @@ write_order_statuses = true
 
 A disabled stream creates no directory and no file.
 
-### Recording is refused on a validator {#validator-refusal}
+### Recording on a validator {#validator-refusal}
 
-These streams de-anonymize order flow and account value. A node in the validator
-set therefore refuses to record.
+Most streams de-anonymize order flow, account value, or a user withdrawal. A node
+in the validator set that enables one publishes the flow of every account that
+trades on it.
 
-- The seven `write_*` streams are refused **as a group**. If any one of them is
-  set on a validator, the node records **none** of them and logs a warning. Set
-  `persistence.allow_stream_on_validator = true` to record anyway. Use that
-  override only when the order flow is your own.
-- `record_l4` and `record_l2` are refused on a validator with **no override**.
+- **An enabled `write_*` stream always records.** A validator that sets one gets
+  a loud start-up warning, never a silent refusal. There is no config override,
+  because there is no gate to lift. Enable these on a validator only when the
+  flow is your own.
+  The warned set is `write_fills`, `write_trades`, `write_order_statuses`,
+  `write_funding`, `write_ledger`, `write_equity_snapshots`,
+  `write_bridge_outbox`, and `write_replica_cmds`.
+- **Three streams carry nothing to de-anonymize** and raise no warning:
+  `write_gov` names a validator, not a trader; `write_asset_ctxs` and
+  `write_blocks` carry no address and no account value. `node_gov` is meant to
+  run on a validator — that is where the votes happen.
+- **`record_l4` and `record_l2` are refused on a validator**, with no override.
   They also walk the whole book once per block, which is work a validator must
   not do on the commit path.
 
-The intended place to run any of these streams is a **non-validating node** that
-follows the chain and serves nobody. Point your indexer at that node.
+The intended place to run a de-anonymizing stream is a **non-validating node**
+that follows the chain and serves nobody. Point your indexer at that node.
 
 ### Snapshot-style streams sample a window {#sampling-windows}
 
@@ -97,6 +115,7 @@ writing every block.
 | Stream | Window | Sampled block |
 |--------|--------|---------------|
 | `node_equity_snapshots` | One UTC hour of consensus block time (3,600,000 ms) | The first committed block of each window |
+| `node_asset_ctxs` | 5,000 ms of consensus block time | The first committed block of each window |
 | `l4_book_diffs` / `l2_book_diffs` | `persistence.snapshot_interval` blocks (default `1024`) | The block that closes the interval, plus one bootstrap snapshot on the first non-empty book |
 
 `node_equity_snapshots` writes exactly one sample per hourly file. It does not
@@ -110,7 +129,7 @@ full snapshot line on the interval.
 
 ### Hourly files {#hourly-files}
 
-Six streams rotate hourly:
+Ten streams rotate hourly:
 
 ```
 <data_dir>/node_fills/hourly/{YYYYMMDD}/{HH}
@@ -118,7 +137,11 @@ Six streams rotate hourly:
 <data_dir>/node_order_statuses/hourly/{YYYYMMDD}/{HH}
 <data_dir>/node_funding/hourly/{YYYYMMDD}/{HH}
 <data_dir>/node_ledger/hourly/{YYYYMMDD}/{HH}
+<data_dir>/node_gov/hourly/{YYYYMMDD}/{HH}
+<data_dir>/node_bridge_outbox/hourly/{YYYYMMDD}/{HH}
 <data_dir>/node_equity_snapshots/hourly/{YYYYMMDD}/{HH}
+<data_dir>/node_asset_ctxs/hourly/{YYYYMMDD}/{HH}
+<data_dir>/node_blocks/hourly/{YYYYMMDD}/{HH}
 ```
 
 `replica_cmds` rotates hourly too, but **without** the `hourly/` segment:
@@ -163,8 +186,9 @@ A consumer must detect a gap line before it parses an envelope, must skip it, an
 should record the hole so archive completeness stays auditable. A gap line always
 starts with `{"gap"`. An envelope never does.
 
-`replica_cmds` writes one envelope for **every** committed block, including an
-empty one, so its heights form a contiguous sequence between gaps.
+`node_blocks` and `replica_cmds` each write one envelope for **every** committed
+block, including an empty one, so their heights form a contiguous sequence
+between gaps. Every other stream skips an empty block.
 
 ### Control files {#control-files}
 
@@ -174,6 +198,7 @@ Each stream root holds small node-internal files beside its date directories:
 |------|---------|
 | `<stream root>/cursor` | Last recorded block number, as decimal text |
 | `<data_dir>/node_equity_snapshots/snapshot_bucket` | Last sampled window index |
+| `<data_dir>/node_asset_ctxs/snapshot_bucket` | Last sampled window index |
 
 These are not archive data. Do not parse them as envelopes. A walker that
 enumerates only directories under the stream root never sees them.
@@ -213,9 +238,22 @@ Which plane a stream uses:
 | `node_order_statuses` | Raw price | Raw size | — |
 | `node_funding` | — | Whole units (`szi`) | Whole USDC |
 | `node_ledger` | — | — | Whole tokens |
+| `node_gov` | — | — | Whole stake units |
+| `node_bridge_outbox` | — | — | Raw token base units |
 | `node_equity_snapshots` | — | — | Whole USDC |
+| `node_asset_ctxs` | Raw price | — | — |
+| `node_blocks` | — | — | — |
 | `replica_cmds` | Whole USDC | **Mixed** — see [`replica_cmds`](#replica_cmds) | Whole USDC |
 | `l4_book_diffs` / `l2_book_diffs` | Raw price | Raw size | — |
+
+Two number kinds sit outside the price / size / money split above.
+
+- `node_gov` carries **stake** as a whole-integer string. It is a count of stake
+  units. It is never divided.
+- `node_bridge_outbox` carries a bridge **amount** as raw base units of the
+  bridged token. Divide it by that token's own on-chain decimals, never by a
+  market's `sz_decimals`. The two raw planes look alike and take different
+  divisors.
 
 Every price, size, and money value is a JSON **string**. Block numbers,
 timestamps, order ids, trade ids, and enum codes are bare JSON numbers.
@@ -485,6 +523,335 @@ credited by validator quorum, and liquidation settlements. Do not reconstruct an
 account balance from `node_ledger` alone.
 :::
 
+## `node_gov` {#node_gov}
+
+One record per governance vote cast, plus one record per enactment. This is the
+only durable record of who voted and what an enactment changed. The live tally is
+transient: a quorum drains it and a timeout prunes it.
+
+```json
+{
+  "block_number": 941006670,
+  "block_time": 1735689603000,
+  "events": [
+    {
+      "type": "vote_cast",
+      "round": 2000007,
+      "category": "dynamic_risk",
+      "sub_id": 7,
+      "action": "setDynamicRiskParam",
+      "asset": 0,
+      "coin": "BTC",
+      "validator": "0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345",
+      "stake": "4000000",
+      "total_stake": "10000000",
+      "quorum_met": true,
+      "payload": "0x01ab",
+      "time": 1735689603000
+    },
+    {
+      "type": "vote_enacted",
+      "round": 2000007,
+      "action": "setDynamicRiskParam",
+      "asset": 0,
+      "coin": "BTC",
+      "changes": [
+        { "field": "max_leverage", "prior": "20", "new": "25" }
+      ],
+      "agreeing_stake": "7000000",
+      "total_stake": "10000000",
+      "time": 1735689603000
+    }
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `block_number` | uint64 | Committed block height |
+| `block_time` | uint64 | Consensus block timestamp, ms |
+| `events` | array | Casts and enactments in **emission order** |
+
+Casts and enactments share one list, so their relative order inside a block is
+preserved. That order is the per-block discriminator. Do not sort `events`.
+
+Each event is one of two shapes. Read `type` to tell them apart.
+
+### `vote_cast` {#node_gov-vote-cast}
+
+| Field | Type | Units | Meaning |
+|-------|------|-------|---------|
+| `round` | uint64 | id | Synthetic vote round this cast belongs to |
+| `category` | string | — | The round's vote family: `"dynamic_risk"`, `"vote_global"`, `"mb_configure_chain"`, `"oracle_weights"`, `"circle_promotion_attest"`, `"option_listing"`, `"option_auto_list"`, `"spot_margin_params"`, or `"proposal"` |
+| `sub_id` | uint64 | — | Offset of `round` inside its category band. Under `"proposal"` it **equals `round`** |
+| `action` | string | — | Wire action name the vote targets, such as `"setDynamicRiskParam"` |
+| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote |
+| `coin` | string \| absent | — | Market symbol for `asset`. Absent when the vote is global, or the market carries no listing spec |
+| `validator` | string | — | Casting validator's `0x` address, lowercase, 20 bytes |
+| `stake` | decimal string | whole stake units | **This validator's own** weight at the cast |
+| `total_stake` | decimal string | whole stake units | Quorum denominator: total active, non-excluded stake at the cast |
+| `quorum_met` | bool | — | `true` when this cast carried the payload to two thirds of `total_stake` |
+| `payload` | string | — | Raw vote bytes, `0x`-hex, undecoded. Two validators agree when these bytes are identical. Decode it per `action` |
+| `time` | uint64 | ms | Cast timestamp. Equals `block_time` |
+
+### `vote_enacted` {#node_gov-vote-enacted}
+
+| Field | Type | Units | Meaning |
+|-------|------|-------|---------|
+| `round` | uint64 | id | The round that reached quorum |
+| `action` | string | — | Wire action name |
+| `asset` | uint32 \| absent | id | Market asset id. Absent on a chain-global change |
+| `coin` | string \| absent | — | Market symbol for `asset` |
+| `changes` | array | — | The fields the enactment moved, in a fixed order |
+| `agreeing_stake` | decimal string | whole stake units | Weight that agreed on the enacted payload |
+| `total_stake` | decimal string | whole stake units | Quorum denominator at enactment |
+| `time` | uint64 | ms | Enactment timestamp. Equals `block_time` |
+
+One entry of `changes`:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `field` | string | Name of the parameter the enactment moved |
+| `prior` | string \| null | The **effective** value just before the write, resolved through the same ladder a read uses |
+| `new` | string | Value after the write |
+
+Values in `changes` stay strings. One enactment can move several fields of one
+struct, and those fields are not one numeric type.
+
+:::warning
+**Five traps on this stream.**
+
+1. **Every cast is recorded, quorum or not.** A vote short of quorum ages out of
+   the live tally, but its `vote_cast` records stay in the archive. There is no
+   "rejected" record: this governance model has a stake threshold and a timeout,
+   no reject vote. The only sign a vote never passed is the absence of a
+   `vote_enacted` on the same `round`.
+2. **`stake` is the caster's own weight, not a running total.** Use
+   `total_stake` as the denominator, and `agreeing_stake` on `vote_enacted` as
+   the numerator.
+3. **`agreeing_stake` and `total_stake` on `vote_enacted` can read `"0"`.** They
+   are joined from the quorum-carrying `vote_cast` in the **same block**. An
+   enactment that fires from another trigger has no such cast in its block, so
+   both read `"0"`. Look up the earlier `vote_cast` with `quorum_met: true` on
+   the same `round`.
+4. **`sub_id` changes meaning with `category`.** In a named category it is an
+   offset inside that category's round band. Under `"proposal"` the round is the
+   proposal id itself, and `sub_id` repeats it.
+5. **`prior: null` does not mean "first ever value".** It means the read path
+   could not resolve an effective prior at all. Never read `null` as zero, and
+   never as "previously unset".
+:::
+
+A `quorum_met: true` cast does not guarantee a `vote_enacted` follows. The node
+emits the enactment only after the state write it describes succeeds. Join on
+`round`; do not assume a match exists.
+
+## `node_bridge_outbox` {#node_bridge_outbox}
+
+The bridge withdrawal outbox, as one envelope per block that moved it. The node
+diffs the committed outbox against the last envelope it wrote, and writes nothing
+when nothing moved.
+
+An entry's `status` is the same value, from the same derivation, that the bridge
+`/info` reads serve. This stream copies it. It never recomputes it.
+
+Four record kinds, told apart by `type`:
+
+| `type` | When it appears |
+|--------|-----------------|
+| `admission` | The recorder's first sight of this `economic_id`. The only kind that carries `msg` |
+| `transition` | The derived half moved: co-signature count, status, or release time |
+| `rebind` | A deployment change re-derived this entry. Emitted for **every** open entry on that block |
+| `removed` | The entry left the outbox, through release or the retention prune. Terminal |
+
+A withdrawal is admitted:
+
+```json
+{
+  "block_number": 941006680,
+  "block_time": 1735689604000,
+  "events": [
+    {
+      "type": "admission",
+      "economic_id": "0x7e1fbb3c5a2d9104e6f8091a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e",
+      "message_id": "0x2c9d40a1b7e35f8206c4d1e9f0a3b5c7d8e9f0a1b2c3d4e5f60718293a4b5c6d",
+      "status": "awaiting_cosignatures",
+      "pending_cosigner_count": 0,
+      "released_at_ms": null,
+      "msg": {
+        "chain": 1,
+        "user": "0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345",
+        "asset": 0,
+        "token": "USDC",
+        "amount_units": "25000000",
+        "dst_addr": "0x0000000000000000000000008a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+        "nonce": 41,
+        "ts_ms": 1735689604000
+      }
+    }
+  ]
+}
+```
+
+Co-signatures reach quorum in a later block:
+
+```json
+{"block_number":941006740,"block_time":1735689610000,"events":[{"type":"transition","economic_id":"0x7e1fbb3c…","message_id":"0x2c9d40a1…","status":"ready_to_release","pending_cosigner_count":0,"released_at_ms":null}]}
+```
+
+The entry is released and leaves the outbox:
+
+```json
+{"block_number":941009000,"block_time":1735689840000,"events":[{"type":"removed","economic_id":"0x7e1fbb3c…","message_id":"0x2c9d40a1…","status":"released","pending_cosigner_count":0,"released_at_ms":1735689840000}]}
+```
+
+### Envelope {#node_bridge_outbox-envelope}
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `block_number` | uint64 | Committed block height |
+| `block_time` | uint64 | Consensus block timestamp, ms |
+| `events` | array | Outbox records for this block. Can be empty |
+| `configs` | array \| absent | The **full** current per-chain deployment set. Present only on a block where it differs from the last envelope |
+| `withdrawals_halted` | bool \| absent | Chain-wide refusal of new withdrawals. Present on exactly the blocks `configs` is |
+
+:::warning
+**`configs` and `withdrawals_halted` mean "replace the stored set", not "a
+rotation happened".** They ride any block whose committed rows differ from the
+last emitted view. That includes the **first envelope after a restart**, because
+the node's memory of the rows starts empty. Reading their presence as a rotation
+marker gives a false rotation on every restart. Compare the rows to decide.
+:::
+
+### One event {#node_bridge_outbox-event}
+
+| Field | Type | Units | Meaning |
+|-------|------|-------|---------|
+| `type` | string | — | `"admission"`, `"transition"`, `"rebind"`, or `"removed"` |
+| `economic_id` | string | — | `0x`-hex, 32 bytes. **The upsert key.** Rotation-invariant: it names the same withdrawal before and after a rotation |
+| `message_id` | string | — | `0x`-hex, 32 bytes. The **current** signing digest. It moves on a rotation |
+| `status` | string | — | `"awaiting_cosignatures"`, `"ready_to_release"`, `"stranded_on_retired_domain"`, or `"released"`. Derived by the node |
+| `pending_cosigner_count` | uint | — | Co-signatures held against `message_id` that are **short of quorum**. `0` once quorum is reached |
+| `released_at_ms` | uint64 \| null | ms | Consensus timestamp of the release. `null` until the entry is released |
+| `msg` | object \| absent | — | The immutable half of the withdrawal. Present on `"admission"` only |
+
+`msg`:
+
+| Field | Type | Units | Meaning |
+|-------|------|-------|---------|
+| `chain` | uint8 | id | Destination chain: `1` Base, `2` Arbitrum |
+| `user` | string | — | The account that opened the withdrawal, `0x`-hex, 20 bytes |
+| `asset` | uint32 | id | **Token asset id**, the same id space as `node_ledger.coin`. Not a market id |
+| `token` | string | — | Symbol for `asset`, resolved once at admission. A later rename does not rewrite it |
+| `amount_units` | u128 string | **raw token base units** | Divide by the token's own on-chain decimals. Do **not** divide by `sz_decimals` |
+| `dst_addr` | string | — | Destination address on `chain`, `0x`-hex, 32 bytes, left-padded |
+| `nonce` | uint64 | — | Per-chain anti-replay nonce |
+| `ts_ms` | uint64 | ms | When the withdrawal entered the outbox |
+
+:::warning
+**Four rules a consumer gets wrong.**
+
+1. **`economic_id` is the upsert key. `message_id` is not.** The message id is
+   the signing digest under the live deployment row, so a rotation moves it. Fold
+   on the message id and one withdrawal counts twice across a rotation.
+2. **`admission` is not "first ever".** The recorder's memory of the outbox is
+   node-local and is never persisted, so a **restart re-emits every open entry as
+   an admission**, at whatever status it holds right then. Always UPSERT on
+   `economic_id`. Never read an admission as an arrival.
+3. **`removed` is terminal, and its `status` is not always `"released"`.** It
+   reads `"released"` when the release is confirmed. Otherwise it carries the
+   entry's last known status, because the entry left through the retention prune.
+   Either way the `economic_id` never returns.
+4. **`status` is derived. Do not recompute it.** It folds the live deployment row
+   through the node's own derivation.
+   `"stranded_on_retired_domain"` is reachable only from that side: a consumer
+   that recomputes status from `configs` and co-signature counts never sees a
+   stranded entry.
+:::
+
+### `configs[]` {#node_bridge_outbox-configs}
+
+One entry per configured chain, in ascending chain id. Each entry is the
+committed deployment row.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `chain` | uint8 | `1` Base, `2` Arbitrum |
+| `contract_address` | string | Bridge contract identity, `0x`-hex, 32 bytes, left-padded |
+| `validator_quorum_threshold_bps` | decimal string | Co-signature threshold in basis points |
+| `replay_nonce` | uint64 | Current outbound replay nonce for this chain |
+| `paused` | bool | `true` when this chain's lane is paused |
+| `evm_chain_id` | uint64 | The destination chain's own EVM chain id |
+| `evm_contract_address` | string | Bridge contract address on that chain, `0x`-hex, 20 bytes |
+| `validator_set_epoch` | uint64 | Validator-set epoch the row binds to. A rotation moves it |
+| `release_retention_ms` | uint64 | Configured retention window. `0` is the **unset sentinel**, not "no retention" |
+| `effective_release_retention_ms` | uint64 | The window actually in force. Read this one |
+| `scan_policy` | object | Deposit-scan settings, below |
+
+`scan_policy`:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `confirmations_only` | bool | Credit on confirmations alone |
+| `confirmations` | uint64 | Configured confirmation depth. `0` is the **unset sentinel** |
+| `effective_confirmations` | uint64 | The depth actually in force. Read this one |
+| `confirmations_only_depth` | uint64 | Depth used when `confirmations_only` is set |
+| `usdc_token` | string | USDC token address on that chain, `0x`-hex, 20 bytes |
+| `raw_transfer_credit` | bool | `true` when a plain token transfer to the contract is credited |
+
+The raw and `effective_*` pairs both ship because `release_retention_ms` and
+`confirmations` are 0-as-unset sentinels. A raw `0` alone tells you nothing about
+the window in force.
+
+### Deriving the rotation verdict {#node_bridge_outbox-rotation}
+
+A deployment rotation **strands** every entry that is `"ready_to_release"` when
+it fires. Those entries already hold a release-ready co-signature quorum under
+the domain the rotation retires. The outbound replay guard keys on the economic
+id, so re-finalization under the new domain is suppressed and no releasable
+multisig can ever appear again. The funds are debited and unreleasable.
+
+The verdict is therefore a fold of this stream: **upsert every event on
+`economic_id`, drop the entries whose last event is `removed`, then count the
+survivors whose `status` is `ready_to_release`.** A rotation is safe only when
+that count is zero.
+
+### Positive control {#node_bridge_outbox-positive-control}
+
+A fold over the wrong path returns zero, and zero reads exactly like the
+all-clear. Check the reading before you trust it.
+
+| What you observe | What it means |
+|------------------|---------------|
+| The stream root or its hourly files do not exist | The stream was never enabled here, or the data directory is wrong. **Not** "no withdrawals" |
+| The stream root exists but holds no `cursor` file | No block has been recorded since the stream was turned on. **Not** "no withdrawals" |
+| `cursor` is far behind the chain's committed height | The view is stale and incomplete. A zero count here proves nothing |
+| The fold finds **no entries at all**, ever | Suspect the path. A live chain that has served any withdrawal has admissions in the archive |
+| `cursor` is at the committed height, entries exist, and none reads `ready_to_release` | The real all-clear |
+
+The control is the fourth row. Confirm your fold sees entries in some state
+before you trust it seeing none in one state.
+
+### What this stream answers {#node_bridge_outbox-scope}
+
+It answers: does any withdrawal sit at `ready_to_release` right now, is any
+withdrawal stranded, how old is the oldest pending entry, and what deployment row
+is committed per chain.
+
+It does not carry inbound deposits, which are a separate flow. It reports a
+**count** of co-signatures, never which validators signed. A `released` entry
+means the chain released it; confirming the payout landed needs a read of the
+destination chain, not this stream.
+
+:::warning
+**The diff runs on the tip block only.** The resume cursor advances through every
+block, so a catch-up replay reports no hole — but the node compares state only on
+the block that owns it. A withdrawal that moved through several statuses entirely
+inside a replayed range surfaces as one `admission` at the status it holds when
+the node catches up. The intermediate moves are not recorded. This happens across
+a restart, never in normal live operation.
+:::
+
 ## `node_equity_snapshots` {#node_equity_snapshots}
 
 A sample tape, not an event tape. One line per sample. One sample per UTC hour of
@@ -550,10 +917,76 @@ in will drag every derived number toward zero.
 Both prices are on the **raw 1e8** plane, like the rest of the `node_*` family.
 Divide by `100000000` before you display them.
 
+Both prices are also **snapped to the market's tick** before the node records
+them, on the same grid `/info` serves. Sub-tick precision never reaches the
+archive. A later tick-size change does not re-grid the samples already written,
+so an old sample keeps the grid it was recorded on.
+
 Use this stream to build mark and oracle candles. The 5-second cadence gives the
 smallest (1-minute) candle twelve samples. It is a price series, not a trade
 series: a bar exists in every window the samples cover, whether or not anything
 traded.
+
+## `node_blocks` {#node_blocks}
+
+One line per committed block, carrying the block head only. This is the one
+stream that writes on an **empty** block, so its heights form a contiguous
+sequence between gaps. Use it to rebuild a block tape that has a row for a block
+which carried no action.
+
+The record is flat. It has no `events` array and no owner address.
+
+```json
+{
+  "block_number": 941006700,
+  "block_time": 1735689600000,
+  "round": 941006700,
+  "epoch": 9410,
+  "proposer": 2,
+  "hash": "0x9c22cbcd0ee34b90987b76f92544e0e64d8f4a0e2b2f7bc1d3f0c8ffb61d0a11",
+  "tx_count": 3
+}
+```
+
+| Field | Type | Units | Meaning |
+|-------|------|-------|---------|
+| `block_number` | uint64 | — | Committed block height |
+| `block_time` | uint64 | ms | Consensus block timestamp |
+| `round` | uint64 | — | Consensus round of this block. It equals `block_number` under the current two-chain rule, and ships apart because both are on the wire |
+| `epoch` | uint64 | — | Consensus epoch of `round` |
+| `proposer` | uint64 | index | **Validator-set index** of the leader that proposed this block. Not an address |
+| `hash` | string | — | Block hash, lowercase hex **with** the `0x` prefix. The same value the `block_info` read serves |
+| `tx_count` | uint64 | — | Core actions plus EVM transactions in the block payload |
+
+:::warning
+**Two traps on this record.**
+
+1. **`hash` carries `0x`. The `hash` on `node_fills` and `node_trades` does
+   not.** They are different fields with the same name. Do not carry one parsing
+   rule across.
+2. **`tx_count: 0` is ambiguous.** A genuinely empty block reads `0`. A payload
+   the node could not decode also reads `0`. This stream cannot tell the two
+   apart. Cross-check against `replica_cmds` when the difference matters.
+:::
+
+### `node_blocks` against `replica_cmds` {#node_blocks-vs-replica-cmds}
+
+Both write one line per committed block, including an empty one. That is not the
+difference.
+
+| Question | `node_blocks` | `replica_cmds` |
+|----------|---------------|----------------|
+| Who proposed it, at what round and epoch? | Yes | No — it carries none of the three |
+| Transaction total, core actions **and** EVM transactions? | Yes, `tx_count` | No — `action_count` counts core actions only |
+| State hash after the block? | No | Yes, `app_hash` |
+| What the block did: fills, orders, positions, funding? | No — head only | Yes, the full body |
+| Hash form | `0x`-hex string | array of byte numbers |
+| Path shape | `.../node_blocks/hourly/{date}/{hour}` | `.../replica_cmds/{date}/{hour}` |
+
+Take `node_blocks` for a light, always-present block tape with the consensus
+routing fields. Take `replica_cmds` to drive a full indexer from one file — but
+its `action_count` undercounts a block that carried EVM transactions, so do not
+read it as a transaction total.
 
 ## `replica_cmds` {#replica_cmds}
 
@@ -776,7 +1209,8 @@ A level event is an absolute set, not an increment. Replace the level's size wit
 2. Test each line for `{"gap"` before you parse it as an envelope.
 3. Accept only newline-terminated lines. Retry a fragment on the next pass.
 4. Key your rows so a re-read inserts nothing new. Re-running over the same files
-   must be a no-op.
+   must be a no-op. On `node_bridge_outbox` the key is `economic_id`, never
+   `message_id`.
 5. Parse every price, size, and money value as an arbitrary-precision decimal.
    Never as a float.
 6. Divide by the right plane. `node_*` prices need `/ 1e8`. `node_*` sizes need
