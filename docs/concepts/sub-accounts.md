@@ -37,9 +37,9 @@ flowchart TD
     sub0["sub_0 (index 0, addr derived from master + 0)"]
     sub1["sub_1 (index 1)"]
     sub2["sub_2 (index 2)"]
-    own0["own positions / orders / margin / agents"]
-    own1["own positions / orders / margin / agents"]
-    own2["own positions / orders / margin / agents"]
+    own0["own balance / own margin / own liquidation threshold"]
+    own1["own balance / own margin / own liquidation threshold"]
+    own2["own balance / own margin / own liquidation threshold"]
     master --> sub0
     master --> sub1
     master --> sub2
@@ -95,7 +95,7 @@ Anyone can compute a sub's address without on-chain state. The derivation is con
 ```json
 {
   "type": "create_sub_account",
-  "params": { "name": "scalping-desk", "explicit_index": null }
+  "params": { "name": "scalping-desk", "explicit_index": null, "shared_stp_group": false }
 }
 ```
 
@@ -103,6 +103,7 @@ Anyone can compute a sub's address without on-chain state. The derivation is con
 |-------|------|-------------|
 | `name` | string ≤ 64 chars | Bookkeeping label |
 | `explicit_index` | uint32 \| null | Specific slot to claim; `null` → next free |
+| `shared_stp_group` | bool | **Required. There is no default** — a body without this field fails admission with a missing-field error. `true` puts the sub in the master's [self-trade-prevention](./order-types.md#self-trade-prevention) group, so the book refuses a match between master and sub. `false` leaves the sub out of the group, so the two CAN match each other. |
 
 Response:
 
@@ -136,19 +137,24 @@ For spot assets use `sub_account_spot_transfer` (adds an `asset` field).
 
 ## Trading from a sub {#trading-from-a-sub}
 
-The sub is a regular account. Sign with the sub's key (or an [approved agent](./agent-wallets.md)) and submit with the sub's address as `sender`.
+**A sub cannot trade today.** It holds no key, so it cannot sign an order. See
+the [TL;DR warning](#tldr).
 
-Common pattern: master signs `approve_agent` for each sub from the sub's address — the master holds delegation authority over its subs, so this is allowed even though `approve_agent` is otherwise master-only. Each sub then has its own hot-key trading flow.
+**An agent does not open a path either, and the attempt fails silently.**
+[`approve_agent`](../api/rest/exchange.md#approve_agent) writes the agent under
+the **recovered signer's** account. Its body carries `agent`, `name` and
+`expires_at_ms` — there is no owner field and no delegation field. So a master
+that signs `approve_agent` "for" a sub approves an agent on the **master**. The
+action is accepted, the sub's agent set stays empty, and you get no error to
+read.
 
-```mermaid
-sequenceDiagram
-    participant master
-    participant hot_key
-    master->>master: signs sender = sub_addr_0, action = approve_agent { agent: 0x<hot_key>, expires_at_ms: ... }
-    hot_key->>hot_key: signs every subsequent trade sender = sub_addr_0, action = submit_order { ... }
-```
+The remap that lets a master act on a sub covers three actions only:
+`create_sub_account`, `sub_account_transfer` and `sub_account_spot_transfer`.
+Every other action lands on the signer's own account. So a master can move funds
+in and out of a sub, and nothing else.
 
-The SDK exposes each sub as a separate `Client` instance with its own keypair, pointed at its derived address.
+There is no workaround. Run one master account per trading strategy until
+sub-account signing ships.
 
 ## Liquidation isolation {#liquidation-isolation}
 
@@ -199,7 +205,11 @@ curl -X POST https://api.devnet.mtf.exchange/info \
   -d '{"type":"account_state","address":"0x<master>","detail":"overview"}'
 ```
 
-Returns the sub list with indices, derived addresses, labels, and a snapshot of each sub's clearinghouse state.
+Returns the sub list. Each row carries exactly three keys: `index`, `address`
+and `equity`. `equity` is one aggregate number — there is no label field and no
+clearinghouse state on the row. To read a sub's positions, query
+[`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) with the sub's
+address.
 
 Each sub can be **read** as a first-class account via `account_state`, `open_orders`, `user_fills` and the rest, by passing its address as `address`. Reads work; writes do not (see the [TL;DR warning](#tldr)).
 
@@ -212,7 +222,7 @@ Each sub can be **read** as a first-class account via `account_state`, `open_ord
 | Concurrent transfers in-flight | 8 per master | Mempool cap |
 | Master can withdraw from sub | yes, if sub stays Safe | Otherwise rejected |
 | Sub can withdraw off-chain | no | Must route via master |
-| Sub can have agents | yes | Configured per-sub |
+| Sub can have agents | no | `approve_agent` writes under the signer, and a sub cannot sign |
 | Sub can be multi-sig | no | V1 only the master can be multi-sig |
 
 ## Use-case patterns {#use-case-patterns}

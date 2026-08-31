@@ -10,18 +10,35 @@ bridge-specific `type`s.
 
 ## TL;DR {#tldr}
 
-One public query:
+:::danger
+**THERE IS NO PUBLIC BRIDGE READ ON THE LIVE CHAIN TODAY.**
+
+This page documents [`bridge_withdrawal_history`](#bridge_withdrawal_history) as
+the **target**. It is not live. A live gateway answers it `400` with
+`{"error":"unknown info type: bridge_withdrawal_history"}`.
+
+The two older names are already retired, so all three fail:
+
+| `type` | Live answer |
+|---|---|
+| `bridge_withdrawal_history` | `400` — `unknown info type` |
+| `bridge_chain_configs` | `410` — `UNKNOWN_TYPE`, `details.use` names `bridge_withdrawal_history` |
+| `bridge_user_outbox` | `410` — `UNKNOWN_TYPE`, `details.use` names `bridge_withdrawal_history` |
+
+**The `410` bodies point at a read that does not answer yet.** Following
+`details.use` gets you a `400`, not data. That is the current state, not a
+mistake in your request.
+
+**Do not build a bridge-status poller against this page yet.** There is no
+interim read to use instead — none exists. Track a withdrawal on the
+destination chain until this read ships.
+:::
+
+One public query, once it lands:
 
 - [`bridge_withdrawal_history`](#bridge_withdrawal_history) — your own pending withdrawals,
   each with a status, plus the committed [deployment row](#chain-configs) for
   each chain.
-
-:::warning
-**`bridge_chain_configs` is removed.** A request now returns `410` with
-`error.code` `UNKNOWN_TYPE` and `details.use` naming the replacement. Read
-[`bridge_withdrawal_history`](#bridge_withdrawal_history) instead —
-`withdrawals_halted` and `configs` are on it, unchanged.
-:::
 
 ## The withdrawal lifecycle {#why}
 
@@ -118,11 +135,13 @@ release timestamp; it is `null` for every other status.
 - Timestamps and nonces are JSON numbers.
 - Entries keep queue order, oldest first.
 
-:::info
-**Renamed at the 0.8.x swap.** This read was `bridge_user_outbox`, and the
-operator read was `bridge_outbox`. The archive answers BOTH names through the
-swap window, so a client built against either keeps working; the old names are
-retired in a later release. A pre-swap node still answers only the old ones.
+:::warning
+**The old names are retired, and the new one is not live.** This read was
+`bridge_user_outbox`, and the operator read was `bridge_outbox`. A
+`bridge_user_outbox` request now answers `410`, and its `details.use` names
+`bridge_withdrawal_history` — which itself answers `400 unknown info type`
+today. No name currently serves these rows. See the notice at the
+[top of this page](#tldr).
 :::
 
 **This read is the whole answer**, in flight and finished alike. It is served by
@@ -137,6 +156,13 @@ Neither carries `economic_id`. It is not a signing digest — do not pair it wit
 `message_id`.
 
 ## A user's pending bridge withdrawals {#bridge_withdrawal_history}
+
+> ⬆️ **Upgrade notice — NOT LIVE YET.** Everything below describes the target
+> shape. A live gateway answers this `type` with `400`
+> `{"error":"unknown info type: bridge_withdrawal_history"}`. Read it as a
+> specification to build against, not as a call you can make today. Until it
+> ships there is **no** public read for bridge withdrawal status, and no
+> substitute read exists.
 
 One account's pending bridge withdrawals, plus the committed deployment row
 for every configured chain, served by the archive rather than a validator.

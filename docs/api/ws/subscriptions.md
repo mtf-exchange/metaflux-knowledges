@@ -468,16 +468,19 @@ re-emits it only when that context changes.
 
 Per-account **collateral and margin health** — the cross-account money figures
 and the four lane summaries — pushed when they change. Requires `user` (the 0x
-address; `address` is also accepted) — NOT a `coin`. The body is built from the
-same builder as the REST [`account_state`](../rest/info.md#account_state) read,
+address) — NOT a `coin`. **`address` is not an alias here**: a subscribe carrying
+`address` is refused with
+``{"channel":"error","data":{"error":"`account_state` requires `user`"}}``, the
+same answer as sending nothing. Note the two surfaces differ — the WS
+subscription takes `user`, while the REST
+[`account_state`](../rest/info.md#account_state) read takes `address`. The body
+is built from the same builder as the REST [`account_state`](../rest/info.md#account_state) read,
 so a push never drifts from that read. The initial snapshot is the live state
 (zeroed for an account with no funds), not an empty array.
 
-:::warning Not live yet
-The frame below is the target state. Until the release fires, a live node pushes
-the previous FLAT body, with the position table and the balance array inside it.
-See [where every field went](../rest/info.md#account-state-lane-split).
-:::
+**This four-lane frame is the live shape.** The earlier FLAT body — the position
+table and the balance array inside this frame — is gone from the wire. Parse the
+lanes. See [where every field went](../rest/info.md#account-state-lane-split).
 
 ```json
 { "method": "subscribe", "subscription": { "type": "account_state", "user": "0x<address>" } }
@@ -567,15 +570,10 @@ auth-at-subscribe gate lands. The same holds for
 
 Per-account **perp position detail** — the dex-keyed position table that left the
 `account_state` body. Requires `user`; a subscribe without one is refused with
-`{"channel":"error","data":{"error":"clearinghouse_state requires a `user`"}}`.
+``{"channel":"error","data":{"error":"`clearinghouse_state` requires `user`"}}``.
 Same builder as the REST
 [`clearinghouse_state`](../rest/info.md#clearinghouse_state) read, so the push and
 the read never drift.
-
-:::warning Not live yet
-This channel lands with the release that reshapes `account_state`. Subscribing
-before that returns `{"channel":"error","data":{"error":"unknown channel: clearinghouse_state"}}`.
-:::
 
 ```json
 { "method": "subscribe", "subscription": { "type": "clearinghouse_state", "user": "0x<address>" } }
@@ -586,12 +584,20 @@ before that returns `{"channel":"error","data":{"error":"unknown channel: cleari
   "channel": "clearinghouse_state",
   "data": {
     "address": "0x<addr>",
-    "clearinghouse_state": { "": { "positions": [
-      { "coin": "BTC", "size": "0.00600", "entry": "62000", "upnl": "441",
-        "isolated": false, "lev": 7, "liq": null, "roe": "0.35",
-        "funding": "-0.02", "margin": "53.14", "maint_margin": "11.16",
-        "notional": "372.60" }
-    ] } },
+    "clearinghouse_state": {
+      "": { "positions": [
+        { "coin": "BTC", "size": "-0.13362", "entry": "80141.2", "upnl": "352.85",
+          "isolated": false, "lev": 39, "liq": "89836.48723157", "roe": "1.27844323",
+          "funding": "-1.59606669", "margin": "276", "maint_margin": "53.54233572",
+          "notional": "-10355.61681", "side": "short" }
+      ] },
+      "0x<deployer>": { "positions": [
+        { "coin": "GRAD:000001SH", "size": "-0.85", "entry": "576.18964705",
+          "upnl": "-10.02605", "isolated": true, "lev": 5, "liq": "699.45368895",
+          "roe": "-0.08392298", "funding": "0", "margin": "119.46727161",
+          "maint_margin": "14.692836", "notional": "-499.78725", "side": "short" }
+      ] }
+    },
     "height": 562,
     "time": 1700000000555
   }
@@ -603,6 +609,14 @@ before that returns `{"channel":"error","data":{"error":"unknown channel: cleari
   in the REST [row table](../rest/info.md#clearinghouse_state). **`liq` is
   nullable** — `null` means no non-negative price liquidates the leg, and it is
   never rendered as `"0"`. See [reading `liq`](../rest/info.md#reading-liq).
+- **`side` is present only in hedge mode, and ABSENT — not `null` — in one-way
+  mode.** Read `position_mode` on [`account_state`](#account_state) to know which
+  shape to expect. The reason is what each mode can hold: hedge mode can hold a
+  long leg AND a short leg on one coin, so every row carries its own `side`
+  (`"long"` / `"short"`) and the pair is unambiguous. One-way mode collapses the
+  coin to a single NET position, so there is no leg to label and the key is
+  omitted. Do not infer the mode from the sign of `size` — a one-way net position
+  is also negative when it is short.
 - **This frame never carries `adl_lamps`.** `detail` is a REST parameter only, so
   the push always renders the default shape. The lamp ranks your seat against
   OTHER accounts, so an always-on lamp would re-emit your frame whenever a
@@ -629,18 +643,14 @@ against one block even though they arrive as two frames.
 
 Per-account **option leg detail** — one row per series the account is party to.
 Requires `user`; a subscribe without one is refused with
-`{"channel":"error","data":{"error":"option_state requires a `user`"}}`. Same
+``{"channel":"error","data":{"error":"`option_state` requires `user`"}}``. Same
 builder as the REST [`option_state`](../rest/info.md#option_state) read.
 
-:::warning Renamed, and the public gateway lags the node
+:::warning Renamed
 This channel was going to be called `option_positions`. That name is **not an
-alias** and is not accepted.
-
-The channel is live on the node. The PUBLIC gateway serves it from gateway
-release 0.8.14; an earlier gateway answers
-`{"channel":"error","data":{"error":"unknown channel: option_state"}}`. The same
-applies to `clearinghouse_state`. The REST reads behind both are already
-reachable, because the gateway passes `/info` through.
+alias** and is not accepted — it answers
+`{"channel":"error","data":{"error":"unknown channel: option_positions"}}`.
+Subscribe to `option_state`.
 :::
 
 ```json
@@ -709,11 +719,18 @@ spot-token-balance feed. Plain per-token spot balances ride the
         "current_debt": "22",
         "params": { "init_bps": 2000, "maint_bps": 1000 }
       }
-    ]
+    ],
+    "height": 26424249,
+    "time": 1788149246789
   }
 }
 ```
 
+- `height` / `time` — the **as-of stamp**, always present, exactly as on
+  [`account_state`](#account_state): `height` is the committed block height the
+  frame was rendered against and `time` the consensus block time in ms. Both are
+  **bare integers**. They advance on every commit, so they tell a quiet account
+  from a stalled feed.
 - `accounts[]` — one entry per open spot-margin position, in pair-id order; the
   same body the REST [`spot_margin_state`](../rest/info/spot.md#spot_margin_state)
   read renders (single-source). `pair` is the pair's symbol (e.g. `"MTF/USDC"`),
@@ -855,12 +872,13 @@ Not a subscription channel, but the way to do one-shot reads and signed writes o
 { "method": "post", "id": 1, "request": { "type": "info", "payload": { "type": "l2_book", "coin": "BTC" } } }
 ```
 
-:::warning
-**The public endpoint does not serve `post` yet.** It is implemented on the validator WebSocket only;
-the gateway that fronts the public endpoint does not carry it. Send orders over
-[`POST /exchange`](../rest/exchange.md) for now. See the warning in the
-[WS README](./index.md#post-requestresponse-over-ws).
-:::
+`post` is **live on the public endpoint**. One socket carries both subscriptions
+and request/response — you do not need a second connection, and you do not need
+to fall back to REST for a read. The request goes to the same `/info` and
+`/exchange` handlers, so a malformed request returns that handler's own
+field-validation error, not a transport error. See the
+[WS README](./index.md#post-requestresponse-over-ws) for the response envelope
+and the signing rules.
 
 ---
 

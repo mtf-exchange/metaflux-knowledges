@@ -443,10 +443,14 @@ shape your client already has.
 These are draft / legacy action names from earlier docs. Most are **not bridged
 on the MTF-native `/exchange` handler** — they are either privileged / system
 writes that must never transit the public user path, or recognized-but-unmapped
-schema stubs, and posting them returns `400` with `ACTION_UNSUPPORTED`. The one
-exception below is `MultiSig`, which **is** bridged (its native tag is
-`multi_sig`). See [the table below](#non-bridged-actions) for the disposition of
-each.
+schema stubs, and posting them returns `400`. **Read the error code, not just the
+status.** A name the action enum does not carry fails decode and returns
+`INVALID_REQUEST` (`unknown variant`); a name the enum does carry but the public
+path refuses returns `ACTION_UNSUPPORTED`. The one exception below is `MultiSig`,
+which **is** bridged (its native tag is `multi_sig`). See
+[the table below](#non-bridged-actions) for the disposition of each, and
+[governance actions](#governance-actions-refused) for the names that decode but
+never execute here.
 
 | Draft name | Native tag (if recognized) | Why not bridged |
 |-----------|----------------------------|-----------------|
@@ -459,7 +463,59 @@ each.
 | (BOLE pool) | `borrow_lend` | **Bridged and live** — `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` are open to any account; `"Borrow"` is refused unless the sender is an approved liquidator |
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit; see [vaults](../../concepts/vaults.md#depositing) |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag — enroll via [`user_portfolio_margin`](#user_portfolio_margin). `pm_unenroll` **is** a bridged alias (no params) for the same action's `enroll:false` form. `pm_rebalance` has been **removed** — rejected as an unknown action |
-| (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `ACTION_UNSUPPORTED` |
+| (cross-chain) | — | **Not an `/exchange` action at all.** `cross_chain_send` is not in the action enum, so it fails decode and returns `400` `INVALID_REQUEST` (`unknown variant`) — the same answer a misspelt action name gets, **not** `ACTION_UNSUPPORTED`. Cross-chain transfer is a different wire: `CrossChainSend` is [CoreWriter action 19](../../evm/interacting-with-core.md), called from MetaFluxEVM |
+
+### Governance actions: in the enum, refused at the door {#governance-actions-refused}
+
+A governance action **decodes** on `/exchange` but never **executes** there.
+This matters because the two failures look nothing alike, and integrators read
+the first one as encouragement:
+
+- A name the enum does not know fails **decode**: `400` `INVALID_REQUEST`,
+  `unknown variant`. The error lists every accepted name, and the governance
+  names are in that list.
+- A governance name **decodes**, so it gets past the schema, past signature
+  recovery, and then hits the refusal:
+  `400` `ACTION_UNSUPPORTED`, `"governance actions are operator-injected only
+  (gov-admin lane)"`.
+
+**Reaching `ACTION_UNSUPPORTED` is not progress.** A valid signature from a real
+validator key gets the same answer. The public `/exchange` path carries **no**
+governance write, whoever signs it. These actions enter through the node's own
+operator lane, and each accepted post is **one vote**: the change enacts only
+when ⅔ of stake has voted for a **byte-identical** payload. Two validators who
+differ by one character vote for two different proposals and neither reaches
+quorum.
+
+The signing types below are **consensus-frozen** and are published so an
+operator tool can build the digest. They are not an invitation to post the
+action to `/exchange`.
+
+| Native tag | Payload | Effect |
+|-----------|---------|--------|
+| `set_metaliquidity_set` | `{"address": "0x<hex>", "allowed": <bool>}` | Adds (`true`) or removes (`false`) an account from the Metaliquidity operator set. This is the set a vault leader's [`register_metaliquidity_operator`](#register_metaliquidity_operator) grant is checked against |
+| `gov_adjust_spot_value` | `{"account": "0x<hex>", "value": "<decimal>"}` | Sets that account's cross-account USDC value to `value`. A **target**, not a delta |
+
+```text
+MetaFluxTransaction:SetMetaliquiditySet(string metafluxChain,address account,bool allowed,uint64 nonce)
+MetaFluxTransaction:GovAdjustSpotValue(string metafluxChain,address account,string value,uint64 nonce)
+```
+
+:::warning
+**`gov_adjust_spot_value.value` is hashed VERBATIM.** It is a whole-USDC decimal
+string, and the digest takes `keccak256` of the **exact bytes you send**. The
+chain does not re-parse or re-format it, so `"100"`, `"100.0"` and `"100.00"` are
+three different signatures and three different votes. Send the signed string
+through byte for byte: do not trim a trailing zero, do not let a JSON library
+round-trip it through a float, and do not normalize it.
+
+The `value` also **discriminates the proposal** — the vote is tallied against the
+decimal it decodes to, so a differently-scaled spelling is a different proposal.
+Agree the exact figure and its scale before the vote, and have every validator
+send that one spelling.
+:::
+
+Both payloads reject the zero address.
 
 ---
 
@@ -4004,7 +4060,9 @@ here only to redirect integrators to the supported path.
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit | [vaults](../../concepts/vaults.md#depositing) |
 | (Earn pool config) | `create_earn_pool` | **Validator governance, never a user action.** `createEarnPool` (201) is a ⅔-stake vote submitted through node governance. It is the **only** way an Earn pool gets a non-zero borrow rate — see [why that matters](#spot-margin--earn) | [`earn_deposit`](#earn_deposit) auto-creates a pool at rate `0` |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` **is** a bridged alias (no params) for the canonical action's `enroll:false` form; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
-| (cross-chain) | `cross_chain_send` | Recognized-but-unmapped stub → `ACTION_UNSUPPORTED` | — |
+| (cross-chain) | — | **Not an `/exchange` action at all.** Not in the action enum: it fails decode and returns `400` `INVALID_REQUEST` (`unknown variant`), **not** `ACTION_UNSUPPORTED` | [`CrossChainSend`, CoreWriter action 19](../../evm/interacting-with-core.md) — a MetaFluxEVM call, not an `/exchange` post |
+| (Metaliquidity set) | `set_metaliquidity_set` | **Validator governance, never a user action.** Decodes, then refused `ACTION_UNSUPPORTED` — `"governance actions are operator-injected only (gov-admin lane)"`. A ⅔-stake vote; a valid validator signature is refused here too | [governance actions](#governance-actions-refused) |
+| (spot value adjust) | `gov_adjust_spot_value` | **Validator governance, never a user action.** Same decode-then-refuse answer. `params.value` is hashed **verbatim**, so quorum needs one byte-identical spelling | [governance actions](#governance-actions-refused) |
 | (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
 | `UserDexAbstraction` | `user_dex_abstraction` | **Removed** at the `0.7.0` re-genesis → `ACTION_UNSUPPORTED`. One unified account, so nothing to abstract | — (no replacement) |
 

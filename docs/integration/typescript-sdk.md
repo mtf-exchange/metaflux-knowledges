@@ -24,7 +24,7 @@ const btc = meta.perp.find((m) => m.coin === 'BTC')!;
 await client.placeOrder({
   venue: 'perp',
   owner: '0x17c5185167401ed00cf5f5b2fc97d9bbfdb7d025',
-  market: btc.asset_id,
+  market: btc.signing_id, // numeric market id; only `markets_meta` carries it
   side: 'bid', // 'bid' = buy, 'ask' = sell
   kind: 'limit',
   size: 1_000, // raw lots, scaled by the market's sz_decimals

@@ -46,17 +46,21 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 | You need | Field on `markets_meta` | Example |
 |----------|------------------------|---------|
-| Market id for `market` | `asset_id` | `0` |
+| Market id for `market` | `signing_id` | `0` |
 | Price grid | `tick_size` (whole units) | `"0.1"` |
 | Size precision | `sz_decimals` | `5` |
 | Size grid | `step_size` (whole units) | `"0.00001"` |
 | Smallest order | `min_order` (whole units) | `"0.00001"` |
 
 :::warning
-**`/info` addresses markets by `coin`; `/exchange` takes the number.** The
-reference marks `asset_id` deprecated as a *read request argument* — you query by
-symbol. It is still the published symbol-to-id map, and the order body needs the
-number. Cache the map at start-up.
+**`/info` addresses markets by `coin`; `/exchange` takes the number.** You
+query a read by symbol. `asset_id` is on no part of the wire today — not as a
+request argument, and not as a response field. Reading it gives you `undefined`.
+
+The id lives on `markets_meta`, and it is named `signing_id` because it is the
+value a signed action carries in `market` (perp) or `pair` (spot). The dynamic
+[`markets`](../api/rest/info/perpetuals.md#markets) read carries **no id on its
+perp rows**, so join the two reads on `coin`. Cache the map at start-up.
 :::
 
 ### Step 2 — convert to the wire planes {#convert-to-planes}
@@ -211,7 +215,7 @@ not a `market` id:
 
 Read the pair id from
 [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) with `kind: "spot"`
-(`spot.pairs[*].id`), and the base token's `sz_decimals` from
+(`spot.pairs[*].signing_id`), and the base token's `sz_decimals` from
 `spot.tokens[*].sz_decimals`. The price plane stays `1e8`.
 
 :::warning

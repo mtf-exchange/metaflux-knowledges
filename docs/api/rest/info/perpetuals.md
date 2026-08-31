@@ -202,7 +202,20 @@ Response (perp truncated to one entry; the `spot` section is identical to
         "mark_source":     "oracle_median",
         "fba_enabled":     false,
         "signing_id":      0,
-        "risk_override":   null
+        "risk_override":   null,
+        "token": {
+          "id":                 101,
+          "token_id":           "0x83bc…9894",
+          "wei_decimals":       8,
+          "is_canonical":       true,
+          "circulating_supply": "0",
+          "system_address":     "0x8c45…dd1b",
+          "evm_contract": {
+            "address":                "0x9b31…c5cc",
+            "variant":                0,
+            "evm_extra_wei_decimals": 0
+          }
+        }
       }
     ],
     "spot": { "pairs": [ /* … same as `markets` */ ], "tokens": [ /* … */ ] }
@@ -230,6 +243,7 @@ Response (perp truncated to one entry; the `spot` section is identical to
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].signing_id` | uint32 | **The number you put in the EIP-712 `market` field when you sign an order for this market.** It has no other meaning on the read plane — do not use it as a sort key, a join key, or a market identity. See below |
 | `perp[*].risk_override` | object \| null | The governance risk override in force on this market, or `null` when the market runs on the defaults. See below |
+| `perp[*].token` | object | The **base token record** of the market — the registry row for the coin the market is written on. **The key is OMITTED on a market that has no token record**; it is never sent as `null`. See below |
 | `spot.pairs` / `spot.tokens` | array | Spot pair / token registry, identical to [`markets`](#markets) (see [the spot registry](./spot.md#spot_meta)) |
 
 **Rules**
@@ -290,22 +304,94 @@ has, `risk_override` is an object naming the replaced values; when it has not,
 ```json
 "risk_override": {
   "max_leverage":       20,
-  "maint_margin_ratio": "250",
-  "init_margin_ratio":  "500",
-  "funding_rate_cap":   "0.02",
-  "oi_cap":             "1000000"
+  "maint_margin_ratio": "0.166",
+  "funding_rate_cap":   "0.04",
+  "realized_vol_30d":   "0.4",
+  "updated_at_block":   8103798,
+  "liq_floor_ppm":      null,
+  "liq_fee_bps":        null,
+  "margin_tiers": [
+    { "lower_bound_notional": "0", "max_leverage": 100, "maint_margin_ratio": "0.005" }
+  ]
 }
 ```
 
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `max_leverage` | uint8 | Leverage ceiling the vote set |
+| `maint_margin_ratio` | Decimal string | Maintenance-margin ratio as a **raw fraction** — see the plane warning below |
+| `funding_rate_cap` | Decimal string | Per-interval funding clamp, a raw fraction (`"0.04"` = 4%) |
+| `realized_vol_30d` | Decimal string | The 30-day realized volatility the vote priced the row on, a raw fraction |
+| `updated_at_block` | uint64 | Block height at which the vote wrote this row |
+| `liq_floor_ppm` | uint \| null | Liquidation-price floor in parts per million. `null` = the vote set none |
+| `liq_fee_bps` | Decimal string \| null | Liquidation-fee override, decimal bps. `null` = the vote set none |
+| `margin_tiers` | array | The override ladder — each `{lower_bound_notional, max_leverage, maint_margin_ratio}` |
+
+:::danger
+**`maint_margin_ratio` appears twice on this row in TWO DIFFERENT PLANES.**
+
+- `perp[*].maint_margin_ratio` (the top-level field) is **decimal basis
+  points**: `"50"` = 0.5%.
+- `perp[*].risk_override.maint_margin_ratio` is a **raw fraction**: `"0.166"` =
+  16.6%.
+
+Same name, same row, scales about **1000x** apart. A caller that reads the
+override value as bps computes a maintenance margin roughly 1000x too small and
+believes a position is safe when it is not. Convert explicitly at the boundary;
+never copy one field into the other's slot.
+:::
+
+**The two `margin_tiers` ladders band on different keys, too.**
+`perp[*].margin_tiers` bands on `max_open_interest` (an ascending upper bound,
+`null` on the top tier). `risk_override.margin_tiers` bands on
+`lower_bound_notional` (an ascending **lower** bound, `"0"` on the first tier).
+The bound runs the opposite way. A ladder walked with the wrong comparison
+selects the wrong tier.
+
+**`init_margin_ratio` and `oi_cap` are NOT override keys.** Neither appears
+inside `risk_override` on any market. Read them from the top level of the same
+row.
+
 Every key inside is optional: an override that moves only `max_leverage`
 carries only `max_leverage`. A key that is absent is not overridden, and the
-market's default (the sibling field on this same row) applies.
+market's default (the sibling field on this same row) applies. A key present
+with `null` is a set field holding "none" — `liq_floor_ppm` and `liq_fee_bps`
+both do that. Absent and `null` are different answers.
 
 **`null` and an empty object are different answers.** `null` means no override
 exists. An object with no overridden keys means an override record exists and
 overrides nothing. Rendering the two the same way is the exact confusion this
 field was added to end — the market's own row is where a caller looks, so the
 answer belongs here and not on a separate read.
+
+#### `token` is the market's base token record {#markets_meta-token}
+
+The token registry row for the coin the market is written on. It is the same
+record the spot registry publishes, carried here so a perp client needs no
+second read.
+
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `token.id` | uint32 | Token registry id |
+| `token.token_id` | string | 32-byte token hash, `0x` plus 64 hex characters |
+| `token.wei_decimals` | uint8 | Base-unit decimals of the token |
+| `token.is_canonical` | bool | Whether this is the canonical token for the symbol |
+| `token.circulating_supply` | Decimal string | Circulating supply, whole units |
+| `token.system_address` | string | The system address that holds the token's core-side balance |
+| `token.evm_contract` | object \| null | The token's EVM contract binding, or `null` when the token has no EVM contract |
+| `token.evm_contract.address` | string | Contract address on the unified EVM |
+| `token.evm_contract.variant` | uint | Contract variant tag |
+| `token.evm_contract.evm_extra_wei_decimals` | int | Decimal shift between the core plane and the EVM contract plane. Add it to `wei_decimals` to get the EVM-side decimals |
+
+**Absent, and `null`, are two different answers here.**
+
+- **`token` ABSENT** — the market has no base token record at all. Some deployed
+  markets are written on a symbol with no registry row. Read a missing `token`
+  as "no record", never as an empty one.
+- **`token.evm_contract` `null`** — the token record exists and states that the
+  token has **no** EVM contract. The key is present and holds `null`.
+
+A client that treats the two the same reports a token that does not exist.
 
 ### Get aggregated order book levels {#l2_book}
 
@@ -352,7 +438,7 @@ market returns empty `bids` / `asks` arrays.
 |-------|------|-------------|
 | `coin` | string | Echoed market symbol |
 | `bids[*].px` / `asks[*].px` | Decimal string | Level price, **human-decimal** (tick-snapped; the grouped grid price when grouping args are sent) |
-| `bids[*].size` / `asks[*].size` | Decimal string | Summed size at the level (whole units) |
+| `bids[*].sz` / `asks[*].sz` | Decimal string | Summed size at the level (whole units). The key is `sz`, not `size` |
 | `bids[*].n_orders` / `asks[*].n_orders` | uint64 | Resting orders aggregated into the level |
 
 **Errors**
@@ -380,10 +466,12 @@ market returns empty `bids` / `asks` arrays.
 Market-scoped public trade tape. One read answers both asks: send `coin` alone
 for the recent window, or add `start_time` / `end_time` for a time window.
 
-> ⬆️ **Upgrade notice — not live yet.** Today the node answers this tape under
-> two older names, `recent_trades` (un-ranged) and `trades_by_time` (ranged).
-> Both go away at the release that ships `trades`; until then a
-> `{"type":"trades"}` request answers `400 UNKNOWN_TYPE`.
+:::info
+**`trades` is the only tape name. Two older names are removed.** `recent_trades`
+(un-ranged) and `trades_by_time` (ranged) both answer `400 UNKNOWN_TYPE` now.
+Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
+`start_time` / `end_time` for a ranged one.
+:::
 
 **Request**
 
@@ -517,19 +605,25 @@ count, while a trade bar carries real volume and a real trade count.
 {
   "data": {
     "type": "candle_snapshot",
+    "coverage": {
+      "start": 1788102000000,
+      "end": 1788148800000,
+      "reaches_newest": true
+    },
     "candles": [
       {
-        "t": 1783000020000,
-        "T": 1783000079999,
+        "t": 1788102000000,
+        "T": 1788105599999,
         "s": "BTC",
-        "i": "1m",
-        "o": "61646.1",
-        "c": "61652.7",
-        "h": "61652.7",
-        "l": "61646.1",
+        "i": "1h",
+        "o": "78748",
+        "c": "78778.1",
+        "h": "78859.9",
+        "l": "78591.4",
         "v": "0",
         "q": "0",
-        "n": 12
+        "n": 0,
+        "f": false
       }
     ]
   }
@@ -538,14 +632,53 @@ count, while a trade bar carries real volume and a real trade count.
 
 | Field | Type | Meaning |
 |-------|------|-------------|
+| `coverage.start` | uint64 \| null | Open time of the oldest bar in THIS answer. **`null` when `candles` is empty** |
+| `coverage.end` | uint64 \| null | Open time of the newest bar in THIS answer. **`null` when `candles` is empty** |
+| `coverage.reaches_newest` | bool | `true` = the answer runs to the newest bar the store holds. `false` = **newer bars exist that this answer does not include** |
 | `t` | uint64 | Bar **open** timestamp (ms, bucket-aligned) |
 | `T` | uint64 | Bar **close** timestamp (ms) |
 | `s` | string | Market symbol |
 | `i` | string | Interval bucket token |
-| `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **whole-unit decimal** string (e.g. `"61652.7"`) — the same plane [`markets`](#markets) reports `mark_px` in |
-| `v` | Decimal string | Always `"0"`. A price bar folds no trades, so it carries no base-asset volume |
-| `q` | Decimal string | Always `"0"`. A price bar folds no trades, so it carries no quote volume |
-| `n` | uint64 | **Sample count** — how many price samples the bar folded. It is **not** a trade count. `0` on a carry-forward bar |
+| `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **whole-unit decimal** string (e.g. `"78778.1"`) — the same plane [`markets`](#markets) reports `mark_px` in |
+| `v` | Decimal string | Base-asset volume. `"0"` on a `mark` / `oracle` bar — a price bar folds no trades. Real volume on a `trade` bar. **May be ABSENT** — see below |
+| `q` | Decimal string | Quote volume. `"0"` on a `mark` / `oracle` bar. Real quote volume on a `trade` bar folded from live prints. **May be ABSENT** — see below |
+| `n` | uint64 | Count. On a `mark` / `oracle` bar it is a **sample count**, not a trade count, and it is `0` on a carry-forward bar. On a `trade` bar it is a real **trade count**. **May be ABSENT** — see below |
+| `f` | bool | Forward-filled flag. `true` = the bar carries the previous close forward and folded no new input; `false` = a real folded bar |
+
+**`coverage` reports the span of THIS answer.** It tells you whether the series
+is cut. Read `reaches_newest: false` as "keep paging forward", never as "the
+market stopped". `coverage.start` and `coverage.end` are both `null` when
+`candles` is empty.
+
+#### `v`, `q` and `n` can be ABSENT, and absent is not `"0"` {#candle_snapshot-volume}
+
+A bar folded from the live price and trade streams carries all three keys. A bar
+served from durable history may **omit** them, because the durable store holds
+no volume for that bucket.
+
+**The two answers mean opposite things:**
+
+- `"v": "0"` states **"no trades in this bucket"**. It is a measured zero.
+- **`v` absent** states **"no volume data for this bucket"**. Nothing was
+  measured.
+
+Serving `"0"` for the second case would put a false zero-to-real step in the
+series, so the key is dropped instead. Test for key presence, not for a zero
+value. A client that defaults a missing `v` to `0` charts a volume collapse that
+did not happen.
+
+All three states appear in one ordinary answer. A three-bar `mark` window can
+hold a bar with real `v` / `q` / `n`, a bar with all three keys **missing**, and
+a bar carrying `"0"` / `"0"` / `0`.
+
+:::warning
+**Some bars carry extra `tn` and `tv` keys. Ignore them.** They are passthrough
+columns from the durable store, and **`tv` is not on the same plane as `v`** —
+one measured bar carried `"v": "0.09690"` beside `"tv": "92888"`. They are not
+documented, not guaranteed to appear, and not interchangeable with `v` / `n`.
+
+Read `v`, `q` and `n`. Treat any other volume-looking key as absent.
+:::
 
 **Errors**
 
@@ -620,7 +753,7 @@ Market-scoped funding premium samples (the premium ring).
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol |
-| `start_time` | uint64 | no | Window start (ms); filters on sample `ts_ms` |
+| `start_time` | uint64 | no | Window start (ms); filters on sample `ts` |
 | `end_time` | uint64 | no | Window end (ms) |
 
 **Response**
@@ -630,9 +763,16 @@ Market-scoped funding premium samples (the premium ring).
   "data": {
     "type": "funding_history",
     "coin": "BTC",
+    "source": "archive",
+    "range_honored": true,
+    "coverage": {
+      "start": 1788145200064,
+      "end": 1788148800041,
+      "reaches_oldest": false
+    },
     "samples": [
-      { "ts_ms": 1783008579269, "premium": "0.00027179", "funding_rate": "0.00027179" },
-      { "ts_ms": 1783008587316, "premium": "0.0005469",  "funding_rate": "0.0005469" }
+      { "ts": 1788145200064, "premium": "-0.0004297698662718041731241326", "funding_rate": "-0.0004281328157157344421589469" },
+      { "ts": 1788148800041, "premium": "-0.0003715847511785635511176017", "funding_rate": "-0.00037488090540037165490589" }
     ]
   }
 }
@@ -641,9 +781,33 @@ Market-scoped funding premium samples (the premium ring).
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `coin` | string | Echoed market symbol |
-| `samples[*].ts_ms` | uint64 | Sample timestamp (consensus ms) |
+| `source` | string | Which store answered — `"archive"` for durable history, `"live_ring"` for the node's in-memory premium ring |
+| `range_honored` | bool | Whether the answer applied your `start_time` / `end_time`. `false` = the window was **ignored** and you got the live ring instead |
+| `coverage.start` | uint64 | Timestamp of the oldest sample in THIS answer |
+| `coverage.end` | uint64 | Timestamp of the newest sample in THIS answer |
+| `coverage.reaches_oldest` | bool | `true` = the answer reaches the oldest sample the store holds. `false` = **older samples exist that this answer does not include** |
+| `samples[*].ts` | uint64 | Sample timestamp (consensus ms). The key is `ts`, not `ts_ms` |
 | `samples[*].premium` | decimal string | Raw funding premium sample, pre-clamp (signed) |
 | `samples[*].funding_rate` | decimal string | Realized rate = `premium` clamped to the per-asset cap (signed) |
+
+#### `coverage` and `range_honored` say what the answer MISSES {#funding_history-coverage}
+
+The samples alone cannot tell you whether you got the series you asked for.
+These three fields do, and a caller that charts funding must read them.
+
+- **`range_honored: false` means your window was not applied.** A window the
+  archive cannot answer does **not** come back empty. It falls back to the live
+  ring, so the body holds samples at "now" and `source` reads `"live_ring"`.
+  Ask for a window years in the past and you still get 64 samples from the last
+  few minutes. Charting them against your own axis plots recent samples in a
+  historical slot. **Check `range_honored` before you plot; the sample count
+  never warns you.**
+- **`reaches_oldest: false` means the series is CUT, not empty.** Older samples
+  exist. Page back with an earlier `end_time` to reach them. A chart that reads
+  the first returned sample as the market's first sample draws a start that
+  never happened.
+- **`coverage` describes THIS answer, not the store.** `start` / `end` are the
+  span of the samples in this body.
 
 **Errors**
 
@@ -705,38 +869,15 @@ No parameters.
 | `bids[*].submitted_at` | uint64 | Bid submission timestamp (consensus ms) |
 | `bids[*].tag` | string | Bid tag (e.g. the proposed market name) |
 
-### List accounts flagged for liquidation {#liquidatable}
+### `liquidatable` is removed {#liquidatable}
 
-Accounts currently flagged for liquidation.
+**This read no longer exists.** A `{"type":"liquidatable"}` request answers
+`400` with `error.code` `UNKNOWN_TYPE`.
 
-**Request**
-
-```json
-{ "type": "liquidatable" }
-```
-
-No parameters.
-
-**Response**
-
-```json
-{
-  "data": { "type": "liquidatable", "accounts": [ { "address": "0x<addr>", "tier": "PartialMarket50" } ] }
-}
-```
-
-| Field | Type | Meaning |
-|-------|------|-------------|
-| `accounts[*].address` | hex address | Needs-action account |
-| `accounts[*].tier` | `"YellowCard" \| "PartialMarket50" \| "FullMarket" \| "BackstopTakeover"` | BOLE tier |
-
-**Rules**
-
-- This list is served from the maintained BOLE needs-action index, not a fresh
-  full-account rescan.
-- The index is derived, not persisted state: it rebuilds on first use and
-  after a snapshot load. On a freshly published snapshot it is empty until
-  the node has completed at least one BOLE pass.
+**There is no replacement read, and no other read lists the flagged accounts.**
+The list named other accounts, so it is not something an account query can
+return. Read your own liquidation distance from your own
+[`account_state`](../info.md#account_state) health fields instead.
 
 ### Get a user's market trading limits {#active_asset_data}
 
@@ -845,7 +986,7 @@ No parameters.
 {
   "data": {
     "type": "perp_dexs",
-    "dexs": [ { "index": 0, "n_assets": 1, "assets": [0] } ],
+    "dexs": [ { "index": 0, "n_assets": 5, "assets": ["BTC", "ETH", "SOL", "MTF", "PUMP"] } ],
     "limits": {
       "mip3_enabled":            true,
       "min_deploy_stake_base":   "100000000000",
@@ -869,7 +1010,7 @@ No parameters.
 |-------|------|-------------|
 | `dexs[*].index` | uint64 | DEX index in the perp-DEX registry |
 | `dexs[*].n_assets` | uint64 | Number of asset books in the DEX |
-| `dexs[*].assets` | uint32[] | Asset ids in the DEX |
+| `dexs[*].assets` | string[] | Market symbols in the DEX, e.g. `["BTC","ETH","SOL"]`. They are **symbols, not ids** — a symbol is the key every market read uses |
 | `limits.mip3_enabled` | bool | Permissionless (MIP-3) perp deploy enabled |
 | `limits.min_deploy_stake_base` | u128 string | Deployer **self-stake floor**, MTF base units |
 | `limits.min_deploy_stake_mtf` | Decimal string | Permissionless-deploy **staking bond**, whole-MTF. An independent governance knob from `min_deploy_stake_base` — two thresholds, not one value on two planes |

@@ -84,14 +84,15 @@ const client = new Client({
 const owner = '0x<YOUR_ADDRESS>';
 
 // `markets()` keys by `coin` (the symbol); the numeric id a signed action
-// needs is `asset_id` on the STATIC read.
+// needs is `signing_id` on `markets_meta`, the STATIC read. There is no
+// `asset_id` field — reading one gives you `undefined`.
 const meta = await client.info.marketsMeta();
 const btc = meta.perp.find((m) => m.coin === 'BTC')!;
 
 const result = await client.placeOrder({
   venue: 'perp',
   owner,
-  market: btc.asset_id,
+  market: btc.signing_id,
   side: 'bid',      // 'bid' = buy, 'ask' = sell
   kind: 'limit',
   size: 1_000,       // raw lots, scaled by the market's sz_decimals
@@ -170,7 +171,7 @@ await ws.subscribe({ type: 'order_updates', user: owner });
 if (result.route === 'batch_order') {
   const status = result.legs[0]?.status;
   const oid = status && 'resting' in status ? status.resting.oid : undefined;
-  if (oid !== undefined) await client.cancelOrderNative({ owner, market: btc.asset_id, oid });
+  if (oid !== undefined) await client.cancelOrderNative({ owner, market: btc.signing_id, oid });
 }
 ```
 

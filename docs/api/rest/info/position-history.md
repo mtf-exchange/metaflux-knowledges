@@ -32,23 +32,6 @@ what you hold now, position
 history for what you already closed.
 :::
 
-## Upgrade notices {#upgrade-notices}
-
-:::caution
-**This page describes the target shape. Two parts are not live yet.**
-
-1. **The `coverage` object is being removed.** Responses today still carry a
-   top-level `coverage` block (`fills_gaps`, `truncated`, `complete`). It is
-   deprecated. Do not read it and do not depend on it. The reply shape is
-   `{address, positions}`, matching [`user_fills`](../info.md#user_fills). The
-   per-row completeness flags described below are the supported mechanism and
-   they are **not** going away.
-2. **`closed_sz` is served as `closed_qty` today.** The field is being renamed to
-   match `max_sz` and the `sz` term used everywhere else on the wire. Until the
-   rename lands, parse `closed_qty`. Accept **either** key for a release, then
-   drop `closed_qty`.
-:::
-
 ## Query types {#query-types}
 
 ### Closed position lifecycles, newest first {#user_position_history}
@@ -65,19 +48,25 @@ history for what you already closed.
 | `end_time` | uint64 | no | Window end (ms, inclusive). Filters on `closed_at`. Absent ⇒ open upper bound |
 
 :::warning
-**The request field is `address`, not `user`.** Sending `user` is rejected:
+**The request field is `address`, not `user`.** Sending `user` is rejected with
+`400`:
 
 ```json
-{
-  "error": {
-    "code":    "INVALID_REQUEST",
-    "message": "missing field: address"
-  }
-}
+{ "error": "missing field: address" }
 ```
 
-An unparseable address is rejected the same way, with `INVALID_REQUEST` and a
-`message` naming the address. Match on `code`; the `message` can change.
+An unparseable address is rejected the same way, with the value named:
+
+```json
+{ "error": "invalid user address: nothex" }
+```
+
+**These two reads answer a validation error as a BARE STRING.** `error` holds
+the message directly. There is **no** `error.code` key and no `error.message`
+key, unlike every other `/info` read, which answers `{"error":{"code":…,
+"message":…}}`. A client that reads `error.code` gets `undefined` here and can
+report the rejection as a success. Handle a string `error` before you index into
+it.
 :::
 
 There is **no per-market filter**. This read is account-scoped only; `coin` is
@@ -88,10 +77,17 @@ an error and not a `404`.
 
 Response:
 
+:::warning
+**`type` sits on the ENVELOPE here, not inside `data`.** Both position-history
+reads answer `{"type": …, "data": {"address", "positions"}}`. Every other
+`/info` read puts `type` inside `data`. A client that reads `data.type` to route
+the reply gets `undefined` on these two. Read the outer `type`.
+:::
+
 ```json
 {
+  "type": "user_position_history",
   "data": {
-    "type": "user_position_history",
     "address": "0x662971350e886a0a5631d3e9133d33f767f80611",
     "positions": [
       {
@@ -170,7 +166,7 @@ read again, or raise `limit` (up to `5000`). Walk a long history by moving the
 | `coin` | string | Market symbol the position traded on |
 | `side` | `"long"` / `"short"` | Direction of the life |
 | `max_sz` | Decimal string \| null | Peak size the position reached, **base units**. `null` when `entry_complete` is `false` |
-| `closed_sz` | Decimal string | Size closed over the life, **base units**. Served as `closed_qty` until the rename lands — see [upgrade notices](#upgrade-notices) |
+| `closed_sz` | Decimal string | Size closed over the life, **base units**. The field was once `closed_qty`; that name is gone |
 | `avg_entry_px` | Decimal string \| null | Size-weighted average entry price, **decimal USDC**. `null` when `entry_complete` is `false` |
 | `avg_close_px` | Decimal string \| null | Size-weighted average close price, **decimal USDC** |
 | `closed_pnl` | Decimal string | Realized PnL before fees, **decimal USDC** (signed). The chain's own lot-matched number — see [the warning below](#closed-pnl) |

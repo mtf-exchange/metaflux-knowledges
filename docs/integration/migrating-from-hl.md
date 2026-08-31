@@ -35,7 +35,7 @@ There is one MTF-native surface; you call it through the SDK or build the envelo
 | `POST /info` `spotClearinghouseState` | [`account_state`](../api/rest/info.md#account_state) — the `spot.balances` array. There is no separate spot read |
 | `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) — **one kind for both**. There is no separate "frontend" variant; the time-in-force, `cloid` and trigger detail is folded into every `open_orders` row. |
 | `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
-| `POST /info` `candleSnapshot` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) (the standalone `candle` type is removed). **Bars carry a price series, not executions** — `candle_type` is `mark` (default) or `oracle`, and `v` / `q` are always `"0"` |
+| `POST /info` `candleSnapshot` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) (the standalone `candle` type is removed). `candle_type` selects one of THREE series: `mark` (the default), `oracle` or `trade`. **A `mark` or `oracle` bar is a price series, not executions** — its `v` and `q` read `"0"` and its `n` reads `0`. **`v`, `q` and `n` can also be ABSENT on any series**, because durable history holds no volume for the bucket; a `trade` bar served from history drops `q` in every case. Test that the key is present before you read it — absent means "no data", `"0"` means "no trades". See [the volume rule](../api/rest/info/perpetuals.md#candle_snapshot-volume) |
 | WS `userEvents`, `l2Book`, `candle` | `fills` / `order_updates` / `ledger_updates` (there is no grab-bag events channel), `l2_book`, `candles` — see [WS subscriptions](../api/ws/subscriptions.md) |
 
 **The account read splits differently from HL's.** HL splits per PRODUCT —
@@ -133,10 +133,10 @@ const client = new Client({
 });
 const owner = '0x<YOUR_ADDRESS>';
 
-// asset lookup: HL `meta.universe` → MTF `marketsMeta` (`asset_id` is the
+// asset lookup: HL `meta.universe` → MTF `marketsMeta` (`signing_id` is the
 // numeric id a signed action needs; may not be 0)
 const meta = await client.info.marketsMeta();
-const BTC = meta.perp.find((m) => m.coin === 'BTC')!.asset_id;
+const BTC = meta.perp.find((m) => m.coin === 'BTC')!.signing_id;
 
 // order / cancel — your strategy logic, native action names
 await client.submitOrderNative({

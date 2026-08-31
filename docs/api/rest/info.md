@@ -55,6 +55,10 @@ The payload fields keep their old path. A field you read at `body.data.fills`
 before is still at `body.data.fills`. Only `type` moved: it was a sibling of
 `data`, and it is now the first key of `data`.
 
+**The history-archive reads are the exception: they still answer with `type` at
+the TOP level.** Read `body.data.type ?? body.type` if you need it, and see
+[the archive lane](#archive-lane) below.
+
 A success has **no** `error` key. Do not test `error === null` — test whether
 the key is present.
 
@@ -87,6 +91,61 @@ Two common `/info` failures: an unknown `type` answers `400` with
 `UNKNOWN_TYPE`; an unknown named resource, such as a vault id, answers `404`
 with `NOT_FOUND`.
 
+#### The history-archive reads answer in the OLD envelope {#archive-lane}
+
+This is live behavior today, not a target state. A group of reads is served by
+the history archive rather than by the node, and the archive was not migrated
+to the envelope above. **It differs in two ways at once.**
+
+The lane is `portfolio`, `historical_orders`, `user_funding`,
+`user_funding_by_time`, `user_position_history`,
+`user_position_history_by_time`, `user_ledger`, `user_ledger_by_time`,
+`user_non_funding_ledger_updates`, `recent_blocks`, `recent_transactions` and
+`validator_votes`.
+
+**Difference 1 — `type` sits at the top level, beside `data`, not inside it.**
+
+```json
+{ "data": { "address": "0x<addr>", "fundings": [] }, "type": "user_funding" }
+```
+
+`body.data.type` is `undefined` on every read in this lane. Every other `/info`
+read carries `type` inside `data`.
+
+**Difference 2 — a rejection puts a bare STRING in `error`,** not the
+`{code, message}` object. This applies to the reads in the lane that take an
+`address`. Two strings occur, both with status `400`:
+
+| String | Cause |
+|--------|-------|
+| `missing field: address` | The request carries no `address` |
+| `invalid user address: <value>` | `address` is present but does not parse |
+
+**A handler that branches on `error.code` reads `undefined` on this lane.**
+Test the type of `error` before you read `code`.
+
+Membership of this lane is a deployment fact, not a wire guarantee. Do not
+hard-code the list; write one handler that tolerates both shapes.
+
+#### A malformed request body answers with no `error` key at all {#malformed-request}
+
+The two shapes above both reject a request the server could read. A request the
+server cannot even parse is refused earlier, and that answer carries **no
+`error` key**. Two forms occur, on every read alike:
+
+| Body | Status | Cause |
+|------|--------|-------|
+| A bare JSON **string**, such as `"Failed to deserialize the JSON body into the target type: ..."` | `422` | Valid JSON, but a field holds the wrong type — for example `limit` as a string |
+| **Plain text**, such as `Failed to parse the request body as JSON: ...` | `400` | The body is not valid JSON |
+
+Both messages are prose for a human and can change in any release. Never match
+on them. Parse the body only after you check the status, and treat any `4xx`
+whose body has no `error` object as a bug in your own request.
+
+Not every wrong type is refused. A field the read treats as optional, such as
+`detail` on [`account_state`](#account_state), falls back to its default rather
+than failing. Only a field with a declared numeric or typed binding rejects.
+
 ## Query types {#query-types}
 
 ### Per-account collateral and margin health {#account_state}
@@ -94,13 +153,14 @@ with `NOT_FOUND`.
 One account, one snapshot: the cross-account money figures at the top level, then
 one summary per **lane** — `perp`, `spot`, `margin`, `option`.
 
-:::warning Not live yet
-The shape on this page is the target state. The release that carries it has not
-fired. Until it does a live node answers `account_state` in the previous FLAT
-shape, and answers [`clearinghouse_state`](#clearinghouse_state) and
-[`option_state`](#option_state) with `unknown info type`. Read
-[where every field went](#account-state-lane-split) first, then ship your client
-change with the release, not before it.
+:::info The lane split is live
+A live node answers the lane shape on this page now. The top level no longer
+carries `maint_margin` or `mode`. `position_mode` replaces `mode`, and
+`cross_maintenance_margin_used` is served only at `detail: "margin"`. The perp
+position table moved to [`clearinghouse_state`](#clearinghouse_state) and the
+option legs to [`option_state`](#option_state). Read
+[where every field went](#account-state-lane-split) if you are moving a client
+off the old flat shape.
 :::
 
 **The rule behind the shape.** `account_state` answers one question: what the
@@ -570,10 +630,10 @@ keys present and each one empty or zeroed.
 The perp position DETAIL for one account, keyed by dex. This is the table that
 used to sit inside `account_state`; the row shape is unchanged.
 
-:::warning Not live yet
-This read and its WS channel land with the release that reshapes
-[`account_state`](#account_state). A live node answers `unknown info type` until
-then.
+:::info Live
+This read and its WS channel are live. The response is keyed by dex, and
+`detail: "adl"` widens the rows. The row shape is the one
+[`account_state`](#account_state) used to carry.
 :::
 
 **Request**
@@ -819,50 +879,52 @@ Returns one account's staking, delegation, and unbonding state.
   "data": {
     "type": "staking_state",
     "address":                  "0x<addr>",
-    "total_staked":             "1000000000",
-    "undelegated_pool_balance": "250000000",
+    "total_staked":                "1000000000",
     "delegations": [
       {
-        "validator":         "0x<val_addr>",
-        "amount":         "500000000",
-        "since_ts":          1735000000000,
-        "pending_rewards":"1000000"
+        "validator":        "0x<val_addr>",
+        "amount":           "500000000",
+        "since_ts":         1735000000000,
+        "pending_rewards":  "1000000"
       }
     ],
     "pending_unstakes": [
       { "amount": "200000000", "matures_at_ts": 1735780000000 }
     ],
-    "reward_pool": {
-      "total_stake":                 "1000000",
-      "pending_validator_pool_usdc": "25.75",
-      "reward_source":               "fee_funded_on_book_buy"
-    }
+    "total_stake":                 "87600000",
+    "pending_validator_pool_usdc": "8800.447354",
+    "n_active_validators":         5,
+    "reward_source":               "fee_funded_on_book_buy"
   }
 }
 ```
 
+**The response is FLAT.** `total_stake`, `pending_validator_pool_usdc`,
+`n_active_validators` and `reward_source` sit at the top level. There is no
+`reward_pool` object.
+
 | Field | Type | Meaning |
 |-------|------|---------|
 | `address` | hex address | Resolved account address |
-| `total_staked` | Decimal string | Delegated stake only, whole-MTF — the sum of `delegations[*].amount` |
-| `undelegated_pool_balance` | Decimal string | Stake deposited but not delegated, whole-MTF, same plane as `total_staked` |
+| `total_staked` | Decimal string | This account's delegated stake only, whole-MTF — the sum of `delegations[*].amount`. It is `"0"` for an account that delegates nothing |
 | `delegations[*].validator` | hex address | Validator the stake is delegated to |
 | `delegations[*].amount` | Decimal string | Stake delegated to this validator, whole-MTF |
-| `delegations[*].since_ts` | uint64 | When the delegation began, consensus ms |
+| `delegations[*].since_ts` | uint64 | **Last reward-claim time, consensus ms — not the time the delegation began.** Committed state keeps the last-claim stamp only. Do not compute a delegation age from it |
 | `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards, whole-MTF |
 | `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window, whole-MTF |
 | `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable, consensus ms |
-| `reward_pool.total_stake` | Decimal string | Total staked MTF across the chain, whole-MTF — the denominator this account's delegated stake competes in |
-| `reward_pool.pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool, not yet distributed, whole USDC. This is the reward the next distribution draws from |
-| `reward_pool.reward_source` | string | Always `"fee_funded_on_book_buy"`. Lets a client tell a fee-funded chain from an emission-funded one without inferring it |
+| `total_stake` | Decimal string | Total staked MTF across the **whole chain**, whole-MTF — the denominator this account's delegated stake competes in. Chain-wide, not per-account |
+| `pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool, not yet distributed, whole USDC. This is the reward the next distribution draws from |
+| `n_active_validators` | uint64 | Count of validators marked active in committed staking state |
+| `reward_source` | string | Always `"fee_funded_on_book_buy"`. Lets a client tell a fee-funded chain from an emission-funded one without inferring it |
 
 **Rules**
 
-- `reward_pool` serves no APR, on purpose. The emission era is over: rewards are funded from fees, not minted on a curve, so there is no annual rate to publish. Do not derive one. The pending pool is a snapshot of accrued fees, not a rate — it depends on trading volume that has not happened yet.
-- `undelegated_pool_balance` and `reward_pool` are not live yet. A node that predates them omits the keys. Treat a missing key as "this node predates the field", not as a zero balance.
-- `total_staked` alone under-reports what an account holds: it counts delegated stake only. [`c_deposit`](./exchange.md#c_deposit) credits a free pool and [`c_withdraw`](./exchange.md#c_withdraw) debits it, and stake can sit in that pool undelegated for as long as the holder likes. Add `undelegated_pool_balance` to get the account's full staked balance.
+- **This read serves no APR, on purpose.** The emission era is over: rewards are funded from fees, not minted on a curve, so there is no annual rate to publish. Do not derive one. `pending_validator_pool_usdc` is a snapshot of accrued fees, not a rate — it depends on trading volume that has not happened yet.
+- **This read does NOT serve the undelegated free pool.** [`c_deposit`](./exchange.md#c_deposit) credits a free pool and [`c_withdraw`](./exchange.md#c_withdraw) debits it, and stake can sit in that pool undelegated for as long as the holder likes. No field on this read reports it. `total_staked` therefore **under-reports** what an account holds: it counts delegated stake only, so an account with a funded free pool and no delegation reads `"0"`. Do not present `total_staked` as the account's whole staked balance.
 - The free pool is not the same as `pending_unstakes`. Undelegated stake is already free. `pending_unstakes` is stake still inside its unbonding window, not withdrawable until `matures_at_ts`.
-- The three balances are disjoint — add them for the whole staked holding. [`c_deposit`](./exchange.md#c_deposit) credits `undelegated_pool_balance`; `token_delegate` moves stake out of that pool into `total_staked`; undelegating moves it out of `total_staked` into `pending_unstakes` for the unbonding window. `undelegated_pool_balance` is the spendable figure `token_delegate` draws from, and the only one of the three that [`c_withdraw`](./exchange.md#c_withdraw) returns to spot with no unbonding window.
+- `total_staked` and `pending_unstakes` are disjoint. `token_delegate` moves stake out of the free pool into `total_staked`; undelegating moves it out of `total_staked` into `pending_unstakes` for the unbonding window. Only the free pool is the figure [`c_withdraw`](./exchange.md#c_withdraw) returns to spot with no unbonding window.
+- `total_stake` and `total_staked` are different figures with near-identical names. `total_stake` is chain-wide; `total_staked` is this account. Do not swap them.
 
 ### Volume-tiered maker and taker fees {#fee_schedule}
 
@@ -874,7 +936,15 @@ Returns the maker/taker fee schedule and its volume tiers.
 { "type": "fee_schedule" }
 ```
 
-No parameters.
+| Arg | Type | Required | Meaning |
+|-----|------|----------|---------|
+| `address` | hex address | no | Adds the per-account `user` block described below |
+| `days` | uint | no | Bounds `user.daily_volume` to its newest `days` buckets. Range `1` to `30`. Default `30` |
+
+`days` does nothing without an `address`, because only the `user` block carries a
+series. **A `days` that is not an integer in `1`–`30` does not fail — it falls
+back to the full 30-day window.** That is deliberate: a typo cannot turn the
+series into an empty array.
 
 **Response**
 
@@ -936,6 +1006,10 @@ carries a `user` block:
       "effective_maker_bps":       "1.2",
       "staking_discount_permille": 100,
       "maker_rebate_bps":          "0.3",
+      "vip_tier":                  0,
+      "mm_tier":                   0,
+      "referrer":                  null,
+      "referrer_credit":           "0",
       "products": [
         { "product": "perp",        "taker_bps": "4.05", "maker_bps": "1.2",
           "taker_volume_30d": "12500000", "maker_volume_30d": "3100000" },
@@ -944,7 +1018,10 @@ carries a `user` block:
         { "product": "spot_margin", "taker_bps": "9.0",  "taker_volume_30d": "12500000" },
         { "product": "option",      "option_taker_bps": "0.5", "option_premium_cap_ppm": 150000 }
       ],
-      "daily_volume": []
+      "daily_volume": [
+        { "day": 0, "taker_volume": "1416854.124376258", "maker_volume": "0",
+          "exchange_maker_volume": "140430596.722835936" }
+      ]
     }
   }
 }
@@ -959,6 +1036,15 @@ carries a `user` block:
 | `user.effective_maker_bps` | Decimal string | The PERP rate a fill charges, rebate subtracted. Negative = a credit |
 | `user.staking_discount_permille` | uint32 | Taker-only staking discount, per mille (`100` = 10%) |
 | `user.maker_rebate_bps` | Decimal string | The PERP maker rebate, before it is subtracted |
+| `user.vip_tier` | uint | The account's VIP-tier override index. `0` when the account holds no override, which is the common case |
+| `user.mm_tier` | uint | The account's market-maker-tier override index. `0` when the account holds no override |
+| `user.referrer` | hex address \| null | The referrer this account is bound to. **`null`, not absent, when the account is bound to nobody** |
+| `user.referrer_credit` | Decimal string | Credit this account has accrued AS a referrer, whole USDC. It is the credit owed TO this address, not the discount it receives |
+| `user.daily_volume` | array | Per-day volume buckets, oldest day first. See the rules below |
+| `user.daily_volume[*].day` | uint64 | **Consensus day index**, that is `consensus_time_ms / 86400000`. It is not a calendar date and not an offset from today. **`0` is a real day index, not an unset marker** — a bucket rolled at consensus time zero reports `0`, and the current chain serves such a row |
+| `user.daily_volume[*].taker_volume` | Decimal string | This account's taker volume on that day |
+| `user.daily_volume[*].maker_volume` | Decimal string | This account's maker volume on that day |
+| `user.daily_volume[*].exchange_maker_volume` | Decimal string | Exchange-wide **maker** volume on that day. There is no exchange-wide taker total — do not read this as total traded volume |
 | `user.products[*].product` | string | `perp`, `spot`, `spot_margin` or `option` |
 | `user.products[*].taker_bps` | Decimal string | The rate a fill on THIS product charges, discount applied |
 | `user.products[*].maker_bps` | Decimal string | The rate a fill on THIS product charges, rebate subtracted. ABSENT on a product with no maker leg |
@@ -994,6 +1080,23 @@ volume and the volume you traded on that product, so the rows agree. After the
 sunset each row reads only its own product. `pooled_volume_sunset_ms` in the same
 response is the date; the rule is in
 [the pooled window](../../concepts/fees.md#pooled-volume-sunset).
+
+**`daily_volume` is SPARSE. A quiet day has NO ROW — it is not a zero row.**
+All three series roll only when a fill charges a **positive protocol fee**. A
+zero-fee market and a fully rebated maker leg never reach them. So a day on
+which the account traded can still be missing, and a gap does not mean the
+account was idle. Index the array by `day`; never assume row `n` is `n` days
+ago, and never assume the array length is the number of days elapsed.
+
+**The rows are a UNION of three sources**: the account's taker buckets, its
+maker buckets, and the exchange-wide maker buckets. A day that carries only
+exchange volume still appears, with the account's own two figures at `"0"`.
+Those zeros are real zeros; a missing day is not.
+
+**`days` bounds each source separately, not the union.** Each of the three
+sources contributes its own newest `days` buckets. The three ranges can be
+disjoint, so the returned array can hold more than `days` rows. Treat `days` as
+a bound on work, not as an exact row count.
 
 See [fees](../../concepts/fees.md).
 
@@ -1438,12 +1541,10 @@ trigger registry and fill ring are keyed by `oid`):
 
 Every live [option](../../products/options.md) series, oldest series first.
 
-:::warning Not live yet
-The shape below is the target state. The release that carries the **standard
-European** option lane has not fired. Until it does a live node answers a THIRD
-`kind` token on its call rows, carries an extra `cap` field on them, and serves no
-`settle_asset` at all. Treat any `kind` outside `"put"` and `"call"` as the
-pre-release lane. Ship your client change with the release, not before it. See
+:::info Live
+The **standard European** option lane is live. A live series carries `kind` of
+`"put"` or `"call"` only, carries `settle_asset`, and carries no `cap` field.
+The capped-call lane and its third `kind` token are removed. See
 [what changed](../../products/options.md#what-changed).
 :::
 
@@ -1651,13 +1752,16 @@ missing or malformed → `400`); an **unknown address is never an error** — it
 returns **200** with the empty shape (the zeroed-default convention used
 elsewhere in this reference).
 
-Some of these types ship the locked wire contract with an **honest-empty**
-array today (marked **Status: empty (history retention pending)** below):
-their backing events currently stream on the live
-[WS channels](../ws/subscriptions.md) only and are not yet retained for REST.
-The retention backfill fills them **without a wire change** — the
-request/response envelopes below are final, and the documented record shapes
-are the locked forms the arrays will carry.
+[`user_funding`](#user_funding) and [`historical_orders`](#historical_orders)
+are live and populated. One type still ships the locked wire contract with an
+**honest-empty** array — [`user_twap_slice_fills`](#user_twap_slice_fills),
+marked **Status: empty (history retention pending)** below. Its backing events
+stream on the live [WS channels](../ws/subscriptions.md) only and are not yet
+retained for REST. The retention backfill fills it **without a wire change** —
+the request and response envelopes below are final.
+
+An empty array alone does not tell you which case you are in: an account with
+no matching history also reads `[]`. Read the notice on the type itself.
 
 [`user_ledger_updates`](#user_ledger_updates) is empty for a different reason:
 its records live in the archive, not on the node. Read its own notice below.
@@ -1669,9 +1773,8 @@ could only ever answer `[]` was deleted rather than documented — see
 
 Realized funding payments for an account, over an optional time window.
 
-**Status: empty (history retention pending).** The envelope is live, but
-`fundings` returns `[]` until funding payments are retained for REST. For live
-per-account funding payments today, subscribe to the
+This read is **live and populated**. For a push feed of the same payments,
+subscribe to the
 [`user_fundings` WS channel](../ws/subscriptions.md#user_fundings).
 
 **Request**
@@ -1692,30 +1795,46 @@ per-account funding payments today, subscribe to the
 {
   "data": {
     "type": "user_funding",
-    "address":    "0x<addr>",
-    "start_time": 1700000000000,
-    "end_time":   1700003600000,
-    "fundings":   []
+    "address": "0x<addr>",
+    "fundings": [
+      {
+        "coin":         "BTC",
+        "funding_rate": "-0.00037488090540037165490589",
+        "szi":          "-0.13362",
+        "time":         1788148800041,
+        "usdc":         "-3.8933688206827414955873986380"
+      }
+    ]
   }
 }
 ```
 
+**The response does NOT echo `start_time` or `end_time`.** It carries `address`
+and `fundings` and nothing else. A caller that reads back the window it sent
+gets `undefined`. Keep the window you requested on your own side.
+
 | Field | Type | Meaning |
 |-------|------|---------|
 | `address` | hex address | Echoes the request address |
-| `start_time` | uint64 \| null | Echoes the request window start |
-| `end_time` | uint64 \| null | Echoes the request window end |
-| `fundings` | array | Funding-payment records. Empty until REST retention ships |
-
-Locked record shape, for when retention ships:
-
-| Field | Type | Meaning |
-|-------|------|---------|
+| `fundings` | array | Funding-payment records, **newest first** |
 | `fundings[*].coin` | string | Market symbol the payment settled on |
-| `fundings[*].payment` | Decimal string | Funding payment, whole USDC, signed |
+| `fundings[*].usdc` | Decimal string | The payment, whole USDC, signed. **The amount key is `usdc`.** A negative value is paid BY the account |
 | `fundings[*].szi` | Decimal string | Signed position size at settlement, whole units |
 | `fundings[*].funding_rate` | Decimal string | Funding rate applied, signed |
 | `fundings[*].time` | uint64 | Settlement timestamp, consensus ms |
+
+**The amount field is `usdc`, never `payment`.** `payment` is the internal name
+and it is not emitted on the wire. A client that reads `payment` reads
+`undefined` on every row.
+
+**The page cap is 500 rows. History goes past it.** A request with no window
+returns the newest 500 payments, and that is not the whole history. To walk
+back, re-request with `end_time` set to the oldest `time` you received.
+
+**`end_time` is INCLUSIVE.** The row at exactly `end_time` comes back again on
+the next page. Drop the duplicate by `time`, and stop when a page returns only
+rows you already hold — otherwise a pager that re-sends the same `end_time`
+never advances.
 
 ### Balance ledger update history {#user_ledger_updates}
 
@@ -1781,10 +1900,9 @@ deltas, once retention lands, come from the archive's
 
 ### Past executed orders {#historical_orders}
 
-An account's past (executed) orders, folded from the same committed
-per-account fill records that [`user_fills`](#user_fills) reads. One record
-per order (`oid`), newest first, with `filled_sz` the exact sum of that
-order's fills.
+An account's past orders, newest first. A record is one **order transition**,
+not one order. An order that rested and then filled contributes two records, so
+`oid` is not unique across the array.
 
 **Request**
 
@@ -1795,7 +1913,12 @@ order's fills.
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
 | `address` | hex address | yes | Account address |
-| `limit` | uint32 | no | Cap on the number of most-recent records returned. Absent or `0` returns all, bounded by the underlying fill history |
+| `limit` | int | no | Cap on the number of most-recent records returned. Absent returns every retained record |
+
+**`limit: 0` returns ONE record, not all of them.** `limit` clamps to a minimum
+of `1`, so `0` and any negative value both return a single record. Omit the key
+to get everything; do not pass a computed `0`. A `limit` that is not a number is
+rejected — see [malformed requests](#malformed-request).
 
 **Response**
 
@@ -1806,15 +1929,24 @@ order's fills.
     "address": "0x<addr>",
     "orders": [
       {
-        "oid":       12345,
-        "coin":      "BTC",
-        "side":      "B",
-        "px":        "67042.5",
-        "filled_sz": "1.2",
-        "time":      1700000000555,
-        "block":     562,
-        "hash":      "0x2315b79b9e82c2deb279a59448bf7841f3767d30d874e5b544d75bb9fd1e9b0c",
-        "status":    "filled"
+        "oid":           32535358,
+        "coin":          "GRAD:000001SH",
+        "side":          "A",
+        "status":        "filled",
+        "time":          1787982042382,
+        "px":            "585.56189134",
+        "limit_px":      "558.58000000",
+        "avg_px":        "585.56189134",
+        "sz":            "4.97",
+        "orig_sz":       "4.97",
+        "total_sz":      "4.97",
+        "filled_sz":     "4.97",
+        "tif":           "Ioc",
+        "reduce_only":   true,
+        "cloid":         null,
+        "cancel_reason": null,
+        "error":         null,
+        "hash":          ""
       }
     ]
   }
@@ -1823,27 +1955,47 @@ order's fills.
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `orders[*].oid` | uint64 | Order id, the fold key |
-| `orders[*].coin` | string | Market symbol the order executed on |
+| `orders[*].oid` | uint64 | Order id. **Not unique** — see the rules below. `0` on an `"error"` record, which never reached the book |
+| `orders[*].coin` | string | Market symbol the order was placed on |
 | `orders[*].side` | `"B"` / `"A"` | Side token — `"B"` = buy/bid, `"A"` = sell/ask. Same token as [`user_fills`](#user_fills) |
-| `orders[*].px` | Decimal string | Price of the order's most-recent fill, decimal USDC |
-| `orders[*].filled_sz` | Decimal string | Total executed size — the exact sum of every fill of this `oid`, whole units |
-| `orders[*].time` | uint64 | Timestamp of the most-recent fill, consensus ms |
-| `orders[*].block` | uint64 | Committed block of the most-recent fill |
-| `orders[*].hash` | hex string | Transaction hash of the originating order. `""` when none was recorded |
-| `orders[*].status` | `"filled"` | The only status emitted today — see below |
+| `orders[*].status` | `"filled"` \| `"resting"` \| `"error"` | The transition this record reports |
+| `orders[*].time` | uint64 | Timestamp of the transition, consensus ms |
+| `orders[*].px` | Decimal string | `avg_px` when the order filled, else `limit_px`. **Absent**, not null, if the record carries neither |
+| `orders[*].limit_px` | Decimal string | The limit price submitted |
+| `orders[*].avg_px` | Decimal string \| null | Realized average fill price. **`null` unless `status` is `"filled"`** |
+| `orders[*].sz` | Decimal string | Size on the record, whole units |
+| `orders[*].orig_sz` | Decimal string | Size as submitted, whole units |
+| `orders[*].total_sz` | Decimal string \| null | Total executed size. **`null` unless `status` is `"filled"`** |
+| `orders[*].filled_sz` | Decimal string | Executed size. **`"0"` unless `status` is `"filled"`** — a string zero, never null |
+| `orders[*].tif` | string | Time in force: `"Gtc"`, `"Ioc"` or `"Alo"` |
+| `orders[*].reduce_only` | bool | Whether the order was submitted reduce-only |
+| `orders[*].cloid` | string \| null | Client order id. `null` when the order carried none |
+| `orders[*].cancel_reason` | string \| null | Why the order was cancelled. `null` when it was not |
+| `orders[*].error` | string \| null | The rejection message. **Non-null only when `status` is `"error"`** |
+| `orders[*].hash` | string | **Always the empty string `""`.** This read records no transaction hash. Never key on it |
 
 **Rules**
 
-- Records list newest-first. The underlying history is bounded, so this is a
-  recent window, not the full account history.
-- `status` is `"filled"` only, today. The history holds executed legs only, so
-  cancel, reject and expire records are not emitted yet — a
-  partially-filled-then-cancelled order still renders as `"filled"`, with
-  `filled_sz` equal to the executed portion.
-- Live resting orders and parked triggers are not repeated here; they are
-  derivable. Read them from [`open_orders`](#open_orders) or
-  [`order_status`](#order_status).
+- Records list newest-first by `time`. The underlying history is bounded, so
+  this is a recent window, not the full account history.
+- **`oid` is not a unique key. Do not use it to deduplicate.** A record is one
+  order transition, so one `oid` can appear more than once. Worse, every
+  `"error"` record carries `oid: 0`, so an account with many rejections holds
+  many records sharing that single id. Key on `oid` plus `time` plus `status`,
+  or do not key at all.
+- **`"error"` is a real status, and it carries a human-readable `error`
+  string.** An order rejected at commit time is recorded here, not dropped. The
+  message is prose for a human and can change in any release — do not match on
+  it. Example: `"precondition failed: hedge leg-reducing order must be
+  reduce_only"`.
+- **`block` is not served.** Earlier drafts of this page listed it. There is no
+  block field on any record.
+- Every key above is present on every record. The optional ones hold `null`;
+  none of them is omitted. The one exception is `px`, which is absent when the
+  record has neither an average nor a limit price.
+- Live resting orders and parked triggers are also readable from
+  [`open_orders`](#open_orders) or [`order_status`](#order_status), which carry
+  the current book state rather than a transition history.
 
 ### Commit-time verdict on a submitted action {#action_outcome}
 
@@ -2094,7 +2246,7 @@ All vaults summary. No parameters.
   "data": {
     "type": "vault_summaries",
     "vaults": [
-      { "id": 7, "address": "0x<vault>", "leader": "0x<leader>", "tvl": "10000000000", "follower_count": 2, "kind": "user" }
+      { "id": 7, "address": "0x<vault>", "leader": "0x<leader>", "name": "MLP", "tvl": "10000000000", "follower_count": 2, "kind": "user" }
     ]
   }
 }
@@ -2104,6 +2256,7 @@ All vaults summary. No parameters.
 |-------|------|-------------|
 | `vaults[*].id` | uint64 | Vault id |
 | `vaults[*].address` / `leader` | hex address | Vault on-chain address / leader |
+| `vaults[*].name` | string | Display name of the vault. Present on every row |
 | `vaults[*].tvl` | decimal string | Mark-to-market NAV, whole-USDC — same figure as [`vault_state.tvl`](#vault_state) |
 | `vaults[*].follower_count` | uint64 | Number of share holders |
 | `vaults[*].kind` | `"user" \| "metaliquidity"` | Vault kind |
@@ -2194,15 +2347,15 @@ Current validator L1 votes. No parameters.
 {
   "data": {
     "type": "validator_l1_votes",
-    "latest_round": 5,
-    "votes": [ { "round": 5, "validator": "0x<validator>", "submitted_at": 1700000000000 } ]
+    "latest_round": 0,
+    "votes": [ { "round": 43000000, "validator": "0x<validator>", "submitted_at": 1700000000000 } ]
   }
 }
 ```
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `latest_round` | uint64 | Latest accepted vote round |
+| `latest_round` | uint64 | **A governance proposal-id counter. It is NOT the latest vote round, and it is not the maximum `round` in `votes`.** The governance proposal path increments it; nothing derives it from the votes. On a chain that has opened no proposal it stays `0` while `votes[*].round` runs into the millions. Never use it to page or to date the votes |
 | `votes[*].round` | uint64 | Vote round |
 | `votes[*].validator` | hex address | Casting validator |
 | `votes[*].submitted_at` | uint64 | Submission timestamp (consensus ms) |
@@ -2288,11 +2441,9 @@ validator instead.
 The nodes this deployment advertises for peer discovery. No parameters. Network
 topology, **not** committed state.
 
-:::warning Not live yet
-The `peers` shape below is the target state. The release that carries it has not
-fired. Until it does, a live node answers this query with the previous shape,
-`{ "root_ips": ["host:port", ...] }`. Do not ship a client against `peers`
-before the release.
+:::info Live
+A live node answers the `peers` shape below. The previous shape,
+`{ "root_ips": ["host:port", ...] }`, is removed — there is no `root_ips` key.
 :::
 
 ```json
@@ -2388,7 +2539,7 @@ The status splits the two kinds of removal:
 | `recent_trades`, `trades_by_time` | [`trades`](./info/perpetuals.md#trades) — un-ranged for the recent window, ranged for a time window |
 | `spot_clearinghouse_state` | [`account_state`](#account_state) — `spot.balances` is the whole token ledger |
 | `spot_deploy_state` | [`spot_deploy_auction`](./info/spot.md#spot_deploy_auction) — the same read, renamed |
-| `staking_apr` | [`staking_state`](#staking_state) — `reward_pool`. It never served an APR |
+| `staking_apr` | [`staking_state`](#staking_state) — `pending_validator_pool_usdc` and `total_stake`. It never served an APR |
 | `sub_accounts` | [`account_state`](#account_state) with `detail: "overview"` — `sub_accounts` |
 | `token_info` | [`markets_meta`](./info/perpetuals.md#markets_meta) with `kind: "spot"` |
 | `user_fees` | [`fee_schedule`](#fee_schedule) with `address` — it resolves the effective maker / taker bps |

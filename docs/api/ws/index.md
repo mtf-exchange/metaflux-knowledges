@@ -54,7 +54,9 @@ sequenceDiagram
 
 ## Frames {#frames}
 
-All frames are JSON **text** frames. Binary frames are rejected with an error frame (the connection stays open). Inbound frames are keyed by `method`; outbound frames are keyed by `channel`.
+All frames are JSON **text** frames by default. Binary frames from the client are rejected with an error frame (the connection stays open). Inbound frames are keyed by `method`; outbound frames are keyed by `channel`.
+
+A connection that negotiates [compression](#websocket-compression-zstd) receives its data frames as **binary** frames that hold the same JSON, compressed. Compression is opt-in: a client that offers no subprotocol receives text frames, unchanged. Frames you send stay text in every mode.
 
 ### `subscribe` {#subscribe}
 
@@ -179,6 +181,157 @@ Response (correlate on `id`):
 ```
 
 A failed-but-well-formed action (e.g. bad signature) comes back as a normal `action` response with `payload.accepted: false` and an `error` string, not an `error`-type response.
+
+## WebSocket compression (zstd) {#websocket-compression-zstd}
+
+> ⬆️ **Upgrade notice — not live yet.** Frame compression ships in the next
+> gateway release. A gateway that predates it ignores the subprotocol you offer
+> and sends plain JSON **text** frames. That answer is safe and correct — rely on
+> it. Write the client now: it keeps working today, and it starts to compress on
+> the day the gateway ships, with no client change.
+
+Compression is **opt-in** and per connection. You ask for it in the WebSocket
+handshake, and the server answers in the same handshake. Market-data frames
+compress well, because they repeat a small set of keys, coins and price shapes;
+expect a large reduction on `l2_book`, which dominates a normal client's byte
+budget.
+
+Compression is a **gateway** capability. A node-direct socket
+(`ws://localhost:8080/ws`) selects no subprotocol and sends text frames, exactly
+as it does today.
+
+### Negotiation {#compression-negotiation}
+
+Offer subprotocols on connect, in the `Sec-WebSocket-Protocol` request header, in
+this preference order:
+
+| Token | Meaning |
+| --- | --- |
+| `mtf-zstd.v1.d<id>` | zstd **with** dictionary `<id>`. Offer it only if you hold those dictionary bytes. |
+| `mtf-zstd.v1` | zstd, **no** dictionary. |
+
+The server echoes **one** token in the `Sec-WebSocket-Protocol` response header,
+or echoes nothing. That answer is the mode:
+
+| Server selects | Data frames you receive |
+| --- | --- |
+| `mtf-zstd.v1.d<id>` | binary, zstd, compressed with dictionary `<id>` |
+| `mtf-zstd.v1` | binary, zstd, no dictionary |
+| nothing | text, plain JSON |
+
+In a browser:
+
+```js
+const ws = new WebSocket("wss://api.<net>.mtf.exchange/ws", [
+  "mtf-zstd.v1.d1a2b3c4",
+  "mtf-zstd.v1",
+]);
+ws.onopen = () => console.log(ws.protocol); // "" when the server selects nothing
+```
+
+**Why the handshake carries this.** The server's answer arrives before the first
+frame. You know the mode up front, so you never guess it from the bytes of the
+first frame, and you never race your own `subscribe` messages.
+
+**Why opt-in.** An existing client drops a binary frame it does not expect. A
+client that offers nothing receives plain JSON text frames, unchanged, forever.
+Compression can never reach a client that did not ask for it.
+
+### Frame format {#compression-frame-format}
+
+The rule is by **WebSocket opcode**, never by channel:
+
+- A **binary** frame is one standard zstd frame. Decompress it. The result is
+  exactly the JSON text you receive without compression — same envelope, same
+  fields, same bytes.
+- A **text** frame is plain JSON. Parse it.
+
+Handle both on **any** channel. Do not build a per-channel table.
+
+**Why opcode-based.** Which frames the server compresses can change. The opcode
+always tells you what to do with the bytes in your hand, so your client stays
+correct across that change.
+
+**Control frames stay text in every mode**: `subscriptionResponse`, `error`,
+`pong`, and `post` replies. They are small and request/response shaped, so
+compression buys nothing on them.
+
+**Frames you send stay text in every mode.** The server still rejects an inbound
+binary frame with an [error frame](#error-frame). There is no inbound
+compression, so a binary frame from a client is still a client defect.
+
+### Dictionary {#compression-dictionary}
+
+Fetch the dictionary over HTTP from the same host:
+
+```
+GET /ws/dict
+```
+
+| Part | Value |
+| --- | --- |
+| Body | the dictionary bytes |
+| `Content-Type` | `application/octet-stream` |
+| `x-mtf-dict-id` | the dictionary id |
+| `ETag` | `"<id>"` — the same id, quoted |
+
+The id is the **first 8 lowercase hex characters of the SHA-256 of the dictionary
+bytes**. It is a content hash, so an id names exactly one set of bytes.
+
+Client flow:
+
+1. `GET /ws/dict`. Read `x-mtf-dict-id`.
+2. Cache the bytes under that id.
+3. Connect, and offer `mtf-zstd.v1.d<id>` first, then `mtf-zstd.v1`.
+4. When the server selects the dict token, load the cached bytes into your zstd
+   decoder for that connection.
+
+**Why a dictionary at all.** One frame is small, so a compressor finds little to
+learn inside it. The dictionary holds the shared structure — the envelope keys,
+the coin names, the common price and size shapes — so each frame carries only
+what is new in that frame.
+
+Dictionary-compressed frames also carry zstd's own 4-byte dictionary id in the
+standard frame header. Your zstd decoder checks it for you. **Why two ids:** the
+8-hex id rides the handshake and the HTTP headers, so it costs no bytes per
+frame; the in-frame id is a decode-time check only.
+
+### Degradation — never corruption {#compression-degradation}
+
+If the id in your dict token is not the server's current id, that token matches
+nothing on the server. The server selects `mtf-zstd.v1` instead. You still get
+zstd, without the dictionary: always decodable, a weaker ratio.
+
+**Why the fork happens once, at the handshake.** A dictionary-compressed frame
+cannot be decoded without those exact dictionary bytes. So the server decides
+before it sends any frame. There is no per-frame fallback, and the dictionary
+never changes during a connection.
+
+**Read "I offered a dict token and the server selected the plain token" as "my
+dictionary is stale."** Refetch `GET /ws/dict`, and use the new id on your next
+connect. A reconnect straight after a gateway upgrade can run dictionary-free
+until you refetch. That costs ratio, never data.
+
+### Per-account channels {#compression-per-account-channels}
+
+Per-account frames (`fills`, `order_updates`, and the other account channels) are
+compressed with the **same public dictionary** as every other frame. The compress
+path does not look at the channel.
+
+The dictionary is trained on **public market channels only**. It is never trained
+on account data.
+
+**Why that rule exists.** A zstd dictionary holds literal byte sequences from the
+samples it was trained on, and it is published to every client. A dictionary
+trained on account channels would hand one account's balances, positions and
+order flow to everyone.
+
+**Why using it on your private frames is still safe.** Compressing your frame
+with the public dictionary emits only your own frame, on your own subscription.
+The dictionary contributes bytes that are already public.
+
+A per-account frame gains less than a book frame, because the public dictionary
+knows less about its content. That is a ratio note, not a limit.
 
 ## Coin parameter {#coin-parameter}
 

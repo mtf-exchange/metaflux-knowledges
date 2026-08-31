@@ -46,10 +46,11 @@ The `spot` section of the `markets_meta` response:
     "spot": {
       "pairs": [
         {
-          "signing_id": 110, "name": "BTC/USDC", "base": 101, "quote": 100,
-          "taker_fee_bps": "5", "min_notional": "100", "active": true,
-          "mark_px": "61650", "mid_px": "61651.5", "day_ntl_vlm": "15230.5",
-          "prev_day_px": "61200", "circulating_supply": "21000000"
+          "signing_id": 113, "name": "MTF/USDC", "base": 104, "quote": 100,
+          "sz_decimals": 2, "taker_fee_bps": "5", "min_notional": "1",
+          "active": true, "deployer": "0x17c5…d025", "registered_at": 0,
+          "mark_px": "0.13787", "mid_px": "0.13787", "day_ntl_vlm": "0",
+          "prev_day_px": null, "circulating_supply": "10000010"
         }
       ],
       "tokens": [
@@ -66,25 +67,31 @@ The `spot` section of the `markets_meta` response:
 ```
 
 :::info
-**`pairs` carries two kinds of entry.** Per-token "self pairs" (`id` = token
-id, `base == quote`) project the token registry as pairs. Real tradable pairs
-have distinct `base` / `quote` (e.g. `"BTC/USDC"`) and carry the live market
-fields: `mark_px`, `mid_px`, `day_ntl_vlm`, `prev_day_px`,
-`circulating_supply`.
+**A pair row keys on `signing_id`, and its price fields can be `null`.** A
+tradable pair has distinct `base` / `quote` (e.g. `"MTF/USDC"`). A per-token
+"self pair" projects the token registry as a pair and has `base == quote`.
+
+`mark_px`, `mid_px` and `prev_day_px` are sent as **`null`** on a pair that has
+not traded — the key is present and holds `null`, it is never omitted. Most of
+the registry reads `null` here at any moment, so treat `null` as the normal
+answer, not as an error.
 :::
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `pairs[*].id` | uint32 | Pair id |
-| `pairs[*].name` | string | Pair name (e.g. `"BTC/USDC"`) |
+| `pairs[*].signing_id` | uint32 | **The number you put in the EIP-712 `market` field when you sign a spot order for this pair.** The field was named `id`; that name is gone. Every read keys the pair by `name` — see below |
+| `pairs[*].name` | string | Pair name (e.g. `"MTF/USDC"`) |
 | `pairs[*].base` / `quote` | uint32 | Base / quote asset id (equal for self-pairs) |
+| `pairs[*].sz_decimals` | uint8 | Size precision of the pair's base leg |
 | `pairs[*].taker_fee_bps` | bps string | Taker fee (whole bps); `"0"` if unset |
 | `pairs[*].min_notional` | Decimal string | Min notional (whole USDC); `"0"` if unset |
 | `pairs[*].active` | bool | Whether the pair is active for trading |
-| `pairs[*].mark_px` | Decimal string \| null | Last-trade price (whole USDC); `null` before the first trade |
-| `pairs[*].mid_px` | Decimal string \| null | Book mid, falls back to `mark_px`; `null` when neither exists |
+| `pairs[*].deployer` | hex address | The account that registered the pair |
+| `pairs[*].registered_at` | uint64 | Block height at which the pair was registered. `0` on a genesis pair |
+| `pairs[*].mark_px` | Decimal string \| null | Last-trade price (whole USDC); **`null`** before the first trade |
+| `pairs[*].mid_px` | Decimal string \| null | Book mid, falls back to `mark_px`; **`null`** when neither exists |
 | `pairs[*].day_ntl_vlm` | Decimal string | 24h notional volume |
-| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; `null` if unknown |
+| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; **`null`** if unknown. It reads `null` on a traded pair too, until 24 hours of history exist |
 | `pairs[*].circulating_supply` | Decimal string | Base token committed supply (whole units) |
 | `tokens[*].id` | uint32 | Spot token asset id |
 | `tokens[*].name` | string | Token name (e.g. `"USDC"`, `"MTF"`) |
@@ -221,23 +228,32 @@ Every Earn lending pool, plus one account's stake when `user` is supplied.
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `pools[*].asset` | uint32 | Lendable quote asset id (the pool key) |
+| `pools[*].name` | string | Pool token name (e.g. `"USDC"`) |
+| `pools[*].signing_id` | uint32 | Lendable asset id — the pool key, and the number you sign an Earn action with |
 | `pools[*].total_supplied` | Decimal string | Pool NAV — supplied principal plus folded-in repaid interest |
 | `pools[*].total_borrowed` | Decimal string | Quote currently lent to spot-margin borrowers |
 | `pools[*].idle` | Decimal string | `total_supplied − total_borrowed` — the instantly-withdrawable bound |
 | `pools[*].shares_total` | Decimal string | Total shares outstanding |
 | `pools[*].share_value` | Decimal string | `total_supplied / shares_total` (`0` when no shares) |
 | `pools[*].borrow_index` | Decimal string | Cumulative borrow index (debt-accrual basis) |
-| `pools[*].reserve_factor_bps` | uint16 | Protocol cut of borrow interest (bps) |
-| `pools[*].borrow_rate_bps_annual` | uint32 | Annualised borrow rate (bps). `0` on every live pool today — see Rules |
+| `pools[*].reserve_factor_bps` | bps string | Protocol cut of borrow interest, whole bps. It is a **string**, not a number |
+| `pools[*].borrow_rate_bps_annual` | bps string | Annualised borrow rate, whole bps. It is a **string**, not a number. `"0"` on every live pool today — see Rules |
 | `pools[*].reserve_accrued` | Decimal string | Protocol reserve accumulated from interest |
 | `pools[*].user_shares` | Decimal string | **Only with `user`** — shares the account holds in the pool |
 | `pools[*].user_value` | Decimal string | **Only with `user`** — `user_shares × share_value` |
+
+**`user_shares` / `user_value` are ABSENT without `user`, not zero.** A request
+that omits `user` drops both keys from every pool row. A request that sends
+`user` carries both on every pool, and they read `"0"` for a pool the account
+has not supplied. Absent means "not asked"; `"0"` means "asked, and the stake is
+nothing". Test for key presence before you read a stake.
 
 **Rules**
 
 - Pools are listed in asset-id order.
 - Omitting `user` drops the `user_shares` / `user_value` fields.
+- **`pools` is empty until the first deposit creates a pool.** An empty array is
+  the honest answer for a chain with no Earn supply, not a failure.
 - **A `borrow_rate_bps_annual` of `0` means the pool pays nothing, and
   `share_value` will not move.** A pool auto-creates at rate `0`, and the
   per-block accrual stamps the time without stepping `borrow_index`. Do not
@@ -248,12 +264,9 @@ Every Earn lending pool, plus one account's stake when `user` is supplied.
 
 MIP-1 spot-pair-deploy gas-auction state.
 
-:::warning
-**The name is not live yet.** The node currently answers this read under the
-old name `spot_deploy_state`. That old name still works; the rename lands at
-a future release, and `spot_deploy_state` goes away then. Until the rename
-ships, a `spot_deploy_auction` request returns
-`400 UNKNOWN_TYPE`.
+:::info
+**`spot_deploy_auction` is the live name. `spot_deploy_state` is removed.** The
+old name answers `400` with `error.code` `UNKNOWN_TYPE`.
 :::
 
 **Request**
@@ -270,20 +283,68 @@ No parameters.
 {
   "data": {
     "type": "spot_deploy_auction",
-    "auction_round": 3, "current_bid": "999", "current_winner": "0x<bidder>",
-    "auction_end_ms": 0, "started_at_ms": 0, "total_burned": "4200", "deposit": "0"
+    "current_ask": "100",
+    "floor": "100",
+    "start": "100",
+    "start_multiplier": 2,
+    "duration_blocks": 100,
+    "opened_at_block": 0,
+    "now_block": 26435840,
+    "last_clearing": "0",
+    "sealed_round": {
+      "auction_round": 0,
+      "current_bid": "0",
+      "current_winner": null,
+      "auction_end": 0,
+      "started_at": 0,
+      "total_burned": "0",
+      "deposit": "0"
+    }
   }
 }
 ```
 
+**This is a descending-clock (Dutch) auction, and the top level is the clock.**
+The ask starts at `start` and decays toward `floor` over `duration_blocks`,
+measured from `opened_at_block`. An accept clears **immediately** at the clock
+ask, so a bidder submits at or above `current_ask`.
+
+**Read `current_ask` fresh on every accept; never cache it.** It falls every
+block, and the chain clears against its own clock, not against the value you
+read a minute ago.
+
 | Field | Type | Meaning |
 |-------|------|---------|
-| `auction_round` | uint64 | Current round |
-| `current_bid` | Decimal string | Leading bid |
-| `current_winner` | hex address \| null | Current high bidder |
-| `auction_end_ms` / `started_at_ms` | uint64 | Auction window (consensus ms) |
-| `total_burned` | Decimal string | Cumulative burned winning-bid notional |
-| `deposit` | Decimal string | Total escrowed deposit (base units) |
+| `current_ask` | Decimal string | The price to deploy a pair **right now**, whole USDC. It falls every block |
+| `floor` | Decimal string | The lowest price the decay reaches. `current_ask` never goes below it |
+| `start` | Decimal string | The price the current decay opened at |
+| `start_multiplier` | uint | Demand-adaptive multiplier that sets the **next** round's start price |
+| `duration_blocks` | uint64 | Length of one decay, in blocks |
+| `opened_at_block` | uint64 | Block height at which the current decay opened. `0` = no round has opened yet |
+| `now_block` | uint64 | The chain height this answer was read at — the clock `current_ask` is priced against |
+| `last_clearing` | Decimal string | Price the previous deploy cleared at. `"0"` = nothing has cleared yet |
+| `sealed_round` | object | The sealed-bid round, described below |
+
+**`sealed_round` is a SECOND auction, not a view of the clock.** It is the
+sealed-bid round that runs beside the descending clock. Its `current_bid` and
+`current_winner` come from submitted bids; its `total_burned` and `deposit` come
+from settled rounds. None of them price the clock. A caller that reads
+`sealed_round.current_bid` as the deploy price pays the wrong number — read
+`current_ask` for that.
+
+**The sealed-bid fields moved here, and lost the `_ms` suffixes.** They were
+once at the top level as `auction_end_ms` and `started_at_ms`. Both names are
+gone. Read them inside `sealed_round` as `auction_end` and `started_at`.
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `sealed_round.auction_round` | uint64 | Current sealed-bid round |
+| `sealed_round.current_bid` | Decimal string | Leading bid |
+| `sealed_round.current_winner` | hex address \| null | Current high bidder. **`null`** when nobody has bid |
+| `sealed_round.auction_end` | uint64 | Round close (consensus ms). `0` = no round is open |
+| `sealed_round.started_at` | uint64 | Round start (consensus ms). `0` = no round is open |
+| `sealed_round.total_burned` | Decimal string | Cumulative burned winning-bid notional |
+| `sealed_round.deposit` | Decimal string | Total escrowed deposit (base units) |
 
 ## See also {#see-also}
 

@@ -14,7 +14,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **ALO — Add-Limit-Only.** Order TIF that rejects the order entirely if any portion would cross the book. Guaranteed maker. See [order types](./order-types.md#time-in-force).
 
-**Asset ID.** A market's canonical integer identifier. Different across networks; look up via `meta` info.
+**Asset ID.** A market's canonical integer identifier. On the wire the field is `signing_id`, on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta). It carries that name because it is the value a signed action puts in `market` (perp) or `pair` (spot). There is no `asset_id` field. Ids differ across networks, so read them at start-up.
 
 **Action.** A state-mutating call to `POST /exchange`. Tagged variant union with about 30 types. See [exchange.md](../api/rest/exchange.md#action-catalog).
 
@@ -70,7 +70,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## H {#h}
 
-**Health ratio.** `account_value / cross_maintenance_margin_used`. Drives the [tiered liquidation](./tiered-liquidation.md) ladder.
+**Health ratio.** `account_value / cross_maintenance_margin_used`. Drives the [tiered liquidation](./tiered-liquidation.md) ladder. The default [`account_state`](../api/rest/info.md#account_state) body gives you the computed `health` but **not** `cross_maintenance_margin_used`; ask for that denominator with `detail: "margin"`.
 
 **High-water mark.** Highest historical share price for a vault, used to gate performance-fee accrual. See [vaults](./vaults.md).
 
@@ -94,7 +94,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## M {#m}
 
-**Maintenance margin.** Minimum collateral required to keep a position open. Health = `account_value / cross_maintenance_margin_used`. The account-level field covers the CROSS bucket only; an isolated leg carries its own `maint_margin` on its position row. See [margin modes](./margin-modes.md).
+**Maintenance margin.** Minimum collateral required to keep a position open. Health = `account_value / cross_maintenance_margin_used`. The account-level field covers the CROSS bucket only; an isolated leg carries its own `maint_margin` on its position row. Read `cross_maintenance_margin_used` from [`account_state`](../api/rest/info.md#account_state) with `detail: "margin"` — the default body omits it. See [margin modes](./margin-modes.md).
 
 **Maker / Taker.** Maker provides liquidity (resting order); taker removes it (crossing order). Different fee rates. See [fees](./fees.md).
 
@@ -166,7 +166,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 ## U {#u}
 
-**Universe.** The active list of markets (perp + spot) on the protocol. Returned by `meta` info.
+**Universe.** The active list of markets (perp + spot) on the protocol. Read [`markets`](../api/rest/info/perpetuals.md#markets) for the dynamic figures, or [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) for the static grids and ids. There is no `meta` read; it answers `UNKNOWN_TYPE`.
 
 **Unrealised PnL.** Mark-to-market profit/loss on open positions. Not yet realised by closing.
 
