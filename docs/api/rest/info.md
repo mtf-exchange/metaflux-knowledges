@@ -687,7 +687,7 @@ positions, so a client can index it without a guard.
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `address` | hex address | The account these positions belong to |
-| `clearinghouse_state` | object | Keyed by dex (`""` = core dex, else a MIP-3 deployer's lowercase `0x` address); each value is `{positions: [...]}` |
+| `clearinghouse_state` | object | Keyed by dex NAME (`""` = core dex, else a deployed dex's name, e.g. `"GRAD"`); each value is `{positions: [...]}`. See [the dex key](#dex-key) |
 | `positions[*].coin` | string | Market symbol (e.g. `"BTC"`), not a numeric id |
 | `positions[*].size` | Decimal string | Signed **real** size (`raw lots / 10^sz_decimals`); negative = short |
 | `positions[*].entry` | Decimal string | Per-whole-unit entry price = `\|entry_notional\| / \|real size\|`, **whole-USDC plane** |
@@ -712,6 +712,46 @@ from [`account_state`](#account_state), and do not compute an account-level
 number by combining the two frames — they can be rendered a commit apart. Compare
 the `height` of both frames before you treat them as one instant.
 :::
+
+#### The dex key is the dex NAME {#dex-key}
+
+:::warning Not live yet
+The dex key changes from the deployer's address to the dex NAME with the next
+network upgrade. Until that upgrade fires, a live node still keys every non-core
+bucket by the deployer's lowercase `0x` address. There is no window in which both
+forms answer. A client that reads the key opaquely and joins it to
+[`perp_dexs`](./info/perpetuals.md#perp_dexs) survives the change; a client that
+parses the key as an address does not.
+:::
+
+The map key is the **dex name**. `""` is the core dex and is always present.
+Every other key is the name of one deployed perp dex.
+
+A dex name is 1 to 16 ASCII alphanumeric bytes. Names are unique without regard
+to case, so `grad` cannot exist while `GRAD` does. A name is set when the dex is
+created, and it never changes — there is no rename.
+
+**The name, the symbol prefix and this key are ONE identifier.** Every market on
+dex `NAME` carries the symbol `NAME:SUFFIX`, matched byte-exactly, with a
+non-empty suffix. So every position under the key `GRAD` has a `coin` that starts
+with `GRAD:`, and the same string is the `name` field of that dex's
+[`perp_dexs`](./info/perpetuals.md#perp_dexs) row. One string joins the account
+read, the market symbol and the dex registry. A core-dex symbol never contains
+`:`, so the core bucket and a named bucket can never claim one symbol.
+
+**At the upgrade, the dexes that already exist receive names.** The dex deployed
+by `0x10572bc485ee62403eb8778c1303857d6f4f9913` becomes `GRAD`. Any other
+deployed dex becomes `DEX<index>`, where `<index>` is the `index` that dex
+already reports in `perp_dexs`. The core dex stays `""`.
+
+**If you cached the old address keys, re-join through the registry.** Every
+`perp_dexs` row serves both `name` and `deployer`, so one read maps each cached
+address to its new key. An integrator that is offline through the upgrade does
+this once on the next connect.
+
+**This names PERP dexes only.** A spot pair symbol such as `GRAD:USDCNY/USDC` is
+a naming habit of its deployer. A dex name reserves nothing on the spot side, and
+spot naming does not change.
 
 #### Reading `liq` {#reading-liq}
 

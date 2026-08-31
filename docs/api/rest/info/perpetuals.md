@@ -972,6 +972,14 @@ The perp DEX(es) plus the governance-set permissionless-deploy (MIP-3) and
 per-market limit configuration. The unit planes are load-bearing and
 deliberately explicit in the field names.
 
+:::warning Not live yet
+`name` and `deployer` land with the next network upgrade, in the same release
+that keys [`clearinghouse_state`](../info.md#clearinghouse_state) by name. Until
+that upgrade fires, each row carries `index`, `n_assets` and `assets` only. The
+name rule, the name each existing dex receives, and the re-join for a cached
+address key are all in [the dex key](../info.md#dex-key).
+:::
+
 **Request**
 
 ```json
@@ -986,7 +994,12 @@ No parameters.
 {
   "data": {
     "type": "perp_dexs",
-    "dexs": [ { "index": 0, "n_assets": 5, "assets": ["BTC", "ETH", "SOL", "MTF", "PUMP"] } ],
+    "dexs": [
+      { "index": 0, "name": "", "deployer": null,
+        "n_assets": 5, "assets": ["BTC", "ETH", "SOL", "MTF", "PUMP"] },
+      { "index": 1, "name": "GRAD", "deployer": "0x10572bc485ee62403eb8778c1303857d6f4f9913",
+        "n_assets": 1, "assets": ["GRAD:000001SH"] }
+    ],
     "limits": {
       "mip3_enabled":            true,
       "min_deploy_stake_base":   "100000000000",
@@ -1008,7 +1021,9 @@ No parameters.
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `dexs[*].index` | uint64 | DEX index in the perp-DEX registry |
+| `dexs[*].index` | uint64 | DEX index in the perp-DEX registry. A position in a list, not a name — see below |
+| `dexs[*].name` | string | The dex NAME, `""` for the core dex. 1 to 16 ASCII alphanumeric bytes, unique without regard to case, set once when the dex is created and never renamed. It prefixes every market symbol on the dex (`NAME:SUFFIX`) and it keys [`clearinghouse_state`](../info.md#clearinghouse_state) |
+| `dexs[*].deployer` | hex address \| null | The account that deployed the dex. **`null` for the core dex** — the core dex has no deployer, and `""` is a reserved name, not an address |
 | `dexs[*].n_assets` | uint64 | Number of asset books in the DEX |
 | `dexs[*].assets` | string[] | Market symbols in the DEX, e.g. `["BTC","ETH","SOL"]`. They are **symbols, not ids** — a symbol is the key every market read uses |
 | `limits.mip3_enabled` | bool | Permissionless (MIP-3) perp deploy enabled |
@@ -1022,6 +1037,17 @@ No parameters.
 | `limits.per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |
 | `limits.per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](../info.md#fee_schedule)) |
 | `limits.per_market_limits.max_oi_per_second` | u128 string | Per-market open-interest growth-rate cap, size base units per second |
+
+**`name` is the join key; `index` is not.** `clearinghouse_state` keys its
+position buckets by `name`, so `name` is the one field that joins an account's
+positions to the dex that lists them. `index` is a subscript into this list: it
+still answers, and it is still stable today, but it is not the identifier any
+other read speaks. Do not key a cache on it.
+
+**`deployer` is served so an old cache can be repaired.** Before the upgrade,
+`clearinghouse_state` keyed its buckets by the deployer address. An integrator
+that cached those keys reads this list once and maps each address to its `name`.
+That is the whole recovery — see [the dex key](../info.md#dex-key).
 
 
 ## See also {#see-also}

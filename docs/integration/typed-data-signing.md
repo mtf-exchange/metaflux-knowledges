@@ -310,9 +310,13 @@ signer is the deployer.
 ### Perp deployer actions {#perp-deployer-actions}
 
 :::warning
-**Not live yet.** These nine types are frozen in the node and land with the next
-release. The chain refuses them until that release fires. Build against them, but
-expect `unknown variant` until then.
+**Not live yet.** These nine types land with the next release. The chain refuses
+them until that release fires, so expect `unknown variant` until then.
+
+**`PerpRegisterAsset` also CHANGES in that release.** It gains `string name`, the
+name of the dex the market joins. The type string below is the NEW one, so the
+digest moves: a signature built over the old struct, without `name`, is invalid
+after the upgrade, and a signature over the new struct is invalid before it.
 :::
 
 The nine [perp deployer](../api/rest/exchange.md#perp-deployment-actions) actions.
@@ -321,7 +325,7 @@ authority is checked against the market's deployer and its sub-deployers.
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
-| `perp_register_asset` | `MetaFluxTransaction:PerpRegisterAsset(string metafluxChain,string symbol,uint8 decimals,uint64 nonce)` |
+| `perp_register_asset` | `MetaFluxTransaction:PerpRegisterAsset(string metafluxChain,string symbol,uint8 decimals,string name,uint64 nonce)` |
 | `perp_set_oracle` | `MetaFluxTransaction:PerpSetOracle(string metafluxChain,uint32 asset,uint16 oracleSourceMask,uint64 nonce)` |
 | `perp_set_leverage` | `MetaFluxTransaction:PerpSetLeverage(string metafluxChain,uint32 asset,uint8 maxLeverage,uint64 nonce)` |
 | `perp_set_fee_tier` | `MetaFluxTransaction:PerpSetFeeTier(string metafluxChain,uint32 asset,uint32 takerFeeDbps,uint32 makerFeeDbps,uint32 deployerFeeBps,uint64 nonce)` |
@@ -330,6 +334,13 @@ authority is checked against the market's deployer and its sub-deployers.
 | `perp_activate_market` | `MetaFluxTransaction:PerpActivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_deactivate_market` | `MetaFluxTransaction:PerpDeactivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
+
+**`name` sits between `decimals` and `nonce`, and it is in the digest.** It names
+the dex, and `symbol` must start with `name` plus `:`. Both strings are hashed,
+so one signature binds one (dex, symbol) pair and cannot be re-aimed at another
+dex. `name` is required on your first registration and write-once after it — the
+rejection rules are on
+[`perp_register_asset`](../api/rest/exchange.md#perp_register_asset).
 
 **Fee units differ inside one struct.** `takerFeeDbps` and `makerFeeDbps` are
 DECI-bps; `deployerFeeBps` is bps. A value moved between the two fields is off by

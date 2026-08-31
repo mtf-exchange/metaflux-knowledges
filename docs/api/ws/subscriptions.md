@@ -575,6 +575,14 @@ Same builder as the REST
 [`clearinghouse_state`](../rest/info.md#clearinghouse_state) read, so the push and
 the read never drift.
 
+:::warning Not live yet
+The dex key changes from the deployer's address to the dex NAME with the next
+network upgrade, on this channel and on the REST read together — one builder
+serves both. Until that upgrade fires, a live node keys every non-core bucket by
+the deployer's lowercase `0x` address. The name rule, and the name each existing
+dex receives, are in [the dex key](../rest/info.md#dex-key).
+:::
+
 ```json
 { "method": "subscribe", "subscription": { "type": "clearinghouse_state", "user": "0x<address>" } }
 ```
@@ -591,7 +599,7 @@ the read never drift.
           "funding": "-1.59606669", "margin": "276", "maint_margin": "53.54233572",
           "notional": "-10355.61681", "side": "short" }
       ] },
-      "0x<deployer>": { "positions": [
+      "GRAD": { "positions": [
         { "coin": "GRAD:000001SH", "size": "-0.85", "entry": "576.18964705",
           "upnl": "-10.02605", "isolated": true, "lev": 5, "liq": "699.45368895",
           "roe": "-0.08392298", "funding": "0", "margin": "119.46727161",
@@ -604,8 +612,10 @@ the read never drift.
 }
 ```
 
-- `clearinghouse_state` is keyed by dex — `""` is the core dex and is **always
-  present**, else a MIP-3 deployer's lowercase `0x` address. Every row field is
+- `clearinghouse_state` is keyed by dex NAME — `""` is the core dex and is
+  **always present**, else the name of one deployed dex. Every market on dex
+  `NAME` has the symbol `NAME:SUFFIX`, so the key and the row's `coin` prefix are
+  the same string; see [the dex key](../rest/info.md#dex-key). Every row field is
   in the REST [row table](../rest/info.md#clearinghouse_state). **`liq` is
   nullable** — `null` means no non-negative price liquidates the leg, and it is
   never rendered as `"0"`. See [reading `liq`](../rest/info.md#reading-liq).

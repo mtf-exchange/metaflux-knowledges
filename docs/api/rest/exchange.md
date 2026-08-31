@@ -2200,14 +2200,57 @@ per deploy epoch — see [Limits](../../mip/mip-3.md#limits). `0` means uncapped
 
 ### Register a perp asset {#perp_register_asset}
 
+:::warning Not live yet
+`name`, and the symbol rule that goes with it, land with the next network
+upgrade. `name` is inside the signature digest, so a call signed over the new
+struct is refused before the upgrade, and a call signed over the old struct is
+refused after it. See
+[typed-data signing](../../integration/typed-data-signing.md#perp-deployer-actions).
+:::
+
+This action also CREATES your dex, on your first call. That is why it carries the
+dex name: there is no separate create-dex action.
+
 ```json
-{ "type": "perp_register_asset", "params": { "symbol": "WIF", "decimals": 8 } }
+{ "type": "perp_register_asset", "params": { "symbol": "WIF:PERP", "decimals": 8, "name": "WIF" } }
 ```
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `symbol` | string | non-empty | Market symbol |
+| `symbol` | string | `<name>:<suffix>` | Market symbol. The part before the first `:` must equal your dex name, byte for byte, and the suffix must not be empty |
 | `decimals` | uint8 | `0` keeps the default of 8 | Token decimals |
+| `name` | string | 1-16 ASCII alphanumeric bytes | Your dex NAME. **Required on your first registration.** Omit it, or repeat it exactly, on every later one |
+
+**The name rules, written as rejections.** These are the rows a caller gets
+wrong, so read them as refusals, not as defaults.
+
+| The call | Result |
+|----------|--------|
+| Your FIRST registration, with `name` absent or empty | **Rejected.** There is no default name. An older client that does not send `name` has its first deploy refused; it does not get a nameless dex |
+| `name` outside 1-16 ASCII alphanumeric bytes | **Rejected.** The check reads raw bytes: no `:`, no space, no punctuation, nothing outside ASCII. Fullwidth `ＧＲＡＤ` is not alphanumeric here and does not become `GRAD` |
+| `name` equal to an existing dex name, ignoring case | **Rejected.** `grad` cannot be taken while `GRAD` exists |
+| A later registration whose `name` differs from your stored name | **Rejected.** The name is write-once |
+| A later registration that omits `name` | **Accepted.** Your stored name applies |
+| `symbol` whose prefix before the first `:` is not your name | **Rejected.** The comparison is byte-exact. No trim, no case folding |
+| `symbol` with an empty suffix, such as `GRAD:` | **Rejected** |
+
+**Why the name is write-once.** It prefixes every market symbol on the dex, and a
+symbol can never be renamed. A renamed dex would leave all of its markets
+carrying the old prefix, and the prefix is what joins a position to its dex.
+
+**Every one of these checks runs BEFORE you are charged.** The name and symbol
+checks come before the Dutch-clock ask is debited and before an asset id is
+taken, so a refused registration costs you nothing and consumes no id.
+
+**Your name is also your read key.** Once the dex exists, its positions arrive
+under the key `name` in
+[`clearinghouse_state`](./info.md#clearinghouse_state), and the dex reports the
+same string as `name` in [`perp_dexs`](./info/perpetuals.md#perp_dexs).
+
+**A governance listing symbol must not contain `:`.** Core markets are listed by
+governance, not by this action, and a core symbol carrying a colon would claim a
+deployer's namespace. Such a listing is refused. This keeps the core dex and
+every named dex disjoint, so one symbol never belongs to two dexes.
 
 ### Set the market oracle {#perp_set_oracle}
 
