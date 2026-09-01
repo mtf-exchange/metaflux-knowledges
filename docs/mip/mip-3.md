@@ -56,35 +56,71 @@ refused even when its total value covers the ask.
 ```mermaid
 flowchart TD
     A["builder — perp_register_asset<br/>(pays the Dutch ask, needs the stake bond)"] --> B["AssetId allocated in the builder's own dex"]
-    B --> C["perp_set_oracle / perp_set_leverage /<br/>perp_set_fee_tier / perp_set_min_size"]
+    B --> C["perp_set_leverage / perp_set_fee_tier /<br/>perp_set_min_size"]
     C --> D["perp_activate_market<br/>(requires full config)"]
     D --> E["market accepts orders"]
 ```
 
-Perp deployment is dispatched by sub-variant, **nine** of them, covering the full
+Perp deployment is dispatched by sub-variant, **ten** of them, covering the full
 market lifecycle:
 
 | Action tag | Purpose |
 |------------|---------|
 | `perp_register_asset` | Register a new perpetual asset; allocates an `AssetId`. Pays the fee, requires the bond |
-| `perp_set_oracle` | Bind or rotate the oracle source subset |
 | `perp_set_leverage` | Set the max leverage cap |
 | `perp_set_fee_tier` | Set the maker / taker fee tier |
 | `perp_set_maker_rebate` | Set the maker rebate (≤ 2 bps) |
 | `perp_set_min_size` | Set the market's minimum order size |
 | `perp_activate_market` | Activate the market. Requires full config |
 | `perp_deactivate_market` | Close to new orders. Existing positions remain |
-| `perp_set_sub_deployers` | Add or remove a delegated sub-deployer. Deployer-authority only |
+| `perp_set_fba_mode` | Set the matching venue: `0` returns the market to the CLOB, `100`-`5000` runs a frequent batch auction with that period in ms |
+| `perp_set_sub_deployers` | Grant or revoke a delegate, all powers at once. Deployer-authority only |
+| `perp_set_sub_deployer_perms` | Grant a delegate an exact permission mask. Deployer-authority only. **Not live until the next release** |
+| `perp_set_oracle` | **RETIRED.** Refused from the next release — see below |
 
 :::info
-**Nine, not eight.** Older copies of this page and of the internal plan list
-eight sub-variants and omit `perp_set_sub_deployers`. The node has nine.
+**Ten, not nine, and not eight.** Older copies of this page listed eight and
+omitted `perp_set_sub_deployers`; a later copy listed nine and omitted
+`perp_set_fba_mode`. The node dispatches ten today and eleven after the next
+release, of which `perp_set_oracle` is refused. Ten are callable either way.
 :::
 
-Only the deployer of record — or a sub-deployer it delegated — may call the
-lifecycle actions on a market it deployed. Delegating is the one exception:
-`perp_set_sub_deployers` needs the deployer's own authority, so a sub-deployer
-cannot appoint another.
+## Delegation is per handler {#delegation}
+
+Only the deployer of record — or a delegate it authorized — may call the
+lifecycle actions on a market it deployed.
+
+A delegate holds **one permission bit per handler**, so a grant names the
+handlers, not the person: you can hand out the price push without handing out the
+fee rates. The nine bits and the two granting lanes are on
+[`perp_set_sub_deployers`](../api/rest/exchange.md#perp_set_sub_deployers).
+
+Two rules bound it:
+
+- **Delegating is never delegable.** Both granting lanes need the deployer's own
+  authority. A delegate holding every bit still cannot appoint another. There is
+  no bit for it.
+- **An upgrade takes nothing away.** Every delegate committed before the release
+  reads as the full mask afterwards, exactly the authority it has today. Narrow
+  one by sending the mask you want it to keep.
+
+:::warning Not live yet
+The bits land with the next release. Until it fires, a delegate holds every
+deployer power, and `perp_set_sub_deployer_perms` is refused with
+`unknown variant`.
+:::
+
+## `perp_set_oracle` is retired {#perp-set-oracle-retired}
+
+The action wrote a market's oracle source-subset mask, and **nothing read the
+mask**. The call returned OK, committed state changed, and the market priced
+exactly as before.
+
+From the next release the node refuses it. Nothing replaces it, because it never
+did anything: the deployer price control is
+[`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) (action 210), a
+different action that stays. The mask field remains in market state, still with no
+reader, until the next re-genesis.
 
 ## Where the new market lands {#where-the-new-market-lands}
 
@@ -106,7 +142,8 @@ shared set means those controls cannot reach a trader who never opted in.
 A deployed market does not price from the validator oracle median. Its index
 price is pushed by its **deployer**, through the
 [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) action (210).
-The deployer or a registered sub-deployer signs each push.
+The deployer, or a delegate holding [permission bit
+0](../api/rest/exchange.md#perp_set_sub_deployers), signs each push.
 
 Because the deployer operates the oracle for its own market, treat any
 builder-deployed market as carrying **deployer price risk**. This is the reason
@@ -123,11 +160,12 @@ the market is isolated and the reason the bond is slashable.
    `feature_active` from
    the operator-lane [`mip3_deployer_oracle`](../api/rest/info.md#operator-reads) read on the
    network you target — do not assume a posture.
-2. **The source subset mask does not decide what a push accepts.** The mask
-   (`perp_set_oracle`) is validated at registration and committed, but nothing
-   filters prices by it today, and no read serves it — see
-   [oracle prices](../concepts/oracle-prices.md#composition). A deployer push is
-   bounded by the price rules below, and by nothing else.
+2. **The source subset mask does not decide what a push accepts.** The mask is
+   committed per market, but nothing filters prices by it, and no read serves it
+   — see [oracle prices](../concepts/oracle-prices.md#composition). That is why
+   the action that wrote it, `perp_set_oracle`, is
+   [retired](#perp-set-oracle-retired). A deployer push is bounded by the price
+   rules below, and by nothing else.
 :::
 
 ### Running the oracle for your market {#running-the-oracle}
@@ -137,7 +175,8 @@ reason is what tells you how to size your own push cadence.
 
 1. **Register and activate the market first.** A push at an asset that is not a
    MIP-3 market is refused. Registration also fixes who may push: the
-   `deployer`, plus any address added through `perp_set_sub_deployers`.
+   `deployer`, plus any delegate granted [permission bit
+   0](../api/rest/exchange.md#perp_set_sub_deployers).
 
 2. **Choose the first price with care.** A push must sit within **±10 %** of the
    committed anchor — the last committed oracle price, or the market's committed

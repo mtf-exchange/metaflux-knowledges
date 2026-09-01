@@ -310,8 +310,8 @@ signer is the deployer.
 ### Perp deployer actions {#perp-deployer-actions}
 
 :::warning
-**Not live yet.** These nine types land with the next release. The chain refuses
-them until that release fires, so expect `unknown variant` until then.
+**Not live yet.** These types land with the next release. The chain refuses them
+until that release fires, so expect `unknown variant` until then.
 
 **`PerpRegisterAsset` also CHANGES in that release.** It gains `string name`, the
 name of the dex the market joins. The type string below is the NEW one, so the
@@ -319,14 +319,15 @@ digest moves: a signature built over the old struct, without `name`, is invalid
 after the upgrade, and a signature over the new struct is invalid before it.
 :::
 
-The nine [perp deployer](../api/rest/exchange.md#perp-deployment-actions) actions.
-Each is sender-authorized: the recovered signer is the deployer, and per-market
-authority is checked against the market's deployer and its sub-deployers.
+The [perp deployer](../api/rest/exchange.md#perp-deployment-actions) actions. Each
+is sender-authorized: the recovered signer is the deployer, and per-market
+authority is checked against the market's deployer and the permission bits its
+delegates hold.
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
 | `perp_register_asset` | `MetaFluxTransaction:PerpRegisterAsset(string metafluxChain,string symbol,uint8 decimals,string name,uint64 nonce)` |
-| `perp_set_oracle` | `MetaFluxTransaction:PerpSetOracle(string metafluxChain,uint32 asset,uint16 oracleSourceMask,uint64 nonce)` |
+| `perp_set_oracle` | **RETIRED** — `MetaFluxTransaction:PerpSetOracle(string metafluxChain,uint32 asset,uint16 oracleSourceMask,uint64 nonce)` |
 | `perp_set_leverage` | `MetaFluxTransaction:PerpSetLeverage(string metafluxChain,uint32 asset,uint8 maxLeverage,uint64 nonce)` |
 | `perp_set_fee_tier` | `MetaFluxTransaction:PerpSetFeeTier(string metafluxChain,uint32 asset,uint32 takerFeeDbps,uint32 makerFeeDbps,uint32 deployerFeeBps,uint64 nonce)` |
 | `perp_set_maker_rebate` | `MetaFluxTransaction:PerpSetMakerRebate(string metafluxChain,uint32 asset,uint16 rebateBps,uint64 nonce)` |
@@ -334,6 +335,23 @@ authority is checked against the market's deployer and its sub-deployers.
 | `perp_activate_market` | `MetaFluxTransaction:PerpActivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_deactivate_market` | `MetaFluxTransaction:PerpDeactivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
+| `perp_set_sub_deployer_perms` | `MetaFluxTransaction:PerpSetSubDeployerPerms(string metafluxChain,uint32 asset,address subDeployer,uint16 permissions,uint64 nonce)` |
+
+**Two rows move in the next release; the other eight do not.**
+
+- **`PerpSetSubDeployerPerms` is new.** It grants a delegate an exact permission
+  mask instead of every power. `permissions` is in the digest, so one signature
+  binds one (market, delegate, mask) triple. The node refuses the action until the
+  release fires. The bit table is on
+  [`perp_set_sub_deployers`](../api/rest/exchange.md#perp_set_sub_deployers).
+- **`PerpSetOracle` is retired.** The type string is NOT deleted and every
+  committed payload still decodes, but the node refuses the action after the
+  release. Stop signing it. The mask it wrote has no reader.
+
+**`PerpSetSubDeployers` itself does not change.** Its type string, its digest and
+its meaning are the same before and after: `add: true` grants every permission
+bit, `add: false` revokes. A client that signs it keeps working, and a delegate
+you already granted keeps every power it has.
 
 **`name` sits between `decimals` and `nonce`, and it is in the digest.** It names
 the dex, and `symbol` must start with `name` plus `:`. Both strings are hashed,

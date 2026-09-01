@@ -2177,17 +2177,23 @@ mint is possible.
 
 :::warning
 **Confirm the lane against the network you target.** The nine deploy actions and
-[`mip3_set_oracle_px`](#mip3_set_oracle_px) are built and frozen. Their wire
-shapes and signing types on this page will not change. What varies by network is
+[`mip3_set_oracle_px`](#mip3_set_oracle_px) are built. What varies by network is
 whether the running build carries them and whether the governance off-switch
 `mip3_enabled` is open, so a call can still be refused. Build against these
 shapes now; probe one call on your target network before you depend on it.
+
+**Two rows move in the next release, and the count stays nine.**
+[`perp_set_oracle`](#perp_set_oracle) is RETIRED: the node refuses it after that
+release. [`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) is NEW: the node
+refuses it until that release. Every other wire shape and signing type on this
+page is unchanged.
 :::
 
 Permissionless perp market deployment, plus the deployer price push the deployed
 market runs on. Each action is sender-authorized: the recovered signer is the
 deployer. After `perp_register_asset`, only that market's deployer or one of its
-sub-deployers may call the rest.
+sub-deployers may call the rest. A sub-deployer holds one permission bit per
+handler — see [delegation](#perp_set_sub_deployers).
 
 **What a deploy requires.** The deployer must hold at least the staked-MTF floor
 (50,000 by default, governance-tunable), and pays the Dutch-clock ask at
@@ -2252,16 +2258,31 @@ governance, not by this action, and a core symbol carrying a colon would claim a
 deployer's namespace. Such a listing is refused. This keeps the core dex and
 every named dex disjoint, so one symbol never belongs to two dexes.
 
-### Set the market oracle {#perp_set_oracle}
+### Set the market oracle — RETIRED {#perp_set_oracle}
 
-```json
-{ "type": "perp_set_oracle", "params": { "asset": 1000, "oracle_source_mask": 3 } }
+:::danger Retired — do not call
+**`perp_set_oracle` is removed in the next release.** The node then refuses it
+with:
+
+```text
+perp_set_oracle is retired: oracle_source_subset_mask has no reader. Use mip3SetOraclePx (action 210) for the deployer price push.
 ```
 
-| Field | Type | Range / values | Description |
-|-------|------|----------------|-------------|
-| `asset` | uint32 | a market you deployed | Target market |
-| `oracle_source_mask` | uint16 | bounded to the ten defined sources | Bitmask of enabled sources |
+**Why.** The action wrote the market's source-subset mask, and nothing read the
+mask. The call returned OK, committed state changed, and the market priced
+exactly as before. An interface that lies is worse than a missing one.
+
+**Nothing replaces it, because it never did anything.** The deployer price
+control is [`mip3_set_oracle_px`](#mip3_set_oracle_px) (action 210). That is a
+different action, it is the real price push, and it stays.
+
+**Until that release fires the live chain still accepts this call** and still
+writes the mask. The write changes no price. Stop sending it now.
+
+The `PerpSetOracle` signing type is not deleted, so every committed payload still
+decodes. Only the handler refuses. The mask field stays in market state, still
+with no reader, until the next re-genesis.
+:::
 
 ### Set max leverage {#perp_set_leverage}
 
@@ -2303,11 +2324,31 @@ them is off by ten. Every fee is bounded by the governance ceilings
 `perp_activate_market` opens the market for trading; `perp_deactivate_market`
 closes it. Both take one field.
 
+**Full config is three settings: leverage, fee tier, min size.** The oracle is
+not one of them. It was, until `perp_set_oracle` retired — that action was the
+only way to satisfy the fourth condition, so keeping it would have made every
+market registered after the release impossible to activate.
+
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | Target market |
 
 ### Delegate to a sub-deployer {#perp_set_sub_deployers}
+
+:::warning Not live yet
+**The permission bits below land with the next release.** Until it fires, the
+live chain has ONE delegation lane — `perp_set_sub_deployers` with `add` — and a
+delegate holds every deployer power. `perp_set_sub_deployer_perms` is refused
+with `unknown variant`, the same error a nonexistent action gets. Lane 1 keeps
+working across the upgrade, unchanged.
+:::
+
+**A grant names HANDLERS, not a person.** One bit is one deployer action, so you
+can hand out the price push without also handing out the fee rates. There are two
+lanes into one stored grant.
+
+**Lane 1 — `perp_set_sub_deployers`.** Unchanged wire, unchanged signing type.
+`add: true` grants **every** bit; `add: false` revokes the address.
 
 ```json
 {
@@ -2320,14 +2361,74 @@ closes it. Both take one field.
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | Target market |
 | `sub_deployer` | address | `0x`-hex | The delegate |
-| `add` | bool | | `true` adds, `false` removes |
+| `add` | bool | | `true` grants all nine bits, `false` revokes |
+
+**Lane 2 — `perp_set_sub_deployer_perms`.** New. It grants an exact mask.
+
+```json
+{
+  "type": "perp_set_sub_deployer_perms",
+  "params": { "asset": 1000, "sub_deployer": "0x…", "permissions": 33 }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `sub_deployer` | address | `0x`-hex | The delegate |
+| `permissions` | uint16 | `0`-`511` | Bit mask. `0` revokes |
+
+| Bit | Value | Grants |
+|-----|-------|--------|
+| 0 | 1 | [`mip3_set_oracle_px`](#mip3_set_oracle_px) — the price push |
+| 1 | 2 | [`perp_set_leverage`](#perp_set_leverage) |
+| 2 | 4 | [`perp_set_fee_tier`](#perp_set_fee_tier) |
+| 3 | 8 | [`perp_set_maker_rebate`](#perp_set_maker_rebate) |
+| 4 | 16 | [`perp_set_min_size`](#perp_set_min_size) |
+| 5 | 32 | [`perp_activate_market`](#perp_activate_market) |
+| 6 | 64 | `perp_deactivate_market` |
+| 7 | 128 | `perp_set_fba_mode` |
+| 8 | 256 | [`perp_register_asset`](#perp_register_asset) into this dex |
+
+`33` is bit 0 plus bit 5: push the price and activate the market, nothing else.
+
+**Your existing delegates keep every power.** An address already in a committed
+delegate set reads as the full mask after the upgrade, as if you had granted all
+nine bits. An upgrade must not silently narrow what anyone can already do. To
+narrow such a delegate, send lane 2 with the mask you want to keep; the old
+all-powers grant is dropped in the same call.
+
+**A grant REPLACES, it never merges.** To take one power away, send the full mask
+you want the delegate to end with. Sending only the bit you want removed grants
+that bit alone.
+
+**Bit 8 is checked against the dex, not against a market.** The other eight bits
+are checked on the market named by `asset`. `perp_register_asset` has no market
+yet, so a sender that does not own the named dex may register into it if it holds
+bit 8 on at least one market of that dex. Three consequences:
+
+- The delegate pays the Dutch-clock ask from **its own** free collateral.
+- The new market's `deployer` is the **dex owner**, never the delegate. A
+  delegate does not become a deployer.
+- A dex's FIRST market is always registered by its owner. No market carries the
+  bit yet, so a delegate cannot bootstrap an empty dex.
+
+**The rules, written as rejections.**
+
+| The call | Result |
+|----------|--------|
+| Either lane sent by a sub-deployer | **Rejected**, `Unauthorized`. Delegating needs the deployer's own authority, whatever bits the delegate holds. There is no bit for it, and there will not be one |
+| `permissions` with any bit above bit 8 set | **Rejected**, `InvalidParams`. Bits 9-15 are reserved for handlers added later |
+| `permissions: 0` | **Accepted.** It revokes. The address is removed, not stored with an empty mask |
+| A handler called by a delegate that lacks that handler's bit | **Rejected**, `Unauthorized` |
+| A second grant to the same address | **Accepted.** It replaces the mask |
 
 ### Push the deployer oracle price {#mip3_set_oracle_px}
 
 A MIP-3 market prices from **its own deployer**, not from the validator oracle
-median. This action is that push. Only the market `deployer` or a registered
-sub-deployer may call it, and the market **must already exist** as a MIP-3
-market.
+median. This action is that push. Only the market `deployer`, or a sub-deployer
+holding [bit 0](#perp_set_sub_deployers), may call it, and the market **must
+already exist** as a MIP-3 market.
 
 ```json
 { "type": "mip3_set_oracle_px", "params": { "asset": 1000, "px": "1250.500001" } }

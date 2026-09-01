@@ -47,7 +47,9 @@ The default table is a fallback. A governance-only `SetOracleWeights { asset_id,
 
 A market also carries a **source-subset mask** — one bit per slot, committed per market. The mask is **recorded, not enforced**: the aggregator does not filter its inputs by it today, so every market composes its price from the same source set. Source filtering is a change to price formation, so it needs its own hard-fork boundary; it is not scheduled. Do not size risk on the mask.
 
-**A market's own mask is not a fixed value.** A [MIP-3](../mip/mip-3.md) market's deployer rewrites it at will with `perp_set_oracle`. This page therefore states that the mechanism exists and who controls it; it never states a value for any market. Anything you cache goes stale on the next deployer push.
+**Nobody can rewrite a market's mask any more.** The action that wrote it, `perp_set_oracle`, is [retired](../mip/mip-3.md#perp-set-oracle-retired) and refused from the next release, precisely because the mask has no reader: the write returned OK and changed no price. The committed value stays frozen until the next re-genesis.
+
+**The deployer price control is a different action.** A [MIP-3](../mip/mip-3.md) deployer sets its market's index price with the [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) overlay. That action is unrelated to the source mask and it stays.
 
 :::warning
 **There is a second price lane, and this page does not describe it.** Everything above is the **venue-weighted-median** lane: validators feed it, governance owns the weights, and no deployer can touch either. A market deployed through [MIP-3](../mip/mip-3.md) does **not** use it. That market prices from a **deployer-operated oracle**: the deployer pushes the index price itself, through [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px).
@@ -118,13 +120,25 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 
 **Only the composed price is on the wire.** The per-venue raw inputs, the weights used in a tick, and the per-market source-subset mask are not served by any read. The weights and the slot identities are [protocol-fixed](#source-table) — read them from the release notes. The mask decides nothing today, so there is nothing to act on.
 
-A [MIP-3](../mip/mip-3.md) market prices from its deployer instead. A deployer monitors that feed with the operator-lane `mip3_deployer_oracle` read, which reports the last pushed price, the staleness window, and whether the market is currently reduce-only for opens:
+A [MIP-3](../mip/mip-3.md) market prices from its deployer instead. A deployer monitors that feed with the operator-lane `mip3_deployer_oracle` read, which reports the last pushed price, the staleness window, whether the market is currently reduce-only for opens, and who may push:
 
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"mip3_deployer_oracle","coin":"WIF"}'
 ```
+
+Two fields on that response name the delegates. `sub_deployers` lists every
+address holding **some** authority on the market; `sub_deployer_perms` maps each
+one to its exact [permission mask](../mip/mip-3.md#delegation) as an integer.
+Read the mask, not the list, before you decide who can push a price: a delegate
+appears in `sub_deployers` whether it holds bit 0 or only the fee bits. A
+delegate granted before the release reads back as `511`, the full mask.
+
+:::warning Not live yet
+`sub_deployer_perms` lands with the next release. Until it fires the field is
+absent, and every address in `sub_deployers` holds every deployer power.
+:::
 
 ## Edge cases {#edge-cases}
 
