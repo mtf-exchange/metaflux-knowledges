@@ -385,7 +385,7 @@ refuse every other market. See [options](../../products/options.md).
 | [`set_referrer`](#set_referrer) | Bind to a referrer address | master only |
 | [`approve_broker_fee`](#approve_builder_fee) | Approve a broker fee ceiling | master only |
 | [`claim_referral_rewards`](#claim_referral_rewards) | Claim accrued referral credit | master only |
-| [`claim_builder_rewards`](#claim_builder_rewards) | Claim accrued broker-code credit | master only |
+| [`claim_broker_rewards`](#claim_builder_rewards) | Claim accrued broker-code credit (the older name `claim_builder_rewards` still decodes) | master only |
 | [`create_sub_account`](#create_sub_account) | Open a sub-account under the master | master only |
 | [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | master only |
 | [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | master only |
@@ -581,6 +581,7 @@ approved agent). To place many orders under one signature, use
 {"resting": {"oid": "12345", "cloid": "0x..."}}                     // posted to book
 {"filled":  {"oid": "12345", "total_sz": "100000000", "avg_px": "10050000000"}}
 {"error":   {"code": "ORDER_INVALID_PRICE", "message": "..."}}      // this entry was rejected
+{"noop":    {"reason": "..."}}                                      // accepted, nothing to do — DO NOT RETRY
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
 
@@ -4296,8 +4297,35 @@ object naming the leg's outcome:
 { "resting": { "oid": "12345", "cloid": "0x..." } }                     // posted to book (cloid echoed only here, only if sent)
 { "filled":  { "oid": "12345", "total_sz": "100000000", "avg_px": "10050000000" } }  // matched
 { "error":   { "code": "MARGIN_INSUFFICIENT", "message": "..." } }     // this leg was rejected
+{ "noop":    { "reason": "position already flat, nothing to reduce" } } // accepted, and it changed nothing
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
+
+#### `noop` — accepted, and it did nothing {#statuses-noop}
+
+> ⬆️ **Upgrade notice — not live yet.** The `noop` entry ships with the next
+> node release. On the live chain the same outcome arrives as an `error` whose
+> message says the order could not match, which is the retry trap this entry
+> exists to close.
+
+A `reduce_only` order against a position that is already flat, or one whose
+reducible size clamps to zero, is **accepted**. It burns the nonce, it places
+nothing, and there is nothing left for it to reduce.
+
+**`noop` is a success, and it MUST NOT be retried.** That is the whole reason it
+is not an `error`. The two outcomes need opposite handling:
+
+| Entry | What happened | What to do |
+|---|---|---|
+| `error` | The leg was refused. Nothing is on the book | Fix the cause named by `code`, then resend |
+| `noop` | The leg was accepted and had no effect | Nothing. Re-read the position before you size another reduce |
+
+`reason` is free prose that says which no-op it was — an already-flat leg, or a
+size that clamped to zero. **Branch on the `noop` key, never on `reason`**, the
+same rule that says match an `error` on `code` and never on `message`.
+
+A `noop` entry carries **no `oid`**: no order was created, so no id was
+assigned. Do not read one out of it and do not cancel against one.
 
 **A failed leg carries the SAME error object as the envelope** — the same
 `code`, the same prose `message`, and the same optional `details`. There is one

@@ -101,20 +101,36 @@ haircut collateral. `abstraction` tells you which class the account is in.
 
 **This is the number that surprises people, so here is the whole of it.**
 
+> ⬆️ **Upgrade notice — the unrealized-loss term is not live yet.** It ships
+> with the next node release. On the live chain today `withdrawable` folds
+> neither side of unrealized PnL, so an account holding a losing position reads
+> HIGHER than the formula below. Everything else on this page is live.
+
 ```
 withdrawable = max(0,  settled cash
                      - unrealized funding you OWE (debit side only)
+                     - unrealized PnL you are DOWN (loss side only)
                      - total_margin_used
                      - initial requirement of spot-margin borrowing )
 ```
 
 Two differences from `account_value`, and both surprise people:
 
-1. **Withdrawable does not count unrealized profit.** Open profit is not yours
-   to remove until you close.
-2. **The funding term is debit-only.** Funding you OWE reduces withdrawable.
-   Funding you are OWED does not raise it. An unrealized credit must not fund a
-   withdrawal.
+1. **Unrealized PnL is loss-only here.** A loss REDUCES withdrawable. A gain
+   does NOT raise it — open profit is not yours to remove until you close. The
+   two halves are asymmetric on purpose, and the loss half is what stops a
+   withdrawal from taking back the collateral admission just made you post: held
+   margin is measured at ENTRY notional, so a position opened far under the mark
+   holds almost nothing against a loss that is already real. Without the loss
+   term a trader opens at a stale price, fills, and withdraws the margin behind
+   the position.
+2. **The funding term is debit-only, for the same reason.** Funding you OWE
+   reduces withdrawable. Funding you are OWED does not raise it. An unrealized
+   credit must not fund a withdrawal.
+
+**A position the engine cannot price contributes `0`, not a guess.** When a leg
+has no usable mark the loss term for the whole account is exactly zero, the same
+deferral `health_deferred` reports.
 
 `total_margin_used` in this formula is the same `total_margin_used` the account
 read reports, and `settled cash` is the same quantity `total_raw_usd` reports.
@@ -250,6 +266,10 @@ market:
 side-aware and never negative. It is `withdrawable × leverage` on the increasing
 side; the reducing side may additionally close what is already open. This is the
 right field behind an order ticket's "available" line.
+
+Because it is derived from `withdrawable`, it carries the same unrealized-loss
+term: an open loss shrinks what the ticket offers on the increasing side, and an
+open gain does not grow it.
 
 The same read carries `max_trade_size`. **That one is not yours** — it is the
 open-interest headroom left on the whole market, shared with every other account,

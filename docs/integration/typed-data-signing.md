@@ -180,7 +180,7 @@ Notes on specific fields:
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
-| `approve_agent` | `MetaFluxTransaction:ApproveAgent(string metafluxChain,address agentAddress,string agentName,uint64 nonce)` |
+| `approve_agent` | `MetaFluxTransaction:ApproveAgent(string metafluxChain,address agentAddress,string agentName,uint64 expiresAtMs,uint64 nonce)` |
 | `set_referrer` | `MetaFluxTransaction:SetReferrer(string metafluxChain,address referrer,uint64 nonce)` |
 | `approve_broker_fee` | `MetaFluxTransaction:ApproveBuilderFee(string metafluxChain,address builder,uint16 maxFeeBps,uint64 nonce)` |
 | `set_display_name` | `MetaFluxTransaction:SetDisplayName(string metafluxChain,string displayName,uint64 nonce)` |
@@ -194,6 +194,8 @@ Notes on specific fields:
 | `vault_modify` | `MetaFluxTransaction:VaultModify(string metafluxChain,uint64 vaultId,string newName,uint64 nonce)` |
 | `spot_margin_close` | `MetaFluxTransaction:SpotMarginClose(string metafluxChain,uint32 pair,uint64 limitPx,uint64 nonce)` |
 | `noop` | `MetaFluxTransaction:Noop(string metafluxChain,uint64 nonce)` |
+| `claim_referral_rewards` | `MetaFluxTransaction:ClaimReferralRewards(string metafluxChain,uint64 nonce)` |
+| `claim_broker_rewards` | `MetaFluxTransaction:ClaimBuilderRewards(string metafluxChain,uint64 nonce)` |
 
 Notes on specific fields:
 
@@ -210,6 +212,21 @@ Notes on specific fields:
   for this action, so one changed byte stops every historical signature from
   verifying. The older action type `approve_builder_fee` is still accepted and
   signs the same string. See [broker codes](../concepts/broker-codes.md#approval).
+- `approve_agent`: **`expiresAtMs` is a sentinel, and it is always in the
+  digest.** For an approval that never expires, OMIT `expires_at_ms` from the
+  POST params and sign `expiresAtMs = 0`. Sign a non-zero value and the approval
+  carries that expiry. A caller that leaves the field out of the struct signs a
+  four-field digest the chain never computes, so the recovered signer is a
+  stranger and the action is refused.
+- `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the
+  envelope nonce are the only signed fields, because neither action carries
+  params. Both drain the WHOLE accrued credit and neither reports the amount, so
+  read the credit first — see [fees](../concepts/fees.md#referrer-credit).
+- `claim_broker_rewards`: the same frozen-spelling rule as `approve_broker_fee`.
+  The action type says `broker`; the `encodeType` says `ClaimBuilderRewards`.
+  Sign the string exactly as printed. The older action type
+  `claim_builder_rewards` is still accepted and signs the same string. See
+  [broker codes](../concepts/broker-codes.md#claiming).
 
 ### Margin {#margin}
 
@@ -456,13 +473,16 @@ Notes on specific fields:
 
 ### Fields that are *not* in the typed digest {#fields-that-are-not-in-the-typed-digest}
 
-Two actions have `params` keys that the typed type string does **not** cover, so
-the server forces them to their default:
+One action has a `params` key that the typed type string does **not** cover, so
+the server forces it to its default:
 
-- `approve_agent` — the `ApproveAgent` type has **no `expires_at_ms`**, so
-  `approve_agent` is **no-expiry**. **Omit** `expires_at_ms`.
 - `create_vault` — the `CreateVault` type has **no `parent`**, so `create_vault`
   is **top-level** (no parent). **Omit** `parent`.
+
+`approve_agent` is **not** in this class, whatever an older copy of this page
+said. `ApproveAgent` DOES bind `uint64 expiresAtMs`. Omitting `expires_at_ms`
+from the POST is right for a never-expiring approval, but the STRUCT still
+carries the field and signs it as `0`.
 
 ## Action expiry (`expiresAfter`) {#action-expiry-expiresafter}
 
@@ -601,8 +621,10 @@ await fetch(`${BASE_URL}/exchange`, {
 
 ## Worked example — `approve_agent` (an account action) {#worked-example--approve_agent-an-account-action}
 
-Approve an agent named `"trading-bot"` on **Testnet** (`chainId = 114514`).
-Remember: typed `approve_agent` is no-expiry — there is no `expires_at_ms`.
+Approve an agent named `"trading-bot"` on **Testnet** (`chainId = 114514`), with
+no expiry. `expiresAtMs` is in the struct and signs as `0`; the POST omits
+`expires_at_ms` entirely. Leave the field out of the struct and the digest has
+four fields where the chain hashes five, so the signature recovers a stranger.
 
 ```json
 {
@@ -617,6 +639,7 @@ Remember: typed `approve_agent` is no-expiry — there is no `expires_at_ms`.
       { "name": "metafluxChain", "type": "string"  },
       { "name": "agentAddress",  "type": "address" },
       { "name": "agentName",     "type": "string"  },
+      { "name": "expiresAtMs",   "type": "uint64"  },
       { "name": "nonce",         "type": "uint64"  }
     ]
   },
@@ -631,6 +654,7 @@ Remember: typed `approve_agent` is no-expiry — there is no `expires_at_ms`.
     "metafluxChain": "Testnet",
     "agentAddress":  "0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
     "agentName":     "trading-bot",
+    "expiresAtMs":   0,
     "nonce":         1
   }
 }
@@ -653,7 +677,7 @@ await fetch(`${BASE_URL}/exchange`, {
       params: {
         agent: '0xa1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1',
         name:  'trading-bot',
-        // no expires_at_ms — approve_agent is no-expiry
+        // no expires_at_ms on the wire; the struct signed expiresAtMs = 0
       },
     },
   }),

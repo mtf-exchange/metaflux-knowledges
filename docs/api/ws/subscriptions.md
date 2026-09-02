@@ -413,7 +413,8 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
   "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
 ```
 
-- `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`).
+- `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`) / `noop` (+`reason`, null `oid`).
+- **`noop` is a SUCCESS, not a rejection** — a `reduce_only` order with nothing left to reduce. It placed nothing and it must not be retried; `rejected` is the one to act on. Branch on `status`, never on `reason`. **Not live yet**: it ships with the next node release, and until then the same outcome arrives as `rejected`. See [`noop`](../rest/exchange.md#statuses-noop).
 - `order.oid` is a **decimal-digit string**, or `null` on a rejected placement.
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `time` is consensus-ms; unknown fields are `null`.

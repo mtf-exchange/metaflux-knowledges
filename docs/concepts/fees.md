@@ -296,7 +296,8 @@ separate claims. Read the referrer balance with
 [`claim_referral_rewards`](../api/rest/exchange.md#claim_referral_rewards); read
 the broker balance with [`builder_state`](../api/rest/info.md#builder_state) and
 claim it with
-[`claim_builder_rewards`](../api/rest/exchange.md#claim_builder_rewards).
+[`claim_broker_rewards`](../api/rest/exchange.md#claim_builder_rewards) (the
+older name `claim_builder_rewards` still decodes).
 Neither claim action reports an amount, so read the balance first.
 
 ## Where fees go {#where-fees-go}

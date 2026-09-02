@@ -136,6 +136,7 @@ The entries are at `body.data.statuses` — one per order placed. The union is:
 | `{"resting":{"oid":N,"cloid":"0x…"}}` | On the book |
 | `{"filled":{"oid":N,"total_sz":"…","avg_px":"…"}}` | Matched |
 | `{"error":{"code":"…","message":"…"}}` | Rejected. The **same error object** the envelope carries — match on `code`, never on `message` |
+| `{"noop":{"reason":"…"}}` | Accepted, and it changed nothing — a `reduce_only` leg with nothing left to reduce. **A success. Do not retry it.** No `oid`. Not live yet; see [`noop`](../api/rest/exchange.md#statuses-noop) |
 | `{"pending":{"action_hash":"0x…","nonce":N}}` | Admitted, no commit inside the wait window (5 s by default) |
 
 `pending` is not a failure. The action may still commit. Track it on the
