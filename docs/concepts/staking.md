@@ -222,6 +222,15 @@ Rewards are FEE-FUNDED. The 20% validator share of the
 epoch distribution pays it out. So the reward is whatever fees the period
 earned, divided by stake — it is not a rate the chain can publish in advance.
 
+**The distribution BUYS the reward asset; it does not convert it.** The pooled
+USDC is spent on the MTF/USDC book, and only the MTF actually acquired is paid
+out by stake weight. This is what keeps the platform from subsidising: USDC
+never credits into an MTF-denominated reward at a made-up rate. The cost is that
+a thin book delays the payout. **With no resting asks on MTF/USDC the buy
+acquires nothing and the distribution is skipped**, leaving the pool untouched
+for the next attempt. A pool that sits at a constant value is that case, not a
+fault.
+
 **There is no APR field, and do not compute one from these values.** The pending
 pool is accrued fees at an instant, not an annualised rate: projecting it forward
 assumes trading volume that has not happened. A delegator's realised return is

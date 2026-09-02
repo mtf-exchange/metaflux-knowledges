@@ -58,7 +58,7 @@ CoreWriter exposes 22 L1 actions (id, big-endian, in the `uint24` slot above):
 
 | id | Action | Purpose |
 |---:|--------|---------|
-| 1 | `LimitOrder` | Place a limit order on a perp / spot market |
+| 1 | `LimitOrder` | Place a limit order on a perp / spot market. **A fill on placement is recorded nowhere** — see [unrecorded fills](../api/rest/info.md#unrecorded-fills) |
 | 2 | `VaultTransfer` | Deposit to / withdraw from a vault |
 | 3 | `TokenDelegate` | Delegate stake to a validator |
 | 4 | `StakingDeposit` | Move tokens into the staking balance |

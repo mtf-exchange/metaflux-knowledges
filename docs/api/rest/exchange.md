@@ -1028,7 +1028,7 @@ Returns a count of cancelled orders.
 
 ### Amend a resting order's price or size {#modify}
 
-Amend a resting order's price and/or size in place. At least one of `new_px` /
+Amend a resting order's price and/or size. At least one of `new_px` /
 `new_size` must be present. The target order is addressed **by `oid`** or **by
 `cloid`** (the client order id the order was placed with) — send one or the other.
 **Sender-authorized by default**; an approved agent may amend **as** an `owner`
@@ -1070,7 +1070,20 @@ Address by `cloid` instead of `oid` (omit `oid`, or leave it `0`):
 | `new_size` | uint64 \| null | New size in fixed-point tick units (`null` / omitted = unchanged) |
 | `always_place` | bool | When `true`, a target that no longer rests is a best-effort no-op rather than a rejection. Defaults to `false` |
 
-Returns a single modify status.
+**The chain cancels the target and rests a replacement under a NEW `oid`.** The
+amend is still atomic — a replacement the pre-trade gates reject restores the
+original — but the order id changes on every successful amend. The replacement
+keeps the original's `cloid`, `tif` and reduce-only flag, so a client that
+tracks orders by `cloid` keeps its handle. A client that tracks by `oid` must
+re-read [`open_orders`](./info.md#open_orders): nothing else carries the new id.
+
+**The replacement can cross the book on placement, and that fill is recorded
+nowhere.** See [unrecorded fills](./info.md#unrecorded-fills). A `modify` also
+writes no [`historical_orders`](./info.md#historical_orders) transition at all —
+not the fill, and not the replacement's rest — and no
+[`order_updates`](../ws/subscriptions.md#order_updates) message.
+
+Returns a per-action ok / error verdict only. It carries no order id.
 
 ---
 

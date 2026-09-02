@@ -235,7 +235,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 <summary>Show edge cases</summary>
 
 - **Lost keys**: M-of-N tolerates up to `N - M` losses. Plan key custody to spread the loss surface (different jurisdictions, different HSMs, different humans).
-- **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — watch [`order_updates`](../api/ws/subscriptions.md#order_updates) and [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) for the multi-sig account for any action you didn't originate.
+- **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — but NOT from the order feeds. An inner order inside a multi-sig envelope produces no [`order_updates`](../api/ws/subscriptions.md#order_updates) message, no [`fills`](../api/ws/subscriptions.md#fills) message and no [`historical_orders`](../api/rest/info.md#historical_orders) record, so a watcher on those channels is blind to exactly the action it is looking for. See [unrecorded fills](../api/rest/info.md#unrecorded-fills). Watch [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) and diff [`account_state`](../api/rest/info.md#account_state) and [`open_orders`](../api/rest/info.md#open_orders) instead.
 - **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other is refused with `INVALID_REQUEST`. Coordinator should assign nonces.
 - **Signature expiry**: roster signatures over the inner blob don't expire on their own — a signature collected today is valid until the bundle is submitted. Some integrators add their own off-chain TTL. (The optional [action `expiresAfter`](../integration/typed-data-signing.md#action-expiry-expiresafter) applies to the **outer** `/exchange` envelope, not to the inner roster signatures.)
 
@@ -283,7 +283,7 @@ sequenceDiagram
     C->>Chain: POST /exchange
     Note over Chain: T-4 chain admits:<br/>recover both roster sigs over the inner blob ≥ threshold(2)<br/>dispatch inner order as user → admit to mempool
     Chain-->>C: return 202
-    Note over Chain: T+commit inner Order applied — order_updates fires;<br/>multi-sig account now has the new resting order
+    Note over Chain: T+commit inner Order applied — NO order_updates, NO fills message;<br/>multi-sig account now has the new resting order<br/>read open_orders to see it
 ```
 
 ## See also {#see-also}

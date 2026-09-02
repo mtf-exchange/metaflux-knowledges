@@ -263,6 +263,27 @@ timestamps, order ids, trade ids, and enum codes are bare JSON numbers.
 One record per **filled party**. A single match produces two records: the taker
 leg first, then the maker leg. Both legs of one match share the same `tid`.
 
+A fill that no signed action produced — a forced close, a TWAP slice, a trigger
+fire, a spot-margin forced close — is recorded on the block it executed in,
+with an empty `hash`. No user signed it, so there is no hash to record.
+
+**Some order lanes produce a fill this stream does NOT carry.** An order placed
+by [`modify`](../api/rest/exchange.md#modify) or
+[`batch_modify`](../api/rest/exchange.md#batch_modify), an order placed by
+[CoreWriter `LimitOrder`](../evm/interacting-with-core.md), any order inside
+a [`multi_sig`](../concepts/multi-sig.md) envelope, and every clearing of a
+[frequent batch auction](../concepts/fba.md) each settle with no record —
+see [unrecorded fills](../api/rest/info.md#unrecorded-fills). Both legs are
+missing, so the maker loses its record as well. An archive folded from this
+stream inherits the gap, and a volume total from it reads low.
+
+> ⬆️ **Upgrade notice — not live yet.** Those four kinds of fill reach this
+> stream from the next node release. Before it they stop at the node's
+> committed fill ring, so the archive built from this stream has no row for
+> them. The four attribution fields below (`liquidation`, `liquidatedUser`,
+> `markPx`, `twapId`) therefore read as constants on the live chain, and carry
+> real values from that release on.
+
 Envelope:
 
 ```json
@@ -329,24 +350,29 @@ One fill record, taker leg:
 | `closedPnl` | decimal string \| absent | whole USDC | Realized PnL on the closed part. `"0"` on a pure open |
 | `startPosition` | i128 string \| absent | **raw size** | Signed leg size **before** this fill |
 | `dir` | string \| absent | — | One of `"Open Long"`, `"Close Long"`, `"Open Short"`, `"Close Short"`, `"Long > Short"`, `"Short > Long"` |
-| `builderFee` | decimal string | — | Reserved. Always `"0"` |
-| `liquidation` | bool | — | Reserved. Always `false` |
+| `builderFee` | decimal string | whole USDC | Broker carve charged on this fill. **Taker leg only** — the maker did not route the order, so its leg reads `"0"`, as does any fill no broker routed |
+| `liquidation` | bool | — | `true` on **both** legs of a forced-close print, else `false`. The absorbing maker learns it took a liquidation; that is the point of flagging both legs |
 | `feeTrialEscrow` | decimal string | — | Reserved. Always `"0"` |
-| `builder` | null | — | Reserved. Always `null` |
-| `twapId` | null | — | Reserved. Always `null` |
+| `builder` | string \| null | — | Broker address that routed the order, `0x`-hex. **Taker leg only**, `null` otherwise |
+| `twapId` | uint64 \| null | id | Parent TWAP order of a slice. **Taker leg only**, `null` otherwise |
 | `deployerFee` | decimal string | — | Reserved. Always `"0"` |
-| `liquidatedUser` | null | — | Reserved. Always `null` |
-| `markPx` | decimal string | — | Reserved. Always `"0"` |
+| `liquidatedUser` | string \| null | — | The account whose position was closed, `0x`-hex. Present on **both** legs of a forced-close print, `null` otherwise |
+| `markPx` | decimal string | **whole USDC** | The mark the liquidation ladder priced from when it classified the leg — not the fill price, and not a later mark. Present with `liquidatedUser`, else `"0"` |
 
 :::warning
 **Three traps on one record.**
 
-1. `fee` and `closedPnl` are **whole USDC**. `startPosition` on the same record is
-   **raw size**. Divide `startPosition` by `10^sz_decimals`; do not divide `fee`.
+1. `fee`, `closedPnl`, `builderFee` and `markPx` are **whole USDC**. `px` and
+   `startPosition` on the same record are **raw**. Divide `px` by `10^8` and
+   `startPosition` by `10^sz_decimals`; divide neither of the other four.
+   `markPx` is the trap inside the trap: it sits beside `px` and takes no
+   divisor.
 2. The six settlement fields (`fee`, `feeToken`, `closedPnl`, `startPosition`,
    `dir`) are **absent** on a fill with no perp settlement leg, such as a spot
    fill. Treat absent as "no settlement data", not as zero.
-3. The eight reserved fields carry constants today. Do not read them as data.
+3. Two fields are reserved and carry constants: `feeTrialEscrow` and
+   `deployerFee`. Do not read them as data. The other six in that group are
+   real — read the rows above and the upgrade notice.
 :::
 
 ## `node_trades` {#node_trades}
@@ -388,6 +414,18 @@ The public trade tape. One record per match, not per party. This stream carries
 
 Join `node_trades` to `node_fills` on `tid` when you need the parties.
 
+**This tape carries no [unrecorded fill](../api/rest/info.md#unrecorded-fills)**
+— no print from a `modify`, from a CoreWriter `LimitOrder`, from inside a
+`multi_sig` envelope, or from a
+[frequent batch auction](../concepts/fba.md) clearing. A volume total built
+from this tape reads low by them.
+
+> ⬆️ **Upgrade notice — not live yet.** From the next node release this tape
+> also carries the prints no signed action produced — a forced close, a TWAP
+> slice, a trigger fire, a spot-margin forced close. Each one carries an empty
+> `hash`. Before that release those prints are missing from the tape, so a
+> volume total built from it reads low.
+
 ## `node_order_statuses` {#node_order_statuses}
 
 One record per order-status transition, keyed by the order owner.
@@ -420,14 +458,14 @@ One record per order-status transition, keyed by the order owner.
 |-------|------|-------|---------|
 | `market` | uint32 | id | Canonical asset id |
 | `oid` | uint64 | id | Order id. **`0` on an `error` record** — the order never got an id |
-| `cloid` | string \| absent | — | Client order id, `0x` plus 32 hex digits |
-| `status` | string | — | Exactly one of `"resting"`, `"filled"`, `"error"` |
+| `cloid` | string \| absent | — | Client order id, `0x` plus 32 hex digits. **Absent on a maker execution record even when the order carried one** |
+| `status` | string | — | Exactly one of `"resting"`, `"filled"`, `"error"`. One `filled` record per (block, maker `oid`) — see [maker execution records](#maker-execution-records) |
 | `side` | string | — | `"B"` buy, `"A"` sell |
 | `limit_px` | i128 string | raw price | Limit price of the order. Always present |
 | `sz` | u128 string | raw size | On `filled`, the **filled** size. On `resting` and `error`, the request size |
-| `orig_sz` | u128 string | raw size | Request size at placement. Always the original |
-| `tif` | string | — | Time in force: `"Gtc"`, `"Ioc"`, `"Alo"` |
-| `reduce_only` | bool | — | Reduce-only flag of the order |
+| `orig_sz` | u128 string | raw size | Request size at placement. **`"0"` on a maker execution record** |
+| `tif` | string \| absent | — | Time in force: `"Gtc"`, `"Ioc"`, `"Alo"`. **Absent on a maker execution record** |
+| `reduce_only` | bool | — | Reduce-only flag of the order. **`false` on a maker execution record, whatever the order carried** |
 | `avg_px` | i128 string \| absent | raw price | Average fill price. Present on `filled` only |
 | `total_sz` | u128 string \| absent | raw size | Total filled size. Present on `filled` only |
 | `error` | string \| absent | — | Rejection reason. Present on `error` only |
@@ -438,6 +476,97 @@ One record per order-status transition, keyed by the order owner.
 filled part and `orig_sz` is the request. Use `orig_sz` when you want the size
 the trader asked for.
 :::
+
+### Maker execution records {#maker-execution-records}
+
+> ⬆️ **Upgrade notice — not live yet.** Maker execution records ship with the
+> next node release. On the live chain a maker order that filled emits no
+> record at all, so it reads `resting` forever.
+
+Every record above comes from an order the account **submitted**. A resting
+order that is HIT submits nothing in that block, so the node derives its record
+from the block's fills instead. That record is a maker execution record.
+**Except when the fill is an
+[unrecorded fill](../api/rest/info.md#unrecorded-fills)**: a `modify`, a
+CoreWriter `LimitOrder`, a `multi_sig` envelope and a batch-auction clearing
+each match against a resting order and derive nothing for it.
+
+**A fill describes the fill, not the order.** `tif` and `cloid` are absent,
+`reduce_only` is `false` and `orig_sz` is `"0"`, whatever the order carried.
+Join to that order's own `resting` record on the same `oid` for the real
+values.
+
+**A `resting` record exists only for an order that a signed `order`,
+`batch_order`, `scale_order`, `spot_order` or `chase_order` placed**, so for two
+groups of order the join has no target.
+
+The first group is the two the node rests by itself: a
+chase leg after a reprice — a reprice cancels the leg and rests a new `oid` —
+and a TP/SL trigger leg that fired as a limit order. A chase's FIRST leg is not
+in this group: `chase_order` is a signed action and its opening leg does get a
+`resting` record. Only the legs a reprice rests are missing one. **`orig_sz` and
+`reduce_only` are not recoverable for these two orders.** The live-book read
+([`open_orders`](../api/rest/info.md#open_orders)) serves `null` for `orig_sz`,
+and no action ever submitted a request size for the leg. `reduce_only` on that
+read is a constant `false` on every book row, so it repeats the same wrong
+value. `tif` and `cloid` ARE real there: take them while the order still rests.
+Afterwards use the order kind: a chase leg is always `"Alo"` and never
+reduce-only; a fired trigger leg is always `"Gtc"` and always reduce-only, so
+`reduce_only: false` is wrong on exactly that record.
+
+The second group is any order that an
+[unrecorded-fill lane](../api/rest/info.md#unrecorded-fills) rested. A `modify`,
+a CoreWriter `LimitOrder` and a `multi_sig` envelope each rest an order with no
+`resting` record. That order is an ordinary resting order after that, so an
+ordinary taker DOES give it a maker execution record later — and that record has
+nothing to join to. All four fields stay missing for its whole life.
+
+**Some order lanes produce no maker execution record, because they produce no
+record at all.** An order inside a `multi_sig` envelope, an order placed by
+`modify` or `batch_modify`, an order placed by CoreWriter `LimitOrder`, and a
+[frequent batch auction](../concepts/fba.md) clearing each write nothing to
+these streams: no `node_fills` print, no `node_trades` print, no status record
+of their own, and no maker execution record for the resting order they hit. The chain still matches the order and moves the money — see
+[unrecorded fills](../api/rest/info.md#unrecorded-fills). So a resting order
+with no `filled` record was not necessarily left alone.
+
+The node sums every match against one `oid` inside one block into ONE record.
+So `sz` and `total_sz` are the size executed **in that block**, not the lifetime
+total, and `avg_px` equals `limit_px`: a resting order executes at its own
+price. A maker hit in three blocks gets three records, and the order can still
+rest after all three.
+
+A forced close, a TWAP slice and a trigger order produce these records too.
+None of them sends an action, and the maker each one hits still needs its
+record.
+
+The REST read built from this stream serves an absent key as `null` — see
+[`historical_orders`](../api/rest/info.md#historical_orders). Absent here and
+`null` there are the same record.
+
+```json
+{
+  "block_number": 941006641,
+  "block_time": 1735689600202,
+  "events": [
+    ["0x8a1b2c3d4e5f60718293a4b5c6d7e8f901234567", {
+      "market": 0,
+      "oid": 366158130011,
+      "status": "filled",
+      "side": "A",
+      "limit_px": "6250000000000",
+      "sz": "40000",
+      "orig_sz": "0",
+      "reduce_only": false,
+      "avg_px": "6250000000000",
+      "total_sz": "40000",
+      "ts": 1735689600202
+    }]
+  ]
+}
+```
+
+No `tif` key, no `cloid` key, no `error` key.
 
 ## `node_funding` {#node_funding}
 

@@ -45,11 +45,11 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 |---------|:-------:|--------|
 | `l2_book` | `coin` (required) | committed book, on change |
 | `bbo` | `coin` (required) | committed book, on change |
-| `trades` | `coin` (required) | committed-block fills, on new fills |
+| `trades` | `coin` (required) | committed-block fills, on new fills — from the next node release this includes forced-close, TWAP-slice and trigger fills |
 | `markets` | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
-| `fills` | `user`/`address` (required) | committed-block fills for that account |
+| `fills` | `user`/`address` (required) | committed-block fills for that account — from the next node release this includes forced-close, TWAP-slice and trigger fills |
 | `candles` | `coin` + `interval` (both required), `candle_type` (optional) | **gateway only** — price samples or trades folded into OHLCV bars, on change |
-| `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change |
+| `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change — from the next node release a resting order hit by a forced close, a TWAP slice or a trigger also reports its fill |
 | `open_orders` | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
 | `notifications` | `user`/`address` (required) | per-account margin / liquidation notices, on change |
 | `ledger_updates` | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), on change |
@@ -63,6 +63,43 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 | `spot_margin_state` | `user`/`address` (required) | per-account spot-margin positions — on change + heartbeat every 4 committed blocks |
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
+
+> ⬆️ **Upgrade notice — not live yet.** The three clauses above ship with the
+> next node release. Until it lands, a fill that no signed action produced
+> reaches none of those three channels: the chain settles it, and no subscriber
+> is told. A market maker watching `fills` therefore misses the liquidation it
+> just absorbed.
+
+:::warning
+**Some order lanes send a fill to NONE of these channels, and that release does
+not change it.** An order placed by `modify` or `batch_modify`, an order placed
+by CoreWriter `LimitOrder`, any order inside a `multi_sig` envelope, and every
+clearing of a [frequent batch auction](../../concepts/fba.md) each settle with
+no message on `trades`, on `fills` or on `order_updates` — for either party. See [unrecorded fills](../rest/info.md#unrecorded-fills). So a
+market maker cannot read `fills` as the complete record of its own executions,
+and must reconcile its position from
+[`account_state`](../rest/info.md#account_state) instead.
+
+An account that SENDS a `modify` still gets an `open_orders` re-snapshot for
+it, because that channel re-emits on every `/exchange` action a subscribed
+account sends. So the sender sees its resting set change with no fill message to
+explain the change. **Read the new snapshot, not the difference between two of
+them**: the difference cannot tell an amend from a fill. To size the fill, read
+the replacement order id's `sz`: the fill is the size you sent minus that `sz`.
+
+**A `multi_sig` re-snapshot goes to the SUBMITTER, not to `user`.** The envelope
+executes as `user`, and the re-emission keys on the account that sent the
+envelope. Any signer may submit, so when the submitter is not `user`, the
+submitter gets a frame with an unchanged set and `user` — whose set really
+changed — gets no frame at all.
+
+**The MAKER gets no frame either, on any of these lanes.** The channel re-emits
+when a fill touches an account, and these fills touch nothing. So a maker's
+`open_orders` view keeps the consumed order at its old size until some other
+event on that account forces a new frame. Poll
+[`open_orders`](../rest/info.md#open_orders) over REST to settle what is really
+resting.
+:::
 
 :::warning
 **`all_mids`, `active_asset_ctx` and `user_events` are RETIRED.** Each one
@@ -384,7 +421,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 
 ### Per-account resting order snapshot {#open_orders}
 
-Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client simply **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
+Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client simply **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. **One exception: a resting order consumed by an [unrecorded fill](../rest/info.md#unrecorded-fills) produces no frame**, so that account's snapshot stays stale — showing the order at its old size — until some other event on the account forces a re-emission. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "open_orders", "user": "0x<address>" } }

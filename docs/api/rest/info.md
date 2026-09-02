@@ -150,6 +150,43 @@ Not every wrong type is refused. A field the read treats as optional, such as
 `detail` on [`account_state`](#account_state), falls back to its default rather
 than failing. Only a field with a declared numeric or typed binding rejects.
 
+#### Empty is not the same as absent {#empty-vs-absent}
+
+A read that answers nothing and a request that asks the wrong question look
+alike inside a client. The first is a fact about the account. The second is a
+bug in your code. Three cases produce a plausible-looking zero — rule each one
+out before you report a holding as missing.
+
+**1. You sent a retired type name.** A name this API no longer serves NEVER
+answers with an empty body. It answers `UNKNOWN_TYPE`, in one of two forms:
+
+| What you sent | Status | Body |
+|---|---|---|
+| `spot_clearinghouse_state`, `oracle_sources`, `sub_accounts`, and every other name in [removed reads](#retired-reads) that is not in the row below | `400` | `{"error":{"code":"UNKNOWN_TYPE","message":"unknown info type: <name>"}}` — no `details` |
+| `account_overview`, `action_outcome`, `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`, `pm_summary` | `410` | the same `code`, plus `details.use` naming the read to call instead |
+
+So a `200` carrying an empty array IS an answer about a real account. A client
+that shows "no balances" after calling `spot_clearinghouse_state` swallowed a
+`4xx`. **Check the status before you read the body.**
+
+**2. You read a key that is not there.** An absent key reads as `undefined`, and
+`undefined` renders as empty almost everywhere. The spot ledger is the one that
+catches people. It lives at **`data.spot.balances`**. There is no `balances` and
+no `spot_balances` at the top level of an
+[`account_state`](#account_state) body; both paths read as "this account holds
+nothing", and both are wrong. Every field that moved is listed in
+[where every field went](#account-state-lane-split).
+
+**3. The read's source is not deployed on the endpoint you called.** The
+[archive-lane](#archive-lane) reads answer with a typed empty body —
+`{"orders":[]}`, `{"fundings":[]}` — when no history archive is configured
+behind that endpoint. On the wire that is identical to an account with no
+history. The public endpoints run the archive, so this is a self-hosted concern.
+
+**The one-line control.** Send the same request with a `type` you KNOW is wrong,
+such as `"type":"nope"`. If your client reports the same empty result it
+reported before, it is hiding the error, not reading an empty account.
+
 ## Query types {#query-types}
 
 ### Per-account collateral and margin health {#account_state}
@@ -396,8 +433,8 @@ The three `pm_*` figures are always present and are **meaningful only when
 | `spot.balances` | array | The **whole** spot token ledger, one row per token held. Never empty: row 0 is USDC unconditionally |
 | `spot.balances[*].name` | string | Token symbol (`"USDC"` for row 0). Rows are keyed and joined by `name` |
 | `spot.balances[*].signing_id` | uint32 | The number you place in the `token` field of a signed [`spot_send`](../rest/exchange.md), and in `asset` of an `earn_deposit`. `100` for USDC. It has no other meaning on the read plane |
-| `spot.balances[*].total` | Decimal string | Full balance. **Not** the spendable amount — perp margin sits inside it. Use `withdrawable` |
-| `spot.balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). Spot escrow only; it never holds perp margin |
+| `spot.balances[*].total` | Decimal string | The **whole** holding of that token, escrow included. **Not** the spendable amount — perp margin sits inside it too. Use `withdrawable` |
+| `spot.balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). **A part OF `total`, not a second bucket beside it** — never add the two. Spot escrow only; it never holds perp margin |
 | `spot.balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset). See [cost basis](#avg-entry-px) |
 
 **A spot balance IS the spot position**, so nothing split off the way the perp
@@ -958,13 +995,14 @@ Returns one account's staking, delegation, and unbonding state.
 | `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window, whole-MTF |
 | `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable, consensus ms |
 | `total_stake` | Decimal string | Total staked MTF across the **whole chain**, whole-MTF — the denominator this account's delegated stake competes in. Chain-wide, not per-account |
-| `pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool, not yet distributed, whole USDC. This is the reward the next distribution draws from |
+| `pending_validator_pool_usdc` | Decimal string | Fees accrued to the validator pool, not yet distributed, whole USDC. This is the reward the next distribution draws from. **A constant value is normal** — see the rule below |
 | `n_active_validators` | uint64 | Count of validators marked active in committed staking state |
 | `reward_source` | string | Always `"fee_funded_on_book_buy"`. Lets a client tell a fee-funded chain from an emission-funded one without inferring it |
 
 **Rules**
 
 - **This read serves no APR, on purpose.** The emission era is over: rewards are funded from fees, not minted on a curve, so there is no annual rate to publish. Do not derive one. `pending_validator_pool_usdc` is a snapshot of accrued fees, not a rate — it depends on trading volume that has not happened yet.
+- **A pool that does not move is not a stalled read.** `reward_source` is `"fee_funded_on_book_buy"`, and the second half of that name is a real step: the distribution spends the pooled USDC on the MTF/USDC book, then pays the MTF it ACQUIRED out by stake weight. It never credits USDC into an MTF-denominated reward, so a buy that fills nothing pays nothing. **With no resting asks on MTF/USDC the buy acquires nothing, the distribution is skipped, and the pool carries forward unchanged.** The pool is not spent and not stranded; it waits. A pool above the floor therefore does NOT mean a payout is due — check `height` on another read to tell a waiting pool from a frozen connection.
 - **This read does NOT serve the undelegated free pool.** [`c_deposit`](./exchange.md#c_deposit) credits a free pool and [`c_withdraw`](./exchange.md#c_withdraw) debits it, and stake can sit in that pool undelegated for as long as the holder likes. No field on this read reports it. `total_staked` therefore **under-reports** what an account holds: it counts delegated stake only, so an account with a funded free pool and no delegation reads `"0"`. Do not present `total_staked` as the account's whole staked balance.
 - The free pool is not the same as `pending_unstakes`. Undelegated stake is already free. `pending_unstakes` is stake still inside its unbonding window, not withdrawable until `matures_at_ts`.
 - `total_staked` and `pending_unstakes` are disjoint. `token_delegate` moves stake out of the free pool into `total_staked`; undelegating moves it out of `total_staked` into `pending_unstakes` for the unbonding window. Only the free pool is the figure [`c_withdraw`](./exchange.md#c_withdraw) returns to spot with no unbonding window.
@@ -1296,10 +1334,10 @@ Returns an account's resting orders, across every perp book and every spot book.
 | `orders[*].side` | `"B"` / `"A"` | Order side. `B` = bid, `A` = ask. The `/exchange` order body uses `"bid"` / `"ask"` instead |
 | `orders[*].px` | Decimal string | Resting price, whole units, tick-snapped |
 | `orders[*].sz` | Decimal string | Remaining size, whole units |
-| `orders[*].orig_sz` | Decimal string \| null | Original size when known; `null` on a resting-order row |
+| `orders[*].orig_sz` | Decimal string \| null | **Always `null`.** This read keeps no request size. `sz` is the size still resting |
 | `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none |
 | `orders[*].tif` | string | Lowercase time-in-force (`"gtc"` / `"ioc"` / `"alo"`), or the literal `"trigger"` on a parked TP/SL row |
-| `orders[*].reduce_only` | bool | Reduce-only flag |
+| `orders[*].reduce_only` | bool | **A row-kind label, not the order's flag.** `false` on every book row, `true` on every parked TP/SL row. See the rule below |
 | `orders[*].trigger` | object \| null | Trigger detail when the row is, or carries, a trigger; `null` otherwise |
 | `orders[*].inserted_at` | uint64 | Placement / insertion timestamp, consensus ms |
 
@@ -1312,6 +1350,15 @@ Returns an account's resting orders, across every perp book and every spot book.
 - A spot entry labels `coin` with the pair name (e.g. `"BTC/USDC"`) and renders `px` / `sz` in the pair's own planes: pair tick, base-token size decimals.
 - Every row is the same canonical shape the WS [`open_orders`](../ws/subscriptions.md#open_orders) snapshot renders, so REST and WS never drift. An unknown field renders `null`.
 - A parked TP/SL leg is an open order too: it renders with `tif: "trigger"` and a populated `trigger` block.
+- **`reduce_only` here is set by row kind and never read from the order.** A
+  resting book row renders `false`; a parked TP/SL row renders `true`. So a
+  reduce-only limit order reads `false`, and a fired TP/SL leg — which IS
+  reduce-only and rests as an ordinary book order — reads `false` as well.
+  **Never recover an order's reduce-only flag from this read.** Read it from the
+  order the account submitted. When no action submitted the order, the flag is
+  not recoverable at all.
+- `tif` and `cloid` ARE read from the order, so both are recoverable here for as
+  long as the order rests.
 
 **Inside the `trigger` block**
 
@@ -1360,6 +1407,63 @@ the AppHash — no external indexer). For one row per
 **opened-then-closed position** instead — peak size, average entry, average
 close, realized PnL and funding folded over the whole life — use
 [position history](./info/position-history.md).
+
+#### The lanes that record no fill {#unrecorded-fills}
+
+This read is not the complete list of an account's executions. Some order lanes
+settle a fill that nothing reports. This page calls that an **unrecorded fill**.
+The chain matches the order, moves both positions and moves the money. No read
+and no stream carries the fill, for either party.
+
+| The order was placed by | Recorded |
+|---|---|
+| [`modify`](./exchange.md#modify) or [`batch_modify`](./exchange.md#batch_modify), when the replacement crosses the book on placement | nothing about the fill |
+| [CoreWriter `LimitOrder`](../../evm/interacting-with-core.md) from MetaFluxEVM, when it crosses on placement | nothing about the fill |
+| a [`multi_sig`](../../concepts/multi-sig.md) envelope holding `order`, `spot_order`, `batch_order`, `scale_order`, `modify` or `batch_modify` | nothing about the fill |
+| a [frequent batch auction](../../concepts/fba.md) clearing, on a market in FBA mode | nothing about the fill |
+
+"Nothing" is the whole surface: no row on this read, no `filled` record on
+[`historical_orders`](#historical_orders), no print on the
+[public trade tape](./info/perpetuals.md#trades), no message on the WS
+[`fills`](../ws/subscriptions.md#fills) or
+[`trades`](../ws/subscriptions.md#trades) channel, and no record in the
+[node streams](../../nodes/data-streams.md).
+
+**The maker gets no `open_orders` frame either.** That channel re-emits an
+account's set when a fill touches it, and an unrecorded fill touches nothing.
+So the maker's live view keeps the consumed order at its old size until some
+other event on that account forces a new frame. Read
+[`open_orders`](#open_orders) over REST to settle what is really resting.
+
+**One lane is half-recorded.** A [`multi_sig`](../../concepts/multi-sig.md)
+envelope holding `spot_margin_open` or `spot_margin_close` records the fill on
+THIS read, and records it nowhere else: no node stream, no WS channel, and no
+maker execution record. A caller reconciling this read against the streams sees
+a fill on one side only.
+
+**What a caller does about it**
+
+- **Trust the position, not the fill list.** A position change with no matching
+  fill row is a real trade, not a lost message. Read the position and the
+  balance from [`account_state`](#account_state); it always reflects every fill.
+  Sum fills for reporting, never for a balance check.
+- **Send an order you must audit as a top-level
+  [`order`](./exchange.md#submit_order),
+  [`batch_order`](./exchange.md#batch_order), `scale_order` or `spot_order`.**
+  Those four lanes record both legs.
+- **To amend an order you must audit, cancel it and place a new one.** A
+  `modify` is atomic and unrecorded. A cancel plus a place is recorded and not
+  atomic. Pick the property your use needs.
+- **A maker cannot opt out.** A resting order hit through one of these lanes
+  records nothing, and its owner chose none of it. So a missing fill row never
+  proves that an order was not hit.
+- **The sender can size the fill, from `open_orders` only.** A `modify`
+  replacement rests under a NEW order id. Read that id's `sz` on
+  [`open_orders`](#open_orders): the fill is the size you sent minus that `sz`.
+  If neither the original id nor the new id is resting, the replacement filled
+  in full — a rejected amend leaves the original in place.
+- **Volume totals read low.** Every figure built from the trade tape, the
+  24-hour volume fields included, excludes these fills.
 
 **Request**
 
@@ -1451,6 +1555,11 @@ ring.
   `twap_id`, `hash`) but never `cause`. Classify a forced close by
   `liquidated_user` and a TWAP slice by `twap_id` — both work on every row; a
   `cause` test silently misses archive-era rows.
+- **The archive holds no forced-close, TWAP-slice or trigger row before the
+  next node release.** Those fills reach the committed ring, but they never
+  reached the stream the archive folds. So a ring-window read has always
+  returned them, and an archive-window read over that earlier period returns
+  nothing for them. From that release on, both windows agree.
 
 ### A single order's lifecycle {#order_status}
 
@@ -2014,8 +2123,23 @@ deltas, once retention lands, come from the archive's
 ### Past executed orders {#historical_orders}
 
 An account's past orders, newest first. A record is one **order transition**,
-not one order. An order that rested and then filled contributes two records, so
-`oid` is not unique across the array.
+not one order. An order that rested and then filled contributes at least two
+records: one `resting` record, then one `filled` record for every block in
+which it executed. So `oid` is not unique across the array.
+
+A resting order that is HIT gets a `filled` record too, with one exception.
+This page calls that a **maker execution record**. The maker sent no action in
+that block, so the node derives the record from the fill. A liquidation, a TWAP
+slice and a trigger order all produce the same record for the maker they hit.
+**The exception is an [unrecorded fill](#unrecorded-fills)**: a `modify`, a
+CoreWriter `LimitOrder`, a `multi_sig` envelope and a batch-auction clearing
+each match against a resting order and derive nothing for it.
+
+> ⬆️ **Upgrade notice — not live yet.** Maker execution records ship with the
+> next node release. So do the fills that a forced close, a TWAP slice or a
+> trigger produces. On the live chain a maker order that filled still reads
+> `status: "resting"` with `filled_sz: "0"`, and it reads that way forever.
+> Every rule below marked "maker execution record" describes the target state.
 
 **Request**
 
@@ -2037,8 +2161,8 @@ rejected — see [malformed requests](#malformed-request).
 
 ```json
 {
+  "type": "historical_orders",
   "data": {
-    "type": "historical_orders",
     "address": "0x<addr>",
     "orders": [
       {
@@ -2066,23 +2190,27 @@ rejected — see [malformed requests](#malformed-request).
 }
 ```
 
+**`type` sits at the TOP level on this read, beside `data`.** The history
+archive serves it, and that lane was not migrated to the current envelope — see
+[the archive lane](#archive-lane). `body.data.type` reads `undefined` here.
+
 | Field | Type | Meaning |
 |-------|------|---------|
 | `orders[*].oid` | decimal-digit string | Order id. **Not unique** — see the rules below. `"0"` on an `"error"` record, which never reached the book |
 | `orders[*].coin` | string | Market symbol the order was placed on |
 | `orders[*].side` | `"B"` / `"A"` | Side token — `"B"` = buy/bid, `"A"` = sell/ask. Same token as [`user_fills`](#user_fills) |
-| `orders[*].status` | `"filled"` \| `"resting"` \| `"error"` | The transition this record reports |
+| `orders[*].status` | `"filled"` \| `"resting"` \| `"error"` | The transition this record reports. **`"filled"` is not a terminal flag** — see the maker execution rule below |
 | `orders[*].time` | uint64 | Timestamp of the transition, consensus ms |
 | `orders[*].px` | Decimal string | `avg_px` when the order filled, else `limit_px`. **Absent**, not null, if the record carries neither |
 | `orders[*].limit_px` | Decimal string | The limit price submitted |
-| `orders[*].avg_px` | Decimal string \| null | Realized average fill price. **`null` unless `status` is `"filled"`** |
-| `orders[*].sz` | Decimal string | Size on the record, whole units |
-| `orders[*].orig_sz` | Decimal string | Size as submitted, whole units |
-| `orders[*].total_sz` | Decimal string \| null | Total executed size. **`null` unless `status` is `"filled"`** |
-| `orders[*].filled_sz` | Decimal string | Executed size. **`"0"` unless `status` is `"filled"`** — a string zero, never null |
-| `orders[*].tif` | string | Time in force: `"Gtc"`, `"Ioc"` or `"Alo"` |
-| `orders[*].reduce_only` | bool | Whether the order was submitted reduce-only |
-| `orders[*].cloid` | string \| null | Client order id. `null` when the order carried none |
+| `orders[*].avg_px` | Decimal string \| null | Realized average fill price. **`null` unless `status` is `"filled"`**. Equals `limit_px` on a maker execution record: a resting order executes at its own price |
+| `orders[*].sz` | Decimal string | Size on the record, whole units. On a maker execution record: the size executed in THAT block |
+| `orders[*].orig_sz` | Decimal string | Size as submitted, whole units. **`"0"` on a maker execution record** — a fill does not carry the request size. Read it from the same order's `resting` record, same `oid` |
+| `orders[*].total_sz` | Decimal string \| null | Total executed size. **`null` unless `status` is `"filled"`**. On a maker execution record: the size executed in THAT block, not the lifetime total |
+| `orders[*].filled_sz` | Decimal string | Executed size. **`"0"` unless `status` is `"filled"`** — a string zero, never null. On a maker execution record: the size executed in THAT block, not the lifetime total. For the lifetime total read [`user_fills`](#user_fills) |
+| `orders[*].tif` | string \| null | Time in force: `"Gtc"`, `"Ioc"` or `"Alo"`. **`null` on a maker execution record** — a fill does not carry it |
+| `orders[*].reduce_only` | bool | Whether the order was submitted reduce-only. **`false` on a maker execution record, whatever the order carried** — a fill does not carry it |
+| `orders[*].cloid` | string \| null | Client order id. `null` when the order carried none, **and on every maker execution record even when the order carried one** |
 | `orders[*].cancel_reason` | string \| null | Why the order was cancelled. `null` when it was not |
 | `orders[*].error` | string \| null | The rejection message. **Non-null only when `status` is `"error"`** |
 | `orders[*].hash` | string | **Always the empty string `""`.** This read records no transaction hash. Never key on it |
@@ -2096,6 +2224,68 @@ rejected — see [malformed requests](#malformed-request).
   `"error"` record carries `oid: "0"`, so an account with many rejections holds
   many records sharing that single id. Key on `oid` plus `time` plus `status`,
   or do not key at all.
+- **Maker execution records.** A resting order that is HIT sends no action, so
+  the node derives its record from the block's fills. **A fill describes the
+  fill, not the order.** Four fields are therefore missing from it: `tif` and
+  `cloid` read `null`, `reduce_only` reads `false`, and `orig_sz` reads `"0"` —
+  whatever the order carried. Join to that order's own `resting` record on the
+  same `oid` for the real values.
+  **A `resting` record exists only for an order that a signed
+  [`order`](./exchange.md#submit_order), `batch_order`, `scale_order`,
+  `spot_order` or `chase_order` placed**, so for two groups of order the join
+  has no target.
+  The first group is the two the node rests by itself:
+  a [chase](../../concepts/order-types.md) leg after a reprice — a reprice
+  cancels the leg and rests a NEW `oid` — and a TP/SL trigger leg that fired as
+  a limit order. A chase's FIRST leg is not in this group: `chase_order` is a
+  signed action and its opening leg does get a `resting` record. Only the legs
+  a reprice rests are missing one. For these two orders, recover what you can and treat the rest
+  as gone. While the order still rests, [`open_orders`](#open_orders) carries
+  its real `tif` (lowercase on that read) and its real `cloid` under the same
+  `oid`, and it is where the new `oid` of a repriced chase leg appears.
+  **`reduce_only` is NOT recoverable from that read**: it is a constant there,
+  `false` on every book row, whatever the order carried. **`orig_sz` is not
+  recoverable anywhere**: that read serves `null` for it, and no action ever
+  submitted a request size for the leg. Once the order leaves the book, `tif`
+  and `cloid` go too. Only the two values fixed by construction survive: a chase
+  leg is always `"Alo"` and never reduce-only; a fired trigger leg is always
+  `"Gtc"` and always reduce-only, so `reduce_only: false` is wrong on exactly
+  that record — and `open_orders` repeats that same wrong `false` while the leg
+  rests.
+  **The second group is any order an
+  [unrecorded-fill lane](#unrecorded-fills) rested.** A `modify`, a CoreWriter
+  `LimitOrder` and a `multi_sig` envelope each rest an order with no `resting`
+  record. That order is an ordinary resting order after that, so an ordinary
+  taker DOES give it a maker execution record later — and that record has
+  nothing to join to. Its `tif`, `cloid`,
+  `reduce_only` and `orig_sz` stay missing for the whole life of the order.
+  **The record reports what executed IN THAT BLOCK, and `"filled"` is not a
+  terminal flag.** A maker hit in three blocks yields three `filled` records,
+  and the order can still rest after all three. For the lifetime executed size
+  read [`user_fills`](#user_fills); do not read the newest record's `total_sz`
+  as cumulative.
+  The node sums every match against one `oid` inside one block into ONE record,
+  so `(oid, time, status)` stays unique within a block. **EDGE:** consensus time
+  never moves backward, so two adjacent blocks can carry the same `time`. Two
+  maker execution records for one `oid` then share the key. They are two
+  separate executions: add them, never drop one.
+- **Some order lanes record no transition here at all** — the
+  [unrecorded fills](#unrecorded-fills).
+  A [`multi_sig`](../../concepts/multi-sig.md) envelope is the committed action
+  and reports only its own outcome, so an inner `order`, `spot_order`,
+  `batch_order`, `scale_order`, `modify` or `batch_modify` produces no
+  `resting`, no `filled` and no `error` record.
+  A [`modify`](./exchange.md#modify) or
+  [`batch_modify`](./exchange.md#batch_modify) sent on its own records no
+  transition either — not the fill, and not the replacement's rest. **The
+  replacement's new `oid` appears only on [`open_orders`](#open_orders)**, so
+  poll that read after an amend if you track order ids.
+  A CoreWriter `LimitOrder` records nothing here.
+  A [frequent batch auction](../../concepts/fba.md) clearing records nothing
+  here for either side.
+  None of them writes a [`user_fills`](#user_fills) entry, and the maker each
+  one hits gets no maker execution record. So a missing maker record is not
+  proof that the order was not hit.
 - **`"error"` is a real status, and it carries a human-readable `error`
   string.** An order rejected at commit time is recorded here, not dropped. The
   message is prose for a human and can change in any release — do not match on
@@ -2113,8 +2303,11 @@ rejected — see [malformed requests](#malformed-request).
 ### Commit-time verdict on a submitted action {#action_outcome}
 
 :::danger[Removed]
-**`action_outcome` no longer exists.** The node answers it with
-`unknown info type`, the same error a type that never existed gets.
+**`action_outcome` no longer exists.** The public gateway answers `410` with
+`error.code: "UNKNOWN_TYPE"` and `details.use: "/exchange"`. A node called
+directly answers `400` with the same code and no `details` — the same error a
+type that never existed gets. **Match on the code, not on the status**: the two
+entry points disagree on the status and agree on the code.
 
 There is nothing to migrate to, because the answer already arrives earlier.
 `POST /exchange` waits for the commit and returns the real outcome: an order
@@ -2726,16 +2919,22 @@ a wrong choice is silent. For the release a removal landed in, see
 The status splits the two kinds of removal:
 
 - **`400`** — the name never named a read on this API, or its answer is gone.
-- **`410`** — the name was public and its answer MOVED. Eight names get this:
-  `account_overview`, `bridge_chain_configs`, `bridge_user_outbox`,
-  `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state` and
-  `pm_summary`. The error carries `details.use`, naming the read to call
-  instead, so a client can follow the move without reading this table.
+- **`410`** — the name was public and its answer MOVED. Ten names get this:
+  `account_overview`, `action_outcome`, `bridge_chain_configs`,
+  `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`,
+  `gov_history`, `gov_proposals`, `gov_state` and `pm_summary`. The error
+  carries `details.use`, naming the read to call instead, so a client can
+  follow the move without reading this table.
+
+**`details.use` does not always name another `/info` type.** `action_outcome`
+and `encode_action` both answer `"use": "/exchange"`, which is an ENDPOINT.
+Read the value as prose for a human, not as a type you can post back.
 
 | Removed | Call this instead |
 |---|---|
 | `abstraction_state` | Nothing. Its `kind` / `value` pair was per-kind free-form, so a value had no wire-defined meaning |
 | `account_overview`, `web_data` | [`account_state`](#account_state) with `detail: "overview"` — the same body |
+| `action_outcome` | [`POST /exchange`](./exchange.md) — the submit call already waits for the commit and returns the verdict. See [the section above](#action_outcome) |
 | `agents` | [`account_state`](#account_state) with `detail: "overview"` — `agents` |
 | `block_info` | [`account_state`](#account_state) for the committed `height` / `time` stamp; the archive-backed `recent_blocks` read for the block head. (The `explorer_block` WS channel that used to answer this is [removed](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed) — a validator must not serve a per-block firehose) |
 | `bridge_chain_configs` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) — `withdrawals_halted` and `configs` |
