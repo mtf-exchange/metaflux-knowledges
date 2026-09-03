@@ -25,7 +25,7 @@ MetaFlux reserves a small set of **well-known addresses** with special protocol 
 | `0x7777777777777777777777777777777777777777` | Treasury | Protocol treasury — holds the treasury fee share and buyback MTF; the mint / burn point for supply changes | Protocol |
 | `0x8888888888888888888888888888888888888888` | Assistance fund | Holds collected fee USDC destined for buyback and executes the on-market MTF buy | Protocol |
 | `0x000000000000000000000000000000000000dead` | Burn | Reserved, provably-unspendable sink | Nobody — spends **from** it are always rejected |
-| `0x0000000000000000000000000000000000005b07` | Spot backstop | Custody sink for base bought off a starved book by the forced spot-margin liquidation waterfall | Nobody — a keyless reserved address |
+| `0x0000000000000000000000000000000000005b07` | Spot backstop | Custody sink for collateral the protocol takes in on a liquidation: base bought off a starved book, and portfolio-margin collateral seized to cover a USDC deficit | Nobody — a keyless reserved address |
 
 All hex is shown in canonical lowercase, `0x`-prefixed, 40 characters — the exact form an explorer displays.
 
@@ -79,13 +79,33 @@ It is **reserved, not yet active.** Today, supply is reduced by **decreasing the
 
 ### Spot backstop — `0x0000…5b07` {#spot-backstop--0x00005b07}
 
-Custody sink for the forced spot-margin liquidation waterfall. When the book is
-too thin to absorb a forced close, the insurance fund buys the base and parks it
-here as an ordinary token balance.
+Custody sink for collateral the protocol takes in when it settles a liquidation.
+Two paths park tokens here, both as ordinary token balances:
+
+- **The forced spot-margin liquidation waterfall.** When the book is too thin to
+  absorb a forced close, the insurance fund buys the base and parks it here.
+- **A portfolio-margin collateral seizure.** When a PM account ends a liquidation
+  in a USDC deficit and holds eligible non-USDC collateral, the protocol takes
+  that collateral at its haircut-valued mark and settles that much of the USDC
+  debt. The seized units land here.
+
+So a balance at this address is not one product's residue. Read it as "collateral
+the protocol now holds and has not yet disposed of".
+
+It is NOT the treasury. The treasury also holds unissued MTF supply, and a
+supply-cut vote burns from that row — so collateral standing behind a settled
+debt must not sit there.
 
 Keyless, and provably so: landing on this fixed image of eighteen zero bytes
 followed by `0x5b07` would take a `2^160` preimage search, so no signer can ever
 act as it.
+
+:::warning Live behaviour today
+The portfolio-margin seizure path is NOT live. It needs a governance vote that
+sets a collateral haircut, and no such vote has ever been enacted on either
+running chain (measured 2026-09-03 over the full archive). Until it is, only the
+spot-margin waterfall credits this address.
+:::
 
 ## Two categories {#two-categories}
 
