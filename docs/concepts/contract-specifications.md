@@ -241,6 +241,16 @@ to move funding.
 sub-tick precision. Submit order `limit_px` on the order-book plane and order `size`
 as a multiple of `step_size`, at or above `min_order`.
 
+:::warning
+**`sz_decimals` is per-market, and it can CHANGE. Read it; never hard-code it.**
+A perp reads `0` — whole units only, so `step_size` is one whole coin — until a
+governance listing vote gives that market a precision. Several live perps read
+`0` today for exactly that reason, and the vote that fixes one moves its
+`step_size` by orders of magnitude. A client that cached `sz_decimals` then sizes
+every order on that market wrong. Re-read it from `markets_meta` rather than
+storing it.
+:::
+
 ## Order & position limits {#order--position-limits}
 
 MetaFlux bounds risk by **open interest and the margin gate**, rather than a fixed

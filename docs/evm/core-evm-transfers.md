@@ -76,12 +76,38 @@ Two assets cross without a bound ERC-20 row: **USDC**, which is the fixed
 FiatToken predeploy, and the **native gas token**, which is the EVM balance
 itself rather than a contract.
 
+:::info
+**A binding is permanent.** ⚠️ **Corrected — an earlier version of this page said
+the bound address rotates. It does not.** The binding vote is first-write-wins:
+it refuses an asset that already has a binding, and refuses a contract already
+bound to another asset. Nothing removes one. Read the address from
+`markets_meta` anyway, because a token can gain its FIRST binding at any time, and
+key your own records on the asset id.
+:::
+
+### What the binding vote decides, and what it does not {#binding-vote}
+
+Binding a token to an ERC-20 is a **⅔-stake validator vote**
+(`FinalizeEvmContract`, [CoreWriter action 8](interacting-with-core.md#actions)).
+Every validator must submit a byte-equal proposal for it to tally.
+
+The proposal fixes the asset, the `variant` and the contract. It does **not** set
+the token's decimals: a credit lands in the token's own `wei_decimals`, chosen
+once at [`spot_register_token`](../api/rest/exchange.md#spot_register_token) and
+never changed after. So the SIZE of every credit on this lane is decided at
+registration, and the binding only decides where the credit goes.
+
 :::warning
-**The bound address ROTATES — read it, never freeze it.** A validator-quorum
-vote can re-bind a token to a different contract. An address copied into your
-config, your source, or your own documentation then points at a contract the
-chain no longer credits. Ask `markets_meta` on each use, and key your own
-records on the asset id, which does not move.
+**`wei_decimals` on the binding vote — NOT LIVE YET.** Today the proposal carries
+no decimals field, so a validator voting on a binding cannot see the scale it is
+blessing without reading the token registry separately. An upcoming release adds
+the bound token's `wei_decimals` to the proposal, and pairs it with a `1`–`18`
+bound at registration (see the
+[register-token notice](../api/rest/exchange.md#spot_register_token)). It becomes
+part of the tallied payload, so validators that send different values will not
+tally together. Until that release ships, read
+[`spot_meta`](../api/rest/info/spot.md#spot_meta) for the value before voting on
+a binding.
 :::
 
 Offer the transfer only for the assets that resolve. An asset the chain cannot

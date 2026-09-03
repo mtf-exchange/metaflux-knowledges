@@ -65,6 +65,14 @@ Devnet/testnet only — the route is **never mounted on mainnet** (`chainId 8964
 The grant is **`"queued"`** — staged for the next block, so the balance updates
 after ~1 block, not synchronously. Full contract: [`POST /faucet`](api/rest/faucet.md).
 
+:::warning
+**`"queued"` is not a credit.** The faucet transfers out of a reserve account
+rather than creating tokens, and the claim is checked again when the block
+applies it. **The reserve is empty on the live chain**, so every claim currently
+returns `200 queued` and credits nothing. Confirm with `account_state`, and see
+[the reserve](api/rest/faucet.md#reserve).
+:::
+
 ```bash
 curl -X POST https://api.devnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \

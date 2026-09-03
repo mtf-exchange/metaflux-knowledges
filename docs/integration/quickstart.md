@@ -46,6 +46,14 @@ rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
 *downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
+:::warning
+**Check the balance; do not trust `"queued"`.** The faucet transfers out of a
+reserve account, and the claim is re-checked when the block applies it. **The
+reserve is empty on the live chain today**, so the claim above returns
+`200 queued` and credits nothing until governance funds it. If no balance
+appears, that is why — see [the reserve](../api/rest/faucet.md#reserve).
+:::
+
 > The faucet is a **devnet/testnet convenience only**. To fund a real account
 > with bridged USDC, deposit through the MetaBridge custody bridge — call the
 > source chain's `deposit(mtfDest, amount)` (never a plain transfer to the

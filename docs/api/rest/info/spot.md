@@ -124,7 +124,7 @@ answer, not as an error.
 | `tokens[*].token_id` | hex string (32 bytes) | Canonical token id, `0x`-hex |
 | `tokens[*].system_address` | hex address | Core-side anchor address |
 | `tokens[*].evm_contract` | object \| null | EVM binding; `null` when the token binds nothing |
-| `tokens[*].evm_contract.address` | hex address | The ERC-20 the asset is bound to. It ROTATES — see Rules |
+| `tokens[*].evm_contract.address` | hex address | The ERC-20 the asset is bound to. Permanent once written — see Rules |
 | `tokens[*].evm_contract.variant` | uint8 | How the token is bound: `0` a deployed contract, `1` first-storage-slot, `2` custom-storage-slot. It does not change whether the asset can cross |
 | `tokens[*].evm_contract.evm_extra_wei_decimals` | int8 | The deployer's declared decimal offset. It has no effect on a credit — see Rules |
 | `tokens[*].is_canonical` | bool | Canonical (genesis / governance-listed) token |
@@ -143,12 +143,17 @@ answer, not as an error.
 - `evm_extra_wei_decimals` is the deployer's declared value. It has no effect
   on a credit — **a credit lands in the token's `wei_decimals`**, the sibling
   field.
-- **The address in `evm_contract.address` ROTATES.** Read it on each use;
-  never copy it into config or prose. A validator-quorum vote can re-bind a
-  token to a different contract. An address you froze then names a contract
-  the chain no longer credits, and a transfer against it fails silently — the
-  burn succeeds and nothing arrives. Key your own records on `tokens[*].id`,
-  which does not move.
+- **A binding is first-write-wins and PERMANENT.** ⚠️ **Corrected — an earlier
+  version of this page said the address rotates. It does not.** The binding vote
+  refuses an asset that already has a binding, and refuses a contract already
+  bound to another asset. Nothing removes a binding. So an address you read here
+  stays valid for that asset. Still read it rather than hard-coding it: a token
+  can gain its FIRST binding at any time, and `null` today is not `null`
+  tomorrow. Key your own records on `tokens[*].id`.
+- **The credit scale is the token's `wei_decimals`, not the contract's.** A
+  binding does not carry a decimals value of its own, and it cannot change the
+  one the token was registered with. Read `tokens[*].wei_decimals` to size a
+  transfer.
 
 ### Every spot-margin position for an account {#spot_margin_state}
 

@@ -45,7 +45,9 @@ The **oracle price feeder**. The protocol's oracle updates — the per-block ref
 
 ### Faucet — `0x5555…5555` {#faucet--0x55555555}
 
-The **test-network faucet**. On testnet and devnet, the faucet credits test accounts with play balances so integrators can exercise the API without real funds. It is keyless and protocol-operated. **On mainnet the faucet does not dispense** — there is no free mint of real assets.
+The **test-network faucet**. On testnet and devnet it funds test accounts so integrators can exercise the API without real funds. It is keyless and protocol-operated. **On mainnet the faucet does not dispense** — there is no free mint of real assets.
+
+This address is also the faucet's **reserve**: a claim TRANSFERS out of the balance held here, and creates nothing. The address is keyless, so the reserve accepts a pre-fund but no signer can spend it. An empty reserve refuses every claim — read its `account_state` to see whether the faucet can pay. See [`POST /faucet`](../api/rest/faucet.md#reserve).
 
 ### Treasury — `0x7777…7777` {#treasury--0x77777777}
 

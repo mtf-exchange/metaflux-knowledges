@@ -1959,21 +1959,30 @@ record only — it has no trading pair and no supply yet. Charges the
 |-------|------|----------------|-------------|
 | `symbol` | string | non-empty, ≤ 32 chars, not already in use | Token symbol. Checked against every existing spot **and** perp symbol |
 | `sz_decimals` | uint8 | `0`–`6` | Display / size precision. A value above `6` is rejected |
-| `wei_decimals` | uint8 | `0`–`18` today; **`1`–`18` from the next release** | Native token decimals. See the warning below |
+| `wei_decimals` | uint8 | `1`–`255` today; **`1`–`18` from the next release** | Native token decimals. See the two notices below |
 | `max_deploy_fee` | decimal string | `≥ 0` | Highest deploy fee you accept, in whole USDC. Sent as a JSON string |
 
+:::info
+**`wei_decimals = 0` is now rejected. LIVE.** A token registered with `0` is
+lossy the moment governance binds an EVM contract to it: the Core-to-EVM path
+then divides by `10^8` and destroys any balance below one whole token. Admission
+refuses `0` outright — it is not clamped, because you signed the declared
+precision. This reject cannot repair a token registered with `0` before it landed.
+:::
+
 :::warning
-**Set `wei_decimals` to at least 1.** A token registered with `wei_decimals = 0`
-is accepted today, and it becomes lossy the moment governance binds an EVM
-contract to it: the Core-to-EVM path then divides by `10^8` and **destroys any
-balance below one whole token**. The next release rejects `0` at admission, but
-that reject cannot repair a token already registered with `0`. Treat `0` as
-invalid now.
+**An upper bound of `18` is coming. NOT LIVE YET.** Today admission enforces only
+the `≥ 1` floor, so a `wei_decimals` above `18` is accepted and stored. Do not
+use one. `wei_decimals` sets the scale of every credit on the
+[Core-to-EVM lane](../../evm/core-evm-transfers.md), and no real ERC-20 exceeds
+`18`; a value above it has no valid use and a later release will refuse it at
+admission. A token already registered above `18` is not repaired by that release.
+Register in `1`–`18`.
 :::
 
 **Gating.** Rejected if `symbol` is empty, longer than 32 characters, or already
 used by a spot token, spot pair or perp market; if `sz_decimals` exceeds `6`; if
-`wei_decimals` exceeds `18`; if `max_deploy_fee` is negative; if the current ask
+`wei_decimals` is `0`; if `max_deploy_fee` is negative; if the current ask
 exceeds `max_deploy_fee`; if your free collateral is below the ask; or if
 governance has closed the lane. The fee comes out of **free** collateral, so an
 account whose value is committed to open positions is refused even when its total
