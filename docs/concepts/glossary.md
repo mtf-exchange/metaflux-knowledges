@@ -28,7 +28,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **bps — Basis point.** 0.01% (= `1e-4`). Fee rates are denominated in bps; `5 bps` = 0.05%.
 
-**Broker credit.** Extra fee charged on top of the taker fee and paid to the address that originated an order (front-end, aggregator, automation service). See [fees](./fees.md#builder-credit) and [broker codes](./broker-codes.md).
+**Broker credit.** Extra fee charged on top of the taker fee and paid to the address that originated an order (front-end, aggregator, automation service). See [fees](./fees.md#broker-credit) and [broker codes](./broker-codes.md).
 
 ## C {#c}
 
@@ -108,7 +108,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **Action JSON.** An action goes on the wire as JSON. The signature covers the EIP-712 typed-data digest of the action, not the JSON bytes. The JSON bytes are hashed separately for the `action_hash` correlation key. See [signing](../integration/signing.md).
 
-**MTF.** The MetaFlux protocol token. Used for staking, governance, fee burns.
+**MTF.** The MetaFlux protocol token. Used for gas, staking, governance, and the fee buyback.
 
 **Multi-sig.** M-of-N signature requirement for an account. See [multi-sig](./multi-sig.md).
 

@@ -242,7 +242,7 @@ that is **paid, not credited**, skips the referrer step entirely and joins this
 same 70/20/10 split at its full amount — see
 [Referrer credit](#referrer-credit): the maker fee carries no referrer carve.
 
-## Broker credit {#builder-credit}
+## Broker credit {#broker-credit}
 
 An order-flow originator can charge its own fee. It sets a broker address on the
 order. The charge is **additive**: the taker pays it on top of the base taker
@@ -296,8 +296,7 @@ separate claims. Read the referrer balance with
 [`claim_referral_rewards`](../api/rest/exchange.md#claim_referral_rewards); read
 the broker balance with [`builder_state`](../api/rest/info.md#builder_state) and
 claim it with
-[`claim_broker_rewards`](../api/rest/exchange.md#claim_builder_rewards) (the
-older name `claim_builder_rewards` still decodes).
+[`claim_broker_rewards`](../api/rest/exchange.md#claim_builder_rewards).
 Neither claim action reports an amount, so read the balance first.
 
 ## Where fees go {#where-fees-go}
@@ -348,7 +347,12 @@ flowchart TD
    rate that scales with trading volume. (The token's headline total supply is a
    separate figure and is not changed by the buyback.)
 5. **Validators reward their stakers from the ~20% validator share.** The staker
-   dividend is funded from the validator fee share, not from the bought-back MTF.
+   dividend is funded from the validator fee share, not from the bought-back MTF:
+   the validator pool accrues in the fill currency and periodically buys its own
+   MTF on the book, which is what gets distributed (see
+   [Staking](./staking.md#reward-sources)). It goes only to delegators locked for
+   **≥ 1 month**; flexible (no-lock) stakers keep their fee discount but take no
+   part in this share.
 
 Cumulative pool totals (MTF bought back and locked out of circulation, validator
 pool, treasury) are tracked in committed state. **No read serves them** — see
@@ -624,8 +628,9 @@ at each fill event.
 **Q: Are fees paid in USDC or in MTF?**
 A: You pay in the fill currency (USDC for perps; the pair's quote token for spot). The
 protocol splits that fee revenue ~70/20/10; the ~70% buyback share buys MTF on the
-open market and locks it out of circulation, while the validator and treasury
-shares stay in the fill currency.
+open market and locks it out of circulation; the validator share accrues in the
+fill currency and is converted to MTF before it is paid to stakers; the treasury
+share stays in the fill currency.
 
 **Q: Is there a min-fee floor?**
 A: No floor. A tiny fill computes a sub-cent fee, and the wire carries that
@@ -639,11 +644,12 @@ slice fees.
 
 **Q: Can the broker credit be zero?**
 A: Yes. If you don't set a broker on an order, no credit is allocated; the full
-protocol share flows into the buyback-and-distribute pipeline.
+protocol share flows into the buyback-and-lock pipeline.
 
 **Q: How do stakers earn from fees?**
-A: Through the validator share. After buyback, 20% of the bought-back MTF goes to
-validators, who distribute it to their stakers — so staking (or delegating) earns
-you a slice of fee revenue. See [Staking](./staking.md).
+A: Through the validator share. 20% of net fee revenue accrues to the validator
+pool, is converted to MTF on the book, and is passed to locked (≥ 1-month)
+stakers — so delegating with a lock earns you a slice of fee revenue, paid in
+MTF. See [Staking](./staking.md#reward-sources).
 
 </details>

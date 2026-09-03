@@ -123,7 +123,7 @@ to claim, even though fee revenue is USDC-denominated at the source:
 | Fee revenue — validator share of the buyback | The accrued USDC validator-fee pool periodically buys MTF on-book (batched behind a governance-tunable minimum pool size and a time throttle, not every block); the acquired MTF is what gets split below | `commission_bps` to the validator, the rest pro-rata by (delegation amount × lock multiplier) across delegators + the validator's own self-stake |
 | Bootstrap rewards (treasury-funded, early phase) | Begin-block emission from the treasury bootstrap budget — **never new issuance** | `stake_share × (1 - validator_commission)`, per the [APR curve](#apr-estimation) |
 
-Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), bought-back MTF splits **70% burn / 20% validators / 10% treasury**, and the validator 20% funds this path.
+Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), net fee revenue splits **70% buyback-and-lock / 20% validators / 10% treasury**, and the validator 20% funds this path.
 `validator_commission` (`commission_bps`): per-validator, in `validator_summaries`, capped by governance.
 
 ## Lock and unbonding {#lock-and-unbonding}
@@ -289,6 +289,6 @@ A: No, and you cannot delegate one for this: every staking action (`c_deposit`, 
 A: No — there is no redelegate action. Once you undelegate, the stake serves the full unbonding window before it is free; only then can you delegate it elsewhere.
 
 **Q: Where do staking rewards come from?**
-A: Fee revenue is the ongoing source: validators receive the **20% validator share** of the [fee buyback](./fees.md) (70% burn / 20% validators / 10% treasury) and distribute it to their stakers minus commission. Early on, a finite treasury-funded bootstrap budget tops this up. The protocol **never mints new MTF for rewards** — the only supply lever is the annual population re-peg ([tokenomics](./tokenomics.md)).
+A: Fee revenue is the ongoing source: validators receive the **20% validator share** of the [fee buyback](./fees.md) (70% buyback-and-lock / 20% validators / 10% treasury) and distribute it to their stakers minus commission. Early on, a finite treasury-funded bootstrap budget tops this up. The protocol **never mints new MTF** — total supply is fixed ([tokenomics](./tokenomics.md)).
 
 </details>

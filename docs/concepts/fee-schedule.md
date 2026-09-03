@@ -6,7 +6,7 @@ description: The MetaFlux perpetual fee schedule — volume fee tiers, maker reb
 
 :::info
 **Rate card.** This page is the user-facing schedule of perpetual trading rates.
-For the underlying mechanics — how a fee is split, the buyback-and-distribute
+For the underlying mechanics — how a fee is split, the buyback-and-lock
 flow, and the referrer and broker credits — see [Fees](./fees.md). Tier values
 are network parameters and can be updated by governance.
 :::
@@ -24,7 +24,7 @@ that stack**:
 3. **Staking discount tiers** — a percentage discount applied to your **taker rate
    only**, set by how much MTF you have staked.
 
-All three are evaluated continuously and apply together. Referral and builder-code
+All three are evaluated continuously and apply together. Referral and broker-code
 credits apply separately, on top.
 
 ## 1. Fee tiers (volume) {#1-fee-tiers-volume}
@@ -64,48 +64,47 @@ This rebate applies to the **maker rate only**. It does not affect your taker ra
 
 Staking MTF earns a **percentage discount on your taker rate**. The discount is
 applied to the taker rate only — it never reduces your maker rate. The ladder is a
-**ten-rung administrative grade** evaluated on your **time-weighted effective
+**ten-tier ladder** evaluated on your **time-weighted effective
 weight** (not raw token count — see [Staking](./staking.md) for the multiplier).
 
-| Grade | Effective weight | Taker discount | Slot cap |
+| Tier | Effective weight | Taker discount | Slot cap |
 |-------|-----------------:|---------------:|----------|
-| Section Chief (Township Head)        | `> 100`        | 5%  | uncapped |
-| Deputy Section Chief                  | `> 500`        | 8%  | uncapped |
-| Division Chief (County Chief)         | `> 2,000`      | 12% | uncapped |
-| Deputy Division Chief                 | `> 8,000`      | 15% | uncapped |
-| Director-General (Mayor)              | `> 30,000`     | 20% | uncapped |
-| Deputy Director-General               | `> 100,000`    | 25% | uncapped |
-| Minister (Governor)                   | `> 500,000`    | 32% | uncapped |
-| Vice Minister (Vice Governor)         | `> 1,500,000`  | 35% | uncapped |
-| State Councilor / Vice Premier        | `> 5,000,000`  | 40% | uncapped |
-| Premier / President / General Secretary | `> 10,000,000` **and ranked #1 by weight** | 50% | **1 seat** |
+| Tier 1 | `> 100`        | 5%  | uncapped |
+| Tier 2 | `> 500`        | 8%  | uncapped |
+| Tier 3 | `> 2,000`      | 12% | uncapped |
+| Tier 4 | `> 8,000`      | 15% | uncapped |
+| Tier 5 | `> 30,000`     | 20% | uncapped |
+| Tier 6 | `> 100,000`    | 25% | uncapped |
+| Tier 7 | `> 500,000`    | 32% | uncapped |
+| Tier 8 | `> 1,500,000`  | 35% | uncapped |
+| Tier 9 | `> 5,000,000`  | 40% | uncapped |
+| Tier 10 | `> 10,000,000` **and ranked #1 by weight** | 50% | **1 seat** |
 
 Discounts climb monotonically from **5% to 50%**, thresholds from **100 to
 10,000,000**.
 
-### Two tracks: uncapped grades vs the single capped seat {#two-tracks-uncapped-grades-vs-the-single-capped-seat}
+### Two tracks: uncapped tiers vs the single capped seat {#two-tracks-uncapped-grades-vs-the-single-capped-seat}
 
 The ladder runs on **two tracks**:
 
-- **Threshold grades (uncapped).** Every grade except the single top grade is a
-  pure threshold: clear the effective-weight bar and you hold the grade, with no
-  limit on how many accounts can. The **Deputy** grades and **Minister (Governor)**
-  are all pure-threshold and uncapped.
-- **Competitive seat (capped).** Only the top grade is **capped and competitive** —
+- **Threshold tiers (uncapped).** Tier 1 through Tier 9 are pure thresholds:
+  clear the effective-weight bar and you hold the tier, with no limit on how
+  many accounts can.
+- **Competitive seat (capped).** Only Tier 10 is **capped and competitive** —
   you must both clear the threshold **and** rank high enough:
-  - **Premier / President / General Secretary** is the **single #1 account** by
-    effective weight among those over `10,000,000`. There is **1 seat**.
+  - **Tier 10** is the **single #1 account** by effective weight among those
+    over `10,000,000`. There is **1 seat**.
 
   The seat is awarded in **real time**: if the seated holder unstakes or their
   effective weight drops below a contender's, the seat **passes to the
   next-ranked qualifying account immediately**. An account that clears the
   `> 10,000,000` threshold but does not win the seat is held at the **highest
-  uncapped grade it qualifies for** (State Councilor / Vice Premier).
+  uncapped tier it qualifies for** (Tier 9).
 
 See [Staking](./staking.md) for how to stake MTF, and
 [Tokenomics](./tokenomics.md#time-weighted-staking-ve-style) for how effective
 weight is derived. **Flexible (no-lock) staking carries 0× weight** and therefore only ever
-reaches the **lowest grade** (Section Chief) and earns **no dividend** — the
+reaches the **lowest tier** (Tier 1) and earns **no dividend** — the
 deliberate market-maker lane.
 
 ## How the three combine {#how-the-three-combine}
@@ -136,8 +135,8 @@ A negative `effective_maker` is a rebate paid **to** you.
 
 ## Worked examples {#worked-examples}
 
-**A State Councilor / Vice Premier staker at the base volume tier.**
-Your effective weight clears `> 5,000,000` (State Councilor / Vice Premier, 40%
+**A Tier 9 staker at the base volume tier.**
+Your effective weight clears `> 5,000,000` (Tier 9, 40%
 taker discount) but your 30-day volume is under $5M (base fee tier: taker 0.0350%,
 maker 0.0100%).
 
@@ -161,7 +160,7 @@ on every maker fill. Your taker rate stays 0.0200% (less any staking discount).
 
 **Stacking all three.**
 Volume `≥ $100M` (taker 0.0250%, maker 0.0040%), maker share `≥ 1.5%` (rebate
-−0.0020%), and Director-General (Mayor) staking (20% taker discount):
+−0.0020%), and Tier 5 staking (20% taker discount):
 
 ```text
 effective_taker = 0.0250% × (1 − 0.20) = 0.0200%
@@ -172,16 +171,16 @@ You pay **0.0200% taker** and **0.0020% maker**.
 
 ## On top of the schedule {#on-top-of-the-schedule}
 
-Referral and builder-code credits apply **separately**, in addition to your
+Referral and broker-code credits apply **separately**, in addition to your
 effective rates above:
 
 - **Referral** — when you have a referrer set, a share of your taker fee is routed
   to them out of the protocol's take; it is not an extra charge to you.
-- **Builder codes** — an order-flow originator (front-end, aggregator) can claim a
+- **Broker codes** — an order-flow originator (front-end, aggregator) can claim a
   share when their address is set on the order.
 
 See [Fees](./fees.md) for the full mechanics — how credits are split and how
-collected fees fund the MTF buyback that is burned and distributed to stakers.
+collected fees fund the MTF buyback and the staker revenue-share.
 
 ## Edge cases {#edge-cases}
 
@@ -198,18 +197,17 @@ collected fees fund the MTF buyback that is burned and distributed to stakers.
   of taker fees collected on the same flow. The exchange never pays out more in
   maker rebates than it takes in.
 - **Staking discount, maker rate.** The staking discount applies to taker only. A
-  Premier / President / General Secretary staker still pays (or earns) the full
-  maker rate; only the taker side is discounted.
-- **The top grade is competitive.** Only the top grade (Premier / President /
-  General Secretary, 1 seat) is awarded by **rank**, not threshold alone. Clearing
-  the threshold is necessary but not sufficient — if the seat is taken you hold
-  the highest uncapped grade you qualify for until it frees up. The seat reassigns
-  in real time as effective weights move.
+  Tier 10 staker still pays (or earns) the full maker rate; only the taker side
+  is discounted.
+- **The top tier is competitive.** Only Tier 10 (1 seat) is awarded by **rank**,
+  not threshold alone. Clearing the threshold is necessary but not sufficient —
+  if the seat is taken you hold the highest uncapped tier you qualify for until
+  it frees up. The seat reassigns in real time as effective weights move.
 
 </details>
 
 ## See also {#see-also}
 
-- [Fees](./fees.md) — fee mechanics, buyback-and-distribute flow, referral and builder credits
+- [Fees](./fees.md) — fee mechanics, buyback-and-lock flow, referral and broker credits
 - [Staking](./staking.md) — stake MTF to unlock the taker discount tiers
 - [Spot trading](../products/spot.md) — spot fills carry their own per-pair rates
