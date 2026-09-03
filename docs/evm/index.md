@@ -25,9 +25,11 @@ directly into the L1 it settles against.
 - **Deterministic** — consensus-injected timestamps, no floats, parallel execution
   with a sequential-equivalent committed state.
 - **EIP-1559 base-fee burn** to a burn-address coinbase.
-- **State, not history** — the chain keeps account state and serves it at the
-  tip. It stores no past block bodies and no receipt archive, so the JSON-RPC
-  serves no historical read. See [State and history](execution-model.md#state-and-history).
+- **State plus receipts** — the chain keeps account state and serves it at the
+  tip. It stores no past block bodies. It does keep every receipt and log it
+  produces, in a durable **receipt store**, so `eth_getTransactionReceipt`,
+  `eth_getLogs` and `eth_getBlockReceipts` answer over the whole range that store
+  holds. See [Receipts and logs](#receipts-and-logs).
 
 ## Pages {#pages}
 
@@ -56,15 +58,18 @@ contracts live in the public
 :::warning
 **The RPC answers at the chain tip. It is not an archive node.**
 Several methods accept a block tag and ignore it, so a query for a past value
-returns today's value. Read [Method support](#method-support) and
-[What the node keeps](#what-the-node-keeps) before you write a client.
+returns today's value. Receipts and logs are the one durable exception — see
+[Receipts and logs](#receipts-and-logs). Read [Method support](#method-support)
+and [What the node keeps](#what-the-node-keeps) before you write a client.
 :::
 
 :::info Not live until the next release
-The two block reads and the `eth_call` block environment change in the next
-release, and so does the block header's `miner`. **The live chain still serves
-the old behaviour**: the block reads answer every request with the tip,
-`eth_call` runs against a placeholder environment, and `miner` reads all-zero.
+Four things change in the next release: the two block reads, the `eth_call`
+block environment, the block header's `miner`, and the whole of
+[Receipts and logs](#receipts-and-logs). **The live chain still serves the old
+behaviour**: the block reads answer every request with the tip, `eth_call` runs
+against a placeholder environment, `miner` reads all-zero, receipts live in
+memory and die with the process, and `eth_getBlockReceipts` is not a method.
 This page states the shipped target, and each affected row says what the live
 chain does today. See the
 [upgrade notice](../api/upgrade-notice-ids-and-shapes.md#evm-rpc).
@@ -89,9 +94,10 @@ hash that `eth_getBlockByHash` takes.
 | `eth_feeHistory` | range echoed | the shape is correct, the numbers are constants: `gasUsedRatio` is `0` and every `reward` is `0x0` |
 | `eth_getBlockByNumber` | **tip only** | a tag, or the tip's own number, returns the tip header; every other reference returns `null` — see [below](#the-block-reads-serve-the-tip-only) |
 | `eth_getBlockByHash` | **tip only** | only the tip's hash resolves; every other hash returns `null` |
-| `eth_getLogs` | **honoured** | `fromBlock` / `toBlock` scan the recorded receipts; a `blockHash` filter is refused with `-32602` |
+| `eth_getLogs` | **honoured** | `fromBlock` / `toBlock` scan the [receipt store](#receipts-and-logs). A range starting before the earliest block is refused with `-32001`, an oversized scan with `-32005`, a `blockHash` filter with `-32602` |
+| `eth_getBlockReceipts` | **honoured** | every receipt of one block, in `transactionIndex` order. A block before the earliest block is refused with `-32001` |
 | `eth_getTransactionByHash` | none | `null` for an unknown hash |
-| `eth_getTransactionReceipt` | none | `null` for an unknown hash |
+| `eth_getTransactionReceipt` | none | `null` means "not mined at or after the earliest block" — see [below](#null-is-not-never-existed) |
 | `eth_sendRawTransaction` | none | see [Transaction submission](#transaction-submission) |
 | `eth_sendTransaction` | none | refused with `-32000`: the node holds no user keys |
 | `eth_subscribe` · `eth_unsubscribe` | none | WebSocket only; over HTTP they return `-32000` |
@@ -100,8 +106,10 @@ Any other method returns JSON-RPC error `-32601`.
 
 **An ignored block tag is never an error.** The call succeeds and returns current
 data. A query for a past balance returns today's balance, with no signal that the
-tag did nothing. Do not read a historical value through this RPC. The two block
-reads are the exception: they refuse a reference they cannot serve.
+tag did nothing. Do not read a historical value through this RPC.
+
+The four **honoured** and **tip only** rows are the exception: they refuse a
+reference they cannot serve instead of answering with something else.
 
 #### The block reads serve the tip only {#the-block-reads-serve-the-tip-only}
 
@@ -188,46 +196,157 @@ surcharge, and the per-calldata-byte cost. It runs no execution and it does no
 binary search. A call that touches storage costs more than the estimate. Set your
 own gas limit for anything past a plain transfer.
 
+### Receipts and logs {#receipts-and-logs}
+
+:::warning Live behaviour today
+**On the live chain a receipt lives in memory only, and a release forgets it.**
+Every row in this section arrives with the next release. Until it lands, read a
+receipt promptly after you send the transaction, and keep the result yourself.
+:::
+
+Receipts are the one part of EVM history the chain keeps. Each node writes the
+receipt and the logs of every committed EVM transaction into a durable **receipt
+store** on disk. `eth_getTransactionReceipt`, `eth_getTransactionByHash`,
+`eth_getLogs` and `eth_getBlockReceipts` all answer from that store. A receipt
+survives a node restart, and it survives a release.
+
+The store sits outside the state commitment, so keeping it costs consensus
+nothing. Two nodes with different receipt retention still agree on state.
+
+#### The series starts when the feature ships {#no-backfill}
+
+**There is no backfill, and there will not be one.** No node holds the raw
+transactions of a past block, so no node can re-derive a receipt it did not
+write. The store's **earliest block** is the first EVM block the new binary
+executes. Every receipt from before that block is gone.
+
+Ask for a range that starts before the earliest block and the request fails:
+
+```json
+{
+  "jsonrpc": "2.0", "id": 1,
+  "error": {
+    "code": -32001,
+    "message": "history unavailable before block 0x2f1a3",
+    "data": { "earliestBlock": "0x2f1a3" }
+  }
+}
+```
+
+`eth_getLogs` and `eth_getBlockReceipts` both raise it.
+
+**The whole request fails. You never get a partial answer.** This is deliberate.
+A partial answer looks exactly like a complete one for the range you asked for,
+so the missing part is written into your own store as "nothing happened here"
+and nothing later corrects it. That is how an indexer corrupts itself silently.
+An error you must handle costs less than a gap you never find.
+
+Read `data.earliestBlock` and start your index at that block.
+
+#### `null` is not "never existed" {#null-is-not-never-existed}
+
+`eth_getTransactionReceipt` answers `null` for a hash it cannot find. On a node
+with a receipt store that `null` carries one exact meaning:
+
+> **The transaction was not mined at or after `earliestBlock`.**
+
+The store never deletes a lookup row. A transaction that landed at or after the
+earliest block therefore always resolves. So a `null` says one of two things: the
+transaction never landed, or it landed before the earliest block.
+
+**This is the row integrators get wrong.** Here is how each kind of caller
+separates the two:
+
+- **A poller** asks about a transaction it has just sent. That transaction is
+  always at or after the earliest block, so `null` means "not mined yet" and
+  nothing else. Keep polling.
+- **An indexer** walks the chain by range. It meets the earliest block as a
+  `-32001` from `eth_getLogs`, and that error names the block. Before that block
+  the indexer must not index at all. At or after it, a `null` is a true "never
+  existed".
+
+Do not guess from a bare `null`. Ask for the range and read the error.
+
+#### A range scan is bounded {#scan-bound}
+
+`eth_getLogs` reads the store row by row. There is no address index, so a wide
+range costs real work on a validator. The scan counts the rows it reads and
+stops at **100,000**:
+
+```json
+{
+  "jsonrpc": "2.0", "id": 1,
+  "error": {
+    "code": -32005,
+    "message": "log scan exceeded the row budget; narrow fromBlock/toBlock",
+    "data": { "maxRowsScanned": 100000 }
+  }
+}
+```
+
+Narrow `fromBlock` / `toBlock` and send the query again. Several narrow queries
+return the same logs as one wide query, because a committed block never reorgs.
+
+#### Log ordering changes {#log-ordering}
+
+A log now carries its real position in its block. **This changes what the live
+chain returns today.**
+
+| Field | Was | Is |
+|---|---|---|
+| `transactionIndex` | always `"0x0"`, on every log and every receipt | the transaction's real position in its block |
+| `logIndex` | counted per transaction, so it restarted at `0x0` on each receipt | counted per block, so it is unique inside the block |
+
+**Check any code that keys a log by `(blockNumber, logIndex)`.** Under the old
+behaviour two logs in one block could share that key, so a de-duplicating store
+dropped one of them. Under the new behaviour the key is unique, which is what
+every other EVM chain gives you.
+
+`eth_getLogs` returns logs in `(block, transactionIndex, logIndex)` order.
+
+#### A node without the store {#no-store-node}
+
+The receipt store is opt-in per node. A node that runs without it keeps a
+bounded in-memory window instead: recent receipts only, emptied by a restart.
+Such a node reports its own `earliestBlock` and refuses anything before it with
+the same `-32001`. The error shape does not change, so one client handles both.
+
 ### What the node keeps {#what-the-node-keeps}
 
 | Data | Kept? |
 |------|-------|
 | Account state — balances, nonces, contract code, contract storage | **Yes**, as committed state, readable at the tip |
+| Receipts and logs | **Yes**, on disk, from the [earliest block](#no-backfill) forward |
 | Block bodies — the transaction list of any block | **No** |
-| Receipts and logs | **In memory only**, recent and bounded |
 | Block hashes | **No** |
 
-A node keeps **state**, not **history**. State is what every node must agree on;
-a past block body is not. So no store sits behind a historical read, and the RPC
-cannot grow one by adding a method. This is a deliberate shape, not an outage.
+A node keeps **state** and **receipts**. It keeps no block bodies. State is what
+every node must agree on; a past block body is not, so nothing on the chain is
+obliged to carry it. Receipts are kept because a caller cannot work without
+them: a transaction that certainly landed must stay provable.
 
-**Receipts and logs are the one partial exception.** A node records the receipt
-and the logs of each committed EVM transaction in memory. `eth_getLogs`,
-`eth_getTransactionByHash` and `eth_getTransactionReceipt` answer from that
-record, and `eth_getLogs` honours `fromBlock` / `toBlock` over it. The record is
-bounded by count and it does not survive a node restart. Treat it as a live tail,
-never as an archive.
-
-That bound carries a trap: an emptied record and a genuine "nothing matched" both
-answer `[]`. You cannot tell them apart at the wire. Never read an empty result as
-proof that nothing happened.
+**The `[]` trap is gone.** An empty `eth_getLogs` result used to mean either "the
+record was emptied" or "nothing matched", and no caller could tell which. The
+store refuses a range it does not hold, so an empty array now means one thing:
+nothing matched.
 
 ### Where to get past data {#where-to-get-past-data}
 
-- **Record it yourself, as it arrives.** Subscribe to `newHeads` and `logs` over
-  the WebSocket and write what you need into your own store. This is the only
-  reliable source of EVM history, and it starts at the moment you connect.
-- **Read a receipt promptly.** After `eth_sendRawTransaction`, poll
-  `eth_getTransactionReceipt` and keep the result. Do not plan to fetch it later.
+- **Receipts and logs come from the RPC.** `eth_getLogs` and
+  `eth_getBlockReceipts` serve every block from the
+  [earliest block](#no-backfill) forward. You no longer have to mirror them.
+- **Block bodies have no source.** No node stores a transaction list, so no
+  method returns one. Subscribe to `newHeads` and record what you need as it
+  arrives.
 - **Core trading history comes from the native API**, not from the EVM RPC. Fills,
   orders, funding and closed positions are served by
   [`POST /info`](../api/rest/info.md) and by
   [position history](../api/rest/info/position-history.md).
 
 :::note
-Whether the chain persists EVM history is an open product decision. It is not a
-scheduled change, so do not design against it. This page states what the surface
-does today, and it is updated in the same batch as any change to that surface.
+**Receipt persistence is decided. Block-body persistence is not.** The chain
+keeps receipts and logs. It keeps no transaction lists and no block hashes, and
+that is not a scheduled change, so do not design against it.
 :::
 
 ### Batch requests {#batch-requests}
@@ -290,11 +409,12 @@ including the same placeholder fields — see
 [The block reads serve the tip only](#the-block-reads-serve-the-tip-only).
 
 Subscriptions are **forward-only** — they stream blocks committed *after* you
-subscribe. There is no historical backfill, and no other method backfills either:
-the EVM RPC serves no history at all, because nothing stores it (see
-[What the node keeps](#what-the-node-keeps)). Record what you need as it arrives.
-Because MetaFlux has single-slot BFT finality a committed block never reorgs, so
-streamed logs are never `removed` and `newHeads` never rewinds.
+subscribe, and no subscription backfills. For past logs call `eth_getLogs`, which
+serves them from the [earliest block](#no-backfill) forward. For past block
+bodies there is no source at all, because nothing stores them (see
+[What the node keeps](#what-the-node-keeps)). Because MetaFlux has single-slot
+BFT finality a committed block never reorgs, so streamed logs are never `removed`
+and `newHeads` never rewinds.
 
 > **`newPendingTransactions` = newly *committed* transactions, not a mempool feed.**
 > MetaFlux exposes no public pending mempool, so this channel emits the hashes of

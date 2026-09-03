@@ -1,5 +1,5 @@
 ---
-description: The next release turns every `oid` and `tid` on a response into a decimal-digit string, gives `order_status` all its fill legs and real terminal states, labels the token a fill's fee is charged in, puts margin and funding on one plane, rejects four inputs that used to pass, removes the two explorer WS channels, and stops the EVM RPC answering a non-tip block reference with the tip.
+description: The next release turns every `oid` and `tid` on a response into a decimal-digit string, gives `order_status` all its fill legs and real terminal states, labels the token a fill's fee is charged in, puts margin and funding on one plane, rejects four inputs that used to pass, removes the two explorer WS channels, makes EVM receipts and logs survive a restart, and stops the EVM RPC answering a non-tip block reference with the tip.
 ---
 
 # Upgrade notice — id strings and wire shapes
@@ -362,9 +362,50 @@ coverage envelope so the two are distinguishable.
 The [WS channel](ws/subscriptions.md#user_twap_slice_fills) of the same name is
 unchanged and remains the live path.
 
-## The EVM JSON-RPC stops answering the wrong block {#evm-rpc}
+## The EVM JSON-RPC keeps receipts, and stops answering the wrong block {#evm-rpc}
 
-Two rows. Both were measured, both are silent today.
+Three rows. All three were measured, and all three are silent today.
+
+### Receipts survive a restart, and a release {#evm-receipts-durable}
+
+**A receipt lives in memory today, so a release forgets it.** Every validator
+halts, swaps its binary and resumes, and the in-memory record starts empty.
+`eth_getTransactionReceipt` then answers `null` for a transaction that certainly
+landed, and an indexer cannot tell that answer apart from "never existed".
+
+**Each node now writes every receipt and every log to disk.** A restart keeps
+them, and so does a release. Three reads move with them:
+
+| Read | Was | Is |
+|---|---|---|
+| `eth_getTransactionReceipt` | `null` after any restart | resolves for every transaction at or after the earliest block the node holds |
+| `eth_getLogs` | `[]` for a range the memory record no longer held — the same answer a genuine no-match gives | the logs, or `-32001` naming the earliest block |
+| `eth_getBlockReceipts` | `-32601`; it was not a method | every receipt of one block, in `transactionIndex` order |
+
+Two JSON-RPC errors arrive with them. Both carry a **`data`** member, which no
+error on this RPC carried before:
+
+| Code | When | `data` |
+|---|---|---|
+| `-32001` | the range starts before the earliest block the node holds | `{"earliestBlock":"0x…"}` |
+| `-32005` | the scan reads more rows than the budget allows | `{"maxRowsScanned":100000}` |
+
+**A `-32001` fails the WHOLE request.** No partial answer is returned. A partial
+answer looks exactly like a complete one, so the missing part becomes a silent
+gap in the caller's own store.
+
+**There is no backfill.** No node holds the raw transactions of a past block, so
+no node can re-derive a receipt it did not write. The series starts at the first
+block the new binary executes, and nothing before it comes back.
+
+**`transactionIndex` and `logIndex` become real.** Every log and every receipt
+reported `transactionIndex: "0x0"`, and `logIndex` restarted at `0x0` on each
+receipt, so two logs in one block could share `(blockNumber, logIndex)`. Both
+now carry the true position, and that pair is unique inside a block. Check any
+de-duplicating store keyed on it.
+
+Full rules, error bodies and the `null` contract:
+[Receipts and logs](../evm/index.md#receipts-and-logs).
 
 ### A non-tip block reference answers `null` {#evm-block-null}
 
@@ -413,7 +454,8 @@ nothing.
 ## What does NOT change {#no-change}
 
 - No signing domain moves. No signed action payload changes shape.
-- No endpoint changes availability, other than the two removed WS channels.
+- No `/info` or `/exchange` type changes availability. The two removed WS
+  channels and the added `eth_getBlockReceipts` are the only availability moves.
 - No consensus rule changes, so no fork gate and no behaviour boundary at a
   height. Every row above takes effect when the binary swaps.
 - Prices, sizes and money stay decimal strings on the same planes.
