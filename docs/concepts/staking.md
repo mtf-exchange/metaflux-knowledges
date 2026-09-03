@@ -79,10 +79,20 @@ One action handles both directions via `is_undelegate`:
 `lock_months` is one of `0` (flexible), `1`, `6`, `24` — ignored on undelegate.
 A locked tier (`> 0`) is only admitted for a governance-allowlisted validator,
 and re-locks the row's maturity on every top-up (so a top-up never shortens
-an in-flight lock). A **locked** row cannot start unbonding until its own
+an in-flight lock). **A row holds ONE tier.** Topping up an existing delegation
+with a different `lock_months` is refused; undelegate the row first, or use a
+second validator. A **locked** row cannot start unbonding until its own
 lock matures; a **flexible** row (`lock_months: 0`) can undelegate any time.
 Delegating funds from the free pool credited by [`c_deposit`](#c_deposit--c_withdraw)
 — an under-funded pool rejects cleanly, no partial state change.
+
+**An EVM contract can delegate too, and it picks a tier the same way.**
+[CoreWriter](../evm/interacting-with-core.md#action-3-lock-tier) action 3 carries
+`lockMonths` as an optional fourth word, and the tier rules above apply
+unchanged. A three-word call omits it and lands on tier `0`, which earns no
+revenue share. A CoreWriter refusal is silent — the EVM receipt still reports
+Success — so read the stored tier back from
+[`staking_state`](../api/rest/info.md#staking_state).
 
 Undelegated stake does not return to your spot balance immediately: it sits
 in a per-delegator unbonding entry, still slashable, until the governed

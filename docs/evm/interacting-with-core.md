@@ -60,7 +60,7 @@ CoreWriter exposes 22 L1 actions (id, big-endian, in the `uint24` slot above):
 |---:|--------|---------|
 | 1 | `LimitOrder` | Place a limit order on a perp / spot market. **A fill on placement is recorded nowhere** — see [unrecorded fills](../api/rest/info.md#unrecorded-fills) |
 | 2 | `VaultTransfer` | Deposit to / withdraw from a vault |
-| 3 | `TokenDelegate` | Delegate stake to a validator |
+| 3 | `TokenDelegate` | Delegate stake to a validator. **MTF takes an optional 4th word, the lock tier** — see [below](#action-3-lock-tier) |
 | 4 | `StakingDeposit` | Move tokens into the staking balance |
 | 5 | `StakingWithdraw` | Move tokens out of the staking balance |
 | 6 | `SpotSend` | Transfer a spot token to another account |
@@ -85,6 +85,61 @@ The typed parameter structs and a ready-to-use Solidity caller live in the publi
 [`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo;
 the on-chain CoreWriter at `0x3333…` is the production target (in tests a
 deterministic Solidity stand-in emits the same `RawAction` payload).
+
+### Action 3 carries a lock tier — a superset of HL's {#action-3-lock-tier}
+
+**Do not assume Hyperliquid parity here.** HL's action 3 encodes three words:
+`validator`, `wei`, `isUndelegate`. MTF accepts an **optional fourth 32-byte
+word**, `lockMonths`. A three-word call stays legal and means tier `0`, so an
+HL-shaped encoder keeps working unchanged.
+
+**Why the word exists: tier `0` earns no revenue share.** MTF splits the
+validator fee share by `amount × lock multiplier`, and the multiplier is `0×` at
+tier `0` — see [the fee schedule](../concepts/fee-schedule.md#3-staking-discount-tiers-mtf-staked) and
+[staking rewards](../concepts/staking.md#reward-sources). Without the fourth
+word every EVM-originated delegation is flexible, so a contract can bond stake
+and be paid nothing from the fee split. It still earns the Tier 1 fee discount.
+
+| `lockMonths` | Meaning |
+|---:|---|
+| absent (3-word call) | tier `0` |
+| `0` | Flexible. No revenue share. Undelegate any time. |
+| `1` / `6` / `24` | Locked. Draws a revenue share. Cannot start unbonding until the lock matures. |
+
+Any other value is **refused**. So are two cases a locked tier reaches: a
+validator not on the governance allowlist for locked stake, and a top-up onto an
+existing row that holds a **different** tier.
+
+:::danger
+**A refusal is silent, and the EVM receipt still says Success.** Every refusal
+above is a deterministic no-op on Core — no funds move, no delegation row
+appears, the free staking pool is untouched. The `sendRawAction` call itself only
+burns gas and emits `RawAction`, so it cannot revert on an L1 outcome (see the
+**Atomicity** note above). Read
+[`staking_state`](../api/rest/info.md#staking_state) after the action delay to
+confirm the tier the ledger actually stored. **Do not read the receipt status as
+proof the delegation landed.**
+:::
+
+:::warning
+**The tier is NOT LIVE on the chain yet.** This page leads the deployed binary.
+The live node still decodes three words and ignores anything after them, so a
+four-word call today delegates at tier `0` — silently, with no error. That row
+then earns no revenue share, and the chain refuses a later top-up at a different
+tier, so recovering costs an undelegate plus the whole unbonding window. Send
+three words until the release lands.
+:::
+
+**Send exactly three words or at least four.** After the swap, a params section
+between 97 and 127 bytes is refused as `params section truncated` — that is a
+four-word call whose declared length is short. Bytes past the fourth word stay
+ignored, as with every other action.
+
+`encodeTokenDelegate` in the reference `Encoders` helper still emits three words
+and keeps its pinned byte vector, so it stays a tier-`0` encoder. A separate
+`encodeTokenDelegateLocked` takes the tier. If you are not using the helper,
+build the payload as `abi.encodePacked(uint8(1), uint24(3), abi.encode(validator,
+wei_, isUndelegate, lockMonths))`.
 
 ## Reading Core — precompiles {#reading-core--precompiles}
 

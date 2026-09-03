@@ -129,6 +129,30 @@ For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
 `encodeType` string is given below (the field order is the message field order).
 `action.type` is the `snake_case` tag you put on the POST.
 
+:::warning
+**These tables are PARTIAL — they list roughly half of the chain's type
+strings.** They cover the actions an integrator assembles by hand. Not listed:
+the order and
+cancel bodies (see [Orders and cancels](#orders-and-cancels)), the RFQ and FBA
+lanes, and the governance, validator and deployer actions.
+
+For a trading or account action with no row here, take the string from a client
+SDK, not from a guess. [`@metaflux-dex/client`](./typescript-sdk.md) and
+`metaflux-client` (Rust) carry the order, cancel, TWAP, sub-account and RFQ
+strings byte-identical to the chain.
+
+**The governance and validator actions are in NEITHER SDK.** `ApproveUpgrade`,
+`ApproveUpgradeAt`, `ArmFeatures`, `ArmFeaturesAt`, `CValidator`,
+`GovAdjustSpotValue`, `GovVote`, `SetMarkMode`, `SetMetaliquiditySet`,
+`SetPmShockGrid`, `VoteAppHash` and `VoteGlobal` have no row here and no SDK
+type. A validator casts them with the `mtf-node gov` CLI over its local socket,
+which builds the digest itself, so no integrator assembles them by hand.
+
+A type string is hashed whole into the typehash, so one wrong byte, one wrong
+field order or one missing field makes the action unsignable — the chain
+recovers a stranger and refuses it. **Copy the string; never retype it.**
+:::
+
 ### Transfers {#transfers}
 
 | `action.type` | `encodeType` |
@@ -241,10 +265,20 @@ Notes on specific fields:
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
-| `token_delegate` | `MetaFluxTransaction:TokenDelegate(string metafluxChain,address validator,string amount,bool isUndelegate,uint64 nonce)` |
+| `token_delegate` | `MetaFluxTransaction:TokenDelegate(string metafluxChain,address validator,string amount,bool isUndelegate,uint8 lockMonths,uint64 nonce)` |
 
 `amount` is a canonical decimal string. `isUndelegate` = `true` undelegates,
 `false` delegates.
+
+`lockMonths` is the staking lock tier: `0` (flexible), `1`, `6` or `24`.
+**Omitting it from the POST params is not the same as omitting it from the
+digest.** The POST field defaults to `0`, so a bare delegate stays valid on the
+wire. The typed struct has no such default: `lockMonths` is always one of the six
+signed fields, including on an undelegate, where the chain ignores the value but
+still hashes it. Sign a five-field struct and the chain computes a digest you
+never signed, so the recovered signer is a stranger and the action is refused.
+Tier `0` earns no revenue share — see
+[staking](../concepts/staking.md#token_delegate) for the tier rules.
 
 ### Vault {#vault}
 
