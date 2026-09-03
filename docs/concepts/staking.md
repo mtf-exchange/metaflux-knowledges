@@ -121,6 +121,20 @@ to claim, even though fee revenue is USDC-denominated at the source:
 | Source | Mechanism | Share |
 |--------|-----------|-------|
 | Fee revenue — validator share of the buyback | The accrued USDC validator-fee pool periodically buys MTF on-book (batched behind a governance-tunable minimum pool size and a time throttle, not every block); the acquired MTF is what gets split below | `commission_bps` to the validator, the rest pro-rata by (delegation amount × lock multiplier) across delegators + the validator's own self-stake |
+
+**A flexible delegation earns no revenue share.** The lock multiplier is `0×` at
+`lock_months: 0` — see the [ve-style table](./tokenomics.md#time-weighted-staking-ve-style).
+So a no-lock row weighs zero in the split above and is paid nothing. Lock for at
+least 1 month to draw a share. A flexible delegation still earns the Tier 1 fee
+discount; the two ladders are separate.
+
+**The split has two levels, and both use the same weight.** The acquired MTF is
+first divided across active validators, then within each validator across its
+delegators. A validator's slice at the first level is sized by the SAME weighted
+stake the second level pays out — self-stake at `1.0×` plus each delegation row's
+`amount × lock multiplier` — not by raw bonded stake. A validator whose
+delegators are all flexible therefore draws only its own self-stake, and its
+commission base shrinks with it.
 | Bootstrap rewards (treasury-funded, early phase) | Begin-block emission from the treasury bootstrap budget — **never new issuance** | `stake_share × (1 - validator_commission)`, per the [APR curve](#apr-estimation) |
 
 Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), net fee revenue splits **70% buyback-and-lock / 20% validators / 10% treasury**, and the validator 20% funds this path.
@@ -234,8 +248,9 @@ fault.
 **There is no APR field, and do not compute one from these values.** The pending
 pool is accrued fees at an instant, not an annualised rate: projecting it forward
 assumes trading volume that has not happened. A delegator's realised return is
-their stake share of each distribution, less their validator's commission
-(`commission_bps`, in whole basis points as a decimal string).
+their WEIGHTED share of each distribution — `amount × lock multiplier`, which is
+zero for a flexible row — less their validator's commission (`commission_bps`, in
+whole basis points as a decimal string).
 
 ## Edge cases {#edge-cases}
 
