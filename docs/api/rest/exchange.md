@@ -134,6 +134,10 @@ recovered address differs from the action's `owner` (or, for sender-authorized
 actions, recovers a phantom address that passes no authorization check). See
 [networks](../../networks.md) for endpoints.
 
+A `chainId` is a signing-domain value, not a chain identifier: two chains can
+run the same one. To confirm WHICH chain an endpoint serves, read
+[`chain_identity`](../rest/info.md#chain-identity) on `exchange_status`.
+
 ### Optional action expiry (`expiresAfter`) {#optional-action-expiry-expiresafter}
 
 Any action may carry an optional expiry so it cannot be replayed or relayed late.

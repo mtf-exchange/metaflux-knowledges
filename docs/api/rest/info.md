@@ -2562,6 +2562,7 @@ Global trading status. No parameters.
 {
   "data": {
     "type": "exchange_status",
+    "chain_identity": "c114514-t1782983757000-gabcdef0123456789",
     "spot_disabled": false,
     "post_only": false,
     "mip3_enabled": true,
@@ -2573,6 +2574,7 @@ Global trading status. No parameters.
 
 | Field | Type | Meaning |
 |-------|------|-------------|
+| `chain_identity` | string | Which chain answered. See [chain identity](#chain-identity) below |
 | `spot_disabled` | bool | Spot trading globally disabled |
 | `post_only` | bool | A post-only window is in force — new orders must be maker-only |
 | `frozen` | bool | The chain is in a pending upgrade halt |
@@ -2584,6 +2586,49 @@ This reports current status only. It does not return the pending upgrade
 height or the node's replay progress. `frozen` shows a halt is coming; it does
 not give a date.
 :::
+
+> ⬆️ **Upgrade notice — `chain_identity` is not live yet.** It ships with the
+> next node release. Until then the field is absent from the response. Treat an
+> absent field the same way you treat a mismatch: refuse to run.
+
+#### Chain identity {#chain-identity}
+
+**A `chain_id` does not identify a chain.** Two chains can run the same
+`chain_id`, and everything else that is stable about them — the endpoint shape,
+the validator addresses, the `eth_chainId` answer — can be identical too. Only
+the moving state differs, and moving state cannot be asserted on.
+
+`chain_identity` is the value that does identify one. It reads
+`c<chain_id>-t<chain start, ms>-g<first 16 hex of the genesis hash>`. The
+genesis hash folds the validator set, the epoch length and the initial state
+root, so two chains that agree on all three parts are the same chain.
+
+**Assert it at startup and refuse to run on a mismatch.** Put the expected value
+in your configuration next to the endpoint URL, read `exchange_status` before
+your first write, compare the two strings, and exit on a difference. Requiring
+the URL to be configured is not enough on its own: that stops a default endpoint
+from being used, not a wrong one. Rows written against the wrong chain are
+byte-identical in shape to correct rows and carry a colliding `chain_id` as
+their only provenance, so the mistake cannot be found afterwards.
+
+| Value | Meaning | What to do |
+|-------|---------|------------|
+| `c…-t…-g…` | The chain the node runs | Compare to your configured constant |
+| `underivable` | The node proves no genesis | Treat as a mismatch. Never as a match |
+| absent | A node older than the field | Treat as a mismatch |
+
+`underivable` can never collide with a real chain's value, because a derived
+identity always starts `c` and a digit.
+
+**What it changes on.** Only a re-genesis of the chain you are reading. It
+survives a node restart, a release, a node upgrade and a validator-set change,
+and a re-genesis of a DIFFERENT chain does not move it. So cache it for the life
+of your process, and re-read it on every reconnect to a new endpoint.
+
+It also survives any config edit the node still boots on. Two edits are not in
+that set: removing the genesis file turns the value to `underivable`, and
+changing the genesis timestamp under a genesis file stops the boot. Neither can
+produce a false match — one refuses, the other never starts.
 
 :::warning
 `frontend_open_orders` is removed (folded into `open_orders`, wire-v2 phase 2).
