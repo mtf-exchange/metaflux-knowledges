@@ -139,6 +139,32 @@ answers mean different things.
 | `eth_getBlockByHash` with a number-keyed hash in range | that block |
 | `eth_getBlockByHash` with any other hash | `null` |
 
+##### There is more than one earliest block {#two-floors}
+
+**The block reads and the receipt reads keep separate histories, so they have
+separate floors, and the block floor is usually the HIGHER of the two.** Two
+different stores back them and each prunes on its own schedule.
+
+Measured on the public testnet in one moment:
+
+```
+eth_getBlockByNumber("0x1")  -> -32001  data.earliestBlock 0x37de4   (229348)
+eth_getBlockReceipts("0x1")  -> -32001  data.earliestBlock 0x28261   (164449)
+eth_getLogs from 0x1         -> -32001  data.earliestBlock 0x28261   (164449)
+```
+
+Nearly 65,000 blocks apart. A caller that reads the floor from `eth_getLogs` and
+then walks with `eth_getBlockByNumber` meets `-32001` long before it reaches the
+number it was told, and the walk looks broken when it is not.
+
+**Read the floor from the SAME method you intend to call**, and re-read it: a
+floor RISES as the node prunes, and it rises in steps rather than one block at a
+time, so a value cached at the start of a long backfill goes stale beneath you.
+
+One out-of-range request is all it takes — ask for block `0x1` and read
+`data.earliestBlock` off the error. There is no bisection and no separate
+endpoint.
+
 **`null` and `-32001` are not interchangeable.** `null` means "not yet"; poll
 again and it will appear. `-32001` means "gone, and it is not coming back";
 polling never resolves it. A client that treats the second as the first retries
