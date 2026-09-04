@@ -2562,7 +2562,7 @@ Global trading status. No parameters.
 {
   "data": {
     "type": "exchange_status",
-    "chain_identity": "c114514-t1782983757000-gabcdef0123456789",
+    "chain_identity": "c114514-t1788275280000-g8f6fce34e462c553",
     "spot_disabled": false,
     "post_only": false,
     "mip3_enabled": true,
@@ -2586,10 +2586,6 @@ This reports current status only. It does not return the pending upgrade
 height or the node's replay progress. `frozen` shows a halt is coming; it does
 not give a date.
 :::
-
-> ⬆️ **Upgrade notice — `chain_identity` is not live yet.** It ships with the
-> next node release. Until then the field is absent from the response. Treat an
-> absent field the same way you treat a mismatch: refuse to run.
 
 #### Chain identity {#chain-identity}
 
