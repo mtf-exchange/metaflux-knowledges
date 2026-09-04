@@ -312,6 +312,8 @@ A leveraged spot position is **cross-margined against your one unified USDC acco
 | [`spot_margin_close`](#spot_margin_close) | Sell held base, repay the loan | master only | no |
 | [`earn_deposit`](#earn_deposit) | Supply quote into the lending pool for shares | master only | no |
 | [`earn_withdraw`](#earn_withdraw) | Redeem pool shares (idle-bounded) | master only | no |
+| [`spot_margin_deposit`](#spot_margin_deposit) ⚠️ | **Retired.** It commits nothing — there is no separate collateral bucket | master only | — |
+| [`spot_margin_withdraw`](#spot_margin_withdraw) ⚠️ | **Retired.** It commits nothing — withdraw USDC from your account instead | master only | — |
 
 **Why a pool pays nothing yet.** A pool auto-creates on the first
 [`earn_deposit`](#earn_deposit) with a borrow rate of **zero**. Nothing on the
@@ -352,6 +354,38 @@ Every action here returns the
 the allocated ids and the committed spec through
 [`/info` `spot_meta`](./info/spot.md).
 
+### Perp deployment (MIP-3) {#perp-deployment}
+
+Eleven **sender-authorized** actions let an account register a perp market in its
+own dex, configure it, open it, and price it. The signer *is* the deployer. After
+the first registration, only that market's deployer — or a
+[sub-deployer](#perp_set_sub_deployers) holding the matching permission bit — may
+call the rest. A market lands in the deployer's own dex, never in the primary
+dex. See [MIP-3](../../mip/mip-3.md) and
+[the field-level sections](#perp-deployment-actions).
+
+Every action here is refused unless governance leaves the `mip3_enabled`
+off-switch open, and unless the target is a MIP-3 deployer market. A core market
+listed by governance is not one, so this lane cannot reach it.
+
+| `type` | Purpose | Signed-by | Charges a deploy fee |
+|--------|---------|-----------|----------------------|
+| [`perp_register_asset`](#perp_register_asset) | Register a perp market, and create your dex on the first call | deployer (sender), or a delegate holding bit 8 | yes — Dutch-clock ask |
+| [`perp_set_leverage`](#perp_set_leverage) | Set max leverage | deployer, or bit 1 | no |
+| [`perp_set_fee_tier`](#perp_set_fee_tier) | Set the taker, maker and deployer fees | deployer, or bit 2 | no |
+| [`perp_set_maker_rebate`](#perp_set_maker_rebate) | Set the maker rebate | deployer, or bit 3 | no |
+| [`perp_set_min_size`](#perp_set_min_size) | Set the minimum order size | deployer, or bit 4 | no |
+| [`perp_activate_market`](#perp_activate_market) | Open the market to trading | deployer, or bit 5 | no |
+| [`perp_deactivate_market`](#perp_activate_market) | Close the market, and cancel every resting order and parked trigger on it | deployer, or bit 6 | no |
+| [`perp_set_sub_deployers`](#perp_set_sub_deployers) | Grant a delegate every bit, or revoke it | deployer only | no |
+| [`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) | Grant a delegate an exact permission mask | deployer only | no |
+| [`mip3_set_oracle_px`](#mip3_set_oracle_px) | Push the market price | deployer, or bit 0 | no |
+| [`perp_set_oracle`](#perp_set_oracle) ⚠️ | **Retired.** It writes a mask nothing reads | deployer | no |
+
+**A delegate cannot delegate.** Both `perp_set_sub_deployers` and
+`perp_set_sub_deployer_perms` need the deployer's own key. A delegate holding
+every other bit still cannot grant or edit a delegation.
+
 ### Margin & risk {#margin--risk}
 
 | `type` | Purpose | Signed-by |
@@ -360,6 +394,8 @@ the allocated ids and the committed spec through
 | [`update_isolated_margin`](#update_isolated_margin) | Signed isolated-margin delta | master / agent |
 | [`top_up_isolated_only_margin`](#top_up_isolated_only_margin) | Strict-iso margin top-up | master / agent |
 | [`user_portfolio_margin`](#user_portfolio_margin) | Enroll / unenroll PM | master only |
+| [`pm_unenroll`](#pm_unenroll) | Unenroll from PM — a no-params alias for `user_portfolio_margin` with `enroll: false` | master only |
+| [`borrow_lend`](#borrow_lend) | Supply to, or draw from, the BOLE liquidation backstop pool | master only |
 
 ### RFQ, FBA & utility {#rfq-fba--utility}
 
@@ -389,11 +425,14 @@ refuse every other market. See [options](../../products/options.md).
 | [`set_referrer`](#set_referrer) | Bind to a referrer address | master only |
 | [`approve_broker_fee`](#approve_builder_fee) | Approve a broker fee ceiling | master only |
 | [`claim_referral_rewards`](#claim_referral_rewards) | Claim accrued referral credit | master only |
-| [`claim_broker_rewards`](#claim_builder_rewards) | Claim accrued broker-code credit (the older name `claim_builder_rewards` still decodes) | master only |
+| [`claim_broker_rewards`](#claim_builder_rewards) | Claim accrued broker-code credit | master only |
+| [`approve_builder_fee`](#approve_builder_fee) | The older spelling of `approve_broker_fee`. It still decodes and behaves identically | master only |
+| [`claim_builder_rewards`](#claim_builder_rewards) | The older spelling of `claim_broker_rewards`. It still decodes and behaves identically | master only |
 | [`create_sub_account`](#create_sub_account) | Open a sub-account under the master | master only |
 | [`sub_account_transfer`](#sub_account_transfer) | Move perp cross-collateral parent ↔ sub | master only |
 | [`sub_account_spot_transfer`](#sub_account_spot_transfer) | Move a spot token balance parent ↔ sub | master only |
 | [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) | Lift account to multi-sig | master only |
+| [`multi_sig`](#multi_sig) | Run one inner action as a multi-sig account, carrying the roster signatures | any submitter; the roster authorizes |
 | [`set_position_mode`](#set_position_mode) | Toggle one-way / hedge position mode | master / agent |
 
 ### Staking & abstraction {#staking--abstraction}
@@ -414,6 +453,7 @@ refuse every other market. See [options](../../products/options.md).
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
 | [`submit_encrypted_order`](#submit_encrypted_order) | Threshold-encrypted order ciphertext | master only |
+| [`encrypted_order_submit`](#encrypted_order_submit) ⚠️ | **Retired alias.** Refused at every height; post the canonical name | — |
 
 ### Vaults {#vaults}
 
@@ -422,8 +462,25 @@ refuse every other market. See [options](../../products/options.md).
 | [`create_vault`](#create_vault) | Leader creates a vault | master only |
 | [`vault_transfer`](#vault_transfer) | Leader seed transfer | master only |
 | [`vault_modify`](#vault_modify) | Leader-only vault config update | master only |
+| [`vault_distribute`](#vault_distribute) | Follower deposit into a vault, from the signer's own account | master only |
 | [`vault_withdraw`](#vault_withdraw) | Follower share redemption | master only |
 | [`register_metaliquidity_operator`](#register_metaliquidity_operator) | Leader grants or revokes an operator key on a Metaliquidity vault | vault leader only |
+
+### Transfers {#transfers}
+
+Value moves inside the Core ledger: to another account, or between your own spot
+and perp balances. Both are **sender-authorized** — there is no `owner` field, so
+an agent signature moves the AGENT's own balance, never the master's.
+
+| `type` | Purpose | Signed-by |
+|--------|---------|-----------|
+| [`send_asset`](#send_asset) | Send one token to another account | master only |
+| [`usd_class_transfer`](#usd_class_transfer) | Move your own USDC between spot and perp | master only |
+
+**`spot_send` and `usd_send` are NOT actions.** They are ledger record kinds on
+the [`ledger_updates`](../ws/subscriptions.md#ledger_updates) feed, which say what
+a committed transfer DID. Posting either name gets `unknown variant`, the same
+error a misspelt action gets.
 
 ### Bridge withdrawals {#bridge-withdrawals}
 
@@ -437,6 +494,7 @@ own account, never the master's.
 | [`core_evm_transfer`](#core_evm_transfer) | Move a spot asset from the Core ledger to MetaFluxEVM, optionally with an EVM payload | master only |
 | [`send_to_evm_with_data`](#send_to_evm_with_data) ⚠️ | The same Core → EVM move in the Hyperliquid-compatible field shape. **Live.** It refuses five things Hyperliquid accepts and ignores — see the section | master only |
 | [`bridge_withdraw`](#bridge_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
+| [`withdraw`](#withdraw) ⚠️ | **Retired.** The legacy CCTP withdrawal. It is refused at commit, and always has been | master only |
 
 Both Core → EVM rows reach the same lane and land the same credit.
 [Which one to use](#core-evm-which-action) is decided by one thing: the field
@@ -459,41 +517,67 @@ never execute here.
 | Draft name | Native tag (if recognized) | Why not bridged |
 |-----------|----------------------------|-----------------|
 | `UpdateMarginMode` | — | No native action; isolation is the `is_isolated` flag on `update_leverage` |
-| `MultiSig` | `multi_sig` | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts (post it as a normal `multi_sig` `/exchange` envelope). See [multi-sig](../../concepts/multi-sig.md#acting-as-multi-sig). (A non-wrapped action from a multi-sig account is still rejected.) |
+| `MultiSig` | [`multi_sig`](#multi_sig) | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts. It verifies the roster signatures and runs the inner action. (A non-wrapped action from a multi-sig account is still rejected.) |
 | `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`bridge_withdraw`](#bridge_withdraw) |
-| (legacy CCTP withdraw) | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use bridge_withdraw"`) — use [`bridge_withdraw`](#bridge_withdraw) |
-| (BOLE pool) | `borrow_lend` | **Bridged and live** — `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` are open to any account; `"Borrow"` is refused unless the sender is an approved liquidator |
-| (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit; see [vaults](../../concepts/vaults.md#depositing) |
-| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag — enroll via [`user_portfolio_margin`](#user_portfolio_margin). `pm_unenroll` **is** a bridged alias (no params) for the same action's `enroll:false` form. `pm_rebalance` has been **removed** — rejected as an unknown action |
+| (legacy CCTP withdraw) | [`withdraw`](#withdraw) | **Retired** — admitted, then rejected at every commit since genesis (`"withdraw3 disabled; use bridge_withdraw"`). Use [`bridge_withdraw`](#bridge_withdraw) |
+| (BOLE pool) | [`borrow_lend`](#borrow_lend) | **Bridged and live** — `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` are open to any account; `"Borrow"` is refused unless the sender is an approved liquidator |
+| (vault distribute) | [`vault_distribute`](#vault_distribute) | **Bridged and live** — a follower's own self-service deposit; see [vaults](../../concepts/vaults.md#depositing) |
+| (PM lifecycle) | `pm_enroll` / [`pm_unenroll`](#pm_unenroll) | `pm_enroll` has no native tag — enroll via [`user_portfolio_margin`](#user_portfolio_margin). `pm_unenroll` **is** a bridged alias (no params) for the same action's `enroll:false` form. `pm_rebalance` is **retired** — rejected as an unknown action |
 | (cross-chain) | — | **Not an `/exchange` action at all.** `cross_chain_send` is not in the action enum, so it fails decode and returns `400` `INVALID_REQUEST` (`unknown variant`) — the same answer a misspelt action name gets, **not** `ACTION_UNSUPPORTED`. Cross-chain transfer is a different wire: `CrossChainSend` is [CoreWriter action 19](../../evm/interacting-with-core.md), called from MetaFluxEVM |
 
-### Governance actions: in the enum, refused at the door {#governance-actions-refused}
+### Governance and validator actions: in the enum, refused at the door {#governance-actions-refused}
 
-A governance action **decodes** on `/exchange` but never **executes** there.
-This matters because the two failures look nothing alike, and integrators read
-the first one as encouragement:
+A governance or validator action **decodes** on `/exchange` but never
+**executes** there. This matters because the two failures look nothing alike,
+and integrators read the first one as encouragement:
 
 - A name the enum does not know fails **decode**: `400` `INVALID_REQUEST`,
-  `unknown variant`. The error lists every accepted name, and the governance
-  names are in that list.
-- A governance name **decodes**, so it gets past the schema, past signature
-  recovery, and then hits the refusal:
-  `400` `ACTION_UNSUPPORTED`, `"governance actions are operator-injected only
-  (gov-admin lane)"`.
+  `unknown variant`. The error lists every accepted name, and the names below
+  are in that list.
+- A name from this section **decodes**, so it gets past the schema, and then
+  hits the refusal: `400` `ACTION_UNSUPPORTED`.
+
+**Read the code, not the message.** `ACTION_UNSUPPORTED` is the contract. The
+text behind it differs by tag, and there are at least three of them:
+`governance actions are operator-injected only (gov-admin lane)`,
+`unsupported action: unsupported native action variant: <tag>`, and
+`action does not support typed signing`. Match on the code; a substring match on
+any one of those sentences fails for most of the table.
+
+**Where the refusal lands also differs.** Most of these tags are refused after
+signature recovery. A few are refused before it, so a valid-looking
+`AUTH_BAD_SIGNATURE` for one tag and an immediate `ACTION_UNSUPPORTED` for
+another say the same thing: not open. Neither is progress.
 
 **Reaching `ACTION_UNSUPPORTED` is not progress.** A valid signature from a real
 validator key gets the same answer. The public `/exchange` path carries **no**
-governance write, whoever signs it. These actions enter through the node's own
-operator lane, and each accepted post is **one vote**: the change enacts only
-when ⅔ of stake has voted for a **byte-identical** payload. Two validators who
-differ by one character vote for two different proposals and neither reaches
-quorum.
+governance or validator write, whoever signs it. These actions enter through
+the node's own operator lane, which only a validator operator has. Each accepted
+vote is **one vote**: the change enacts only when ⅔ of stake has voted for a
+**byte-identical** payload. Two validators who differ by one character vote for
+two different proposals and neither reaches quorum.
 
-The signing types below are **consensus-frozen** and are published so an
-operator tool can build the digest. They are not an invitation to post the
-action to `/exchange`.
+The table lists every such tag the node accepts today. **No client sends
+these.** They are listed so that a reader who meets one in the `unknown variant`
+list, or in [`gov_history`](./info/governance.md), knows what it is.
+
+| Native tag | Who | What it does |
+|-----------|-----|--------------|
+| `gov_vote` | Validator, ⅔ stake | Aye or nay on a `gov_propose` proposal. ⅔ aye enacts it; ⅔ nay discards it |
+| `vote_global` | Validator, ⅔ stake | Sets one global parameter directly, with no proposal step |
+| `set_mark_mode` | Validator, ⅔ stake | Sets a perpetual market's mark mode: automatic, oracle-synced, or a fixed price |
+| `set_pm_shock_grid` | Validator, ⅔ stake | Sets the price and volatility shock grids that portfolio margin stresses positions against |
+| `arm_features` | Validator, ⅔ stake | Arms protocol features to activate at a future height or time. The signature binds the feature list, so a replayed vote cannot arm a different list |
+| `approve_upgrade` | Validator, ⅔ stake | Schedules or cancels the coordinated halt at which every validator swaps binaries |
+| `c_validator` | The validator itself | Maintains its own record: commission, active flag, self-jail, unjail, deregister. Not a vote; one signed action applies. A commission **raise** waits out a notice period; a cut applies at once |
+| `vote_app_hash` | The validator node itself | The checkpoint state-hash vote every validator node emits on its own after each checkpoint. No person casts it |
+
+Two more tags in this set, `set_metaliquidity_set` and `gov_adjust_spot_value`,
+keep their payloads and signing types below, because their `value` hashing rule
+is the one operators get wrong. The types are **consensus-frozen**. They are not
+an invitation to post the action to `/exchange`.
 
 | Native tag | Payload | Effect |
 |-----------|---------|--------|
@@ -1899,6 +1983,80 @@ Redeem pool shares back to quote, paid to your spendable balance. The payout is 
 
 ---
 
+### Retired: post separate spot-margin collateral {#spot_margin_deposit}
+
+:::danger Retired — it commits nothing
+`spot_margin_deposit` decodes and admits, and then does nothing at all.
+**Spot margin is [cross-collateralized](#spot-margin--earn-actions)**: a position
+draws its margin from your one unified USDC account, so there is no separate
+collateral bucket to fund. The node drops the action before the state machine
+sees it. It writes no state and it advances no nonce.
+
+**The admission envelope is not a confirmation.** A dropped action still returns
+the ordinary [`202 Accepted`](#202-accepted--non-order-admission) shape, the same
+shape an action that is only slow returns — read
+[`accepted` is not `committed`](#accepted-is-not-committed). Nothing appears in
+[`/info` `spot_margin_state`](./info/spot.md#spot_margin_state), because nothing
+happened.
+
+**Do this instead.** Fund the position with your USDC account. Free collateral
+backs the open exactly as it backs a perpetual open. See
+[`spot_margin_open`](#spot_margin_open).
+:::
+
+The tag stays on the wire so that every committed block still decodes. It is not
+a lane to build on. Both fields are still required at decode, so a malformed post
+fails earlier, with `400` `INVALID_REQUEST`.
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:SpotMarginDeposit`.
+
+```json
+{
+  "type": "spot_margin_deposit",
+  "params": { "pair": 200, "amount": "1000" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | a spot pair id | Spot pair id (`SpotPairSpec.pair_id`) |
+| `amount` | decimal string | `> 0` | Quote to post, as a JSON string. A bare JSON number is rejected at decode |
+
+---
+
+### Retired: withdraw separate spot-margin collateral {#spot_margin_withdraw}
+
+:::danger Retired — it commits nothing
+`spot_margin_withdraw` is the mirror of
+[`spot_margin_deposit`](#spot_margin_deposit), and it is retired the same way,
+for the same reason: there is no separate collateral bucket to draw from. It
+decodes, admits, and is dropped before the state machine sees it.
+
+**Do this instead.** Your spot-margin collateral IS your unified USDC account.
+Withdraw from it with the ordinary paths —
+[`usd_class_transfer`](#usd_class_transfer) to move USDC to spot, or
+[`bridge_withdraw`](#bridge_withdraw) to leave the chain. Both are gated on free
+collateral, so an open spot-margin position holds back what it needs.
+:::
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:SpotMarginWithdraw`.
+
+```json
+{
+  "type": "spot_margin_withdraw",
+  "params": { "pair": 200, "amount": "1000" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pair` | uint32 | a spot pair id | Spot pair id the position is on |
+| `amount` | decimal string | `> 0` | Collateral to draw, as a JSON string. A bare JSON number is rejected at decode |
+
+---
+
 ## Spot deployment actions (MIP-1) {#spot-deployment-actions}
 
 The permissionless spot deployer lane. **Live on testnet.** See the
@@ -2209,15 +2367,16 @@ whether the running build carries them and whether the governance off-switch
 `mip3_enabled` is open, so a call can still be refused. Build against these
 shapes now; probe one call on your target network before you depend on it.
 
-**Two rows move in the next release, and the count stays nine.**
-[`perp_set_oracle`](#perp_set_oracle) is RETIRED: the node refuses it after that
-release. [`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) is NEW: the node
-refuses it until that release. Every other wire shape and signing type on this
-page is unchanged.
+**One row still moves.** [`perp_set_oracle`](#perp_set_oracle) is RETIRED: the
+node still accepts it today and refuses it after the next release.
+[`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) has **shipped** — the
+node accepts it now. Every other wire shape and signing type on this page is
+unchanged.
 :::
 
 Permissionless perp market deployment, plus the deployer price push the deployed
-market runs on. Each action is sender-authorized: the recovered signer is the
+market runs on. See the [catalog entry](#perp-deployment) for the lane at a
+glance. Each action is sender-authorized: the recovered signer is the
 deployer. After `perp_register_asset`, only that market's deployer or one of its
 sub-deployers may call the rest. A sub-deployer holds one permission bit per
 handler — see [delegation](#perp_set_sub_deployers).
@@ -2360,19 +2519,33 @@ market registered after the release impossible to activate.
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | Target market |
 
-### Delegate to a sub-deployer {#perp_set_sub_deployers}
+`perp_deactivate_market` takes the same one field. Its EIP-712
+[typed-data](#signing) primary type is
+`MetaFluxTransaction:PerpDeactivateMarket`; activation signs
+`MetaFluxTransaction:PerpActivateMarket`.
 
-:::warning Not live yet
-**The permission bits below land with the next release.** Until it fires, the
-live chain has ONE delegation lane — `perp_set_sub_deployers` with `add` — and a
-delegate holds every deployer power. `perp_set_sub_deployer_perms` is refused
-with `unknown variant`, the same error a nonexistent action gets. Lane 1 keeps
-working across the upgrade, unchanged.
-:::
+**Deactivating CANCELS the book.** It clears every resting order and every parked
+trigger on the market, the same way a governance delist halts a core market. Open
+positions are untouched: they stay open, and they still mark and fund. Deactivate
+cannot close a position for anyone.
+
+**Who may call either one.** The market's deployer, or a delegate holding
+[bit 5](#perp_set_sub_deployers) to activate and [bit 6](#perp_set_sub_deployers)
+to deactivate. Anyone else reads `AUTH_UNAUTHORIZED`.
+
+**Both are refused unless the target is a MIP-3 deployer market**
+(`target is not a MIP-3 deployer perp market`), and unless governance leaves
+`mip3_enabled` open (`MIP-3 disabled by governance`). A core market listed by
+governance is not a deployer market, so this lane cannot reach one.
+
+### Delegate to a sub-deployer {#perp_set_sub_deployers}
 
 **A grant names HANDLERS, not a person.** One bit is one deployer action, so you
 can hand out the price push without also handing out the fee rates. There are two
 lanes into one stored grant.
+
+**Both lanes need the deployer's own key.** Neither checks the permission bits,
+so a delegate holding every bit still cannot grant or edit a delegation.
 
 **Lane 1 — `perp_set_sub_deployers`.** Unchanged wire, unchanged signing type.
 `add: true` grants **every** bit; `add: false` revokes the address.
@@ -2440,14 +2613,14 @@ bit 8 on at least one market of that dex. Three consequences:
 - A dex's FIRST market is always registered by its owner. No market carries the
   bit yet, so a delegate cannot bootstrap an empty dex.
 
-**The rules, written as rejections.**
+**The rules, as rejections.**
 
 | The call | Result |
 |----------|--------|
-| Either lane sent by a sub-deployer | **Rejected**, `Unauthorized`. Delegating needs the deployer's own authority, whatever bits the delegate holds. There is no bit for it, and there will not be one |
+| Either lane sent by a sub-deployer | **Rejected**, `AUTH_UNAUTHORIZED`. Delegating needs the deployer's own authority, whatever bits the delegate holds. There is no bit for it, and there will not be one |
 | `permissions` with any bit above bit 8 set | **Rejected**, `InvalidParams`. Bits 9-15 are reserved for handlers added later |
 | `permissions: 0` | **Accepted.** It revokes. The address is removed, not stored with an empty mask |
-| A handler called by a delegate that lacks that handler's bit | **Rejected**, `Unauthorized` |
+| A handler called by a delegate that lacks that handler's bit | **Rejected**, `AUTH_UNAUTHORIZED` |
 | A second grant to the same address | **Accepted.** It replaces the mask |
 
 ### Push the deployer oracle price {#mip3_set_oracle_px}
@@ -2538,8 +2711,9 @@ its own oracle defaults to `Disabled`.
 
 ## Perpetual margin & risk actions {#perpetual-margin--risk-actions}
 
-Leverage, isolated-margin, and portfolio-margin controls for **perpetual**
-positions. See [margin modes](../../concepts/margin-modes.md) and
+Leverage, isolated-margin and portfolio-margin controls for **perpetual**
+positions, plus the BOLE liquidation backstop pool. See
+[margin modes](../../concepts/margin-modes.md) and
 [portfolio margin](../../concepts/portfolio-margin.md) for the models.
 
 ### Set leverage and margin mode {#update_leverage}
@@ -2635,6 +2809,79 @@ Enrollment is refused in two cases:
 
 The equity check runs first, so an underfunded account at the cap reads the
 equity refusal. See [portfolio margin](../../concepts/portfolio-margin.md).
+
+---
+
+### Unenroll from portfolio margin — alias {#pm_unenroll}
+
+An alias for [`user_portfolio_margin`](#user_portfolio_margin) with
+`enroll: false`. It carries **no params**.
+
+**It is always allowed.** Unlike enrollment, unenrolling checks nothing: not
+equity, not the enrolled-account cap. Unenrolling an account that was never
+enrolled is a no-op, not an error, so a client may send it without first reading
+the account's state. Unenrolling frees a slot under the cap.
+
+**There is no `pm_enroll` tag, and no `PmUnenroll` signing type.** To enroll,
+post [`user_portfolio_margin`](#user_portfolio_margin) with `enroll: true`. To
+sign this alias, sign the canonical
+`MetaFluxTransaction:UserPortfolioMargin` type with `enroll` set to `false` — the
+two spellings share one digest.
+
+```json
+{ "type": "pm_unenroll", "params": {} }
+```
+
+The action takes no fields. `params` may be an empty object or omitted.
+
+---
+
+### Lend to, or draw from, the BOLE pool {#borrow_lend}
+
+The BOLE pool is the **liquidation backstop**. Any account may supply USD to it
+and take that supply back. Only an **approved liquidator** may draw from it. That
+asymmetry is the access model: three of the four kinds are open, and
+one is not.
+
+**There is no asset field.** The pool holds one asset, so `kind` and `amount` are
+the entire body.
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:BorrowLend`. **`kind` signs as a `uint8`, not as the string
+you post**: `Lend` `UnLend` `Borrow` `Repay` sign as `0` `1` `2` `3`, in that
+order. Sign the number, post the string — see
+[typed-data signing](../../integration/typed-data-signing.md#bole-pool).
+
+```json
+{
+  "type": "borrow_lend",
+  "params": { "kind": "Lend", "amount": "500" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `kind` | enum string | `"Lend"`, `"UnLend"`, `"Borrow"`, `"Repay"` | Case-exact. Any other value fails decode with `unknown variant`, and the error lists the four |
+| `amount` | decimal string | `> 0` | Amount in USD, as a JSON string |
+
+**What each kind does, and what it refuses.**
+
+| The call | Result |
+|----------|--------|
+| `"Lend"` | Supplies `amount` to the pool |
+| `"UnLend"` | Takes supply back. **Rejected** above what you have lent — `insufficient lent balance` |
+| `"Borrow"` | Draws from the pool. **Rejected**, `AUTH_UNAUTHORIZED`, unless the sender is an approved liquidator. This is the only kind with an allowlist |
+| `"Repay"` | Repays a draw. **Rejected** above what you owe — `repay exceeds outstanding borrow` |
+| Any kind, `amount` at or below zero | **Rejected** — `amount must be positive` |
+| Any kind whose arithmetic would overflow | **Rejected** — code `INTERNAL`, message `internal error`. The node's own reason names the overflow, and the envelope replaces it: an overflow is our defect, not your input, so the text never reaches you. Do not grep for it. The pool never saturates, because a saturated total would silently break the supplied-versus-shares identity |
+
+The BOLE bound is active on this network. An `amount` above `1000000000000` is
+refused with `amount exceeds bole bound`. Probe one call on your target network
+if you send figures near that size.
+
+**The success message still reads `borrowLend accepted (stub)`.** The word is
+stale: the pool accounting is real and the balances move. Do not treat the
+message as a sign that nothing committed.
 
 ---
 
@@ -3155,7 +3402,7 @@ an error. See [broker codes](../../concepts/broker-codes.md#claiming).
 
 ### Convert the account to multi-sig {#convert_to_multi_sig_user}
 
-Convert the account to a multi-sig roster. **Irreversible**.
+Register a multi-sig roster on the account. It takes effect at that commit.
 
 ```json
 {
@@ -3173,22 +3420,103 @@ Convert the account to a multi-sig roster. **Irreversible**.
 | Field | Type | Description |
 |-------|------|-------------|
 | `signers` | array of hex addresses | The multi-sig signer set |
-| `threshold` | uint32 | M-of-N threshold (`1 ≤ threshold ≤ signers.len()`; validated by the core handler) |
+| `threshold` | uint32 | M-of-N threshold: at least `1`, and no more than the number of `signers`. The one exception is the disable form below, which pairs an empty `signers` with `threshold: 0` |
 
-:::warning
-**Conversion works; the collect-and-execute wrapper is a preview.**
-`convert_to_multi_sig_user` **registers** the roster (threshold + signer set) on
-the account and takes effect immediately. The companion `multi_sig` envelope that
-would **collect signatures and execute a wrapped inner action** is **not yet
-executing**: it validates the roster, the threshold, and that every named signer
-is in the configured set, but it does **not** verify the member signatures and
-does **not** run the inner action. It is also **not bridged on the public
-`/exchange` path** (see the [non-bridged table](#non-bridged-actions)). Treat
-multi-sig as **register-only / preview** for now — do not rely on it to gate live
-state changes.
+:::warning Only the roster can change the roster
+From that commit on, a plain signed action from the account is refused. The
+account acts only through the [`multi_sig`](#multi_sig) wrapper below — including
+when it re-keys or turns multi-sig off. Both are the same action wrapped in a
+`multi_sig` envelope that the current roster signs:
+
+- **Re-key**: a new `signers` + `threshold`. It replaces the roster.
+- **Disable**: `signers: []` with `threshold: 0`. It removes the roster and
+  returns the account to its single key.
+
+So register a roster you can still reach a quorum on. If you lose the quorum, you
+lose the account, because nothing outside the roster can repair it.
 :::
 
 See [multi-sig](../../concepts/multi-sig.md).
+
+---
+
+### Execute an inner action as a multi-sig account {#multi_sig}
+
+This is the collect-and-execute wrapper. It is the **only** way a converted account acts.
+It carries ONE inner action as opaque bytes, plus the roster signatures that
+authorize it, and it runs that inner action **as `user`**. Register the roster
+first with [`convert_to_multi_sig_user`](#convert_to_multi_sig_user); see
+[multi-sig](../../concepts/multi-sig.md#acting-as-multi-sig) for the worked flow
+and the inner digest.
+
+**Anyone may submit it.** The outer envelope is signed by the submitter with the
+submitter's own key, and the submitter need not be on the roster — a coordinator,
+or any one signer, can broadcast the assembled bundle. All authority comes from
+the recovered addresses in `signatures`.
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:MultiSig`.
+
+```json
+{
+  "type": "multi_sig",
+  "params": {
+    "user":              "0x00000000000000000000000000000000000004a1",
+    "inner_action_blob": "0x7b2274797065223a2263616e63656c5f616c6c5f6f7264657273227d",
+    "signatures":        ["0x<65-byte sig>", "0x<65-byte sig>"],
+    "nonce":             1735689600099
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `user` | hex address | 40 hex chars | The multi-sig account. It must already carry a registered roster |
+| `inner_action_blob` | hex string | `0x`-hex, non-empty | The canonical JSON bytes of the inner action. These EXACT bytes are what every signer signs and what the server hashes. They are never re-serialized |
+| `signatures` | array of hex strings | each 65 bytes | Roster signatures over the inner digest. There is no per-entry signer field — the signer is recovered |
+| `nonce` | uint64 | | The inner nonce. It advances **`user`'s** nonce window, and every signer folds it into the inner digest |
+
+There is no `signers` field on the wire. A declared list would not add authority:
+the roster membership is what counts, and it is recovered, not declared.
+
+**The two nonces are checked against two different accounts.** `params.nonce`
+advances `user`'s window inside the handler. The envelope's own top-level `nonce`
+advances the **submitter's** window before dispatch. Setting them equal is the
+convention, and it is what the [worked flow](../../concepts/multi-sig.md) shows,
+but the chain does not compare them.
+
+**The rules, written as rejections.**
+
+| The call | Result |
+|----------|--------|
+| `user` has no registered roster, or a zero threshold | **Rejected** — `user not multi-sig` / `multi-sig threshold zero` |
+| An empty `inner_action_blob` | **Rejected**, `InvalidParams` — `empty inner_action_blob` |
+| A signature of the wrong length, or from a non-roster key | **Silently skipped.** One malformed entry must not block an otherwise valid quorum, so it is not an error — it simply does not count |
+| Fewer than `threshold` **distinct** roster signers recovered | **Rejected**, `AUTH_UNAUTHORIZED` |
+| A stale or replayed `params.nonce` | **Rejected** — `stale or replayed multi-sig nonce` |
+| An inner action outside the executable set: a governance vote, a system write, or a nested `multi_sig` | **Rejected**, `AUTH_UNAUTHORIZED` — and `user`'s nonce has **already advanced**. This is deliberate: a valid quorum cannot retry the same nonce with a privileged body swapped in |
+| An inner blob whose own `owner` field names an account other than `user` | **Rejected**, `InvalidParams` — `inner_action_blob owner must be the multisig user` |
+
+**The nonce advances the moment the quorum verifies, and before the blob is
+even decoded.** So a bad-signature attempt never burns `user`'s nonce, and
+EVERY failure after a valid quorum does — an undecodable blob, the `owner`
+mismatch, a non-executable inner, and an inner that fails its own handler.
+
+That is deliberate: a valid quorum must not be able to retry one nonce with a
+different body. The consequence for a caller is the part to remember. **After
+any of those refusals, re-sign with the NEXT nonce.** Retrying the same one gets
+`stale or replayed multi-sig nonce`, which reads like a replay guard firing on a
+request that was never accepted.
+
+:::warning Every authorization failure reads the same
+`AUTH_UNAUTHORIZED` carries the flat message `"unauthorized"`. It does **not**
+say which check failed: threshold not met, signer not in the roster, and inner
+action not executable all answer with that one string. Diagnose by re-deriving
+the inner digest and the recovered addresses on your own side.
+:::
+
+**The inner action runs as `user`**, so every rule that applies to `user` posting
+it directly applies here too, including its own margin and balance gates.
 
 ---
 
@@ -3620,11 +3948,28 @@ pending-pool depth after the push is carried in the **commit outcome**, not the
 HTTP body. An empty or over-sized ciphertext, a zero `threshold`, or a full
 pending pool errors at commit.
 
-:::info
-**The old `encrypted_order_submit` alias is retired.** `/exchange` rejects it
-`400` with an error pointing at the canonical spelling — submit as
-`submit_encrypted_order` (same fields, same signed digest).
+---
+
+### Retired alias: `encrypted_order_submit` {#encrypted_order_submit}
+
+:::danger Retired — do not call
+`encrypted_order_submit` decodes, and `/exchange` then refuses it:
+
+```json
+{"error":{"code":"ACTION_UNSUPPORTED","message":"encrypted_order_submit is deprecated; use submit_encrypted_order"}}
+```
+
+Post [`submit_encrypted_order`](#submit_encrypted_order) instead. **Same fields,
+same signed digest** — the alias never had a second signing form, so a client
+changes one string and keeps its signing code unchanged.
 :::
+
+**The refusal is unconditional.** It is not a height gate and no upgrade re-opens
+the name: every well-formed post gets it, at every height, whatever the
+signature. The refusal also lands **before** signature recovery, so a valid
+signature reads the same as a bad one.
+
+The tag stays in the action enum so that every committed block still decodes.
 
 ---
 
@@ -3699,6 +4044,63 @@ unchanged).
 | `new_lock_period_secs` | uint64 \| null | **Always rejected if `Some` and different** (anti-rug: lock cannot be shortened) |
 | `new_management_fee_bps` | uint16 \| null | New management fee bps (capped at 2000 = 20%) |
 | `new_paused` | bool \| null | New paused flag |
+
+---
+
+### Deposit into a vault as a follower {#vault_distribute}
+
+A follower deposits USD into a vault and receives shares. **Read the name and the
+`pnl` field against what the action does**: this is not a leader payout and it is
+not a profit figure. It debits the recovered signer's own account by `pnl` and
+credits that account with shares. A leader seeds its own vault with
+[`vault_transfer`](#vault_transfer) instead.
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:VaultDistribute`.
+
+```json
+{
+  "type": "vault_distribute",
+  "params": { "vault_id": 4, "pnl": "250" }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `vault_id` | uint64 | an existing vault | Target vault id |
+| `pnl` | decimal string | `> 0` | The **deposit amount** in USD, as a JSON string. The field name is legacy |
+
+**Funding is gated on free collateral**, not on raw equity: equity minus the
+margin your open positions hold. Collateral backing a position cannot be moved
+into a vault. An underfunded deposit is refused with
+`follower has insufficient USD`.
+
+**A deposit LOCKS what it buys.** Every deposit sets a withdrawal-lock expiry of
+`now + the vault's lock period`. The default is **4 days** for a leader vault and
+**7 days** for a Metaliquidity vault. This is the rule a depositor most needs, and
+the action name does not hint at it.
+
+The lock holds only the shares THIS deposit minted. Shares you already held stay
+withdrawable, so a second deposit does not re-lock the first.
+
+The leader cannot shorten the period. `vault_modify` refuses a different
+`new_lock_period_secs`, which is why that field is documented as always rejected
+when it changes.
+
+**The rules, written as rejections.**
+
+| The call | Result |
+|----------|--------|
+| `pnl` at or below zero | **Rejected**, `InvalidParams` — `deposit amount must be positive` |
+| An amount that truncates to zero cents | **Rejected**, `InvalidParams` — `deposit amount rounds to zero cents`. The deposit is stored in cents, and it truncates toward zero |
+| An unknown `vault_id` | **Rejected** — `vault not found: <id>` |
+| A vault the leader has paused | **Rejected** — `vault paused by leader` |
+| A vault that holds value but has **no shares outstanding** | **Rejected** — deposits stay suspended until the leader seeds shares. This closes a share-capture attack: without the guard, one cent into a seeded but shareless vault mints 100% of the shares and captures the leader's seed |
+
+**Response.** Non-order action →
+[`202 Accepted` admission envelope](#202-accepted--non-order-admission). Confirm
+the minted shares through the vault reads. See
+[vaults](../../concepts/vaults.md#depositing).
 
 ---
 
@@ -4290,6 +4692,34 @@ collateral for withdrawal`.
 
 ---
 
+### Retired: the legacy CCTP withdrawal {#withdraw}
+
+:::danger Retired — it has never succeeded on this chain
+`withdraw` decodes and admits normally, so a probe reaches signature recovery and
+an integrator reads that as progress. It is not. Commit then refuses it:
+
+```json
+{"error":{"code":"PRECONDITION_FAILED","message":"precondition failed: withdraw3 disabled; use bridge_withdraw"}}
+```
+
+**The disable height is `0` on both testnet and mainnet.** This action has been
+refused at every commit since genesis. No height changes this,
+and no release turns it on.
+
+Use [`bridge_withdraw`](#bridge_withdraw). It is the only live path out of the
+chain, it carries a real destination address, and it is gated on free collateral.
+:::
+
+The tag stays on the wire so that old fixtures still decode. Its four fields —
+`asset`, `amount`, `destination_chain_id` and `use_cctp` — are all required at
+decode, and they are listed here only so a reader can identify the action. They
+are not a shape to build against, and the signed digest,
+`MetaFluxTransaction:Withdraw`, is not one to implement.
+
+There is no CCTP code path on this chain. `use_cctp` selects nothing.
+
+---
+
 ### Non-bridged actions {#non-bridged-actions}
 
 The following draft action names are **not** wired on the MTF-native `/exchange`
@@ -4301,19 +4731,20 @@ here only to redirect integrators to the supported path.
 |-----------|-----------|-------------|-------------|
 | `Order` (multi) / `Cancel` (multi) | — | Single vs. batch are distinct tags | [`submit_order`](#submit_order) + [`batch_order`](#batch_order); [`cancel_order`](#cancel_order) + [`batch_cancel`](#batch_cancel) |
 | `UpdateMarginMode` | — | No native action | `is_isolated` flag on [`update_leverage`](#update_leverage) |
-| `MultiSig` | `multi_sig` | **Bridged and executing.** Post it as a normal `multi_sig` envelope | [`multi_sig`](../../concepts/multi-sig.md#acting-as-multi-sig) acts; [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
+| `MultiSig` | `multi_sig` | **Bridged and executing.** Post it as a normal `multi_sig` envelope | [`multi_sig`](#multi_sig) acts; [`convert_to_multi_sig_user`](#convert_to_multi_sig_user) *registers* the roster |
 | `RegisterReferrer` | — | Not bridged | [`set_referrer`](#set_referrer) binds by address |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged | — |
-| `WithdrawUsdc` | `withdraw` | Recognized and admitted, but rejected at commit past the network's CCTP-disable height (`"withdraw3 disabled; use bridge_withdraw"`) | [`bridge_withdraw`](#bridge_withdraw) withdraws USDC cross-collateral externally |
+| `WithdrawUsdc` | [`withdraw`](#withdraw) | **Retired.** Recognized and admitted, then rejected at commit — `"withdraw3 disabled; use bridge_withdraw"`. The disable height is `0`, so it has never succeeded here | [`bridge_withdraw`](#bridge_withdraw) withdraws USDC cross-collateral externally |
 | (BOLE pool) | `borrow_lend` | **Bridged and live.** `params.kind` `"Lend"` / `"UnLend"` / `"Repay"` open to any account; `"Borrow"` refused unless the sender is an approved liquidator | — |
 | (vault distribute) | `vault_distribute` | **Bridged and live** — a follower's own self-service deposit | [vaults](../../concepts/vaults.md#depositing) |
 | (Earn pool config) | `create_earn_pool` | **Validator governance, never a user action.** `createEarnPool` (201) is a ⅔-stake vote submitted through node governance. It is the **only** way an Earn pool gets a non-zero borrow rate — see [why that matters](#spot-margin--earn) | [`earn_deposit`](#earn_deposit) auto-creates a pool at rate `0` |
-| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` **is** a bridged alias (no params) for the canonical action's `enroll:false` form; `pm_rebalance` **removed** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
+| (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` **is** a bridged alias (no params) for the canonical action's `enroll:false` form; `pm_rebalance` **retired** → rejected as an unknown action | [`user_portfolio_margin`](#user_portfolio_margin) |
 | (cross-chain) | — | **Not an `/exchange` action at all.** Not in the action enum: it fails decode and returns `400` `INVALID_REQUEST` (`unknown variant`), **not** `ACTION_UNSUPPORTED` | [`CrossChainSend`, CoreWriter action 19](../../evm/interacting-with-core.md) — a MetaFluxEVM call, not an `/exchange` post |
-| (Metaliquidity set) | `set_metaliquidity_set` | **Validator governance, never a user action.** Decodes, then refused `ACTION_UNSUPPORTED` — `"governance actions are operator-injected only (gov-admin lane)"`. A ⅔-stake vote; a valid validator signature is refused here too | [governance actions](#governance-actions-refused) |
-| (spot value adjust) | `gov_adjust_spot_value` | **Validator governance, never a user action.** Same decode-then-refuse answer. `params.value` is hashed **verbatim**, so quorum needs one byte-identical spelling | [governance actions](#governance-actions-refused) |
-| (retired alias) | `encrypted_order_submit` | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
-| `UserDexAbstraction` | `user_dex_abstraction` | **Removed** at the `0.7.0` re-genesis → `ACTION_UNSUPPORTED`. One unified account, so nothing to abstract | — (no replacement) |
+| (Metaliquidity set) | `set_metaliquidity_set` | **Validator governance, never a user action.** Decodes, then refused `ACTION_UNSUPPORTED` (read the code, not the message). A ⅔-stake vote; a valid validator signature is refused here too | [governance and validator actions](#governance-actions-refused) |
+| (spot value adjust) | `gov_adjust_spot_value` | **Validator governance, never a user action.** Same decode-then-refuse answer. `params.value` is hashed **verbatim**, so quorum needs one byte-identical spelling | [governance and validator actions](#governance-actions-refused) |
+| (validator lane) | `gov_vote` `vote_global` `set_mark_mode` `set_pm_shock_grid` `arm_features` `approve_upgrade` `c_validator` `vote_app_hash` | **Validator governance or self-service, never a user action.** Decode, then refused `ACTION_UNSUPPORTED`; a valid validator signature is refused here too | [governance and validator actions](#governance-actions-refused) |
+| (retired alias) | [`encrypted_order_submit`](#encrypted_order_submit) | Retired from the public surface — rejected `400`, error points at the canonical spelling | [`submit_encrypted_order`](#submit_encrypted_order) |
+| `UserDexAbstraction` | `user_dex_abstraction` | **Retired** at the `0.7.0` re-genesis → `ACTION_UNSUPPORTED`. One unified account, so nothing to abstract | — (no replacement) |
 
 ---
 
