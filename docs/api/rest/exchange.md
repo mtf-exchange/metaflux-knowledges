@@ -3774,6 +3774,84 @@ as `0`; encode `expiresAtMs = 0` in the typed struct when you leave it out. See
 
 ---
 
+### Send a token to another account {#send_asset}
+
+The plain user-to-user transfer. It moves ONE asset from the recovered signer to
+`destination`. **Sender-authorized** — no `owner` field; an agent signature
+therefore moves the AGENT's own balance, never the master's.
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:SendAsset`.
+
+```json
+{
+  "type": "send_asset",
+  "params": {
+    "source_dex":      0,
+    "destination_dex": 0,
+    "asset":           100,
+    "destination":     "0xabababababababababababababababababababab",
+    "amount":          "25.5",
+    "to_perp":         false
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `source_dex` | uint32 | `0` = spot, `1`+ = a perp dex | Which ledger the amount leaves |
+| `destination_dex` | uint32 | same | Which ledger it arrives on |
+| `asset` | uint32 | a `signing_id` | The token. `100` is USDC — this is the `signing_id` from [`spot.balances[*]`](./info.md), not the market index |
+| `destination` | hex address | 40 hex chars | Recipient |
+| `amount` | decimal string | `> 0` | Amount, as a JSON string. Carried verbatim into the signed digest, then parsed |
+| `to_perp` | bool | | `true` credits the recipient's perp cross-collateral, `false` their spot balance |
+| `nonce` | uint64 | | Optional inside `params`; the envelope's own `nonce` is the replay guard |
+
+**A send that crosses the spot/perp boundary is a CONVERSION, not a move.** When
+`source_dex` and `destination_dex` sit on opposite sides of that boundary and the
+asset is not USDC, the perp class has no per-asset row to receive units — it
+holds only a USDC-denominated collateral value. So the send is priced at the
+oracle mark. What is conserved is USD value, not unit count. A round trip out and
+back at two different marks therefore returns a different number of units, and
+that is profit or loss, not a defect. A same-class send, and every USDC send, is
+a plain move.
+
+That path is guarded: the mark is clamped to the oracle band, a stale or
+unprotected mark is refused, and the perp debit is gated on free collateral.
+
+### Move your own USDC between spot and perp {#usd_class_transfer}
+
+Moves USDC between YOUR OWN spot balance and YOUR OWN perp cross-collateral. No
+recipient: both sides are the signer.
+
+Its EIP-712 [typed-data](#signing) primary type is
+`MetaFluxTransaction:UsdClassTransfer`.
+
+```json
+{
+  "type": "usd_class_transfer",
+  "params": {
+    "ntl":     "250.5",
+    "to_perp": true
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `ntl` | decimal string | `> 0` | Amount in the **whole-USDC** plane |
+| `to_perp` | bool | | `true` = spot to perp (post collateral). `false` = perp to spot, and that direction is **margin-gated**: it is refused if the withdrawal would leave the account under its maintenance requirement |
+
+:::warning There is no `spot_send` and no `usd_send`
+Those two names are **ledger record kinds**, not actions. They appear on the
+[`ledger_updates`](../ws/subscriptions.md#ledger_updates) feed to say what a
+committed transfer DID. Sending either as an `/exchange` action gets
+`unknown variant`, the same error a misspelled action gets.
+
+To send a token to someone, use `send_asset`. To move your own USDC between spot
+and perp, use `usd_class_transfer`.
+:::
+
 ### Transfer USDC from Core to EVM {#core_evm_transfer}
 
 Move USDC from the **Core clearing ledger** to the **MetaFluxEVM** side: debits

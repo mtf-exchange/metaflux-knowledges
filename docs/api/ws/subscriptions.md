@@ -474,6 +474,7 @@ Per-account money movement, attributed to its **cause**. A record appears only w
 { "channel": "ledger_updates", "data": [ { "kind": "usd_send", "destination": "0x..", "amount": "25.5", "time": 1735689600123 } ] }
 ```
 
+- **These `kind` values are RECORD NAMES, not action names.** `usd_send` and `spot_send` describe what a committed transfer did; neither is an `/exchange` action, and sending one gets `unknown variant`. The actions are [`send_asset`](../rest/exchange.md#send_asset) and [`usd_class_transfer`](../rest/exchange.md#usd_class_transfer).
 - `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver). Two more kinds arrive next release — see [Two record sources arrive next release](#ledger_updates-incoming).
 - **Every `amount` is a whole-token decimal string**, `withdraw` included — there is no raw base-unit field on any record. `amount` is UNSIGNED on every kind listed above; read the direction from the `kind` (the incoming `liquidation` kind below is the one signed exception). Inbound bridge credit amounts and delayed contract calls (which dispatch in a later block) are not yet attributed. The ORDER of records inside one block's array is not part of the contract and it changed this release; correlate on `time` and `kind`, never on position.
 
