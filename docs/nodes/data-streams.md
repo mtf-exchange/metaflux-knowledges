@@ -1081,7 +1081,8 @@ The record is flat. It has no `events` array and no owner address.
   "epoch": 9410,
   "proposer": 2,
   "hash": "0x9c22cbcd0ee34b90987b76f92544e0e64d8f4a0e2b2f7bc1d3f0c8ffb61d0a11",
-  "tx_count": 3
+  "tx_count": 3,
+  "evm_block_number": 235251
 }
 ```
 
@@ -1094,9 +1095,24 @@ The record is flat. It has no `events` array and no owner address.
 | `proposer` | uint64 | index | **Validator-set index** of the leader that proposed this block. Not an address |
 | `hash` | string | — | Block hash, lowercase hex **with** the `0x` prefix. The same value the `block_info` read serves |
 | `tx_count` | uint64 | — | Core actions plus EVM transactions in the block payload |
+| `evm_block_number` | uint64 or `null` | — | The EVM block this Core round minted, or `null` if it minted none |
+
+**`evm_block_number` is the join between a Core round and an EVM block.** The
+EVM mints a block only when its own period elapses, so the ratio to Core rounds
+is not fixed — it moves with the chain's cadence. Read it this way:
+
+- **`null` means this round minted no EVM block.** It is not `0` and it is not
+  a missing key. Do not default a missing key to `0`; that number names a real
+  block.
+- **A number means this round minted that EVM block, empty blocks included.**
+  An EVM block with no transactions still gets a number and still appears
+  here.
+- **The value is this round's own EVM block, not the running EVM tip.** Most
+  rounds carry `null`; only the round that closes an EVM period carries a
+  number, and it is always that block, never a later one.
 
 :::warning
-**Two traps on this record.**
+**Three traps on this record.**
 
 1. **`hash` carries `0x`. The `hash` on `node_fills` and `node_trades` does
    not.** They are different fields with the same name. Do not carry one parsing
@@ -1104,6 +1120,9 @@ The record is flat. It has no `events` array and no owner address.
 2. **`tx_count: 0` is ambiguous.** A genuinely empty block reads `0`. A payload
    the node could not decode also reads `0`. This stream cannot tell the two
    apart. Cross-check against `replica_cmds` when the difference matters.
+3. **`evm_block_number: 0` never appears.** The EVM numbers its blocks from 1,
+   so a round with no EVM block reads `null`, never `0`. If you see `0`, your
+   decoder defaulted a missing field — fix the decoder, not the data.
 :::
 
 ### `node_blocks` against `replica_cmds` {#node_blocks-vs-replica-cmds}

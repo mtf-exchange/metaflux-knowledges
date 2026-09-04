@@ -29,9 +29,10 @@ directly into the L1 it settles against.
   tip. It keeps every receipt and log it produces, in a durable **receipt store**,
   and the block reads rebuild a block from that store, so
   `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getBlockReceipts` and
-  `eth_getBlockByNumber` all answer over the whole range it holds. It stores no
-  raw transactions and no block hashes. See
-  [Receipts and logs](#receipts-and-logs).
+  `eth_getBlockByNumber` all answer over the whole range it holds. It keeps the
+  raw signed transaction from this release forward (no backfill) and stores no
+  block hashes. See [Receipts and logs](#receipts-and-logs) and
+  [the transaction object](#the-transaction-object).
 
 ## Pages {#pages}
 
@@ -303,20 +304,77 @@ every other EVM chain gives you.
 
 #### The transaction object {#the-transaction-object}
 
-`eth_getTransactionByHash` and the two by-index reads render from the receipt,
-not from the raw transaction, because no node keeps the raw transaction. Four
-fields therefore carry placeholders:
+`eth_getTransactionByHash`, the two by-index reads, and a full transaction
+object embedded in a block read all render from the receipt store. From this
+release forward the store keeps the raw signed transaction, so these fields
+are the real signed values, not placeholders:
 
-| Field | Value | Why |
-|-------|-------|-----|
-| `input` | `0x` | the calldata is not retained |
-| `gas` | the gas the transaction USED | the original limit is not retained; this is the receipt's `gasUsed`, not the limit you signed |
-| `v` · `r` · `s` | `0x0` | the signature is not retained, so the sender cannot be re-derived from it |
-| `contractAddress` (on the receipt) | `null`, even for a real deployment | the created address is not recorded |
+| Field | Value |
+|-------|-------|
+| `type` | the real envelope type: `0x0` legacy, `0x2` EIP-1559 |
+| `gas` | the gas limit the sender SIGNED |
+| `gasPrice` | the price the sender SIGNED: the legacy `gasPrice`, or an EIP-1559 transaction's `maxFeePerGas` |
+| `maxFeePerGas` · `maxPriorityFeePerGas` | present on an EIP-1559 transaction only; absent on a legacy one |
+| `input` | the real calldata |
+| `v` · `r` · `s` | the real signature |
 
-**`gas` is the one that misleads**, because it is a plausible number in the right
-place. Do not read it as the limit. Do not re-derive a sender from `v/r/s`; use
-`from`, which is exact.
+**Three fields changed meaning, not just value.**
+
+- `gas` held the gas the transaction USED. Now it holds the gas LIMIT the
+  sender signed. A client that still renders it as "gas used" reports the
+  wrong number.
+- `gasPrice` was a fixed value, the same number `eth_gasPrice` returns. Now it
+  is the price the sender actually signed.
+- `type` was always `0x0`. Now it is the real envelope type, so an EIP-1559
+  transaction reads `0x2`.
+
+##### Rows with no raw bytes {#rows-with-no-raw-bytes}
+
+Three kinds of row keep no raw bytes, and all three fall back to the OLD
+placeholders:
+
+- A transaction committed **before this release**. **There is no backfill**:
+  its raw bytes were never stored, and none will be added later. The
+  placeholder is permanent for that row.
+- A **system-lane call**. No user signs it, so there is nothing to store.
+- Any row served by a node that runs [without a receipt
+  store](#no-store-node). Its in-memory window drops the raw bytes on
+  arrival, so this applies to every transaction such a node serves, not only
+  an old one.
+
+A placeholder row renders:
+
+| Field | Value |
+|-------|-------|
+| `type` | `0x0`, even when the sender actually used EIP-1559 |
+| `gas` | the gas the transaction USED (the pre-release placeholder) |
+| `gasPrice` | the same fixed value `eth_gasPrice` returns |
+| `input` | `0x` |
+| `v` | `0x0` |
+| `r` · `s` | `0x0` (32 zero bytes) |
+
+`maxFeePerGas` and `maxPriorityFeePerGas` are absent from a placeholder row,
+whatever envelope the sender actually used.
+
+**Tell the two apart from the signature, not from `gas` or `type`.** A real
+secp256k1 signature never signs `r == 0`. So a non-zero `r` (or `s`) means
+every field on that transaction is the real signed value; `r == 0x0` together
+with `v == 0x0` means the row carries no raw bytes and every field above is
+the old placeholder. Do not decide from `gas` or `type` alone — a
+placeholder's gas-used value can coincidentally match a real gas limit, and
+its `type` reads the same `0x0` a genuine legacy transaction also reports.
+
+##### `contractAddress` stays null {#contractaddress-stays-null}
+
+`contractAddress` on a receipt reads `null` for every transaction, deployment
+included, on both old and new rows. This is unrelated to the raw-bytes change
+above.
+
+The field is carried, not missing: the receipt row reserves a slot for it, so
+a future release can fill it in with no wire-shape change. It is never
+populated today. revm reports the created address after a deployment runs,
+but the node drops that address before it reaches the stored receipt. Read a
+`null` here as "not implemented yet", not as a sign the deployment failed.
 
 To learn a contract's address after a deployment, compute it locally from the
 sender and the nonce — ethers v6 and viem both do this without an RPC call.
@@ -352,6 +410,12 @@ bounded in-memory window instead: recent receipts only, emptied by a restart.
 Such a node reports its own `earliestBlock` and refuses anything before it with
 the same `-32001`. The error shape does not change, so one client handles both.
 
+**This window drops the raw signed transaction on arrival**, to keep memory
+bounded — see [rows with no raw bytes](#rows-with-no-raw-bytes). So every
+transaction a store-less node serves carries the OLD placeholders, even one
+signed and mined after this release. Point a client that needs the real signed
+values at a node running the durable store instead.
+
 ### What the node keeps {#what-the-node-keeps}
 
 | Data | Kept? |
@@ -359,7 +423,7 @@ the same `-32001`. The error shape does not change, so one client handles both.
 | Account state — balances, nonces, contract code, contract storage | **Yes**, as committed state, readable at the tip |
 | Receipts and logs | **Yes**, on disk, from the [earliest block](#no-backfill) forward |
 | Block bodies — the transaction list of any block | **Derived** from the receipts, over the same span |
-| The raw signed transaction — calldata, gas limit, signature | **No** |
+| The raw signed transaction — calldata, gas limit, signature | **Yes**, from this release forward; no backfill for a row committed before it |
 | Block hashes | **No** |
 
 A node keeps **state** and **receipts**. State is what every node must agree on;
@@ -369,8 +433,10 @@ landed must stay provable. The block reads rebuild a block's transaction list an
 `gasUsed` from those receipts, which is why they cover exactly the receipt span
 and no more.
 
-The RAW transaction is a separate matter: nothing keeps it, so the fields only it
-carries cannot be served — see [the transaction object](#the-transaction-object).
+The raw transaction now rides inside the same receipt row. A row written before
+this release carries none, and none will be added later — see
+[the transaction object](#the-transaction-object) for how a caller tells the two
+kinds of row apart.
 
 **The `[]` trap is gone.** An empty `eth_getLogs` result used to mean either "the
 record was emptied" or "nothing matched", and no caller could tell which. The
@@ -384,8 +450,8 @@ nothing matched.
   [earliest block](#no-backfill) forward. You no longer have to mirror them.
 - **A block body is rebuilt from those same receipts.** `eth_getBlockByNumber`
   serves the transaction list and `gasUsed` of any block in the receipt span. It
-  cannot go further back, and it cannot serve the raw transaction — see
-  [the transaction object](#the-transaction-object).
+  cannot go further back, and a row from before this release still has no raw
+  transaction to serve — see [the transaction object](#the-transaction-object).
 - **Core trading history comes from the native API**, not from the EVM RPC. Fills,
   orders, funding and closed positions are served by
   [`POST /info`](../api/rest/info.md) and by
@@ -393,9 +459,8 @@ nothing matched.
 
 :::note
 **The receipts are the archive.** A block read, a log query and a receipt query
-all answer from the one store and all stop at the same earliest block. The chain
-keeps no block hashes and no raw transactions, and that is not a scheduled
-change, so do not design against it.
+all answer from the one store and all stop at the same earliest block. The
+chain keeps no block hashes; that is permanent, so do not design against it.
 :::
 
 ### Batch requests {#batch-requests}
