@@ -75,7 +75,7 @@ market lifecycle:
 | `perp_deactivate_market` | Close to new orders. Existing positions remain |
 | `perp_set_fba_mode` | Set the matching venue: `0` returns the market to the CLOB, `100`-`5000` runs a frequent batch auction with that period in ms |
 | `perp_set_sub_deployers` | Grant or revoke a delegate, all powers at once. Deployer-authority only |
-| `perp_set_sub_deployer_perms` | Grant a delegate an exact permission mask. Deployer-authority only. **Not live until the next release** |
+| `perp_set_sub_deployer_perms` | Grant a delegate an exact permission mask. Deployer-authority only |
 | `perp_set_oracle` | **RETIRED.** Refused from the next release — see below |
 
 :::info
@@ -104,10 +104,10 @@ Two rules bound it:
   reads as the full mask afterwards, exactly the authority it has today. Narrow
   one by sending the mask you want it to keep.
 
-:::warning Not live yet
-The bits land with the next release. Until it fires, a delegate holds every
-deployer power, and `perp_set_sub_deployer_perms` is refused with
-`unknown variant`.
+:::warning Grant the mask explicitly
+A delegate added by `perp_set_sub_deployers` alone holds every deployer power.
+The mask narrows it, so send `perp_set_sub_deployer_perms` with the mask you
+want the delegate to keep.
 :::
 
 ## `perp_set_oracle` is retired {#perp-set-oracle-retired}

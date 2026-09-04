@@ -361,10 +361,12 @@ signer is the deployer.
 ### Perp deployer actions {#perp-deployer-actions}
 
 :::warning
-**Not live yet.** These types land with the next release. The chain refuses them
-until that release fires, so expect `unknown variant` until then.
+**`PerpSetSubDeployerPerms` is LIVE.** Measured on the public testnet: the node
+accepts the variant and asks for its `params`, while a made-up action name in
+the same request answers `unknown variant`. That control is what separates the
+two answers.
 
-**`PerpRegisterAsset` also CHANGES in that release.** It gains `string name`, the
+**`PerpRegisterAsset` also CHANGES in a coming release.** It gains `string name`, the
 name of the dex the market joins. The type string below is the NEW one, so the
 digest moves: a signature built over the old struct, without `name`, is invalid
 after the upgrade, and a signature over the new struct is invalid before it.
@@ -392,8 +394,7 @@ delegates hold.
 
 - **`PerpSetSubDeployerPerms` is new.** It grants a delegate an exact permission
   mask instead of every power. `permissions` is in the digest, so one signature
-  binds one (market, delegate, mask) triple. The node refuses the action until the
-  release fires. The bit table is on
+  binds one (market, delegate, mask) triple. The bit table is on
   [`perp_set_sub_deployers`](../api/rest/exchange.md#perp_set_sub_deployers).
 - **`PerpSetOracle` is retired.** The type string is NOT deleted and every
   committed payload still decodes, but the node refuses the action after the

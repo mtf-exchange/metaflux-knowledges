@@ -1,19 +1,26 @@
 ---
-description: The next release turns every `oid` and `tid` on a response into a decimal-digit string, gives `order_status` all its fill legs and real terminal states, labels the token a fill's fee is charged in, puts margin and funding on one plane, rejects four inputs that used to pass, removes the two explorer WS channels, makes EVM receipts and logs survive a restart, and stops the EVM RPC answering a non-tip block reference with the tip.
+description: Every row on this page is LIVE. One release turned every `oid` and `tid` into a decimal-digit string, gave `order_status` all its fill legs and real terminal states, labelled the token a fill's fee is charged in, put margin and funding on one plane, rejected four inputs that used to pass, removed the two explorer WS channels, made EVM receipts and logs survive a restart, and stopped the EVM RPC answering a non-tip block reference with the tip.
 ---
 
 # Upgrade notice — id strings and wire shapes
 
-:::warning
-**NOT LIVE YET.** This page is written ahead of the release, so the reference and
-the two client SDKs move as one batch. **The live chain still serves the OLD
-shapes on every row below.** Do not code against this page until the release
-lands; read it now so the change is not a surprise.
+:::tip
+**LIVE. Every row below has shipped.** This page was written ahead of the
+release so the reference and the two client SDKs moved as one batch. The
+release has landed, and each row was re-measured on the public testnet
+afterwards. Code against it.
 
-Everything here is read-side. No signing domain moves, no signed payload
-changes, and no consensus rule changes. `{"type":"account_state","address":"0x…"}`
-carries the live `height` if you need to check where the chain is.
+It stays published as the record of what changed and when, for anyone whose
+client still assumes the old shapes. If your client reads `tid` as a JSON
+number, or treats a spot `taker_fee_bps` of `null` as a zero rate, read
+[Ids become decimal-digit strings](#id-strings) and
+[The spot taker fee](#spot-taker-fee) — those two are the rows that corrupt
+data silently rather than erroring.
+
+Everything here is read-side. No signing domain moved, no signed payload
+changed, and no consensus rule changed.
 :::
+
 
 One release moves every row below at one boundary. Each row is something a
 caller can observe.
@@ -364,7 +371,7 @@ unchanged and remains the live path.
 
 ## The EVM JSON-RPC keeps receipts, and stops answering the wrong block {#evm-rpc}
 
-Three rows. All three were measured, and all three are silent today.
+Three rows. All three are live, and all three were re-measured after the release.
 
 ### Receipts survive a restart, and a release {#evm-receipts-durable}
 

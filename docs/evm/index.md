@@ -66,18 +66,6 @@ returns today's value. Receipts and logs are the one durable exception — see
 and [What the node keeps](#what-the-node-keeps) before you write a client.
 :::
 
-:::info Not live until the next release
-Four things change in the next release: the two block reads, the `eth_call`
-block environment, the block header's `miner`, and the whole of
-[Receipts and logs](#receipts-and-logs). **The live chain still serves the old
-behaviour**: the block reads answer every request with the tip, `eth_call` runs
-against a placeholder environment, `miner` reads all-zero, receipts live in
-memory and die with the process, and `eth_getBlockReceipts` is not a method.
-This page states the shipped target, and each affected row says what the live
-chain does today. See the
-[upgrade notice](../api/upgrade-notice-ids-and-shapes.md#evm-rpc).
-:::
-
 ### Method support {#method-support}
 
 **Block tag** means the `latest` / `pending` / `0x<number>` argument, or the block
@@ -90,7 +78,7 @@ hash that `eth_getBlockByHash` takes.
 | `eth_getBalance` | **ignored** | reads the tip |
 | `eth_getTransactionCount` | **ignored** | reads the tip |
 | `eth_getCode` | **ignored** | reads the tip |
-| `eth_getStorageAt` | **ignored** | reads the tip |
+| `eth_getStorageAt` | **ignored** | reads the tip. The slot is a QUANTITY, so `0x9` and the padded 64-digit form name the same key; a full 32-byte slot (every `keccak256(key . slot)` mapping slot) is accepted. Over 64 hex digits is refused with `-32602` |
 | `eth_call` | **ignored** | runs at the tip; see [the block environment](#eth_call-block-environment) |
 | `eth_estimateGas` | **ignored** | a real execution at the tip; see [below](#eth_estimategas-executes) |
 | `eth_gasPrice` · `eth_maxPriorityFeePerGas` | none | fixed informational values; there is no priority-fee market |
@@ -106,8 +94,27 @@ hash that `eth_getBlockByHash` takes.
 | `eth_sendRawTransaction` | none | see [Transaction submission](#transaction-submission) |
 | `eth_sendTransaction` | none | refused with `-32000`: the node holds no user keys |
 | `eth_subscribe` · `eth_unsubscribe` | none | WebSocket only; over HTTP they return `-32000` |
+| `eth_syncing` | none | `false` once replay finished. While the node is replaying it answers the progress object instead, because the RPC is already serving then and a `false` would say the reads can be trusted |
+| `eth_accounts` | none | always `[]` — the node custodies no keys, so it can name no account. Sign locally |
+| `eth_coinbase` | none | the same address every block header names as `miner` |
+| `eth_getUncleCountByBlockNumber` · `eth_getUncleCountByBlockHash` | accepted | always `0x0` |
+| `eth_getUncleByBlockNumberAndIndex` · `eth_getUncleByBlockHashAndIndex` | accepted | always `null` |
+| `eth_mining` · `eth_hashrate` | none | `false` and `0x0`. There is no proof of work here |
 
 Any other method returns JSON-RPC error `-32601`.
+
+**Three absences are deliberate, not gaps.** A stub for any of them would be a
+lie a caller cannot detect:
+
+| Method | Why it does not exist |
+|--------|-----------------------|
+| `eth_getProof` | The app hash is a fold, not a Merkle-Patricia trie. There is no proof to return, so there is nothing to verify against |
+| `eth_createAccessList` | Access lists cost nothing here — the gas schedule has no EIP-2929 warm/cold split to pre-pay |
+| `net_peerCount` | Consensus topology is not a client read |
+
+**There are no uncles at any height, ever.** The chain finalizes one block per
+consensus round and orphans none, so the uncle reads are constants and the block
+header's `sha3Uncles` is always the empty-list hash. Do not walk them.
 
 **An ignored block tag is never an error.** The call succeeds and returns current
 data. A query for a past balance returns today's balance, with no signal that the
