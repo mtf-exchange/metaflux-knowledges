@@ -148,22 +148,29 @@ different stores back them and each prunes on its own schedule.
 Measured on the public testnet in one moment:
 
 ```
-eth_getBlockByNumber("0x1")  -> -32001  data.earliestBlock 0x37de4   (229348)
+eth_getBlockByNumber("0x1")  -> -32001  data.earliestBlock 0x37de4   (228836)
 eth_getBlockReceipts("0x1")  -> -32001  data.earliestBlock 0x28261   (164449)
 eth_getLogs from 0x1         -> -32001  data.earliestBlock 0x28261   (164449)
 ```
 
-Nearly 65,000 blocks apart. A caller that reads the floor from `eth_getLogs` and
-then walks with `eth_getBlockByNumber` meets `-32001` long before it reaches the
+64,387 blocks apart. A caller that reads the floor from `eth_getLogs` and then
+walks with `eth_getBlockByNumber` meets `-32001` long before it reaches the
 number it was told, and the walk looks broken when it is not.
 
-**Read the floor from the SAME method you intend to call**, and re-read it: a
-floor RISES as the node prunes, and it rises in steps rather than one block at a
-time, so a value cached at the start of a long backfill goes stale beneath you.
+**Read the floor from the SAME method you intend to call.** One out-of-range
+request is all it takes — ask for block `0x1` and read `data.earliestBlock` off
+the error. There is no bisection and no separate endpoint.
 
-One out-of-range request is all it takes — ask for block `0x1` and read
-`data.earliestBlock` off the error. There is no bisection and no separate
-endpoint.
+**Neither floor is a retention horizon, and neither moves.** Nothing prunes
+these rows. Each floor is a START MARK: the first block that index ever
+recorded. The two differ because the two indexes shipped in different releases,
+so the gap between them is fixed — it does not close on its own and it does not
+widen.
+
+That has one consequence worth planning around: a surface that reaches deeper
+today will still reach deeper tomorrow. If you need both log-emitting and
+log-less transactions, run two walks against their own floors rather than
+picking one surface and hoping the shallower floor catches up.
 
 **`null` and `-32001` are not interchangeable.** `null` means "not yet"; poll
 again and it will appear. `-32001` means "gone, and it is not coming back";
