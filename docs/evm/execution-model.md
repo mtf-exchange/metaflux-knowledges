@@ -89,7 +89,7 @@ a duplicate inside the EVM.
 
 ## State and history {#state-and-history}
 
-The EVM keeps **state** and **receipts**. It does not keep block bodies.
+The EVM keeps **state** and **receipts**. It keeps no raw transactions.
 
 - **State is durable.** Account balances, nonces, contract code and contract
   storage are committed state. Every node holds the same state and serves it at
@@ -98,21 +98,22 @@ The EVM keeps **state** and **receipts**. It does not keep block bodies.
   every committed EVM transaction to disk, outside the state commitment. See
   [Receipts and logs](index.md#receipts-and-logs) for the range each node holds
   and for the two errors that guard it.
-- **Block bodies are not kept.** No node stores a past EVM block body or a past
-  transaction list. A block executes once; what survives is the state it
-  produced and the receipts it wrote, not the block.
+- **A block body is DERIVED from those receipts.** No node stores a block body as
+  such; `eth_getBlockByNumber` rebuilds the transaction list and `gasUsed` from
+  the receipt rows, so it covers exactly the receipt range.
+- **The raw transaction is not kept.** The calldata, the declared gas limit and
+  the signature are gone once the block executes, so no read can return them —
+  see [the transaction object](index.md#the-transaction-object).
 - **Block hashes are not kept either.** The state store reserves a number-keyed
   slot for block hashes, to back the `BLOCKHASH` opcode. Nothing writes that slot
   today, so `BLOCKHASH` returns `0x0` in a committed transaction, for every
   number. Do not build on it.
 
-State is what every node must agree on. A past block body is not, so nothing on
-the chain is obliged to carry it. This is a deliberate shape, and it sets what
-the JSON-RPC can serve: reads at the tip, plus the receipt series. A block
-reference that is not the tip has no answer, so the RPC returns `null` for it
-rather than serving the tip in its place. **That `null` is not live until the
-next release**, and neither are durable receipts — see the
-[upgrade notice](../api/upgrade-notice-ids-and-shapes.md#evm-block-null).
+State is what every node must agree on. A block body is not, so nothing on the
+chain is obliged to carry it — that it can be rebuilt at all is a property of the
+receipts, not a commitment. This sets what the JSON-RPC can serve: reads at the
+tip, plus everything the receipt series supports. A block above the tip returns
+`null`; a block below the earliest receipt returns `-32001`.
 
 See [Method support](index.md#method-support) for which methods this limits, and
 [Where to get past data](index.md#where-to-get-past-data) for what each kind of

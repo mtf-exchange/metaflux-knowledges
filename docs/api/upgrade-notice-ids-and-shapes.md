@@ -425,9 +425,55 @@ handles it.
 The block header's `miner` moves with them: it was all-zero and it becomes the
 burn coinbase, so the header agrees with the `COINBASE` an execution sees.
 
-**This is not history serving, and it will not become it by asking.** The node
-stores no EVM block bodies, so there is nothing to read back. Whether it should
-is an open product question, not a defect.
+**Superseded — see [The block reads answer a range](#evm-block-range) below.**
+This section stood for one release. The paragraph that used to sit here said
+block reads would never serve history; that was wrong, and the next section says
+why.
+
+### The block reads answer a range {#evm-block-range}
+
+`eth_getBlockByNumber` and `eth_getBlockByHash` now serve **any block from the
+earliest retained block to the tip**, with a real `transactions` list and a real
+`gasUsed`. The block body is rebuilt from the receipt rows, which is why the span
+is exactly the receipt span.
+
+The two out-of-range answers are different and must be handled differently:
+
+| Request | Answer | Meaning |
+|---------|--------|---------|
+| above the tip | `null` | not yet; poll again |
+| below the earliest block | `-32001`, with `data.earliestBlock` | gone; polling never resolves it |
+
+**This is the row that broke wallets.** MetaMask fetches
+`eth_getBlockByHash(receipt.blockHash)` after a receipt arrives, and destructures
+`baseFeePerGas` and `timestamp` from the result. The previous `null` threw inside
+that destructure, so a transaction that had CONFIRMED stayed on screen as pending,
+retrying every block. Any client that reads the block after the receipt hit the
+same wall.
+
+`timestamp` is now recorded per block, so a past block reports the time its own
+`TIMESTAMP` opcode saw — not the time you asked.
+
+Four methods arrive with it, all slices of the same block:
+`eth_getBlockTransactionCountByNumber`, `eth_getBlockTransactionCountByHash`,
+`eth_getTransactionByBlockNumberAndIndex`, `eth_getTransactionByBlockHashAndIndex`.
+
+The roots stay all-zero, permanently: MTF commits no block header, so there is no
+root to report. See [The block reads](../evm/index.md#the-block-reads).
+
+### `eth_estimateGas` executes {#evm-estimate-gas}
+
+`eth_estimateGas` returned an intrinsic-gas formula — base cost, creation
+surcharge, per-calldata-byte cost — and ran no code. **Every contract interaction
+sent with a default wallet or library therefore ran out of gas, reverted, and
+burned the gas.** An ERC-20 `transfer` estimated about 21.6k against a real cost
+several times that.
+
+It now runs the call through the same simulation `eth_call` uses and returns the
+larger of the pre-refund gas consumed and the EIP-7623 calldata floor. A
+reverting call is an error, as it is on geth.
+
+A plain native transfer still estimates 21000, so nothing changes for that path.
 
 ### `eth_call` runs in the committed block environment {#evm-call-env}
 

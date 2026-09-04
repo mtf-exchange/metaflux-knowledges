@@ -26,10 +26,12 @@ directly into the L1 it settles against.
   with a sequential-equivalent committed state.
 - **EIP-1559 base-fee burn** to a burn-address coinbase.
 - **State plus receipts** — the chain keeps account state and serves it at the
-  tip. It stores no past block bodies. It does keep every receipt and log it
-  produces, in a durable **receipt store**, so `eth_getTransactionReceipt`,
-  `eth_getLogs` and `eth_getBlockReceipts` answer over the whole range that store
-  holds. See [Receipts and logs](#receipts-and-logs).
+  tip. It keeps every receipt and log it produces, in a durable **receipt store**,
+  and the block reads rebuild a block from that store, so
+  `eth_getTransactionReceipt`, `eth_getLogs`, `eth_getBlockReceipts` and
+  `eth_getBlockByNumber` all answer over the whole range it holds. It stores no
+  raw transactions and no block hashes. See
+  [Receipts and logs](#receipts-and-logs).
 
 ## Pages {#pages}
 
@@ -89,11 +91,13 @@ hash that `eth_getBlockByHash` takes.
 | `eth_getCode` | **ignored** | reads the tip |
 | `eth_getStorageAt` | **ignored** | reads the tip |
 | `eth_call` | **ignored** | runs at the tip; see [the block environment](#eth_call-block-environment) |
-| `eth_estimateGas` | **ignored** | an intrinsic-gas formula, not a simulation; see [below](#eth_estimategas-is-a-lower-bound) |
+| `eth_estimateGas` | **ignored** | a real execution at the tip; see [below](#eth_estimategas-executes) |
 | `eth_gasPrice` · `eth_maxPriorityFeePerGas` | none | fixed informational values; there is no priority-fee market |
 | `eth_feeHistory` | range echoed | the shape is correct, the numbers are constants: `gasUsedRatio` is `0` and every `reward` is `0x0` |
-| `eth_getBlockByNumber` | **tip only** | a tag, or the tip's own number, returns the tip header; every other reference returns `null` — see [below](#the-block-reads-serve-the-tip-only) |
-| `eth_getBlockByHash` | **tip only** | only the tip's hash resolves; every other hash returns `null` |
+| `eth_getBlockByNumber` | **honoured** | any block from the earliest block to the tip; see [below](#the-block-reads) |
+| `eth_getBlockByHash` | **honoured** | the hash is number-keyed, so it resolves the same range |
+| `eth_getBlockTransactionCountByNumber` · `eth_getBlockTransactionCountByHash` | **honoured** | the transaction count of one block |
+| `eth_getTransactionByBlockNumberAndIndex` · `eth_getTransactionByBlockHashAndIndex` | **honoured** | one transaction by position; `null` past the end |
 | `eth_getLogs` | **honoured** | `fromBlock` / `toBlock` scan the [receipt store](#receipts-and-logs). A range starting before the earliest block is refused with `-32001`, an oversized scan with `-32005`, a `blockHash` filter with `-32602` |
 | `eth_getBlockReceipts` | **honoured** | every receipt of one block, in `transactionIndex` order. A block before the earliest block is refused with `-32001` |
 | `eth_getTransactionByHash` | none | `null` for an unknown hash |
@@ -108,46 +112,50 @@ Any other method returns JSON-RPC error `-32601`.
 data. A query for a past balance returns today's balance, with no signal that the
 tag did nothing. Do not read a historical value through this RPC.
 
-The four **honoured** and **tip only** rows are the exception: they refuse a
-reference they cannot serve instead of answering with something else.
+The **honoured** rows are the exception: they refuse a reference they cannot
+serve instead of answering with something else.
 
-#### The block reads serve the tip only {#the-block-reads-serve-the-tip-only}
+#### The block reads {#the-block-reads}
 
-The node stores no EVM block bodies, so the tip is the only block it can answer
-for. The two reads say so instead of guessing.
+A block read answers for any block from the earliest block the node retains to
+the committed tip. Outside that span it says which way it is outside, and the two
+answers mean different things.
 
 | Request | Answer |
 |---------|--------|
-| `latest` · `pending` · `safe` · `finalized` | the tip header |
-| the tip's own number | the tip header |
-| `earliest`, a past number, a future number, anything unparsable | `null` |
-| `eth_getBlockByHash` with the tip's hash | the tip header |
+| `latest` · `pending` · `safe` · `finalized` | the tip |
+| `earliest` | the earliest block the node retains |
+| a number in `[earliest, tip]` | that block |
+| a number above the tip | `null` — that block does not exist YET |
+| a number below the earliest block | `-32001`, with `data.earliestBlock` |
+| `eth_getBlockByHash` with a number-keyed hash in range | that block |
 | `eth_getBlockByHash` with any other hash | `null` |
 
-`null` is the standard JSON-RPC answer for "no such block", and every EVM client
-already handles it.
+**`null` and `-32001` are not interchangeable.** `null` means "not yet"; poll
+again and it will appear. `-32001` means "gone, and it is not coming back";
+polling never resolves it. A client that treats the second as the first retries
+for ever.
 
-:::warning Live behaviour today
-**The live chain returns the TIP for every request instead.** Three calls for
-`0x1`, `0x3e8` and `0x186a0` came back with three different rising numbers, each
-one the tip at the moment of the call. The body is well formed and carries a
-`number` the caller never asked for, so a client that trusts it indexes the wrong
-block and sees no error.
+`transactions` and `gasUsed` are real. Pass `true` as the second argument for
+whole transaction objects, `false` (or nothing) for hashes. An **empty block is a
+real block**: it renders with `transactions: []` and `gasUsed: 0x0`, which is a
+different answer from `null`.
 
-**Until the release lands, compare the echoed `number` with the number you
-requested and treat a mismatch as a failure.** That guard is correct against both
-behaviours, so write it once and keep it.
-:::
+`timestamp` is the value the `TIMESTAMP` opcode saw in that block, recorded per
+block. It is not the time the node answered you.
 
-Every header also carries fixed placeholder fields, on the HTTP read and on the
-`newHeads` stream alike:
+##### Fields that stay placeholders
+
+These are permanent, not a gap waiting on a release. MTF commits no block header,
+so there is no root to report and nothing to hash. They are on the HTTP read and
+the `newHeads` stream alike.
 
 | Field | Value | Why |
 |-------|-------|-----|
-| `transactions` | `[]`, even when you pass `true` | no block body is stored |
-| `gasUsed` | `0x0` | the transaction list it sums is not stored |
-| `transactionsRoot` · `receiptsRoot` · `stateRoot` | all-zero | left zero rather than faked |
+| `transactionsRoot` · `receiptsRoot` · `stateRoot` | all-zero | no header is committed, so there is no root; left zero rather than faked |
+| `logsBloom` | all-zero | same; filter with `eth_getLogs` instead |
 | `hash` · `parentHash` | the block number in the low 8 bytes | a number-keyed derivation, not a hash of the block |
+| `size` · `difficulty` · `totalDifficulty` | `0x0` | no encoded block, no proof of work |
 | `miner` | the burn coinbase | the address EIP-1559 base fees burn to, so the header agrees with the `COINBASE` an execution sees |
 
 Do not treat `hash` as a commitment to the block contents, and do not use it to
@@ -176,33 +184,22 @@ block hashes (see [What the node keeps](#what-the-node-keeps)), so `0x0` is what
 committed execution itself returns. A contract that uses `blockhash()` for
 randomness or as a proof gets zero, not entropy.
 
-:::warning Live behaviour today
-**The live chain runs `eth_call` in a placeholder environment**, so a simulation
-disagrees with the execution it simulates, with no error either way: `TIMESTAMP`
-reads `0x1`, `COINBASE` and `PREVRANDAO` read `0x0`, `GASLIMIT` and `BASEFEE` are
-baked constants, and `BLOCKHASH` returns a value derived from the requested
-number instead of `0x0`.
+#### `eth_estimateGas` executes {#eth_estimategas-executes}
 
-**A `view` function that branches on `block.timestamp` — an expiry, a deadline, a
-funding window — therefore simulates against timestamp 1 and can return the wrong
-branch.** Until the release lands, pass the time in as an argument when the
-simulation has to be correct.
-:::
+`eth_estimateGas` runs the call through the same simulation `eth_call` uses, then
+returns the larger of two figures: the gas the run consumed BEFORE its refund, and
+the EIP-7623 calldata floor.
 
-#### `eth_estimateGas` is a lower bound {#eth_estimategas-is-a-lower-bound}
+Both terms are load-bearing. A receipt reports gas AFTER the refund, and EIP-3529
+lets that be a fifth lower than what the transaction needed to run — a limit set
+from a receipt runs out of gas on anything that clears storage. The floor binds in
+the other direction: a calldata-heavy transaction is charged the floor even when
+it executes for less.
 
-`eth_estimateGas` charges the intrinsic-gas rule only: the base cost, the creation
-surcharge, and the per-calldata-byte cost. It runs no execution and it does no
-binary search. A call that touches storage costs more than the estimate. Set your
-own gas limit for anything past a plain transfer.
+One execution, no binary search. **It does not cover a contract that branches on
+`gasleft()`.** Pass an explicit `gas` if yours does.
 
 ### Receipts and logs {#receipts-and-logs}
-
-:::warning Live behaviour today
-**On the live chain a receipt lives in memory only, and a release forgets it.**
-Every row in this section arrives with the next release. Until it lands, read a
-receipt promptly after you send the transaction, and keep the result yourself.
-:::
 
 Receipts are the one part of EVM history the chain keeps. Each node writes the
 receipt and the logs of every committed EVM transaction into a durable **receipt
@@ -304,6 +301,50 @@ every other EVM chain gives you.
 
 `eth_getLogs` returns logs in `(block, transactionIndex, logIndex)` order.
 
+#### The transaction object {#the-transaction-object}
+
+`eth_getTransactionByHash` and the two by-index reads render from the receipt,
+not from the raw transaction, because no node keeps the raw transaction. Four
+fields therefore carry placeholders:
+
+| Field | Value | Why |
+|-------|-------|-----|
+| `input` | `0x` | the calldata is not retained |
+| `gas` | the gas the transaction USED | the original limit is not retained; this is the receipt's `gasUsed`, not the limit you signed |
+| `v` · `r` · `s` | `0x0` | the signature is not retained, so the sender cannot be re-derived from it |
+| `contractAddress` (on the receipt) | `null`, even for a real deployment | the created address is not recorded |
+
+**`gas` is the one that misleads**, because it is a plausible number in the right
+place. Do not read it as the limit. Do not re-derive a sender from `v/r/s`; use
+`from`, which is exact.
+
+To learn a contract's address after a deployment, compute it locally from the
+sender and the nonce — ethers v6 and viem both do this without an RPC call.
+
+#### `mtfStatus` on a receipt {#mtf-status}
+
+Every `eth_getTransactionReceipt` carries a non-standard `mtfStatus` field
+alongside the standard `status`. `status` is spec-correct on its own: `0x1` for a
+success, `0x0` for everything else. A client that ignores unknown fields is
+unaffected.
+
+`mtfStatus` says WHY a `0x0` happened, and it is the only place that distinction
+is on the wire:
+
+| `mtfStatus` | Meaning |
+|-------------|---------|
+| `success` | executed and succeeded |
+| `reverted` | executed and reverted |
+| `bad_nonce` | mined, never executed: the nonce did not match |
+| `insufficient_funds` | mined, never executed: the sender could not pay |
+| `not_executed_calldata` | mined, never executed: the calldata path was closed |
+
+**Why it exists:** MTF receipts a transaction that failed a pre-check. Standard
+Ethereum never includes such a transaction in a block, so a standard client
+assumes any receipt means the nonce was consumed. On MTF that assumption is wrong
+for the last three rows. Read `mtfStatus`, or read `gasUsed == 0x0`, before you
+conclude a nonce was spent.
+
 #### A node without the store {#no-store-node}
 
 The receipt store is opt-in per node. A node that runs without it keeps a
@@ -317,13 +358,19 @@ the same `-32001`. The error shape does not change, so one client handles both.
 |------|-------|
 | Account state — balances, nonces, contract code, contract storage | **Yes**, as committed state, readable at the tip |
 | Receipts and logs | **Yes**, on disk, from the [earliest block](#no-backfill) forward |
-| Block bodies — the transaction list of any block | **No** |
+| Block bodies — the transaction list of any block | **Derived** from the receipts, over the same span |
+| The raw signed transaction — calldata, gas limit, signature | **No** |
 | Block hashes | **No** |
 
-A node keeps **state** and **receipts**. It keeps no block bodies. State is what
-every node must agree on; a past block body is not, so nothing on the chain is
-obliged to carry it. Receipts are kept because a caller cannot work without
-them: a transaction that certainly landed must stay provable.
+A node keeps **state** and **receipts**. State is what every node must agree on;
+a block body is not, so nothing on the chain is obliged to carry it. Receipts are
+kept because a caller cannot work without them: a transaction that certainly
+landed must stay provable. The block reads rebuild a block's transaction list and
+`gasUsed` from those receipts, which is why they cover exactly the receipt span
+and no more.
+
+The RAW transaction is a separate matter: nothing keeps it, so the fields only it
+carries cannot be served — see [the transaction object](#the-transaction-object).
 
 **The `[]` trap is gone.** An empty `eth_getLogs` result used to mean either "the
 record was emptied" or "nothing matched", and no caller could tell which. The
@@ -335,18 +382,20 @@ nothing matched.
 - **Receipts and logs come from the RPC.** `eth_getLogs` and
   `eth_getBlockReceipts` serve every block from the
   [earliest block](#no-backfill) forward. You no longer have to mirror them.
-- **Block bodies have no source.** No node stores a transaction list, so no
-  method returns one. Subscribe to `newHeads` and record what you need as it
-  arrives.
+- **A block body is rebuilt from those same receipts.** `eth_getBlockByNumber`
+  serves the transaction list and `gasUsed` of any block in the receipt span. It
+  cannot go further back, and it cannot serve the raw transaction — see
+  [the transaction object](#the-transaction-object).
 - **Core trading history comes from the native API**, not from the EVM RPC. Fills,
   orders, funding and closed positions are served by
   [`POST /info`](../api/rest/info.md) and by
   [position history](../api/rest/info/position-history.md).
 
 :::note
-**Receipt persistence is decided. Block-body persistence is not.** The chain
-keeps receipts and logs. It keeps no transaction lists and no block hashes, and
-that is not a scheduled change, so do not design against it.
+**The receipts are the archive.** A block read, a log query and a receipt query
+all answer from the one store and all stop at the same earliest block. The chain
+keeps no block hashes and no raw transactions, and that is not a scheduled
+change, so do not design against it.
 :::
 
 ### Batch requests {#batch-requests}
@@ -405,13 +454,14 @@ Three channels are supported:
 | `newPendingTransactions` | see the note below |
 
 A `newHeads` frame carries the same header shape the HTTP block read returns,
-including the same placeholder fields — see
-[The block reads serve the tip only](#the-block-reads-serve-the-tip-only).
+including the same placeholder fields — see [The block reads](#the-block-reads).
+It carries an empty `transactions`, as a standard header notification does; call
+`eth_getBlockByNumber` for the list.
 
 Subscriptions are **forward-only** — they stream blocks committed *after* you
 subscribe, and no subscription backfills. For past logs call `eth_getLogs`, which
-serves them from the [earliest block](#no-backfill) forward. For past block
-bodies there is no source at all, because nothing stores them (see
+serves them from the [earliest block](#no-backfill) forward. For a past block body call
+`eth_getBlockByNumber`, which covers the same span as the receipts (see
 [What the node keeps](#what-the-node-keeps)). Because MetaFlux has single-slot
 BFT finality a committed block never reorgs, so streamed logs are never `removed`
 and `newHeads` never rewinds.
