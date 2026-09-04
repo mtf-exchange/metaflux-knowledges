@@ -184,12 +184,6 @@ A failed-but-well-formed action (e.g. bad signature) comes back as a normal `act
 
 ## WebSocket compression (zstd) {#websocket-compression-zstd}
 
-> ⬆️ **Upgrade notice — not live yet.** Frame compression ships in the next
-> gateway release. A gateway that predates it ignores the subprotocol you offer
-> and sends plain JSON **text** frames. That answer is safe and correct — rely on
-> it. Write the client now: it keeps working today, and it starts to compress on
-> the day the gateway ships, with no client change.
-
 Compression is **opt-in** and per connection. You ask for it in the WebSocket
 handshake, and the server answers in the same handshake. Market-data frames
 compress well, because they repeat a small set of keys, coins and price shapes;

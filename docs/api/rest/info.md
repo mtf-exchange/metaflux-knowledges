@@ -2135,12 +2135,6 @@ slice and a trigger order all produce the same record for the maker they hit.
 CoreWriter `LimitOrder`, a `multi_sig` envelope and a batch-auction clearing
 each match against a resting order and derive nothing for it.
 
-> ⬆️ **Upgrade notice — not live yet.** Maker execution records ship with the
-> next node release. So do the fills that a forced close, a TWAP slice or a
-> trigger produces. On the live chain a maker order that filled still reads
-> `status: "resting"` with `filled_sz: "0"`, and it reads that way forever.
-> Every rule below marked "maker execution record" describes the target state.
-
 **Request**
 
 ```json
@@ -2777,13 +2771,6 @@ the same answer as a `"0"` ceiling.
 |-------|------|-------------|
 | `builders[*].builder` | hex address | Approved builder address |
 | `builders[*].max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points |
-
-> ⬆️ **Upgrade notice — `max_fee_bps` becomes a STRING at the next node
-> release.** The value stays the same; only the JSON type changes. Parse every
-> `*_bps` field as a decimal string. Most carry whole basis points.
-> `maker_bps` and `taker_bps` carry one fraction digit, because the fee ladder
-> stores deci-bps. A client that reads any `*_bps` field as a number will
-> break on release day. Accept a string now.
 
 Builders list in ascending address order; an account with no approvals returns
 an empty array.

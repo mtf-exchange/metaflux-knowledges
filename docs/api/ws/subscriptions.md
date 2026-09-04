@@ -64,12 +64,6 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
-> ⬆️ **Upgrade notice — not live yet.** The three clauses above ship with the
-> next node release. Until it lands, a fill that no signed action produced
-> reaches none of those three channels: the chain settles it, and no subscriber
-> is told. A market maker watching `fills` therefore misses the liquidation it
-> just absorbed.
-
 :::warning
 **Some order lanes send a fill to NONE of these channels, and that release does
 not change it.** An order placed by `modify` or `batch_modify`, an order placed

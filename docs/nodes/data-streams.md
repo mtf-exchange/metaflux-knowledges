@@ -277,13 +277,6 @@ see [unrecorded fills](../api/rest/info.md#unrecorded-fills). Both legs are
 missing, so the maker loses its record as well. An archive folded from this
 stream inherits the gap, and a volume total from it reads low.
 
-> ⬆️ **Upgrade notice — not live yet.** Those four kinds of fill reach this
-> stream from the next node release. Before it they stop at the node's
-> committed fill ring, so the archive built from this stream has no row for
-> them. The four attribution fields below (`liquidation`, `liquidatedUser`,
-> `markPx`, `twapId`) therefore read as constants on the live chain, and carry
-> real values from that release on.
-
 Envelope:
 
 ```json
@@ -420,12 +413,6 @@ Join `node_trades` to `node_fills` on `tid` when you need the parties.
 [frequent batch auction](../concepts/fba.md) clearing. A volume total built
 from this tape reads low by them.
 
-> ⬆️ **Upgrade notice — not live yet.** From the next node release this tape
-> also carries the prints no signed action produced — a forced close, a TWAP
-> slice, a trigger fire, a spot-margin forced close. Each one carries an empty
-> `hash`. Before that release those prints are missing from the tape, so a
-> volume total built from it reads low.
-
 ## `node_order_statuses` {#node_order_statuses}
 
 One record per order-status transition, keyed by the order owner.
@@ -478,18 +465,7 @@ filled part and `orig_sz` is the request. Use `orig_sz` when you want the size
 the trader asked for.
 :::
 
-> ⬆️ **Upgrade notice — `noop` is not live yet.** It ships with the next node
-> release. A `noop` record says the order was ACCEPTED and changed nothing — a
-> `reduce_only` order with nothing left to reduce. Do not count it as a
-> rejection: on the live chain today the same order writes an `error` record,
-> so a fill-rate or rejection-rate query over old files counts it on the wrong
-> side.
-
 ### Maker execution records {#maker-execution-records}
-
-> ⬆️ **Upgrade notice — not live yet.** Maker execution records ship with the
-> next node release. On the live chain a maker order that filled emits no
-> record at all, so it reads `resting` forever.
 
 Every record above comes from an order the account **submitted**. A resting
 order that is HIT submits nothing in that block, so the node derives its record

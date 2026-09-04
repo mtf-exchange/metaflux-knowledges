@@ -4825,11 +4825,6 @@ object naming the leg's outcome:
 
 #### `noop` — accepted, and it did nothing {#statuses-noop}
 
-> ⬆️ **Upgrade notice — not live yet.** The `noop` entry ships with the next
-> node release. On the live chain the same outcome arrives as an `error` whose
-> message says the order could not match, which is the retry trap this entry
-> exists to close.
-
 A `reduce_only` order against a position that is already flat, or one whose
 reducible size clamps to zero, is **accepted**. It burns the nonce, it places
 nothing, and there is nothing left for it to reduce.
