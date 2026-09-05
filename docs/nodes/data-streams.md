@@ -1330,9 +1330,15 @@ Recompute the hash to prove the tape did not alter the body.
 
 Three rules go with it:
 
-- **`payload: null` means there was no signed body.** An injected or system
-  action, and a pre-fork block, carry none. `action_hash` is `""` on the same
-  rows. There is nothing to verify.
+- **`payload: null` USUALLY means there was no signed body.** An injected or
+  system action, and a pre-fork block, carry none. `action_hash` is `""` on
+  those rows, and there is nothing to verify.
+
+  **Do not read a null payload as proof of that.** It is also null when the body
+  was not parseable JSON, and there `action_hash` IS set — a 64-hex string over
+  the bytes the block carried. So the pair to test is `payload` AND
+  `action_hash`, never `payload` alone. Only a faulty proposer produces such a
+  row: `/exchange` strict-parses before it signs, so no ordinary client can.
 - **`payload` uses the request's own number planes.** It is an
   [`/exchange`](../api/rest/exchange.md) body, so its prices and sizes are bare
   JSON numbers on the raw planes, not the strings the rest of these streams use.
