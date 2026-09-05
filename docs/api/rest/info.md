@@ -154,17 +154,36 @@ an account's money, and nothing else. Funding is excluded because it has its own
 read, [`user_funding`](#user_funding); a fill's realized PnL is excluded because
 it is trading, and it already has [`user_fills`](#user_fills).
 
-In scope: deposits, withdrawals, transfers between accounts and sub-accounts,
-staking (moving MTF in and out of the staking balance, delegating, and CLAIMING
-REWARDS), Earn, and vault deposits and withdrawals.
+**Every row carries a `kind` and a signed `delta`.** `delta` is signed from the
+side the holder could spend a moment earlier: money that leaves that side is
+negative, money that arrives is positive. `coin` names the token. These are the
+kinds:
 
-> ⚠️ **The read does not cover all of that yet, and it says so.** The node emits
-> ledger events for bridge credits, withdrawals, transfers and forced-close
-> settlements only — four kinds. Staking, Earn and vault movements produce no
-> ledger event at all today, so they are absent from this read. A claimed
-> staking reward credits the spot MTF balance and leaves NO record here. The
-> `flag` field on every response names the gap. Do not read an empty result as
-> "no money moved".
+| `kind` | What produced it | Extra fields |
+|---|---|---|
+| `deposit` | A MetaBridge inbound credit, a system spot credit, or an EVM→Core credit | `chain` on a bridge credit |
+| `withdraw` | A withdrawal to an EVM chain | |
+| `transfer` | An account, sub-account or spot transfer, and a VAULT deposit or withdrawal | `counterparty` when the move has one |
+| `liquidation` | A forced-close settlement | `market`, `mark_px` |
+| `staking_deposit` | MTF moves from spot into the staking free pool | |
+| `staking_withdraw` | MTF returns from the free pool to spot | |
+| `delegate` | MTF moves from the free pool to a validator | |
+| `undelegate` | MTF leaves a validator for the unbonding window | |
+| `staking_reward` | A CLAIMED staking reward, credited to the free pool | |
+| `earn_deposit` / `earn_withdraw` | An Earn deposit or withdrawal | |
+
+A vault movement is a `transfer`, not a kind of its own. It carries no
+`counterparty`, because the other side is the vault.
+
+`delegate` and `undelegate` do not change what the account holds in total. They
+move MTF between what it can withdraw and what it cannot, and that is a
+movement this read must show.
+
+> ⚠️ **The seven staking and Earn kinds are NOT LIVE YET.** The code is landed
+> and the next release carries it. Until that release, a staking or Earn
+> movement produces no row, and this read answers as if it did not happen. The
+> other four kinds are live today. Write the handler for the full table now;
+> a `kind` your client does not know must never throw.
 
 Membership of this lane is a deployment fact, not a wire guarantee. Do not
 hard-code the list; write one handler that tolerates both shapes.

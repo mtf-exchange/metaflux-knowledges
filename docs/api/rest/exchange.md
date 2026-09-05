@@ -3764,6 +3764,22 @@ Claim staking rewards, optionally scoped to one validator.
 |-------|------|-------------|
 | `validator` | hex address \| null | `null` / omitted = claim across all delegations |
 
+**A claim pays into the STAKING free pool, not into spot.** That is the same
+balance [`token_delegate`](#token_delegate) spends, so a claimed reward can be
+re-delegated with no second step. To spend it, move it to spot with
+[`c_withdraw`](#c_withdraw), which the free pool returns with no unbonding
+window.
+
+Claiming nothing is not an error. A claim with no accrued reward commits, moves
+no money, and writes no ledger row.
+
+> ⚠️ **The destination changes at the next release.** Today a claim credits the
+> SPOT MTF balance directly. After the release it credits the free pool, as
+> described above. A client that reads the spot balance to confirm a claim
+> breaks at that boundary — read
+> `staking.summary.undelegated` on
+> [`account_state`](./info.md#account_state-overview) instead.
+
 ---
 
 ### Alias a staking target address {#link_staking_user}
