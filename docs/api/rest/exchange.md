@@ -815,12 +815,19 @@ Multi-leg entry-plus-protective baskets use [`batch_order`](#batch_order) with
 
 #### Trailing stops (`trail_px`) {#trailing-stops}
 
-:::info
-**Not live yet.** Trailing stops are written here ahead of activation. The
-network REFUSES an order carrying `trail_px` until the release that binds it
-activates — the current node answers `trail_px is not bound by the order signing
-type yet`. Everything below is the target behaviour, including the digest rules:
-build against it, but do not submit one until the release lands.
+:::tip
+**LIVE.** The release that binds `trail_px` has shipped. The frozen EIP-712 type
+carrying `uint64 trailPx` is in the running node, admission accepts the field,
+and no fork gate guards either half — the signer picks the type by whether the
+field is PRESENT, so an order without it keeps the older digest unchanged.
+
+Two rules the node enforces, and both refuse rather than reinterpret:
+
+- `trail_px` must be greater than zero. Sending `0` is not the same as omitting
+  it: `0` selects the trailing type string and then fails admission.
+- A trailing leg must be the STOP-LOSS. A trailing take-profit is refused. The
+  ratchet moves the level toward the mark, so on a take-profit it would chase
+  its level away from a winning position and fire at a price nobody asked for.
 :::
 
 A trigger leg becomes a **trailing stop** when its `trigger` block carries

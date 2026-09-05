@@ -170,14 +170,6 @@ trigger and its sibling collapse on the first fill; a **limit** trigger and its
 sibling collapse at **conversion** — the instant the resting limit is placed —
 because the live limit order is now the protection.
 
-:::info
-**Not live yet.** Trailing stops are written here ahead of activation. The
-network REFUSES an order carrying `trail_px` until the release that binds it
-activates — the current node answers `trail_px is not bound by the order signing
-type yet`. Everything below is the target behaviour, including the digest rules:
-build against it, but do not submit one until the release lands.
-:::
-
 **Trailing stops.** A trigger leg that carries `trail_px` parks a *trailing*
 stop: the level ratchets toward the mark by that callback offset once per block
 and never away from it, so it fires at the ratcheted level, not the one you sent.

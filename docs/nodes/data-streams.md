@@ -21,7 +21,7 @@ Each envelope holds zero or more **records**.
 The node does not serve these files. It only writes them. You read them with your
 own indexer, archiver, or analytics job.
 
-Thirteen streams exist. Nine carry block events. Two sample on a timer. Two carry
+Fourteen streams exist. Ten carry block events. Two sample on a timer. Two carry
 order-book state.
 
 | Stream | On-disk root | Content |
@@ -35,6 +35,7 @@ order-book state.
 | [`node_bridge_outbox`](#node_bridge_outbox) | `<data_dir>/node_bridge_outbox/` | Bridge withdrawal outbox: admissions, status moves, deployment rows |
 | [`node_equity_snapshots`](#node_equity_snapshots) | `<data_dir>/node_equity_snapshots/` | Hourly account-value samples |
 | [`node_asset_ctxs`](#node_asset_ctxs) | `<data_dir>/node_asset_ctxs/` | Per-market mark and oracle price samples, every 5 s |
+| [`node_actions`](#node_actions) | `<data_dir>/node_actions/` | One record per action in a block payload, applied and rejected. **Not live yet** |
 | [`node_blocks`](#node_blocks) | `<data_dir>/node_blocks/` | One block head per committed block, including an empty one |
 | [`replica_cmds`](#replica_cmds) | `<data_dir>/replica_cmds/` | One block envelope per block, header plus events |
 | [`l4_book_diffs`](#l4_book_diffs) | `<data_dir>/l4_book_diffs.jsonl` | Per-order book diffs, with owner |
@@ -65,6 +66,7 @@ Every flag defaults to `false`.
 | `node_bridge_outbox` | `write_bridge_outbox` | `false` |
 | `node_equity_snapshots` | `write_equity_snapshots` | `false` |
 | `node_asset_ctxs` | `write_asset_ctxs` | `false` |
+| `node_actions` | `write_actions` | `false` |
 | `node_blocks` | `write_blocks` | `false` |
 | `replica_cmds` | `write_replica_cmds` | `false` |
 | `l4_book_diffs` | `record_l4` | `false` |
@@ -82,6 +84,9 @@ write_order_statuses = true
 
 A disabled stream creates no directory and no file.
 
+`write_actions` is **not live yet**. A node on the current release ignores
+the flag and records nothing. See [`node_actions`](#node_actions).
+
 ### Recording on a validator {#validator-refusal}
 
 Most streams de-anonymize order flow, account value, or a user withdrawal. A node
@@ -94,7 +99,7 @@ trades on it.
   flow is your own.
   The warned set is `write_fills`, `write_trades`, `write_order_statuses`,
   `write_funding`, `write_ledger`, `write_equity_snapshots`,
-  `write_bridge_outbox`, and `write_replica_cmds`.
+  `write_bridge_outbox`, `write_actions`, and `write_replica_cmds`.
 - **Three streams carry nothing to de-anonymize** and raise no warning:
   `write_gov` names a validator, not a trader; `write_asset_ctxs` and
   `write_blocks` carry no address and no account value. `node_gov` is meant to
@@ -129,7 +134,7 @@ full snapshot line on the interval.
 
 ### Hourly files {#hourly-files}
 
-Ten streams rotate hourly:
+Eleven streams rotate hourly:
 
 ```
 <data_dir>/node_fills/hourly/{YYYYMMDD}/{HH}
@@ -141,6 +146,7 @@ Ten streams rotate hourly:
 <data_dir>/node_bridge_outbox/hourly/{YYYYMMDD}/{HH}
 <data_dir>/node_equity_snapshots/hourly/{YYYYMMDD}/{HH}
 <data_dir>/node_asset_ctxs/hourly/{YYYYMMDD}/{HH}
+<data_dir>/node_actions/hourly/{YYYYMMDD}/{HH}
 <data_dir>/node_blocks/hourly/{YYYYMMDD}/{HH}
 ```
 
@@ -242,6 +248,7 @@ Which plane a stream uses:
 | `node_bridge_outbox` | — | — | Raw token base units |
 | `node_equity_snapshots` | — | — | Whole USDC |
 | `node_asset_ctxs` | Raw price | — | — |
+| `node_actions` | Raw price | Raw size | — |
 | `node_blocks` | — | — | — |
 | `replica_cmds` | Whole USDC | **Mixed** — see [`replica_cmds`](#replica_cmds) | Whole USDC |
 | `l4_book_diffs` / `l2_book_diffs` | Raw price | Raw size | — |
@@ -254,6 +261,10 @@ Two number kinds sit outside the price / size / money split above.
   bridged token. Divide it by that token's own on-chain decimals, never by a
   market's `sz_decimals`. The two raw planes look alike and take different
   divisors.
+- `node_actions` embeds the submitted action body under `payload`. That body
+  follows the request planes of [`POST /exchange`](../api/rest/exchange.md), so
+  its prices and sizes are **bare JSON numbers** on the raw planes, not strings.
+  The `result` block on the same record keeps the string convention.
 
 Every price, size, and money value is a JSON **string**. Block numbers,
 timestamps, order ids, trade ids, and enum codes are bare JSON numbers.
@@ -435,7 +446,8 @@ One record per order-status transition, keyed by the order owner.
       "reduce_only": false,
       "avg_px": "6249800000000",
       "total_sz": "40000",
-      "ts": 1735689600102
+      "ts": 1735689600102,
+      "hash": "9c22cbcd0ee34b90987b76f92544e0e64d8f4a0e2b2f7bc1d3f0c8ffb61d0a11"
     }]
   ]
 }
@@ -455,9 +467,9 @@ One record per order-status transition, keyed by the order owner.
 | `reduce_only` | bool | — | Reduce-only flag of the order. **`false` on a maker execution record, whatever the order carried** |
 | `avg_px` | i128 string \| absent | raw price | Average fill price. Present on `filled` only |
 | `total_sz` | u128 string \| absent | raw size | Total filled size. Present on `filled` only |
-| `error` | string \| absent | — | Rejection reason. Present on `error` only |
-| `reason` | string \| absent | — | Why the order had no effect. Present on `noop` only |
+| `error` | string \| absent | — | Free text. On `error` it is the rejection reason. On `noop` it is why the order had no effect — **a `noop` is a success, so do not read a present `error` as a rejection**. Absent on `resting` and `filled`. There is no `reason` key |
 | `ts` | uint64 | ms | Transition timestamp. Equals `block_time` |
+| `hash` | string | — | Trace hash of the action that caused the transition: lowercase hex, no `0x`. Always present. **Empty** when no signed action owns it, such as a forced close. On a maker execution record it is the TAKER's action hash |
 
 :::warning
 **`sz` changes meaning with `status`.** On a partially filled order, `sz` is the
@@ -544,13 +556,14 @@ The REST read built from this stream serves an absent key as `null` — see
       "reduce_only": false,
       "avg_px": "6250000000000",
       "total_sz": "40000",
-      "ts": 1735689600202
+      "ts": 1735689600202,
+      "hash": "9c22cbcd0ee34b90987b76f92544e0e64d8f4a0e2b2f7bc1d3f0c8ffb61d0a11"
     }]
   ]
 }
 ```
 
-No `tif` key, no `cloid` key, no `error` key.
+No `tif` key, no `cloid` key, no `error` key. The `hash` is the taker's.
 
 ## `node_funding` {#node_funding}
 
@@ -1040,6 +1053,379 @@ smallest (1-minute) candle twelve samples. It is a price series, not a trade
 series: a bar exists in every window the samples cover, whether or not anything
 traded.
 
+## `node_actions` {#node_actions}
+
+> ⬆️ **Upgrade notice — landed, not yet released.** This stream is written,
+> tested and merged. It is **not on the live chain**. A node on the current
+> release ignores `write_actions`, creates no `node_actions` directory, and
+> raises no error for the unknown flag — so an enabled flag looks like a stream
+> that records nothing. The stream ships with the next node release. Read this
+> section as the shape to build against, not as a tape you can read today.
+
+One record per action in a committed block payload — **every** action, the ones
+the chain applied and the ones it dropped. This is the per-action tape: it
+answers "what did this account send, and what did the chain do with it".
+
+Enable it with `write_actions`. It is off by default, like every stream. Each
+record names a sender and carries the submitted action body, so this stream
+de-anonymizes order flow in full. Run it on a non-validating node.
+
+A block whose payload carried no action writes no line.
+
+Envelope:
+
+```json
+{
+  "block_number": 941006631,
+  "block_time": 1735689599852,
+  "events": [
+    ["0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345", { /* record, shape below */ }],
+    ["0x8a1b2c3d4e5f60718293a4b5c6d7e8f901234567", { /* record, shape below */ }]
+  ]
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `block_number` | uint64 | Committed block height. The same height `node_blocks` writes |
+| `block_time` | uint64 | Consensus block timestamp, ms |
+| `events` | array | `[sender, record]` pairs, in `action_index` order. `sender` is `0x`-hex, lowercase, 20 bytes |
+
+**Do not sort `events`.** The list is already in payload order, and that order is
+the cursor. See [`action_index`](#node_actions-index).
+
+Three records, one applied and two rejected:
+
+```json
+{
+  "block_number": 941006631,
+  "block_time": 1735689599852,
+  "events": [
+    ["0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345", {
+      "action_index": 0,
+      "action_type": "Order",
+      "action_hash": "9c22cbcd0ee34b90987b76f92544e0e64d8f4a0e2b2f7bc1d3f0c8ffb61d0a11",
+      "signer": "0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345",
+      "nonce": 1735689599801,
+      "expires_after": 0,
+      "status": "success",
+      "error_code": null,
+      "payload": {
+        "type": "submit_order",
+        "order": {
+          "owner": "0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345",
+          "market": 0,
+          "side": "bid",
+          "kind": "limit",
+          "size": 50000,
+          "limit_px": 6250000000000,
+          "tif": "gtc",
+          "reduce_only": false
+        }
+      },
+      "result": {
+        "statuses": [
+          {
+            "market": 0,
+            "oid": 366158135200,
+            "status": "filled",
+            "side": "B",
+            "limit_px": "6250000000000",
+            "sz": "50000",
+            "orig_sz": "50000",
+            "tif": "Gtc",
+            "reduce_only": false,
+            "avg_px": "6249800000000",
+            "total_sz": "50000",
+            "ts": 1735689599852,
+            "hash": "9c22cbcd0ee34b90987b76f92544e0e64d8f4a0e2b2f7bc1d3f0c8ffb61d0a11"
+          }
+        ]
+      }
+    }],
+    ["0x8a1b2c3d4e5f60718293a4b5c6d7e8f901234567", {
+      "action_index": 1,
+      "action_type": "Cancel",
+      "action_hash": "4d1f0b7a2e93c56480a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcde",
+      "signer": null,
+      "nonce": 1735689599802,
+      "expires_after": 0,
+      "status": "failure",
+      "error_code": "DROPPED_INVALID_SIGNATURE",
+      "payload": { "type": "cancel_order", "cancel": { "market": 0, "oid": 366158130011 } },
+      "result": null
+    }],
+    ["0x5c4d3e2f1a0b9988776655443322110099aabbcc", {
+      "action_index": 2,
+      "action_type": "Order",
+      "action_hash": "e30bb4c7715f2a9d0c8e1f3b5d7a9c0e2f4b6d8a0c2e4f6b8d0a2c4e6f8b0d21",
+      "signer": "0xaabbccddeeff00112233445566778899aabbccdd",
+      "nonce": 1735689599803,
+      "expires_after": 1735689659000,
+      "status": "failure",
+      "error_code": "MARGIN_INSUFFICIENT",
+      "payload": {
+        "type": "submit_order",
+        "order": {
+          "owner": "0x5c4d3e2f1a0b9988776655443322110099aabbcc",
+          "market": 0,
+          "side": "ask",
+          "kind": "limit",
+          "size": 900000000,
+          "limit_px": 6260000000000,
+          "tif": "gtc",
+          "reduce_only": false
+        }
+      },
+      "result": {
+        "statuses": [
+          {
+            "market": 0,
+            "oid": 0,
+            "status": "error",
+            "side": "A",
+            "limit_px": "6260000000000",
+            "sz": "900000000",
+            "orig_sz": "900000000",
+            "tif": "Gtc",
+            "reduce_only": false,
+            "error": "precondition failed: insufficient margin: required 56340.00, available 812.55",
+            "ts": 1735689599852,
+            "hash": "e30bb4c7715f2a9d0c8e1f3b5d7a9c0e2f4b6d8a0c2e4f6b8d0a2c4e6f8b0d21"
+          }
+        ]
+      }
+    }]
+  ]
+}
+```
+
+| Field | Type | Nullable | Meaning |
+|-------|------|:--------:|---------|
+| `action_index` | uint32 | no | Position of this action in the block payload, from `0`. **Dense over every action in the block, rejected ones included.** See [the cursor rule](#node_actions-index) |
+| `action_type` | string | no | The action kind, from a closed set. **Not the `type` string in `payload`** — see [the vocabulary](#node_actions-types) |
+| `action_hash` | string | no | Correlation hash: lowercase hex, **no** `0x`. **Empty string** on an injected or system action, and on a pre-fork block. See [the hash rule](#node_actions-hash) |
+| `signer` | string \| null | yes | The address whose EIP-712 signature authorized this action, `0x`-hex. It differs from the sender on an agent-signed action. See [the signer rule](#node_actions-signer) |
+| `nonce` | uint64 | no | The action's nonce, as submitted |
+| `expires_after` | uint64 | no | Signed expiry, ms. **`0` means the action never expires** — that is the common value |
+| `status` | string | no | `"success"` or `"failure"`. Nothing else |
+| `error_code` | string \| null | yes | Why it failed. `null` on success. See [rejections](#node_actions-rejections) |
+| `payload` | object \| null | yes | The action body as submitted. `null` when the action carries no signed body. See [the payload rule](#node_actions-payload) |
+| `result` | object \| null | yes | What the action produced. `null` for every action that is not order-shaped. See [`result`](#node_actions-result) |
+
+### `action_index` is half the seek cursor {#node_actions-index}
+
+`action_index` is the action's position in the committed block payload. Every
+node derives it from the same committed bytes, so `(block_number,
+action_index)` is a **total and stable** order over the whole chain. Page a
+detail view on `(block_number DESC, action_index DESC)` and rows never repeat
+and never skip.
+
+**The index counts EVERY action in the payload, applied and rejected alike.**
+That is what keeps it stable. An index that counted only applied actions would
+shift the moment a rejection rule changed, and every stored cursor would then
+point at a different row.
+
+Two consequences:
+
+- **The indices in one envelope are contiguous from `0`.** A missing index means
+  your reader dropped a record, not that the chain skipped one.
+- **Re-reading a file re-derives the same pair.** Key your rows on
+  `(block_number, action_index)` and a re-read inserts nothing new.
+
+`action_hash` is the detail-route key, not the cursor. It is stable across
+replay too, but it is empty on injected and system actions, so it does not order
+a block on its own.
+
+### `action_hash` is the hash the exchange returned {#node_actions-hash}
+
+`action_hash` is the same value
+[`POST /exchange`](../api/rest/exchange.md) returned to the submitter in its
+admission response. A submitter that logged its `action_hash` can find its
+action on this tape with a string match, and no other join.
+
+**One difference in form: the tape writes it without the `0x` prefix.** The
+`/exchange` response writes it with one. Strip or add the prefix at the join —
+this is the same rule the `hash` field on
+[`node_fills`](#node_fills) and [`node_trades`](#node_trades) already follows,
+and those hashes are the same value again for an action that produced a fill.
+
+**An empty `action_hash` is not an error.** An injected or system action carries
+no signed body, so there is no hash to compute. Those rows are joined by
+`(block_number, action_index)` alone.
+
+### A rejected action is on the tape, with its reason {#node_actions-rejections}
+
+**Branch on `status`.** `"success"` means the chain applied the action.
+`"failure"` means it did not. There is no third value, and `error_code` is
+`null` if and only if `status` is `"success"`.
+
+A failure is one of two kinds, and `error_code` tells them apart.
+
+**A `DROPPED_*` code means the action never dispatched.** The commit loop
+refused it before it ran. It consumed no nonce and changed no state.
+
+| `error_code` | Cause |
+|---|---|
+| `DROPPED_MALFORMED_SENDER` | The payload's sender field is not 20 bytes. Only a faulty proposer produces this row, and `sender` reads as the zero address |
+| `DROPPED_NOT_PROPOSER_BOUND` | An injected validator or system action arrived under a sender that is not the block proposer |
+| `DROPPED_EXPIRED` | `expires_after` is at or before `block_time`, or timed expiry is not armed on this chain |
+| `DROPPED_RETIRED` | The action kind is retired and no longer dispatches |
+| `DROPPED_PAYLOAD_KEYS_INACTIVE` | A `CoreEvmTransfer` carried payload keys that are not active yet |
+| `DROPPED_INVALID_SIGNATURE` | No authorized signature recovered from the action |
+| `DROPPED_NONCE_REPLAY` | This `(sender, nonce)` pair is already used |
+
+**Any other code means the action dispatched and a state rule refused it.**
+Those codes are the same catalog `/exchange` answers with — read them in
+[error codes](../api/errors.md#catalog). `PRECONDITION_FAILED` is the documented
+catch-all.
+
+The two sets do not overlap, so `error_code.startsWith("DROPPED_")` is a safe
+test for "the chain never ran it".
+
+:::warning
+**A batch is a success when ANY leg landed.** A `BatchOrder` reads
+`status: "success"` and `error_code: null` when at least one leg was accepted,
+even if the other legs were rejected. The per-leg verdicts are in
+`result.statuses[].status`. A consumer that wants "did every leg land" reads
+`result`, never `status`. A batch of one therefore reads exactly like a single
+`Order`, which is the point.
+:::
+
+### `signer` says who authorized the row {#node_actions-signer}
+
+`signer` is the address whose EIP-712 signature the chain recovered and
+accepted. `sender` is the account the action acts for. They differ on an
+[agent-signed](../integration/agent-wallets-howto.md) action: the sender is the
+master account, the signer is the agent wallet. Keep them in two columns.
+
+**`signer: null` does not mean "unauthorized".** It means no per-action wallet
+signature authorized this row. There are four cases:
+
+- an injected or system action, which the proposer binding authorizes instead;
+- a [`multi_sig`](../concepts/multi-sig.md) envelope, whose authority is a
+  roster, not one address;
+- a block below the signature-verification fork height;
+- a rejection, where no signature ever verified.
+
+:::danger
+**On a `DROPPED_*` row, trust `sender` only when `signer` is non-null.** A drop
+that precedes signature recovery carries whatever address the payload claimed.
+Attributing a `DROPPED_INVALID_SIGNATURE` or `DROPPED_NOT_PROPOSER_BOUND` row to
+that account lets anyone put a rejected action on anyone's page. Rows the chain
+applied are always authorized, so `status: "success"` needs no such test.
+:::
+
+### `payload` is the bytes the submitter signed {#node_actions-payload}
+
+`payload` is the action body as posted, not a re-rendering of it. It is the
+preimage of `action_hash`:
+
+```
+action_hash = keccak256( payload_bytes ‖ sender_20 ‖ nonce_be8 [ ‖ expires_after_be8 ] )
+```
+
+The trailing 8 bytes are appended **only** when `expires_after` is non-zero.
+Recompute the hash to prove the tape did not alter the body.
+
+Three rules go with it:
+
+- **`payload: null` means there was no signed body.** An injected or system
+  action, and a pre-fork block, carry none. `action_hash` is `""` on the same
+  rows. There is nothing to verify.
+- **`payload` uses the request's own number planes.** It is an
+  [`/exchange`](../api/rest/exchange.md) body, so its prices and sizes are bare
+  JSON numbers on the raw planes, not the strings the rest of these streams use.
+  The `result` block on the same record does use strings. Read
+  [Number planes](#number-planes) before you divide anything.
+- **A body posted with line breaks is re-serialized compact.** A raw newline
+  inside a record would break NDJSON framing, so the node writes the same JSON
+  value in compact form. The value is identical; the bytes are not, so the hash
+  does not recompute from that row. Every SDK client posts a compact body, so
+  this is rare, and the tape does not flag which rows it touched. **Treat a
+  failed recompute as this case, and take `action_hash` as the authority.**
+
+### `result` carries the order legs {#node_actions-result}
+
+`result` is `null` on every action that is not order-shaped, success included.
+An `Order`, a `BatchOrder` and a `ChaseOrder` fill it in:
+
+```json
+{ "statuses": [ /* one record per placed leg */ ] }
+```
+
+- **`Order`** — one element.
+- **`BatchOrder`** — one element per placed leg, in leg order. Parked TP/SL
+  protective legs never rest, so they are not in the list, and a batch that
+  placed nothing has an empty list.
+- **`ChaseOrder`** — one element, plus `"chase_oid": <uint64>` beside
+  `statuses`. That handle is the `cancel_chase` key, not the leg's `oid`.
+
+Each element is the same record
+[`node_order_statuses`](#node_order_statuses) writes, with the same fields and
+the same planes. Its `hash` repeats the row's own `action_hash`, and its `ts`
+repeats `block_time`.
+
+**`result` is the only per-leg surface.** The record has no per-leg column of
+its own.
+
+### `action_type` vocabulary {#node_actions-types}
+
+`action_type` is the protocol's own name for the action kind. It is a closed
+set, it is **append-only**, and a name is never reused for another kind.
+
+:::warning
+**`action_type` is not the `type` string inside `payload`.** The wire body uses
+snake_case (`"submit_order"`); the tape uses the protocol name (`"Order"`). The
+two do not always share a word: the body of a market seed is `"seed_market"` and
+its `action_type` is `"Listing"`. Map the pair explicitly. Never derive one from
+the other.
+:::
+
+**Treat an unknown value as data, not as an error.** A new action appends a new
+name, and a reader that rejects unknown names breaks on the next release. Store
+the string.
+
+- **Trading** — `Order`, `Cancel`, `CancelByCloid`, `Modify`, `BatchModify`, `ScheduleCancel`, `TwapOrder`, `TwapCancel`, `Liquidate`, `BatchOrder`, `BatchCancel`, `CancelAllOrders`, `ChaseOrder`, `CancelChase`, `ScaleOrder`, `CancelScale`, `SubmitEncryptedOrder`, `SubmitDecryptionShare`, `RfqRequest`, `RfqQuote`, `RfqAccept`, `FbaSubmit`
+- **Spot and Earn** — `SpotOrder`, `SpotCancel`, `SpotSend`, `SpotMarginDeposit`, `SpotMarginWithdraw`, `SpotMarginOpen`, `SpotMarginClose`, `EarnDeposit`, `EarnWithdraw`, `SpotGenesis`
+- **Margin** — `UpdateLeverage`, `UpdateIsolatedMargin`, `TopUpIsolatedOnlyMargin`, `UserPortfolioMargin`, `SetPositionMode`
+- **Transfers** — `UsdSend`, `SendAsset`, `Withdraw3`, `SendToEvmWithData`, `UsdClassTransfer`, `CoreEvmTransfer`
+- **Sub-accounts** — `CreateSubAccount`, `SubAccountTransfer`, `SubAccountSpotTransfer`
+- **Vaults** — `CreateVault`, `VaultTransfer`, `VaultDistribute`, `VaultModify`, `NetChildVaultPositions`, `VaultWithdraw`, `SetMetaliquiditySet`, `RegisterMetaliquidityOperator`
+- **Account** — `ApproveAgent`, `SetDisplayName`, `SetReferrer`, `ApproveBuilderFee`, `ConvertToMultiSigUser`, `MultiSig`, `Noop`, `UserSetAbstraction`, `AgentSetAbstraction`, `PriorityBid`, `ClaimBuilderRewards`, `ClaimReferralRewards`
+- **Staking** — `TokenDelegate`, `ClaimRewards`, `LinkStakingUser`, `RegisterValidator`, `ExtendLongTermStaking`, `StakingDeposit`, `StakingWithdraw`, `BorrowLend`
+- **Governance and validator** — `GovPropose`, `GovVote`, `VoteGlobal`, `CValidator`, `CSigner`, `ValidatorL1Vote`, `ValidatorL1Stream`, `VoteAppHash`, `ForceIncreaseEpoch`, `ApproveUpgrade`, `ArmFeatures`, `SubmitSlashingEvidence`, `SetDynamicRiskParam`, `SetOracleWeights`, `SetDisabledVenues`, `SetFundingFormula`, `SetFeeSchedule`, `SetPrimeAccount`, `SetPmShockGrid`, `SetPopulationTarget`, `SetLockedStakeAllowlist`, `SetSpotMarginParams`, `SetMarketTick`, `SetMarkMode`, `SetSpotMinNotional`, `SetPerpMaxOpenInterest`, `SetThresholdEpochKey`, `GovAdjustSpotValue`, `GovAdjustSpotBalance`, `MintTreasury`, `BurnTreasury`, `CreateEarnPool`, `ConfigTreasuryBackstop`, `TreasuryBackstopDraw`, `DisableDex`, `QuarantineUser`, `ReactivateUser`, `ForceClosePosition`, `RegisterSpot`, `Listing`, `Delisting`, `OptionListing`, `OptionAutoList`, `FbaConfigure`
+- **Market deployment** — `PerpDeploy`, `SpotDeploy`, `SetGlobal`, `SubmitGasAuctionBid`, `Mip3SetOraclePx`
+- **Bridge** — `BridgeAttest`, `BridgeWithdraw`, `BridgeEmergencyPause`, `BridgeConfigureChain`, `RegisterBridgeCosigner`, `BridgeWithdrawReleased`, `ValidatorSignWithdrawal`, `VoteEthFinalizedWithdrawal`, `VoteEthFinalizedValidatorSetUpdate`, `SignValidatorSetUpdate`, `ValidatorBridgePause`, `CirclePromotionSchedule`, `CirclePromotionCustodyAttest`, `CirclePromotionAdvance`, `CirclePromotionPruneCosig`
+- **EVM** — `EvmRawTx`, `EvmUserModify`, `FinalizeEvmContract`
+- **System** — `SystemBole`, `SystemSpotSend`, `CWithdraw`, `CUserModify`, `SystemUserModify`, `OracleSubmit`
+
+### Limits {#node_actions-limits}
+
+What this tape does **not** carry:
+
+- **No effects.** The record says what the action was and whether it landed, not
+  what it moved. Money is [`node_ledger`](#node_ledger), executions are
+  [`node_fills`](#node_fills), funding is [`node_funding`](#node_funding). Join
+  on `block_number` and, where a hash exists, on `action_hash`.
+- **No signature bytes.** `signer` reports that a signature authorized the row.
+  The signature itself is not written.
+- **No multi-sig roster.** A `multi_sig` envelope is ONE row with
+  `signer: null`. The inner actions are not unpacked onto the tape, and the
+  co-signers are not listed.
+- **No EVM transactions.** The tape covers the Core actions in the block
+  payload. An EVM transaction in the same block gets no row, though
+  [`node_blocks`](#node_blocks) counts it in `tx_count`.
+- **Nothing that never committed.** An action that no proposer put in a payload
+  has no row — a rate-limited submission, an eviction from the mempool, and an
+  admission that timed out all leave nothing. An `accepted` response is not
+  evidence of a row.
+- **No receive time.** `block_time` is the only clock on the record. The tape
+  does not say when the node first saw the action.
+- **No line for a block with no actions.** Absence is not an archive hole. Use
+  [`node_blocks`](#node_blocks) when you need a row for every height, and test
+  for a [gap line](#gaps) to find a real hole.
+
 ## `node_blocks` {#node_blocks}
 
 One line per committed block, carrying the block head only. This is the one
@@ -1342,7 +1728,7 @@ A level event is an absolute set, not an increment. Replace the level's size wit
 3. Accept only newline-terminated lines. Retry a fragment on the next pass.
 4. Key your rows so a re-read inserts nothing new. Re-running over the same files
    must be a no-op. On `node_bridge_outbox` the key is `economic_id`, never
-   `message_id`.
+   `message_id`. On `node_actions` it is `(block_number, action_index)`.
 5. Parse every price, size, and money value as an arbitrary-precision decimal.
    Never as a float.
 6. Divide by the right plane. `node_*` prices need `/ 1e8`. `node_*` sizes need
