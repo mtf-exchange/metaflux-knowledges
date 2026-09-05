@@ -175,6 +175,10 @@ kinds:
 A vault movement is a `transfer`, not a kind of its own. It carries no
 `counterparty`, because the other side is the vault.
 
+`market` on a `liquidation` row is the perp market ID as a NUMBER, not a
+symbol. It is the one market reference on this read that is not resolved for
+you. Map it with [`markets_meta`](./info/perpetuals.md#markets_meta).
+
 `delegate` and `undelegate` do not change what the account holds in total. They
 move MTF between what it can withdraw and what it cannot, and that is a
 movement this read must show.
