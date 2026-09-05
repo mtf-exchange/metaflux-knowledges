@@ -99,8 +99,8 @@ to the envelope above. **It differs in two ways at once.**
 
 The lane is `portfolio`, `historical_orders`, `user_funding`,
 `user_funding_by_time`, `user_position_history`,
-`user_position_history_by_time`, `user_ledger`, `user_ledger_by_time`,
-`user_non_funding_ledger_updates`, [`recent_blocks`](#recent_blocks),
+`user_position_history_by_time`, `user_non_funding_ledger_updates`,
+[`recent_blocks`](#recent_blocks),
 [`recent_transactions`](#recent_transactions) and `validator_votes`.
 
 `portfolio` takes an `interval` alongside `address`, and it accepts exactly one
@@ -127,6 +127,44 @@ read carries `type` inside `data`.
 
 **A handler that branches on `error.code` reads `undefined` on this lane.**
 Test the type of `error` before you read `code`.
+
+**The collection key, per read.** The rows sit under a key named for what they
+are, not under a generic `data[]`. Every key is snake_case, like the rest of
+this wire:
+
+| Read | Collection key |
+|---|---|
+| `historical_orders` | `orders` |
+| `user_funding`, `user_funding_by_time` | `fundings` |
+| `user_position_history`, `..._by_time` | `positions` |
+| `user_non_funding_ledger_updates` | `ledger_updates` |
+| `recent_transactions` | `txns` |
+| `portfolio` | `points` |
+
+> ⚠️ **`ledger_updates` was `ledgerUpdates`.** It was the one camelCase key on
+> this wire. A client reading `data.ledgerUpdates` now gets `undefined` — read
+> `data.ledger_updates`.
+
+> ⚠️ **`user_ledger` and `user_ledger_by_time` are REMOVED.** Both were narrower
+> views of the same source that `user_non_funding_ledger_updates` already
+> serves, and its name states what it holds where theirs did not.
+
+**What `user_non_funding_ledger_updates` means.** Every NON-TRADING movement of
+an account's money, and nothing else. Funding is excluded because it has its own
+read, [`user_funding`](#user_funding); a fill's realized PnL is excluded because
+it is trading, and it already has [`user_fills`](#user_fills).
+
+In scope: deposits, withdrawals, transfers between accounts and sub-accounts,
+staking (moving MTF in and out of the staking balance, delegating, and CLAIMING
+REWARDS), Earn, and vault deposits and withdrawals.
+
+> ⚠️ **The read does not cover all of that yet, and it says so.** The node emits
+> ledger events for bridge credits, withdrawals, transfers and forced-close
+> settlements only — four kinds. Staking, Earn and vault movements produce no
+> ledger event at all today, so they are absent from this read. A claimed
+> staking reward credits the spot MTF balance and leaves NO record here. The
+> `flag` field on every response names the gap. Do not read an empty result as
+> "no money moved".
 
 Membership of this lane is a deployment fact, not a wire guarantee. Do not
 hard-code the list; write one handler that tolerates both shapes.
