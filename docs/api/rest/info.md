@@ -483,6 +483,7 @@ three share are `address` and the `height` / `time` stamp. See
 | `health_deferred` | `true` \| absent | Present, and only ever `true`, when the risk engine cannot price a leg. **The risk numbers are then not a solvency statement** — see [account value](../../concepts/account-value.md). Absent is the normal case; treat absent as `false` |
 | `tier` | enum **string** | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md). It is a STRING, never a number |
 | `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (per-product reservations — see [`user_set_abstraction`](../rest/exchange.md#user_set_abstraction)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
+| `reservations` | object \| **absent** | The per-product reservation ledger. Present **only when `abstraction` is `"standard"`** — see [`reservations`](#account-state-reservations) below. **Served from the release after 0.9.6**; a 0.9.6 node omits it in every mode |
 | `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled. **Account-scoped, so it is NOT under `perp`** — see the warning above |
 | `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) — see [hedge mode](../../concepts/hedge-mode.md) |
 | `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
@@ -567,6 +568,59 @@ writer's spot balance. Read
 
 The chain never prices an option, so this lane carries no mark-priced figure. See
 [options](../../products/options.md).
+
+**`reservations` — the standard-mode ledger.** {#account-state-reservations}
+
+:::warning NOT ON 0.9.6
+`reservations` is served from the release AFTER 0.9.6. A 0.9.6 node omits the
+field in every mode, `"standard"` included, so read a missing field as "this node
+is older", not as "this account reserved nothing".
+:::
+
+Present **only when `abstraction` is `"standard"`**. The other two modes have no
+ledger: [`user_set_abstraction`](../rest/exchange.md#user_set_abstraction) clears
+the reservations when an account returns to `"unified"`, and refuses to set one in
+any mode but `"standard"`. Branch on `abstraction`, which is in the same body.
+
+The three keys are reservation SCOPES, not markets. **`spot` covers spot AND spot
+margin** — one reservation binds both, so this `spot` is wider than the `spot` of
+the [`fee_schedule`](#fee_schedule) product rows, which splits `spot_margin` off.
+
+| Field | Type | Meaning |
+|-------|------|-------------|
+| `reservations.<perp\|spot\|option>.reserved` | Decimal string | The cap the owner set for that scope, whole-USDC. A scope the owner never set reads `"0"`, and **in this mode `0` admits nothing** — the mode is fail-closed, so a fresh `"standard"` account trades nothing until it allocates |
+| `reservations.<scope>.held` | Decimal string | USDC that scope encumbers **right now**, whole-USDC: cross plus isolated perp initial margin, spot-margin initial margin, or option escrow |
+| `reservations.<scope>.available` | Decimal string | What the pre-trade gate still admits for **new** exposure in that scope, **clamped at zero** |
+
+`available` is **not** `reserved − held`. Its second arm stops one scope spending
+another scope's unused reservation:
+
+```
+available(p) = max(0, min(reserved(p) − held(p),
+                          withdrawable − Σ_{q≠p} max(0, reserved(q) − held(q))))
+```
+
+So a scope can read `"0"` while `reserved` still exceeds `held` — the other scopes
+have promised the rest of the pool away. **This is the figure that explains a
+margin rejection on an account that holds USDC.**
+
+The ledger binds ADMISSION only. No engine path (liquidation, ADL, settlement,
+funding) and no cash path (withdraw, transfer, vault, Earn) reads it, so a
+reservation can never hold back your own money and never makes the account harder
+to liquidate. `withdrawable` is unaffected by it.
+
+```json
+"abstraction": "standard",
+"reservations": {
+  "perp":   { "reserved": "900", "held": "250", "available": "600" },
+  "spot":   { "reserved": "0",   "held": "0",   "available": "0"   },
+  "option": { "reserved": "400", "held": "0",   "available": "350" }
+}
+```
+
+The pool holds 1000. Perp reads 600, not its 650 of unused cap, because option
+has promised 400. Option reads 350, not its 400 cap, because perp has promised
+650. Spot reserved nothing, so it admits nothing.
 
 #### The as-of stamp {#account-state-as-of}
 
