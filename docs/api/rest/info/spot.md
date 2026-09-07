@@ -188,7 +188,7 @@ Every spot-margin position held by one account.
         "borrow_index_snapshot": "1",
         "base_held": "9.99",
         "current_debt": "22",
-        "params": { "init_bps": 2000, "maint_bps": 1000 }
+        "params": { "init_bps": "2000", "maint_bps": "1000" }
       }
     ]
   }
@@ -288,6 +288,85 @@ nothing". Test for key presence before you read a stake.
   per-block accrual stamps the time without stepping `borrow_index`. Do not
   compute an APY from a rising `share_value` that is not rising. A governance
   vote sets a non-zero rate — see [Earn](../../../concepts/earn.md).
+
+### Borrow interest an account owes {#user_interest}
+
+Every open borrow one account carries, split into principal and interest.
+
+:::info
+**This read is keyed on the ACCOUNT, not on the lane that charged the
+interest.** Spot margin is one lane that can create a debt and an Earn pool is
+one place that funds it, but neither *is* the debt. A second lane that charges
+interest later joins the `borrows` array — it does not get a second query type.
+So build an "Interest" view on this read, not on
+[`spot_margin_state`](#spot_margin_state).
+:::
+
+**Request**
+
+```json
+{ "type": "user_interest", "user": "0x<addr>" }
+```
+
+| Field | Type | Required | Meaning |
+|-------|------|----------|---------|
+| `user` | hex address | yes | Account to read |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "user_interest",
+    "user": "0x<addr>",
+    "owed": "2",
+    "borrows": [
+      {
+        "lane": "spot_margin",
+        "pair": "MTF/USDC",
+        "principal": "20",
+        "accrued": "22",
+        "interest": "2",
+        "index_snapshot": "1",
+        "pool_index": "1.1"
+      }
+    ],
+    "earned": null
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `owed` | Decimal string | Sum of `borrows[*].interest`, whole-USDC |
+| `borrows[*].lane` | string | What created the debt. `"spot_margin"` is the only value today |
+| `borrows[*].pair` | string | Spot pair symbol (e.g. `"MTF/USDC"`), not a numeric id |
+| `borrows[*].principal` | Decimal string | Loan principal, before interest |
+| `borrows[*].accrued` | Decimal string | What the debt is worth now — principal plus interest |
+| `borrows[*].interest` | Decimal string | `accrued − principal` |
+| `borrows[*].index_snapshot` | Decimal string | Pool borrow index captured at open — the basis interest is measured FROM |
+| `borrows[*].pool_index` | Decimal string \| null | The pool's borrow index now. `null` when the pair has no committed pool |
+| `earned` | null | Always `null` — see Rules |
+
+**Rules**
+
+- **Both indices are in the answer so you can check the arithmetic.** `accrued =
+  principal × pool_index / index_snapshot`. Divide before you multiply: the
+  chain's settlement path does, and on a non-terminating ratio the other order
+  lands on a different last digit.
+- **An `index_snapshot` of `0` reads as `1`.** It is the pre-accrual basis a
+  position gets before the pool has ever accrued, not a division by zero.
+- **A `pool_index` of `null` means nothing can accrue.** The pair has no
+  committed pool, so `accrued` equals `principal` and `interest` is `"0"`.
+- Borrows are listed in pair-id order. A borrow whose principal is zero is not
+  listed — this read answers what you owe.
+- An account with no borrows returns an empty `borrows` array and `owed` `"0"`.
+- **`earned` is always `null`, and that is not a placeholder.** The chain stores
+  a supplier's shares but no cost basis, so lending profit is not derivable from
+  committed state and this read will not invent it. For the supplier side read
+  [`earn_state`](#earn_state) with `user`: `user_shares` and `user_value` give
+  the stake and what it is worth now. Track your own deposits if you need a
+  profit figure.
 
 ### Spot-pair-deploy gas-auction state {#spot_deploy_auction}
 

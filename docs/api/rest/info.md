@@ -55,8 +55,9 @@ The payload fields keep their old path. A field you read at `body.data.fills`
 before is still at `body.data.fills`. Only `type` moved: it was a sibling of
 `data`, and it is now the first key of `data`.
 
-**The history-archive reads are the exception: they still answer with `type` at
-the TOP level.** Read `body.data.type ?? body.type` if you need it, and see
+**Every read carries `type` inside `data`, the history-archive reads included.**
+Until the next gateway release the archive lane still answers with `type` at the
+top level, so read `body.data.type ?? body.type` while that window is open. See
 [the archive lane](#archive-lane) below.
 
 A success has **no** `error` key. Do not test `error === null` — test whether
@@ -93,9 +94,8 @@ with `NOT_FOUND`.
 
 #### The history-archive reads answer in the OLD envelope {#archive-lane}
 
-This is live behavior today, not a target state. A group of reads is served by
-the history archive rather than by the node, and the archive was not migrated
-to the envelope above. **It differs in two ways at once.**
+A group of reads is served by the history archive rather than by the node, and
+the archive was not migrated to the envelope above.
 
 The lane is `portfolio`, `historical_orders`, `user_funding`,
 `user_funding_by_time`, `user_position_history`,
@@ -107,14 +107,26 @@ The lane is `portfolio`, `historical_orders`, `user_funding`,
 value: **`1d`**. Any other value is rejected `400 invalid interval: <value>`,
 and the rejection now names `1d`.
 
-**Difference 1 — `type` sits at the top level, beside `data`, not inside it.**
+**Difference 1 — `type` sits at the top level, beside `data`, not inside it.
+NOT YET LIVE: this is fixed in the gateway but not released.**
+
+Today, on the deployed gateway:
 
 ```json
 { "data": { "address": "0x<addr>", "fundings": [] }, "type": "user_funding" }
 ```
 
-`body.data.type` is `undefined` on every read in this lane. Every other `/info`
-read carries `type` inside `data`.
+After the next gateway release, and on every other `/info` read already:
+
+```json
+{ "data": { "type": "user_funding", "address": "0x<addr>", "fundings": [] } }
+```
+
+Read `body.data.type ?? body.type` and both answers work. **A read used to
+change shape with its content**: with no archive configured the SAME read
+answered `type` inside `data`, so a client that dispatched on `data.type` worked
+only while the result was empty. That is gone — one read now answers one shape,
+empty or not.
 
 **Difference 2 — a rejection puts a bare STRING in `error`,** not the
 `{code, message}` object. This applies to the reads in the lane that take an
@@ -1469,62 +1481,44 @@ the AppHash — no external indexer). For one row per
 close, realized PnL and funding folded over the whole life — use
 [position history](./info/position-history.md).
 
-#### The lanes that record no fill {#unrecorded-fills}
+#### Every order lane records its fill {#unrecorded-fills}
 
-This read is not the complete list of an account's executions. Some order lanes
-settle a fill that nothing reports. This page calls that an **unrecorded fill**.
-The chain matches the order, moves both positions and moves the money. No read
-and no stream carries the fill, for either party.
+Four lanes used to settle a fill that nothing reported — the chain matched the
+order, moved both positions and moved the money, and no read and no stream
+carried it, for either party. All four are fixed:
 
-| The order was placed by | Recorded |
+| The order was placed by | Fixed in |
 |---|---|
-| [`modify`](./exchange.md#modify) or [`batch_modify`](./exchange.md#batch_modify), when the replacement crosses the book on placement | nothing about the fill |
-| [CoreWriter `LimitOrder`](../../evm/interacting-with-core.md) from MetaFluxEVM, when it crosses on placement | nothing about the fill |
-| a [`multi_sig`](../../concepts/multi-sig.md) envelope holding `order`, `spot_order`, `batch_order`, `scale_order`, `modify` or `batch_modify` | nothing about the fill |
-| a [frequent batch auction](../../concepts/fba.md) clearing, on a market in FBA mode | nothing about the fill |
+| [`modify`](./exchange.md#modify) / [`batch_modify`](./exchange.md#batch_modify), when the replacement crosses on placement | node 0.9.5 |
+| a [`multi_sig`](../../concepts/multi-sig.md) envelope holding an order action | node 0.9.5 |
+| [CoreWriter `LimitOrder`](../../evm/interacting-with-core.md) from MetaFluxEVM, when it crosses on placement | the next release |
+| a [frequent batch auction](../../concepts/fba.md) clearing | the next release |
 
-"Nothing" is the whole surface: no row on this read, no `filled` record on
-[`historical_orders`](#historical_orders), no print on the
-[public trade tape](./info/perpetuals.md#trades), no message on the WS
-[`fills`](../ws/subscriptions.md#fills) or
-[`trades`](../ws/subscriptions.md#trades) channel, and no record in the
-[node streams](../../nodes/data-streams.md).
+> **Other pages still describe all four lanes as unrecorded.** This section is
+> the current answer; where another page enumerates four, read it as the two
+> above that are not yet live.
 
-**The maker gets no `open_orders` frame either.** That channel re-emits an
-account's set when a fill touches it, and an unrecorded fill touches nothing.
-So the maker's live view keeps the consumed order at its old size until some
-other event on that account forces a new frame. Read
-[`open_orders`](#open_orders) over REST to settle what is really resting.
+> ⚠️ **The last two ship with the NEXT node release.** Until it swaps, a
+> CoreWriter order that crosses on placement and an FBA clearing still record
+> nothing. The two rows above them are live now.
 
-**One lane is half-recorded.** A [`multi_sig`](../../concepts/multi-sig.md)
-envelope holding `spot_margin_open` or `spot_margin_close` records the fill on
-THIS read, and records it nowhere else: no node stream, no WS channel, and no
-maker execution record. A caller reconciling this read against the streams sees
-a fill on one side only.
+So a fill reaches this read, [`historical_orders`](#historical_orders), the
+[public trade tape](./info/perpetuals.md#trades), the WS
+[`fills`](../ws/subscriptions.md#fills) and
+[`trades`](../ws/subscriptions.md#trades) channels, and the
+[node streams](../../nodes/data-streams.md), whichever lane placed the order.
 
-**What a caller does about it**
+**Two properties survive the fix, and a caller still has to know them.**
 
-- **Trust the position, not the fill list.** A position change with no matching
-  fill row is a real trade, not a lost message. Read the position and the
-  balance from [`account_state`](#account_state); it always reflects every fill.
-  Sum fills for reporting, never for a balance check.
-- **Send an order you must audit as a top-level
-  [`order`](./exchange.md#submit_order),
-  [`batch_order`](./exchange.md#batch_order), `scale_order` or `spot_order`.**
-  Those four lanes record both legs.
-- **To amend an order you must audit, cancel it and place a new one.** A
-  `modify` is atomic and unrecorded. A cancel plus a place is recorded and not
-  atomic. Pick the property your use needs.
-- **A maker cannot opt out.** A resting order hit through one of these lanes
-  records nothing, and its owner chose none of it. So a missing fill row never
-  proves that an order was not hit.
-- **The sender can size the fill, from `open_orders` only.** A `modify`
-  replacement rests under a NEW order id. Read that id's `sz` on
-  [`open_orders`](#open_orders): the fill is the size you sent minus that `sz`.
-  If neither the original id nor the new id is resting, the replacement filled
-  in full — a rejected amend leaves the original in place.
-- **Volume totals read low.** Every figure built from the trade tape, the
-  24-hour volume fields included, excludes these fills.
+**A position change is authoritative; a fill list is a report.** Read the
+position and the balance from [`account_state`](#account_state) for anything
+that must balance. Sum fills for reporting, never for a balance check. That was
+true before these lanes were fixed and it stays true: a fill list is a stream of
+events, and a stream can be behind.
+
+**A `modify` replacement rests under a NEW order id.** That is not a recording
+gap, it is how the action works — but a caller tracking an order by id has to
+follow the new one. Read that id on [`open_orders`](#open_orders).
 
 **Request**
 
@@ -2192,9 +2186,10 @@ A resting order that is HIT gets a `filled` record too, with one exception.
 This page calls that a **maker execution record**. The maker sent no action in
 that block, so the node derives the record from the fill. A liquidation, a TWAP
 slice and a trigger order all produce the same record for the maker they hit.
-**The exception is an [unrecorded fill](#unrecorded-fills)**: a `modify`, a
-CoreWriter `LimitOrder`, a `multi_sig` envelope and a batch-auction clearing
-each match against a resting order and derive nothing for it.
+**The exception is a still-[unrecorded fill](#unrecorded-fills)**. Node 0.9.5
+records the `modify` and `multi_sig` lanes; a CoreWriter `LimitOrder` that
+crosses on placement and a batch-auction clearing still match against a resting
+order and derive nothing for it, until the next release.
 
 **Request**
 
@@ -2245,9 +2240,9 @@ rejected — see [malformed requests](#malformed-request).
 }
 ```
 
-**`type` sits at the TOP level on this read, beside `data`.** The history
-archive serves it, and that lane was not migrated to the current envelope — see
-[the archive lane](#archive-lane). `body.data.type` reads `undefined` here.
+**`type` sits at the TOP level on this read until the next gateway release.**
+The history archive serves it — see [the archive lane](#archive-lane). Read
+`body.data.type ?? body.type` and both answers work.
 
 | Field | Type | Meaning |
 |-------|------|---------|
@@ -2308,8 +2303,8 @@ archive serves it, and that lane was not migrated to the current envelope — se
   that record — and `open_orders` repeats that same wrong `false` while the leg
   rests.
   **The second group is any order an
-  [unrecorded-fill lane](#unrecorded-fills) rested.** A `modify`, a CoreWriter
-  `LimitOrder` and a `multi_sig` envelope each rest an order with no `resting`
+  [unrecorded-fill lane](#unrecorded-fills) rested** — a CoreWriter
+  `LimitOrder`, until the next release. It rests an order with no `resting`
   record. That order is an ordinary resting order after that, so an ordinary
   taker DOES give it a maker execution record later — and that record has
   nothing to join to. Its `tif`, `cloid`,
@@ -2474,8 +2469,8 @@ standalone history archive. **They are the replacement for the removed
 for why a validator no longer pushes that firehose.
 
 Both answer in the [history-archive envelope](#archive-lane): `type` sits beside
-`data`, not inside it. A gateway with no archive configured answers an empty
-array with a `flag`, never an error.
+`data` until the next gateway release, and inside it after. A gateway with no
+archive configured answers an empty array with a `flag`, never an error.
 
 ### Recent committed blocks {#recent_blocks}
 

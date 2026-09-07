@@ -69,7 +69,7 @@ Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unk
 not change it.** An order placed by `modify` or `batch_modify`, an order placed
 by CoreWriter `LimitOrder`, any order inside a `multi_sig` envelope, and every
 clearing of a [frequent batch auction](../../concepts/fba.md) each settle with
-no message on `trades`, on `fills` or on `order_updates` — for either party. See [unrecorded fills](../rest/info.md#unrecorded-fills). So a
+no message on `trades`, on `fills` or on `order_updates` — for either party. **Fixed for `modify` and `multi_sig` in node 0.9.5; a CoreWriter order that crosses on placement and an FBA clearing follow in the next release.** See [unrecorded fills](../rest/info.md#unrecorded-fills). So a
 market maker cannot read `fills` as the complete record of its own executions,
 and must reconcile its position from
 [`account_state`](../rest/info.md#account_state) instead.
@@ -416,7 +416,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 
 ### Per-account resting order snapshot {#open_orders}
 
-Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client simply **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. **One exception: a resting order consumed by an [unrecorded fill](../rest/info.md#unrecorded-fills) produces no frame**, so that account's snapshot stays stale — showing the order at its old size — until some other event on the account forces a re-emission. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
+Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client simply **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. **One exception, and it is shrinking: a resting order consumed by a still-[unrecorded fill](../rest/info.md#unrecorded-fills) produces no frame**, so that account's snapshot stays stale — showing the order at its old size — until some other event forces a re-emission. Two of the four lanes were fixed in node 0.9.5; the CoreWriter and FBA lanes follow in the next release, after which this exception is gone. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "open_orders", "user": "0x<address>" } }
@@ -435,9 +435,9 @@ The snapshot is an **array** of records, each in the same fixed shape as an [`or
 - Because every frame is a full snapshot, `is_snapshot` is always `true` here — treat each frame as the account's complete current resting set, not an incremental change.
 - A parked TP/SL leg renders the SAME `trigger` block the REST read serves, so a ladder leg carries `group` and a trailing leg carries `trail_px` here too. Both keys are absent on every other leg — see [`open_orders`](../rest/info.md#open_orders) for the rule.
 
-### Per-account margin and liquidation notices {#notifications}
+### Per-account notices {#notifications}
 
-Per-account margin / liquidation notices, derived by diffing consecutive committed states. Requires `user`. One array frame per affected commit; initial snapshot `[]`.
+Per-account notices. The margin / liquidation kinds are derived by diffing consecutive committed states; `action_dropped` is written by the commit loop. Requires `user`. One array frame per affected commit; initial snapshot `[]`.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "notifications", "user": "0x<address>" } }
@@ -450,11 +450,31 @@ Per-account margin / liquidation notices, derived by diffing consecutive committ
   { "kind": "tier_cleared", "tier": null, "message": "...", "time": 1735689600123 },
   { "kind": "forced_close", "coin": "BTC", "side": "long", "closed_sz": "600", "message": "...", "time": 1735689600123 },
   { "kind": "backstop_residual", "coin": "BTC", "side": "long", "lots": "120", "message": "...", "time": 1735689600123 },
-  { "kind": "backstop_residual_cleared", "coin": "BTC", "side": "long", "message": "...", "time": 1735689600123 } ] }
+  { "kind": "backstop_residual_cleared", "coin": "BTC", "side": "long", "message": "...", "time": 1735689600123 },
+  { "kind": "action_dropped", "action_hash": "ab..", "nonce": 42, "code": "DROPPED_EXPIRED", "message": "...", "time": 1735689600123 } ] }
 ```
 
 - `kind` is the machine tag; `message` is the human-readable text. `tier` ∈ `yellow_card` / `partial_market_50` / `full_market` / `backstop_takeover` (or `null` on clear).
 - `yellow_card` is the one-block margin-warning grace (the [tiered-liquidation](../../concepts/tiered-liquidation.md) T0 contract); `forced_close` fires when a liquidation actually executes against the account.
+
+#### `action_dropped` {#notifications-action_dropped}
+
+> **NOT LIVE YET.** This record ships in the next node release. Until then the
+> channel emits the risk kinds only. It adds no field to a record you already
+> receive, so a client can switch on it before that release.
+
+The commit loop dropped a committed action **before it dispatched**. The action consumed no nonce and changed no state, so it produces no `order_updates` status, no fill and no `ledger_updates` record — this notice is the only push that carries it. `action_hash` is the value [`/exchange`](../rest/exchange.md) returned, so a caller joins on that.
+
+`code` is a closed vocabulary:
+
+| `code` | Meaning |
+|--------|---------|
+| `DROPPED_EXPIRED` | The signed `expires_after` is past the block time, or the expiry feature is not armed. |
+| `DROPPED_RETIRED` | The action id is retired. |
+| `DROPPED_PAYLOAD_KEYS_INACTIVE` | A `core_evm_transfer` carries keys the unified lane has not armed. |
+| `DROPPED_NONCE_REPLAY` | The nonce is used, or below the per-sender replay window. |
+
+**A badly-signed action produces NO notice, by design.** The node emits this record only when the signature verified, so it knows who signed. Every other drop — an invalid signature, a malformed sender, an injected action from the wrong proposer — carries a sender the payload merely CLAIMED, and pushing it would let anyone post a failure into that account's feed. So the absence of a notice is not proof an action landed: a caller that must know either holds the [`/exchange`](../rest/exchange.md) request open for the synchronous verdict, or reads the account's state.
 
 ### Per-account money movement history {#ledger_updates}
 

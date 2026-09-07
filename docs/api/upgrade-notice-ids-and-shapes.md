@@ -335,7 +335,8 @@ and both take an optional `limit`:
 ```
 
 Both reads answer in the [history-archive envelope](rest/info.md#archive-lane) —
-`type` sits beside `data`, not inside it.
+`type` sits beside `data` until the next gateway release, and inside it after.
+Read `body.data.type ?? body.type` and both answers work.
 
 **Two facts a poller must plan for, because they are real losses.**
 

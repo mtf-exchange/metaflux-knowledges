@@ -483,9 +483,10 @@ Every record above comes from an order the account **submitted**. A resting
 order that is HIT submits nothing in that block, so the node derives its record
 from the block's fills instead. That record is a maker execution record.
 **Except when the fill is an
-[unrecorded fill](../api/rest/info.md#unrecorded-fills)**: a `modify`, a
-CoreWriter `LimitOrder`, a `multi_sig` envelope and a batch-auction clearing
-each match against a resting order and derive nothing for it.
+[unrecorded fill](../api/rest/info.md#unrecorded-fills)**. Node 0.9.5 records
+the `modify` and `multi_sig` lanes; a CoreWriter `LimitOrder` that crosses on
+placement and a batch-auction clearing still match against a resting order and
+derive nothing for it, until the next release.
 
 **A fill describes the fill, not the order.** `tif` and `cloid` are absent,
 `reduce_only` is `false` and `orig_sz` is `"0"`, whatever the order carried.
@@ -511,8 +512,8 @@ reduce-only; a fired trigger leg is always `"Gtc"` and always reduce-only, so
 `reduce_only: false` is wrong on exactly that record.
 
 The second group is any order that an
-[unrecorded-fill lane](../api/rest/info.md#unrecorded-fills) rested. A `modify`,
-a CoreWriter `LimitOrder` and a `multi_sig` envelope each rest an order with no
+[unrecorded-fill lane](../api/rest/info.md#unrecorded-fills) rested — a
+CoreWriter `LimitOrder`, until the next release. It rests an order with no
 `resting` record. That order is an ordinary resting order after that, so an
 ordinary taker DOES give it a maker execution record later — and that record has
 nothing to join to. All four fields stay missing for its whole life.
