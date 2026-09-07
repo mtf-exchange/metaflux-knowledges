@@ -101,7 +101,8 @@ The lane is `portfolio`, `historical_orders`, `user_funding`,
 `user_funding_by_time`, `user_position_history`,
 `user_position_history_by_time`, `user_non_funding_ledger_updates`,
 [`recent_blocks`](#recent_blocks),
-[`recent_transactions`](#recent_transactions) and `validator_votes`.
+[`recent_transactions`](#recent_transactions), `validator_votes` and
+[`user_volume_history`](#user_volume_history).
 
 `portfolio` takes an `interval` alongside `address`, and it accepts exactly one
 value: **`1d`**. Any other value is rejected `400 invalid interval: <value>`,
@@ -152,6 +153,7 @@ this wire:
 | `user_non_funding_ledger_updates` | `ledger_updates` |
 | `recent_transactions` | `txns` |
 | `portfolio` | `points` |
+| `user_volume_history` | `days` |
 
 > ⚠️ **`ledger_updates` was `ledgerUpdates`.** It was the one camelCase key on
 > this wire. A client reading `data.ledgerUpdates` now gets `undefined` — read
@@ -2112,6 +2114,157 @@ back, re-request with `end_time` set to the oldest `time` you received.
 the next page. Drop the duplicate by `time`, and stop when a page returns only
 rows you already hold — otherwise a pager that re-sends the same `end_time`
 never advances.
+
+### Daily traded volume for an account {#user_volume_history}
+
+Per UTC day, the whole exchange's traded volume beside this account's own maker
+and taker volume, plus the account's trailing 14-day maker share. It is the read
+behind a "Your Volume History" panel.
+
+> ⚠️ **NOT LIVE YET.** The archive serves it and the gateway routes it, but
+> neither is released. A live gateway answers `400 UNKNOWN_TYPE` until the next
+> release. Read [`fee_schedule`](#fee_schedule) for volume you can query today.
+
+**Request**
+
+```json
+{ "type": "user_volume_history", "address": "0x<addr>", "limit": 30 }
+```
+
+| Field | Type | Required | Meaning |
+|-------|------|----------|---------|
+| `address` | hex address | yes | Account address |
+| `start_time` | uint64 | no | Window start, ms. Snapped down to its UTC day. Default: 30 days ago. Send `0` for all history |
+| `end_time` | uint64 | no | Window end, ms. Snapped down to its UTC day, and never past yesterday |
+| `limit` | uint | no | Most days to return. Default `500`, capped at `5000` |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "user_volume_history",
+    "address": "0x<addr>",
+    "days": [
+      { "date": "2026-09-06", "exchange_volume": "470", "maker_volume": "200", "taker_volume": "0" }
+    ],
+    "maker_volume_share_14d": "0.42553191",
+    "flag": "traded notional on the RAW node plane …"
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `address` | hex address | Echoes the request address |
+| `days` | array | One row per UTC day, **newest first** |
+| `days[*].date` | string | The UTC day, `YYYY-MM-DD` |
+| `days[*].exchange_volume` | Decimal string | EVERY account's traded notional that day, each print counted once |
+| `days[*].maker_volume` | Decimal string | This account's notional as the RESTING side |
+| `days[*].taker_volume` | Decimal string | This account's notional as the AGGRESSOR |
+| `maker_volume_share_14d` | Decimal string | `maker_volume / exchange_volume` over the trailing 14 full days. A fraction, not a percent: `"0.0002"` is 0.02% |
+| `flag` | string | The scope and plane caveats, restated below |
+
+**Rules**
+
+- **The current UTC day is EXCLUDED, always.** A partial day reads as a collapse
+  in volume and makes a fee tier look like it moved. `end_time` cannot open it.
+- **`maker_volume_share_14d` is the trailing 14 FULL days and does not follow
+  the window.** `start_time` / `end_time` / `limit` page the table; the share is
+  the same number on every page. It is `"0"` when the exchange traded nothing.
+- **A quiet day has NO ROW.** A day on which nobody traded is absent, not a zero
+  row. A day the EXCHANGE traded but this account did not IS present, with the
+  account's two figures at `"0"`.
+- **`exchange_volume` counts each print once.** Both sides of a match record a
+  fill, so the sum of every account's `maker_volume` equals `exchange_volume`,
+  and so does the sum of every `taker_volume`.
+- **Every fill counts, with NO product weighting.** Perp and spot notional enter
+  at 1x alike, because [the chain weights them alike](../../concepts/fees.md).
+  This wire carries no doubled spot volume.
+
+> ⚠️ **This is NOT your fee tier, and the two disagree on purpose.** The ladder
+> reads a **30-day** window, counts each product separately, and rolls only
+> volume that PAID a protocol fee — a zero-fee pair adds nothing to it. This
+> read counts every fill over whatever window you ask for. Read the tier itself,
+> and the volume the tier saw, from [`fee_schedule`](#fee_schedule) with an
+> `address`.
+
+> ⚠️ **The volumes are on the RAW node plane.** `px` is scaled by `1e8` and `sz`
+> by `10^sz_decimals`, so `px x sz` carries a per-market factor. The figure is a
+> true USDC notional only within ONE market, and a total across markets is not
+> a dollar amount. `maker_volume_share_14d` divides two such totals, so it is
+> exact only while the account and the exchange trade the same size planes. The
+> archive holds no market registry to normalize with. `leaderboard` `volume` and
+> `portfolio` `volume` are on the same plane. For volume in whole USDC, read
+> `fee_schedule`.
+
+### Borrow interest an account owes {#user_interest}
+
+Every open borrow, with what it costs. One read for every lane that charges
+interest — spot margin today, and anything added later joins the same `borrows`
+array rather than getting a query type of its own.
+
+> ⚠️ **NOT LIVE YET.** The node read is landed and unreleased. A live node
+> answers `unknown info type` until the next swap.
+
+**The request key is `user`, NOT `address`.** It follows
+[`spot_margin_state`](./info/spot.md#spot_margin_state), not the account-history reads.
+
+```json
+{ "type": "user_interest", "user": "0x<addr>" }
+```
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "user_interest",
+    "user": "0x<addr>",
+    "owed": "12.5",
+    "borrows": [
+      {
+        "lane": "spot_margin",
+        "pair": "MTF/USDC",
+        "principal": "1000",
+        "accrued": "1012.5",
+        "interest": "12.5",
+        "index_snapshot": "1.0",
+        "pool_index": "1.0125"
+      }
+    ],
+    "earned": null
+  }
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `owed` | Decimal string | Sum of every row's `interest`. What the account owes in interest right now |
+| `borrows[*].lane` | string | Which lane created the debt. `spot_margin` today |
+| `borrows[*].pair` | string | The market symbol the borrow funds |
+| `borrows[*].principal` | Decimal string | Borrowed, before interest |
+| `borrows[*].accrued` | Decimal string | `principal x (pool_index / index_snapshot)` — the figure a repay charges |
+| `borrows[*].interest` | Decimal string | `accrued - principal` |
+| `borrows[*].index_snapshot` | Decimal string | The pool's borrow index when this borrow was opened or last re-based |
+| `borrows[*].pool_index` | Decimal string | The pool's borrow index now |
+| `earned` | `null` | Always. See below |
+
+**Both indices are in the answer so you can check the arithmetic.** The chain
+divides before it multiplies, and `Decimal` keeps 28 significant digits, so the
+two orders do not always agree — an account owing 3 units against a 1:3 index
+ratio accrues `0.9999999999999999999999999999`, not `1`. Reproduce it the way
+the chain does, or read `accrued` and do not re-derive it.
+
+**`earned` is permanently `null`, and that is a fact about the chain rather than
+this read.** An Earn pool stores a supplier's `shares` and nothing else — there
+is no cost basis in committed state, so a supplier's earnings are not derivable.
+Serving a number that looks like profit and is not would be worse than serving
+nothing. Read shares and their current value from
+[`earn_state`](./info/spot.md#earn_state) with a `user`.
+
+**An account with no borrow answers an empty `borrows` and `owed: "0"`**, not an
+error. That is a fact about the account.
 
 ### Balance ledger update history {#user_ledger_updates}
 
