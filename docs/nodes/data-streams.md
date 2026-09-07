@@ -1673,10 +1673,26 @@ bootstrap. Diff lines then apply on top.
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
 | `kind` | string | — | `"snapshot"` or `"diff"` |
-| `block_number` | uint64 | — | Committed block height |
-| `block_time` | uint64 | ms | Consensus block timestamp |
+| `block_number` | uint64 | — | Committed block height. The LAST round this line covers |
+| `from_block` | uint64 | — | The FIRST round this line covers. Equals `block_number` on an ordinary one-round commit |
+| `block_time` | uint64 | ms | Consensus block timestamp of `block_number` |
 | `orders` | array | — | Full resting set. Present on `"snapshot"` |
 | `events` | array | — | Changed orders only. Present on `"diff"` |
+
+> ⚠️ **NOT LIVE YET.** `from_block` ships with the next node release. Until then
+> every line carries `block_number` only, and a batch is indistinguishable from
+> a single round.
+
+**One line can cover several rounds, and `from_block` is how you tell.** The node
+writes these from committed state, which a state-sync batch has already advanced
+to the batch TIP — the intermediate states no longer exist, so the line is one
+aggregate rather than one line per round. An order that rested and vanished
+inside the batch never appears at all.
+
+A consumer that counts lines to count blocks is wrong on exactly the path that
+produces large batches: a catching-up node. Advance your own height to
+`block_number`, and read `block_number - from_block + 1` as the number of rounds
+folded into that line.
 
 One order or event:
 
@@ -1709,8 +1725,9 @@ books only. Written to `<data_dir>/l2_book_diffs.jsonl`.
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
 | `kind` | string | — | `"snapshot"` or `"diff"` |
-| `block_number` | uint64 | — | Committed block height |
-| `block_time` | uint64 | ms | Consensus block timestamp |
+| `block_number` | uint64 | — | Committed block height. The LAST round this line covers |
+| `from_block` | uint64 | — | The FIRST round this line covers. Equals `block_number` on an ordinary one-round commit |
+| `block_time` | uint64 | ms | Consensus block timestamp of `block_number` |
 | `levels` | array | — | Full level set. Present on `"snapshot"` |
 | `events` | array | — | Changed levels only. Present on `"diff"` |
 
