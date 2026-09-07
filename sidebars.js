@@ -174,6 +174,8 @@ const sidebars = {
         },
       ],
     },
+
+    {type: 'doc', id: 'brand', label: 'Brand'},
   ],
 };
 
