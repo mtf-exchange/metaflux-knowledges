@@ -377,7 +377,10 @@ total is conserved.
 [`202 Accepted` admission envelope](../exchange.md#202-accepted--non-order-admission).
 
 **Common errors** (at commit): `amount must be positive`, `sub account not
-found`, `insufficient spot balance`.
+found`, `insufficient spot balance`. A split `standard` leg (not live yet) moves
+USDC through its spot wallet, so on that leg the USDC rejection is `insufficient
+spot balance`, not `insufficient cross collateral`; a pooled leg keeps
+`insufficient cross collateral`.
 
 ---
 
@@ -480,6 +483,14 @@ allowed, even when your equity has fallen below the total already reserved.
 **`standard` and `portfolio` are mutually exclusive.** Each refuses the other, in
 both directions.
 
+**The USDC split (not live yet).** From the node 0.9.7 swap, an account that
+ENTERS `standard` also splits its USDC: perp collateral stays in the perp wallet,
+spot USDC moves to its own wallet, and only
+[`usd_class_transfer`](./transfers.md#usd_class_transfer) crosses. An account
+already in `standard` at the swap is NOT split until it leaves and re-enters.
+Leaving folds the spot wallet back into the pool, and is refused while that
+wallet is below zero. See [the standard-mode split](../../../concepts/usdc.md#standard-split).
+
 Rejections, all `Precondition` unless noted:
 
 | Message | Cause |
@@ -491,6 +502,8 @@ Rejections, all `Precondition` unless noted:
 | `reservations exceed account value` | an INCREASE whose new total exceeds account value |
 | `cannot change abstraction while enrolled in portfolio margin` | PM enrolled |
 | `cannot change abstraction with <surface>` | the account is not flat |
+| `spot has its own wallet in standard mode; no spot reservation` | `kind: 2` on a split `standard` account (not live yet) |
+| `spot wallet is negative; cannot leave standard mode` | `kind: 0, value: 0` while the split account's spot wallet is below zero (not live yet) |
 
 ---
 

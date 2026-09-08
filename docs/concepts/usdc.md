@@ -6,7 +6,8 @@ description: Where a trader's USDC lives on MetaFlux — one unified balance, fo
 
 :::tip
 **Stable.** USDC is **one balance** on MetaFlux. The perp collateral account and
-the spendable spot-USDC balance are the same number.
+the spendable spot-USDC balance are the same number. One exception is coming: a
+`standard`-mode account will hold two — see [the standard-mode split](#standard-split).
 :::
 
 ## TL;DR {#tldr}
@@ -19,8 +20,9 @@ the spendable spot-USDC balance are the same number.
 - Two number planes. `/info` and most `/exchange` fields are **whole-USDC decimal
   strings**. [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and the EVM
   token are **6-decimal integers**. Mixing them is an error of 10⁶.
-- [`usd_class_transfer`](#moving-usdc) is **rejected**. There is no second pool
-  to move to.
+- [`usd_class_transfer`](#moving-usdc) is **rejected** on a unified account. There
+  is no second pool to move to. A split `standard` account is the one exception —
+  see [the standard-mode split](#standard-split).
 
 ## The four identities {#four-identities}
 
@@ -126,11 +128,38 @@ Because it is one pool, the two directions are real and intended:
 
 Cancel the bid and the escrow returns to the pool.
 
+## The standard-mode split {#standard-split}
+
+:::warning Not live yet
+This ships with the node 0.9.7 freeze-swap. Until then every account, `standard`
+included, holds one USDC balance and behaves as the rest of this page says.
+:::
+
+From the swap, an account that **enters** `standard` mode holds **two** USDC
+wallets:
+
+- The **perp wallet** is the collateral account. Perp margin, funding, liquidation,
+  ADL, Earn, vaults and bridge withdrawals read and write this one.
+- The **spot wallet** is spot token `100`. Spot orders, spot fills, spot fees,
+  `send_asset` of USDC and Core→EVM transfers read and write this one.
+- [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer) is the
+  **only** lane that crosses. It moves one amount from one wallet to the other.
+
+Three rules follow, and each is deliberate:
+
+1. **A perp loss cannot reach the spot wallet.** A split account's perp bankruptcy
+   is absorbed by the insurance fund and ADL, never by its spot USDC.
+2. **A split account is refused spot margin and a spot reservation.** Spot has its
+   own wallet, so there is nothing to reserve against.
+3. **Only entry splits.** An account already in `standard` at the swap keeps one
+   balance until it leaves the mode and enters again. Leaving folds the spot
+   wallet back into the pool.
+
 ## Moving USDC {#moving-usdc}
 
 | Move | How | What it costs |
 |------|-----|---------------|
-| Perp ↔ spot class | — | **Rejected.** See below |
+| Perp ↔ spot class | [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer), **split `standard` accounts only** | No protocol fee. **Rejected** on every other account — see below |
 | To another MetaFlux account | [`send_asset`](../integration/typed-data-signing.md#transfers) | No protocol fee |
 | Parent ↔ sub-account | [`sub_account_transfer`](../api/rest/exchange/account.md#sub_account_transfer) / [`sub_account_spot_transfer`](../api/rest/exchange/account.md#sub_account_spot_transfer) | No protocol fee |
 | Core → EVM | [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | No protocol fee; the amount is rescaled ×10⁶ |

@@ -253,7 +253,7 @@ The three `pm_*` figures are always present and are **meaningful only when
 | `spot.balances` | array | The **whole** spot token ledger, one row per token held. Never empty: row 0 is USDC unconditionally |
 | `spot.balances[*].name` | string | Token symbol (`"USDC"` for row 0). Rows are keyed and joined by `name` |
 | `spot.balances[*].signing_id` | uint32 | The number you place in the `asset` field of a signed [`send_asset`](../../rest/exchange/transfers.md#send_asset), and in `asset` of an `earn_deposit`. `100` for USDC. It has no other meaning on the read plane. **Not `spot_send`** — no such action exists; that name is a [ledger record kind](../../ws/subscriptions.md#ledger_updates) |
-| `spot.balances[*].total` | Decimal string | The **whole** holding of that token, escrow included. **Not** the spendable amount — perp margin sits inside it too. Use `withdrawable` |
+| `spot.balances[*].total` | Decimal string | The **whole** holding of that token, escrow included. **Not** the spendable amount — perp margin sits inside it too. Use `withdrawable`. **Split `standard` account (not live yet):** the USDC row is the spot wallet alone, and perp margin is NOT inside it — see [the standard-mode split](../../../concepts/usdc.md#standard-split) |
 | `spot.balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). **A part OF `total`, not a second bucket beside it** — never add the two. Spot escrow only; it never holds perp margin |
 | `spot.balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset). See [cost basis](#avg-entry-px) |
 
@@ -347,6 +347,13 @@ available(p) = max(0, min(reserved(p) − held(p),
 So a scope can read `"0"` while `reserved` still exceeds `held` — the other scopes
 have promised the rest of the pool away. **This is the figure that explains a
 margin rejection on an account that holds USDC.**
+
+**Split `standard` account (not live yet).** From the node 0.9.7 swap an account
+that enters `standard` holds a separate spot wallet, so its `spot` row changes
+meaning: `reserved` reads `"0"`, `held` is unchanged, and `available` is the spot
+wallet itself. Setting a spot reservation on such an account is refused. A
+`standard` account that entered before the swap keeps the pooled row above until
+it leaves and re-enters — see [the standard-mode split](../../../concepts/usdc.md#standard-split).
 
 The ledger binds ADMISSION only. No engine path (liquidation, ADL, settlement,
 funding) and no cash path (withdraw, transfer, vault, Earn) reads it, so a
