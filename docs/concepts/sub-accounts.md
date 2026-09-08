@@ -208,7 +208,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 Returns the sub list. Each row carries exactly three keys: `index`, `address`
 and `equity`. `equity` is one aggregate number — there is no label field and no
 clearinghouse state on the row. To read a sub's positions, query
-[`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) with the sub's
+[`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state) with the sub's
 address.
 
 Each sub can be **read** as a first-class account via `account_state`, `open_orders`, `user_fills` and the rest, by passing its address as `address`. Reads work; writes do not (see the [TL;DR warning](#tldr)).
@@ -300,7 +300,7 @@ sequenceDiagram
 - [Agent wallets](./agent-wallets.md) — per-sub hot keys
 - [Portfolio margin](./portfolio-margin.md) — interaction with cross-asset PM
 - [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso per sub
-- [`POST /info account_state`](../api/rest/info.md#account_state-overview) with `detail: "overview"` — MTF-native query; the sub-account list is one facet of it
+- [`POST /info account_state`](../api/rest/info/account.md#account_state-overview) with `detail: "overview"` — MTF-native query; the sub-account list is one facet of it
 
 ## FAQ {#faq}
 

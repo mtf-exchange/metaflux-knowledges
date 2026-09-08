@@ -147,7 +147,7 @@ share_price = NAV(vault) / total_shares
 
 `NAV` is marked to market: settled cash, plus unrealised PnL on every open position at the latest oracle mark, plus unrealised funding. The Metaliquidity backstop vault also subtracts its pending-loss reserve. Pricing updates every commit — a deposit or withdrawal executes at the **post-commit** share price, not the price at request time.
 
-The reads carry that same NAV. [`vault_state`](../api/rest/info.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info.md#vault_summaries) `tvl`, and [`account_state`](../api/rest/info.md#account_state-overview) `vault.equities[*].equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange/vaults.md#vault_withdraw) pays.
+The reads carry that same NAV. [`vault_state`](../api/rest/info/vaults-staking.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info/node.md#vault_summaries) `tvl`, and [`account_state`](../api/rest/info/account.md#account_state-overview) `vault.equities[*].equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange/vaults.md#vault_withdraw) pays.
 
 #### `high_water_mark` is not NAV {#high-water-mark}
 
@@ -208,9 +208,9 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 
 `performance_fee_bps` here is the vault's `new_management_fee_bps` (see
 [Fees](#fees)); `strategy` is the vault's `kind` (`"User"` or
-`"Metaliquidity"`). See [`vault_state`](../api/rest/info.md#vault_state) for
+`"Metaliquidity"`). See [`vault_state`](../api/rest/info/vaults-staking.md#vault_state) for
 the full field table. This read carries no `manager` field and no
-per-caller `your_*` fields — query [`account_state`](../api/rest/info.md#account_state-overview) with `detail: "overview"` for one account's own share holding.
+per-caller `your_*` fields — query [`account_state`](../api/rest/info/account.md#account_state-overview) with `detail: "overview"` for one account's own share holding.
 
 ## Insurance pool {#insurance-pool}
 
@@ -246,9 +246,9 @@ sequenceDiagram
 ## See also {#see-also}
 
 - [Tiered liquidation](./tiered-liquidation.md) — T3 backstop, insurance pool
-- [`POST /info vault_state`](../api/rest/info.md#vault_state)
-- [`POST /info account_state`](../api/rest/info.md#account_state-overview) with `detail: "overview"` — one account's own share holding
-- [`ledger_updates` WS](../api/ws/subscriptions.md#ledger_updates) — a leader's `vault_transfer` rides this channel (`kind: vault_transfer`); there is no live event today for `vault_distribute`, `vault_withdraw`, or fee accrual — poll [`vault_state`](../api/rest/info.md#vault_state) for share-price and NAV changes
+- [`POST /info vault_state`](../api/rest/info/vaults-staking.md#vault_state)
+- [`POST /info account_state`](../api/rest/info/account.md#account_state-overview) with `detail: "overview"` — one account's own share holding
+- [`ledger_updates` WS](../api/ws/subscriptions.md#ledger_updates) — a leader's `vault_transfer` rides this channel (`kind: vault_transfer`); there is no live event today for `vault_distribute`, `vault_withdraw`, or fee accrual — poll [`vault_state`](../api/rest/info/vaults-staking.md#vault_state) for share-price and NAV changes
 - [Staking](./staking.md) — separate from vaults
 
 ## FAQ {#faq}

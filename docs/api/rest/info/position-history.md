@@ -17,8 +17,8 @@ realized PnL, fees and funding.
 :::warning
 **This is not a trade log.** One row covers a whole life, not one execution. For
 **per-fill** rows — one record per execution, with price, size, fee and order id
-— use [`user_fills`](../info.md#user_fills) and
-[`user_fills`](../info.md#user_fills) with a time window. If you are porting code
+— use [`user_fills`](./orders-fills.md#user_fills) and
+[`user_fills`](./orders-fills.md#user_fills) with a time window. If you are porting code
 that reads another exchange's per-trade history, `user_fills` is the query you
 want, not this one.
 :::
@@ -26,7 +26,7 @@ want, not this one.
 :::info
 **An OPEN position is never returned.** A life enters this history only when it
 closes. An open position is not lost — the live position is served by
-[`clearinghouse_state`](../info.md#clearinghouse_state) from the node's
+[`clearinghouse_state`](./account.md#clearinghouse_state) from the node's
 clearinghouse state. The two reads are complements: `clearinghouse_state` for
 what you hold now, position
 history for what you already closed.
@@ -296,7 +296,7 @@ the life that was seen, not as whole-life totals.
 
 ## See also {#see-also}
 
-- [`user_fills`](../info.md#user_fills) — per-fill history, one row per execution
-- [`account_state`](../info.md#account_state) — live margin health and balances
-- [`clearinghouse_state`](../info.md#clearinghouse_state) — live perp positions
+- [`user_fills`](./orders-fills.md#user_fills) — per-fill history, one row per execution
+- [`account_state`](./account.md#account_state) — live margin health and balances
+- [`clearinghouse_state`](./account.md#clearinghouse_state) — live perp positions
 - [`POST /info` base page](../info.md) — envelope and shared conventions

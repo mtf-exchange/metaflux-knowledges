@@ -136,7 +136,7 @@ actions, recovers a phantom address that passes no authorization check). See
 
 A `chainId` is a signing-domain value, not a chain identifier: two chains can
 run the same one. To confirm WHICH chain an endpoint serves, read
-[`chain_identity`](../rest/info.md#chain-identity) on `exchange_status`.
+[`chain_identity`](../rest/info/node.md#chain-identity) on `exchange_status`.
 
 ### Optional action expiry (`expiresAfter`) {#optional-action-expiry-expiresafter}
 
@@ -416,7 +416,7 @@ no-op. See [the field-level sections](./exchange/rfq-utility.md) for the wire
 planes and the digest-bound `owner` rule.
 
 The three RFQ actions are the **option trade path**. They take an
-[option series](./info.md#option_series) `signing_id` as the market, and they
+[option series](./info/options.md#option_series) `signing_id` as the market, and they
 refuse every other market. See [options](../../products/options.md).
 
 | `type` | Purpose | Signed-by |
@@ -801,9 +801,9 @@ The two classes differ, so treat them differently:
 | **Every other action** — [`twap_order`](./exchange/orders.md#twap_order), cancels, margin, vault, staking, governance, … | **Reported in this response.** The call waits for the commit, so a rejection returns the `error` envelope, and success returns `committed: true` | Read `committed` on the payload. A `202` means the wait expired, not that the action failed — read the EFFECT the action was supposed to have |
 
 **Confirm by effect.** Each action's own section names the read that proves it
-landed — a TWAP parent on [`user_twaps`](./info.md#user_twaps), a leverage change
-on [`account_state`](./info.md#account_state), a cancel by the order's absence
-from [`open_orders`](./info.md#open_orders). Poll that read for a few blocks. If
+landed — a TWAP parent on [`user_twaps`](./info/node.md#user_twaps), a leverage change
+on [`account_state`](./info/account.md#account_state), a cancel by the order's absence
+from [`open_orders`](./info/orders-fills.md#open_orders). Poll that read for a few blocks. If
 the effect has not appeared, the action was rejected; resubmit with a corrected
 body rather than waiting.
 
@@ -828,7 +828,7 @@ produced.
 **The most common silent rejection is a position-mode mismatch.** A hedge account
 must name `position_side` on an order and cannot use [`twap_order`](./exchange/orders.md#twap_order)
 at all; a one-way account must omit `position_side`. Read `position_mode` from
-[`account_state`](./info.md#account_state) once at session start and build every
+[`account_state`](./info/account.md#account_state) once at session start and build every
 order body from it.
 
 ### Rejection envelope {#rejection-envelope}
@@ -945,7 +945,7 @@ flowchart LR
     D -.-> D2["appears in /info and WS feeds"]
 ```
 
-Track commit status via the [WS feed](../ws/subscriptions.md) — [`order_updates`](../ws/subscriptions.md#order_updates) / [`fills`](../ws/subscriptions.md#fills) — or poll `/info` for `open_orders` / `user_fills`. Correlate by `cloid`: the `action_hash` returned at admission is not echoed on any per-account WS event today. **No feed carries it.** The `explorer_txs` channel that used to is [removed](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed), and its replacement [`recent_transactions`](../rest/info.md#recent_transactions) has no `hash` field. For a per-action verdict, read [`action_outcome`](../rest/info.md#action_outcome).
+Track commit status via the [WS feed](../ws/subscriptions.md) — [`order_updates`](../ws/subscriptions.md#order_updates) / [`fills`](../ws/subscriptions.md#fills) — or poll `/info` for `open_orders` / `user_fills`. Correlate by `cloid`: the `action_hash` returned at admission is not echoed on any per-account WS event today. **No feed carries it.** The `explorer_txs` channel that used to is [removed](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed), and its replacement [`recent_transactions`](../rest/info/chain.md#recent_transactions) has no `hash` field. For a per-action verdict, read [`action_outcome`](../rest/info/account-history.md#action_outcome).
 
 ## Sequence diagram — place an order and see it on the book {#sequence-diagram--place-an-order-and-see-it-on-the-book}
 

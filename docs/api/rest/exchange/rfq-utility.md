@@ -18,7 +18,7 @@ commit-time refusal comes back as a `200` with an `error` body — read
 **RFQ is the option trade path.** It clears
 [option series](../../../products/options.md) and nothing else. The market a
 request names is the `signing_id` of a live series, from
-[`option_series`](../info.md#option_series).
+[`option_series`](../info/options.md#option_series).
 
 :::note[The session is read by polling, not by a feed]
 [`rfq_open`](../../../concepts/rfq.md#querying-open-rfqs) lists every open session and its quotes, and
@@ -27,7 +27,7 @@ quoted on. Both are public. **No WS channel carries an RFQ event**, so a taker
 polls for its quotes and a maker polls for requests to answer.
 
 A fill itemises nothing of its own: the **balance change** on
-[`account_state`](../info.md#account_state) is the public trace of the premium
+[`account_state`](../info/account.md#account_state) is the public trace of the premium
 and the escrow.
 :::
 
@@ -54,7 +54,7 @@ admission, **not** digest-bound.
 
 :::danger[`market` is an option series, and nothing else]
 `market` takes the `signing_id` of a **live option series**, from
-[`option_series`](../info.md#option_series). Every other market is refused, on
+[`option_series`](../info/options.md#option_series). Every other market is refused, on
 all three actions:
 
 ```
@@ -95,7 +95,7 @@ by `limit_px`, open for maker quotes until `expiry_ms`.
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional: open the RFQ **as** this master / vault (approved agents only). **Digest-bound** — see above |
-| `market` | uint32 | a live option series | The [`option_series`](../info.md#option_series) `signing_id`. Any other market is refused |
+| `market` | uint32 | a live option series | The [`option_series`](../info/options.md#option_series) `signing_id`. Any other market is refused |
 | `side` | enum | `"Bid"` / `"Ask"` | Side the requester wants to take. `"Bid"` BUYS the option and pays the premium; `"Ask"` WRITES it and locks the escrow |
 | `size` | uint64 | `> 0` | Requested size, on the series' `10^sz_decimals` plane (widened to `u128`) |
 | `limit_px` | uint64 \| null | — | Optional taker limit price, 1e8 plane; `null` / omitted = none |
@@ -128,7 +128,7 @@ or the escrow the premium does not fund on an `"Ask"`. It refuses with
 unit of the underlying per whole unit, out of the writer's spot balance, so an
 `"Ask"` with a `limit_px` on such a series is refused with `precondition failed:
 insufficient underlying balance for the escrow` when the sender does not hold the
-coin. Read [`settle_asset`](../info.md#option_series) on the series row to know
+coin. Read [`settle_asset`](../info/options.md#option_series) on the series row to know
 which asset the request will be measured in.
 
 `expiry_ms` is an absolute consensus-ms stamp, not a duration. `0` takes the
@@ -225,8 +225,8 @@ The accept settles one option fill. It moves three amounts and nothing else.
    `price` × whole units, truncated toward zero to micro-USDC. **The premium is
    USDC on both kinds.**
 2. The **escrow** goes from the writer's balance into the series pot. Escrow =
-   [`escrow_per_unit`](../info.md#option_series) × whole units, **denominated in
-   the row's [`settle_asset`](../info.md#option_series)**. It is the strike in USDC
+   [`escrow_per_unit`](../info/options.md#option_series) × whole units, **denominated in
+   the row's [`settle_asset`](../info/options.md#option_series)**. It is the strike in USDC
    for a put, and **ONE COIN of the underlying** for a call.
 3. A closing writer's escrow comes **out** of the pot, exactly, in the same asset.
    The chain nets each account's own legs first, so a round trip returns what it
@@ -250,7 +250,7 @@ it needs can still be refused for the fee.
 
 **The response does not carry the fee, so compute it.** Read
 `option_taker_bps` and `option_premium_cap_ppm` from the `option` row of
-`products` on [`/info fee_schedule`](../info.md#fee_schedule), then:
+`products` on [`/info fee_schedule`](../info/fees-credit.md#fee_schedule), then:
 
 ```text
 strike_face = strike x size          # BOTH kinds, in USDC

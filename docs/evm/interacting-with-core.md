@@ -58,7 +58,7 @@ CoreWriter exposes 22 L1 actions (id, big-endian, in the `uint24` slot above):
 
 | id | Action | Purpose |
 |---:|--------|---------|
-| 1 | `LimitOrder` | Place a limit order on a perp / spot market. **A fill on placement is recorded nowhere** — see [unrecorded fills](../api/rest/info.md#unrecorded-fills) |
+| 1 | `LimitOrder` | Place a limit order on a perp / spot market. **A fill on placement is recorded nowhere** — see [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills) |
 | 2 | `VaultTransfer` | Deposit to / withdraw from a vault |
 | 3 | `TokenDelegate` | Delegate stake to a validator. **MTF takes an optional 4th word, the lock tier** — see [below](#action-3-lock-tier) |
 | 4 | `StakingDeposit` | Move tokens into the staking balance |
@@ -116,7 +116,7 @@ above is a deterministic no-op on Core — no funds move, no delegation row
 appears, the free staking pool is untouched. The `sendRawAction` call itself only
 burns gas and emits `RawAction`, so it cannot revert on an L1 outcome (see the
 **Atomicity** note above). Read
-[`staking_state`](../api/rest/info.md#staking_state) after the action delay to
+[`staking_state`](../api/rest/info/vaults-staking.md#staking_state) after the action delay to
 confirm the tier the ledger actually stored. **Do not read the receipt status as
 proof the delegation landed.**
 :::

@@ -235,7 +235,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 <summary>Show edge cases</summary>
 
 - **Lost keys**: M-of-N tolerates up to `N - M` losses. Plan key custody to spread the loss surface (different jurisdictions, different HSMs, different humans).
-- **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — but NOT from the order feeds. An inner order inside a multi-sig envelope used to produce no [`order_updates`](../api/ws/subscriptions.md#order_updates) message, no [`fills`](../api/ws/subscriptions.md#fills) message and no [`historical_orders`](../api/rest/info.md#historical_orders) record, leaving a watcher blind to exactly the action it looks for. **Node 0.9.5 records it** — see [unrecorded fills](../api/rest/info.md#unrecorded-fills). Against an older node, or for defence in depth, Watch [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) and diff [`account_state`](../api/rest/info.md#account_state) and [`open_orders`](../api/rest/info.md#open_orders) instead.
+- **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — but NOT from the order feeds. An inner order inside a multi-sig envelope used to produce no [`order_updates`](../api/ws/subscriptions.md#order_updates) message, no [`fills`](../api/ws/subscriptions.md#fills) message and no [`historical_orders`](../api/rest/info/account-history.md#historical_orders) record, leaving a watcher blind to exactly the action it looks for. **Node 0.9.5 records it** — see [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills). Against an older node, or for defence in depth, Watch [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) and diff [`account_state`](../api/rest/info/account.md#account_state) and [`open_orders`](../api/rest/info/orders-fills.md#open_orders) instead.
 - **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other is refused with `INVALID_REQUEST`. Coordinator should assign nonces.
 - **Signature expiry**: roster signatures over the inner blob don't expire on their own — a signature collected today is valid until the bundle is submitted. Some integrators add their own off-chain TTL. (The optional [action `expiresAfter`](../integration/typed-data-signing.md#action-expiry-expiresafter) applies to the **outer** `/exchange` envelope, not to the inner roster signatures.)
 
@@ -265,7 +265,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 `multisig.is_multi_sig` is `false` (and `signers` empty) for a plain account. The
 signer set + threshold come straight from the committed `multi_sig_tracker`
 config. See
-[`detail: "overview"`](../api/rest/info.md#account_state-overview).
+[`detail: "overview"`](../api/rest/info/account.md#account_state-overview).
 
 ## Sequence — multi-sig order {#sequence--multi-sig-order}
 

@@ -61,7 +61,7 @@ else                                                  → PartialMarket50 { size
 
 Every open leg carries a `liq` price: the mark at which that leg's own health
 crosses `1.0` and the tier ladder above puts the account into T0. Read it on
-[`clearinghouse_state`](../api/rest/info.md#clearinghouse_state), on the
+[`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state), on the
 position row (`clearinghouse_state["<dex>"].positions[*].liq`).
 
 The formula differs by margin mode, because each mode measures maintenance
@@ -84,7 +84,7 @@ liq = entry_px + (cross_maintenance_margin_used − base_equity) / size
 
 | Term | Unit / plane | Where to read it |
 |---|---|---|
-| `account_value` | whole-USDC, signed | [`account_state`](../api/rest/info.md#account_state) |
+| `account_value` | whole-USDC, signed | [`account_state`](../api/rest/info/account.md#account_state) |
 | `upnl` | whole-USDC, signed | Same read, this leg's `upnl` |
 | `cross_maintenance_margin_used` | whole-USDC | `account_state` with `detail: "margin"` |
 | `entry_px` | whole-USDC per whole unit | This leg's `entry` |
@@ -476,7 +476,7 @@ produces alerts that never fire.
    against the yellow-card / partial / full-market thresholds. This ratio
    decides your tier. No read returns it as its own field — derive it
    yourself from `account_value` and `cross_maintenance_margin_used`. Both are
-   on [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state);
+   on [`account_state` with `detail: "margin"`](../api/rest/info/account.md#account_state);
    the full `account_state` carries `account_value` but NOT the maintenance
    figure, so the ratio needs the margin depth.
 2. **The wire `health` field.** The `health` field that `account_state` and
@@ -500,7 +500,7 @@ hardcoding a ratio boundary in your own alerting.
 
 ## How to stay clear {#how-to-stay-clear}
 
-- Watch `account_value` and `cross_maintenance_margin_used` via [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state) queries and derive your own ratio from them — see [two meanings of health](#two-meanings-of-health) above; the wire `health` field is a dollar figure, not this ratio.
+- Watch `account_value` and `cross_maintenance_margin_used` via [`account_state` with `detail: "margin"`](../api/rest/info/account.md#account_state) queries and derive your own ratio from them — see [two meanings of health](#two-meanings-of-health) above; the wire `health` field is a dollar figure, not this ratio.
 - Set an internal alert when your derived ratio drops under `1.2` — comfortably above the yellow-card entry.
 - For automated strategies, register a [risk-watcher bot](../integration/risk-watcher.md) to deposit when your `tier` crosses a threshold.
 - Watch [`notifications`](../api/ws/subscriptions.md#notifications) on the WS feed for immediate tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`), and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values.

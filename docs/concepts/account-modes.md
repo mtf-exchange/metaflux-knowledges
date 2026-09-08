@@ -6,7 +6,7 @@ description: unified, standard and portfolio — what each one changes, and what
 # Account modes
 
 An account carries ONE of three modes: `unified`, `standard` or `portfolio`.
-`/info` [`account_state`](../api/rest/info.md#account_state) reports it as
+`/info` [`account_state`](../api/rest/info/account.md#account_state) reports it as
 `abstraction`.
 
 :::caution Two different things are called a "mode"
@@ -55,7 +55,7 @@ called reservations and there are three:
 | `option` | Option escrow |
 
 Set each one with `user_set_abstraction` kinds 1–3. Read them back on
-[`account_state.reservations`](../api/rest/info.md#account-state-reservations).
+[`account_state.reservations`](../api/rest/info/account.md#account-state-reservations).
 
 **The mode is fail-closed.** An unset reservation is zero, and zero admits
 nothing. A fresh `standard` account can place NO order until it allocates. That

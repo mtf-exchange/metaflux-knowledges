@@ -169,7 +169,7 @@ fill, but they carry **no live public event** today: they do not appear on
 [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills),
 and there is no
 `/info` read that lists past fills for a closed window. A batch clearing is one
-of the [unrecorded fills](../api/rest/info.md#unrecorded-fills) **until the next node release, which records it**; that page lists
+of the [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills) **until the next node release, which records it**; that page lists
 every lane with the same gap, and what a caller does about it. Observe a settlement
 by diffing [`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state)
 before and after, and [`account_state`](../api/ws/subscriptions.md#account_state)

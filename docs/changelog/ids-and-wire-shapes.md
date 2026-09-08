@@ -49,12 +49,12 @@ strings. The field names do not change.
 
 | Surface | Fields |
 |---|---|
-| [`user_fills`](../api/rest/info.md#user_fills) | `fills[*].oid`, `fills[*].tid` |
+| [`user_fills`](../api/rest/info/orders-fills.md#user_fills) | `fills[*].oid`, `fills[*].tid` |
 | [`trades`](../api/rest/info/perpetuals.md#trades) | `trades[*].tid` |
-| [`order_status`](../api/rest/info.md#order_status) | `order.oid`, `trigger.oid`, `fills[*].oid`, `fills[*].tid`, `outcome.oid` |
-| [`open_orders`](../api/rest/info.md#open_orders) | each row's `oid` |
-| [`historical_orders`](../api/rest/info.md#historical_orders) | `orders[*].oid` |
-| [`user_ledger_updates`](../api/rest/info.md#user_ledger_updates) | a trade row's `tid` |
+| [`order_status`](../api/rest/info/orders-fills.md#order_status) | `order.oid`, `trigger.oid`, `fills[*].oid`, `fills[*].tid`, `outcome.oid` |
+| [`open_orders`](../api/rest/info/orders-fills.md#open_orders) | each row's `oid` |
+| [`historical_orders`](../api/rest/info/account-history.md#historical_orders) | `orders[*].oid` |
+| [`user_ledger_updates`](../api/rest/info/account-history.md#user_ledger_updates) | a trade row's `tid` |
 | The RFQ / FBA read | `oid` |
 | [`/exchange`](../api/rest/exchange.md) | EVERY id in the ACK union — `resting.oid`, `filled.oid`, `chase.chase_oid`, `chase.leg_oid` |
 | WS [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills), [`order_updates`](../api/ws/subscriptions.md#order_updates), [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) | `oid`, `tid` |
@@ -186,7 +186,7 @@ committed state. Two consequences, and both are the honest kind:
   not a history.
 - **`unknown` is not proof the order never existed.** It says this node cannot
   see it. For the archive answer, read
-  [`historical_orders`](../api/rest/info.md#historical_orders).
+  [`historical_orders`](../api/rest/info/account-history.md#historical_orders).
 
 This is the same retention contract `historical_orders` already documents.
 
@@ -219,12 +219,12 @@ balance credit. See
 ## The spot taker fee is lossless, and `null` means "the schedule applies" {#spot-taker-fee}
 
 Two reads disagreed, and neither said why. A pair served
-`taker_fee_bps: "5"` while [`fee_schedule`](../api/rest/info.md#fee_schedule) said
+`taker_fee_bps: "5"` while [`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) said
 `"3.5"`.
 
 **The resolution rule.** A spot pair's deployer may set a taker override. If an
 override exists it WINS, for every account, whatever the volume tier says. If no
-override exists the volume-tiered [`fee_schedule`](../api/rest/info.md#fee_schedule)
+override exists the volume-tiered [`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule)
 applies.
 
 Two things made that undiscoverable, and both change:
@@ -345,7 +345,7 @@ Read `body.data.type ?? body.type` and both answers work.
 - **`recent_transactions` carries no `hash`.** The WS row did, and
   [`/exchange`](../api/rest/exchange.md) pointed at it as the hash-keyed way to check a
   submitted action. Correlate by `cloid` instead, or read
-  [`action_outcome`](../api/rest/info.md#action_outcome).
+  [`action_outcome`](../api/rest/info/account-history.md#action_outcome).
 
 **Size the poll so it cannot gap.** The block cadence is about 100 ms, so 100
 rows span roughly 10 seconds of chain. A poll every 2 seconds with `limit: 100`
@@ -360,7 +360,7 @@ an answer.
 
 It is now backed. The record shape is the one this reference already locked —
 `{twap_id, fill}`, where `fill` is a full
-[`user_fills`](../api/rest/info.md#user_fills) record — so the envelope does not change.
+[`user_fills`](../api/rest/info/orders-fills.md#user_fills) record — so the envelope does not change.
 
 **It is a node-local retention window, with the same caveat as the terminal order
 states above:** a node restart empties it, and an empty window after a restart is

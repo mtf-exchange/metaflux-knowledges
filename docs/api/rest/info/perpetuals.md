@@ -890,7 +890,7 @@ No parameters.
 **There is no replacement read, and no other read lists the flagged accounts.**
 The list named other accounts, so it is not something an account query can
 return. Read your own liquidation distance from your own
-[`account_state`](../info.md#account_state) health fields instead.
+[`account_state`](./account.md#account_state) health fields instead.
 
 ### Get a user's market trading limits {#active_asset_data}
 
@@ -987,10 +987,10 @@ deliberately explicit in the field names.
 
 :::warning Not live yet
 `name` and `deployer` land with the next network upgrade, in the same release
-that keys [`clearinghouse_state`](../info.md#clearinghouse_state) by name. Until
+that keys [`clearinghouse_state`](./account.md#clearinghouse_state) by name. Until
 that upgrade fires, each row carries `index`, `n_assets` and `assets` only. The
 name rule, the name each existing dex receives, and the re-join for a cached
-address key are all in [the dex key](../info.md#dex-key).
+address key are all in [the dex key](./account.md#dex-key).
 :::
 
 **Request**
@@ -1035,7 +1035,7 @@ No parameters.
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `dexs[*].index` | uint64 | DEX index in the perp-DEX registry. A position in a list, not a name — see below |
-| `dexs[*].name` | string | The dex NAME, `""` for the core dex. 1 to 16 ASCII alphanumeric bytes, unique without regard to case, set once when the dex is created and never renamed. It prefixes every market symbol on the dex (`NAME:SUFFIX`) and it keys [`clearinghouse_state`](../info.md#clearinghouse_state) |
+| `dexs[*].name` | string | The dex NAME, `""` for the core dex. 1 to 16 ASCII alphanumeric bytes, unique without regard to case, set once when the dex is created and never renamed. It prefixes every market symbol on the dex (`NAME:SUFFIX`) and it keys [`clearinghouse_state`](./account.md#clearinghouse_state) |
 | `dexs[*].deployer` | hex address \| null | The account that deployed the dex. **`null` for the core dex** — the core dex has no deployer, and `""` is a reserved name, not an address |
 | `dexs[*].n_assets` | uint64 | Number of asset books in the DEX |
 | `dexs[*].assets` | string[] | Market symbols in the DEX, e.g. `["BTC","ETH","SOL"]`. They are **symbols, not ids** — a symbol is the key every market read uses |
@@ -1048,7 +1048,7 @@ No parameters.
 | `limits.dutch_start_multiplier` | Decimal string | Dutch-auction start-price multiplier over the minimum bid |
 | `limits.per_market_limits.max_oi` | u128 string | Per-market open-interest cap, size base units |
 | `limits.per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |
-| `limits.per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](../info.md#fee_schedule)) |
+| `limits.per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](./fees-credit.md#fee_schedule)) |
 | `limits.per_market_limits.max_oi_per_second` | u128 string | Per-market open-interest growth-rate cap, size base units per second |
 
 **`name` is the join key; `index` is not.** `clearinghouse_state` keys its
@@ -1060,7 +1060,7 @@ other read speaks. Do not key a cache on it.
 **`deployer` is served so an old cache can be repaired.** Before the upgrade,
 `clearinghouse_state` keyed its buckets by the deployer address. An integrator
 that cached those keys reads this list once and maps each address to its `name`.
-That is the whole recovery — see [the dex key](../info.md#dex-key).
+That is the whole recovery — see [the dex key](./account.md#dex-key).
 
 
 ## See also {#see-also}

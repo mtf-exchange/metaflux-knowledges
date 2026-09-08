@@ -68,7 +68,7 @@ maint_required   = position_value × spot_margin_maintenance_bps / 10000
 position is open; `position_pnl` and `maint_required` enter the **account-level**
 health decision alongside your perpetual legs. An open is rejected if your free
 collateral cannot cover `init_required`. Read free collateral from the account
-read as [`withdrawable`](../api/rest/info.md#account_state), which is the same
+read as [`withdrawable`](../api/rest/info/account.md#account_state), which is the same
 budget **clamped at zero**; the gate itself keeps the raw signed value. The
 position is liquidated when the
 **account** falls through its maintenance floor — see [Liquidation](#liquidation)
@@ -145,7 +145,7 @@ schedule, not the perp tiers. The borrow interest is the spot-margin-specific co
 — it is exactly the yield [Earn](../concepts/earn.md) suppliers receive. All rates
 are per-pair governance parameters; query them via
 [`/info spot_margin_state`](../api/rest/info/spot.md#spot_margin_state) and the spot
-[`fee_schedule`](../api/rest/info.md#fee_schedule).
+[`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule).
 
 ## Collateral scope {#collateral-scope}
 

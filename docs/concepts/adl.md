@@ -126,7 +126,7 @@ between pushes; treat a shrink you did not order yourself as a forced event
 
 ## Predicting ADL exposure {#predicting-adl-exposure}
 
-Read [`clearinghouse_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl).
+Read [`clearinghouse_state` with `detail: "adl"`](../api/rest/info/account.md#account_state-adl).
 Each position row then carries `adl_lamps`, an integer from `0` to `4`. More
 lamps means the position sits sooner in the queue.
 
@@ -203,7 +203,7 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 - [Insurance pool](./vaults.md#insurance-pool) — T3 mechanism
 - [Portfolio margin](./portfolio-margin.md) — how PM interacts with ADL
 - [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state) — the only live signal that an ADL haircut changed your position
-- [`clearinghouse_state` with `detail: "adl"`](../api/rest/info.md#account_state-adl) — the `adl_lamps` queue indicator
+- [`clearinghouse_state` with `detail: "adl"`](../api/rest/info/account.md#account_state-adl) — the `adl_lamps` queue indicator
 
 ## FAQ {#faq}
 

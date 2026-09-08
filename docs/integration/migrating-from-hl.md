@@ -31,10 +31,10 @@ There is one MTF-native surface; you call it through the SDK or build the envelo
 | `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange/orders.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange/orders.md#cancel_by_cloid) |
 | `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange/orders.md#modify) / [`batch_modify`](../api/rest/exchange/orders.md#batch_modify) |
 | `POST /info` `meta` | [`markets`](../api/rest/info/perpetuals.md#markets) |
-| `POST /info` `clearinghouseState` | **Two reads, not one.** [`account_state`](../api/rest/info.md#account_state) for the collateral and margin health, [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) for the position rows. HL keeps positions inside the account read; MetaFlux does not — see below |
-| `POST /info` `spotClearinghouseState` | [`account_state`](../api/rest/info.md#account_state) — the `spot.balances` array. There is no separate spot read |
-| `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info.md#open_orders) — **one kind for both**. There is no separate "frontend" variant; the time-in-force, `cloid` and trigger detail is folded into every `open_orders` row. |
-| `POST /info` `userFills` | [`user_fills`](../api/rest/info.md#user_fills) |
+| `POST /info` `clearinghouseState` | **Two reads, not one.** [`account_state`](../api/rest/info/account.md#account_state) for the collateral and margin health, [`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state) for the position rows. HL keeps positions inside the account read; MetaFlux does not — see below |
+| `POST /info` `spotClearinghouseState` | [`account_state`](../api/rest/info/account.md#account_state) — the `spot.balances` array. There is no separate spot read |
+| `POST /info` `openOrders` / `frontendOpenOrders` | [`open_orders`](../api/rest/info/orders-fills.md#open_orders) — **one kind for both**. There is no separate "frontend" variant; the time-in-force, `cloid` and trigger detail is folded into every `open_orders` row. |
+| `POST /info` `userFills` | [`user_fills`](../api/rest/info/orders-fills.md#user_fills) |
 | `POST /info` `candleSnapshot` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) (the standalone `candle` type is removed). `candle_type` selects one of THREE series: `mark` (the default), `oracle` or `trade`. **A `mark` or `oracle` bar is a price series, not executions** — its `v` and `q` read `"0"` and its `n` reads `0`. **`v`, `q` and `n` can also be ABSENT on any series**, because durable history holds no volume for the bucket; a `trade` bar served from history drops `q` in every case. Test that the key is present before you read it — absent means "no data", `"0"` means "no trades". See [the volume rule](../api/rest/info/perpetuals.md#candle_snapshot-volume) |
 | WS `userEvents`, `l2Book`, `candle` | `fills` / `order_updates` / `ledger_updates` (there is no grab-bag events channel), `l2_book`, `candles` — see [WS subscriptions](../api/ws/subscriptions.md) |
 
@@ -90,7 +90,7 @@ An agent is a key with no withdrawal authority — same model as HL (see [agent 
 
 ### 8. Vaults {#8-vaults}
 
-HL vaults and MetaFlux vaults are not the same product. The [`vault_state`](../api/rest/info.md#vault_state) read returns MTF's own vault types (MFlux Vault, user vaults). HL vault addresses won't resolve. Expect MTF entities, not HL ones.
+HL vaults and MetaFlux vaults are not the same product. The [`vault_state`](../api/rest/info/vaults-staking.md#vault_state) read returns MTF's own vault types (MFlux Vault, user vaults). HL vault addresses won't resolve. Expect MTF entities, not HL ones.
 
 ## Step-by-step migration {#step-by-step-migration}
 

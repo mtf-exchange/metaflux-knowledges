@@ -56,15 +56,15 @@ anything.
 | `pm_maint_margin` | `perp.pm_maint_margin` |
 | `pm_concentration_penalty` | `perp.pm_concentration_penalty` |
 | `balances` | `spot.balances` — the rows are unchanged, field for field |
-| `clearinghouse_state` | its own read, [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state), same wire name and same row shape |
+| `clearinghouse_state` | its own read, [`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state), same wire name and same row shape |
 | `cross_maintenance_margin_used` | `detail: "margin"` only — it was already only there |
 
 Two names moved outside the body:
 
 | Was | Is now |
 |---|---|
-| `option_positions` (read) | [`option_state`](../api/rest/info.md#option_state) — a rename, **not an alias**. The old name answers `unknown info type` |
-| `account_state` with `detail: "adl"` | [`clearinghouse_state`](../api/rest/info.md#account_state-adl) with `detail: "adl"`. On `account_state` it is now refused with `400` |
+| `option_positions` (read) | [`option_state`](../api/rest/info/options.md#option_state) — a rename, **not an alias**. The old name answers `unknown info type` |
+| `account_state` with `detail: "adl"` | [`clearinghouse_state`](../api/rest/info/account.md#account_state-adl) with `detail: "adl"`. On `account_state` it is now refused with `400` |
 
 Two new lanes have no old field to map from: `margin` (spot-margin collateral,
 debt and pair count) and `option` (writer escrow, leg count, nearest expiry).
@@ -109,7 +109,7 @@ half-migrated body cannot ship. Prepare the client before the release, not after
 3. **Move `balances` to `spot.balances`.** Row fields are unchanged.
 4. **Leave `pm_net_value` at the top level.** Do not move it with the other
    `pm_*` fields.
-5. **Subscribe to, or poll, [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state)
+5. **Subscribe to, or poll, [`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state)
    for positions.** Same wire name, same rows, its own read and its own WS
    channel. Both require a `user` on subscribe.
 6. **Rename `option_positions` to `option_state`**, in REST calls and as a WS
@@ -121,7 +121,7 @@ half-migrated body cannot ship. Prepare the client before the release, not after
 9. **Handle the two new lanes** — `margin` and `option` — or ignore them safely:
    both are always present and zeroed.
 
-See [`account_state`](../api/rest/info.md#account_state) for the full field table, and
+See [`account_state`](../api/rest/info/account.md#account_state) for the full field table, and
 [WS subscriptions](../api/ws/subscriptions.md#account_state) for the three channels.
 
 # The one response envelope {#response-envelope}
@@ -246,7 +246,7 @@ Checklist:
    new field names; an older SDK build cannot reach them.
 
 See [account value](../concepts/account-value.md#the-scalars) for the arithmetic
-behind each scalar, and [`account_state`](../api/rest/info.md#account_state) for the
+behind each scalar, and [`account_state`](../api/rest/info/account.md#account_state) for the
 full field table.
 
 # The read-surface cut {#read-surface-cut}
@@ -266,13 +266,13 @@ The four shapes of the change:
 
 | Shape | What to do |
 |---|---|
-| **A read merged into a bigger one** — `agents`, `sub_accounts`, `user_to_multi_sig_signers`, `user_vault_equities`, `delegator_summary`, `user_role`, `pm_summary`, `evm_contract_bindings`, `bridge_chain_configs` | Call the read that owns the question. [`account_state`](../api/rest/info.md#account_state) with `detail: "overview"` carries the first six as named sub-objects; `account_state` already carries the PM figures; the EVM binding rides [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `kind: "spot"`; the bridge config rows ride [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) |
-| **A read became a PARAMETER** — `market_info`, `margin_summary`, `account_overview` (and its old name `web_data`), `user_fills_by_time`, `trades_by_time`, `max_builder_fee` | Same question, one read, one argument: `coin` on [`markets`](../api/rest/info/perpetuals.md#markets), `detail: "margin"` or `detail: "overview"` on [`account_state`](../api/rest/info.md#account_state), `start_time` / `end_time` on [`user_fills`](../api/rest/info.md#user_fills) and [`trades`](../api/rest/info/perpetuals.md#trades) |
+| **A read merged into a bigger one** — `agents`, `sub_accounts`, `user_to_multi_sig_signers`, `user_vault_equities`, `delegator_summary`, `user_role`, `pm_summary`, `evm_contract_bindings`, `bridge_chain_configs` | Call the read that owns the question. [`account_state`](../api/rest/info/account.md#account_state) with `detail: "overview"` carries the first six as named sub-objects; `account_state` already carries the PM figures; the EVM binding rides [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `kind: "spot"`; the bridge config rows ride [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) |
+| **A read became a PARAMETER** — `market_info`, `margin_summary`, `account_overview` (and its old name `web_data`), `user_fills_by_time`, `trades_by_time`, `max_builder_fee` | Same question, one read, one argument: `coin` on [`markets`](../api/rest/info/perpetuals.md#markets), `detail: "margin"` or `detail: "overview"` on [`account_state`](../api/rest/info/account.md#account_state), `start_time` / `end_time` on [`user_fills`](../api/rest/info/orders-fills.md#user_fills) and [`trades`](../api/rest/info/perpetuals.md#trades) |
 | **A read was RENAMED** — `spot_deploy_state` → [`spot_deploy_auction`](../api/rest/info/spot.md#spot_deploy_auction), `recent_trades` → [`trades`](../api/rest/info/perpetuals.md#trades) | Change the `type` string. The payload is the same |
 | **A read a change made UNNECESSARY** — `encode_action` | The multisig inner blob now accepts the ordinary `{type, params}` wire action, so there is nothing left to encode. UTF-8 encode the action you would post to `/exchange` and let every member sign those bytes. See [signing the inner action](../concepts/multi-sig.md#signing-the-inner-action) |
 | **A read left the public API** — `mip3_deployer_oracle`, `fba_batch_state` | Operator lane. The FBA read ships publicly with its engine |
 | **A read CAME BACK** — `rfq_open`, `rfq_user` | Both are public again. They shipped with the option lane, because an accept cannot be completed without them: a taker finds its own `rfq_id` and a maker finds a request to answer |
-| **A read was DELETED outright** — `protocol_metrics`, `node_info`, `block_info` | None of the three is served any more. Every public fact `protocol_metrics` carried is on [`markets`](../api/rest/info/perpetuals.md#markets), [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) and [`staking_state`](../api/rest/info.md#staking_state); the chain id is fixed per network, see [networks](../networks.md#summary); the committed height and consensus time stamp every read, and the block head is on [`recent_blocks`](../api/rest/info.md#recent_blocks) |
+| **A read was DELETED outright** — `protocol_metrics`, `node_info`, `block_info` | None of the three is served any more. Every public fact `protocol_metrics` carried is on [`markets`](../api/rest/info/perpetuals.md#markets), [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) and [`staking_state`](../api/rest/info/vaults-staking.md#staking_state); the chain id is fixed per network, see [networks](../networks.md#summary); the committed height and consensus time stamp every read, and the block head is on [`recent_blocks`](../api/rest/info/chain.md#recent_blocks) |
 | **A read was DELETED outright** — `oracle_sources` | It served a per-market source bitmask nothing acts on. Its static facts — the ten source slots and their protocol-fixed weights — are prose on [oracle prices](../concepts/oracle-prices.md#source-table) |
 
 **Two reads gained a field**, and both answer a question that used to need
@@ -351,7 +351,7 @@ The `account_id` echo field is gone from these responses.
 |---------|-------------|-------------|
 | `candle` | `400 unknown info type: candle` | [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) |
 | `margin_table` | `400 unknown info type: margin_table` | `margin_tiers` inline on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) |
-| `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](../api/rest/info.md#account_state) (default and `detail: "overview"`) + [`open_orders`](../api/rest/info.md#open_orders) + [`exchange_status`](../api/rest/info.md#exchange_status) |
+| `web_data2` (REST) | `400 unknown info type: web_data2` | [`account_state`](../api/rest/info/account.md#account_state) (default and `detail: "overview"`) + [`open_orders`](../api/rest/info/orders-fills.md#open_orders) + [`exchange_status`](../api/rest/info/node.md#exchange_status) |
 | `web_data2` (WS channel) | `unknown channel: web_data2` | `account_state` WS channel |
 
 ## 4. `margin_tiers` — inline notional-banded ladder {#4-margin_tiers--inline-notional-banded-ladder}
@@ -411,8 +411,8 @@ Each `perp[]` element carries a market's **dynamic** fields only. The **static**
 - **`user_fundings`**: records now carry `{coin, payment, szi, fundingRate, time}`
   (`payment` signed whole-USDC: negative = paid, positive = received).
 - **`explorer_txs` and `explorer_block` are REMOVED.** Read
-  [`recent_transactions`](../api/rest/info.md#recent_transactions) and
-  [`recent_blocks`](../api/rest/info.md#recent_blocks) instead — see the
+  [`recent_transactions`](../api/rest/info/chain.md#recent_transactions) and
+  [`recent_blocks`](../api/rest/info/chain.md#recent_blocks) instead — see the
   [upgrade notice](./ids-and-wire-shapes.md#explorer-channels-removed).
 - **`order_updates`**: on a `filled` record, the `order.sz` is the **FILLED** size
   and `order.orig_sz` the **original** order size.

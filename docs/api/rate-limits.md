@@ -41,7 +41,7 @@ The limits are operator configuration, not governance parameters. The volume
 ladder is the one input that comes from committed chain state.
 
 > **`user_rate_limit` does not report the budget.** The native
-> [`user_rate_limit`](./rest/info.md#user_rate_limit) read returns the account's
+> [`user_rate_limit`](./rest/info/node.md#user_rate_limit) read returns the account's
 > action counters (`last_nonce`, `pending_count`, `lifetime_count`). It does not
 > return bucket state, and no read does. Track your own spend against the table
 > above.

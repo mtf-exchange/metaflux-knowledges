@@ -84,7 +84,7 @@ taken, so a refused registration costs you nothing and consumes no id.
 
 **Your name is also your read key.** Once the dex exists, its positions arrive
 under the key `name` in
-[`clearinghouse_state`](../info.md#clearinghouse_state), and the dex reports the
+[`clearinghouse_state`](../info/account.md#clearinghouse_state), and the dex reports the
 same string as `name` in [`perp_dexs`](../info/perpetuals.md#perp_dexs).
 
 **A governance listing symbol must not contain `:`.** Core markets are listed by

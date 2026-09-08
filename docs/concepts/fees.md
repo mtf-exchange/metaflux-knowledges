@@ -18,7 +18,7 @@ paid, the protocol splits the remaining fee revenue **~70% buyback / ~20%
 validators / ~10% treasury**. The buyback share buys MTF on the open market and
 locks it forever in a keyless protocol address — permanently removing it from
 circulation. Fees are deducted from
-your balance at fill time and shown in [`userFills`](../api/rest/info.md#user_fills).
+your balance at fill time and shown in [`userFills`](../api/rest/info/orders-fills.md#user_fills).
 One fee here is not a trading fee: a transfer from Core to MetaFluxEVM charges a
 [fee in MTF](#core-evm-transfer-fee), which is `0` today.
 
@@ -45,7 +45,7 @@ share, and a taker discount from how much MTF you stake. A negative effective ma
 rate is a rebate paid **to** the maker, funded out of taker fees collected on the
 same flow — the protocol never pays out more than it takes in.
 
-Per-fill fee appears in every [`userFills`](../api/rest/info.md#user_fills) entry as
+Per-fill fee appears in every [`userFills`](../api/rest/info/orders-fills.md#user_fills) entry as
 `fee` (USDC base units; positive = paid, negative = rebate received).
 
 ### Resolving your rate {#resolving-your-rate}
@@ -108,7 +108,7 @@ never knows which lane crossed it, so a maker is always priced and counted as
 `spot_margin` rate; the maker it hit pays the `spot` rate on the same fill.
 
 So `spot_margin` and `option` have **no maker leg at all**, and their rows on
-[`/info fee_schedule`](../api/rest/info.md#fee_schedule) carry no maker fields.
+[`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) carry no maker fields.
 
 **A forced liquidation is `spot`, not `spot_margin`.** The owner of a forced
 close did not choose to take, and their history is not on the margin counter, so
@@ -155,7 +155,7 @@ parallel for one full 30-day window:
 
 The window opens on the first fill after the upgrade and closes 30 days later.
 **Read the date, do not assume it.**
-[`/info fee_schedule`](../api/rest/info.md#fee_schedule) serves it directly as
+[`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) serves it directly as
 `pooled_volume_sunset_ms`, with `pooled_volume_counts` telling you whether the
 window is still open.
 
@@ -175,7 +175,7 @@ small maker look large. During the window the rebate therefore reads the pooled
 plane alone, exactly as before. It switches to per-product on the sunset day
 together with the tiers.
 
-**Where to read it.** [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
+**Where to read it.** [`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule)
 called with your `address` returns `taker_volume_30d`, `maker_volume_30d`,
 `effective_taker_bps`, `effective_maker_bps`, `staking_discount_permille`, and
 `maker_rebate_bps` for that account — the resolved numbers this section derives,
@@ -208,7 +208,7 @@ protocol_fee   = taker_fee − referrer_share = 2.1105 USDC
 
 The referrer share leaves the taker's *fee*, not an extra charge — the taker
 still pays exactly `2.345` in total. The credit accrues where
-[`/info fee_schedule`](../api/rest/info.md#fee_schedule) reports
+[`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) reports
 `user.referrer_credit`, for the referrer's own address.
 
 **A different maker, at a rebate tier.** Now the maker sits at the top volume
@@ -292,9 +292,9 @@ out independently.
 
 **Where to read each balance.** They are two separate accumulators with two
 separate claims. Read the referrer balance with
-[`referral_state`](../api/rest/info.md#referral_state) and claim it with
+[`referral_state`](../api/rest/info/fees-credit.md#referral_state) and claim it with
 [`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards); read
-the broker balance with [`builder_state`](../api/rest/info.md#builder_state) and
+the broker balance with [`builder_state`](../api/rest/info/fees-credit.md#builder_state) and
 claim it with
 [`claim_broker_rewards`](../api/rest/exchange/account.md#claim_builder_rewards).
 Neither claim action reports an amount, so read the balance first.
@@ -441,7 +441,7 @@ multiplier.
 it receives** (see [below](#spot-buy-fee-in-base)). Each spot pair may set
 its own maker/taker rate; when a pair leaves them unset, the global spot default
 applies. See the spot tiers in the
-[`/info fee_schedule`](../api/rest/info.md#fee_schedule) response, and
+[`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) response, and
 [spot trading](../products/spot.md#matching-fills-and-fees) for the settlement
 model.
 
@@ -449,7 +449,7 @@ model.
 
 :::note Historical fills — before block 6,565,000
 Below that height a spot buyer paid its fee in the quote token. Every fill now
-carries [`fee_token`](../api/rest/info.md#user_fills), derived per record, so an
+carries [`fee_token`](../api/rest/info/orders-fills.md#user_fills), derived per record, so an
 older fill correctly reports `"USDC"` on both sides and a newer one reports the
 base token on the buy leg. Read `fee_token`; do not re-derive the boundary from
 the block height yourself.
@@ -493,7 +493,7 @@ Four consequences a caller must handle:
    **The base fee is NETTED, not debited, so the fill's `fee` field does not
    carry it.** The committed trade record is unchanged — the fee is observable as
    the difference between `sz` and the balance change, and deliberately nowhere
-   else. The read-side [`fee_token`](../api/rest/info.md#user_fills) field names
+   else. The read-side [`fee_token`](../api/rest/info/orders-fills.md#user_fills) field names
    the denomination so a caller knows which case it is in: on a spot BUY it reads
    the base token, and it is telling you the `fee` number is not the whole story.
    `fee_token` is derived at read time and changes no committed field.
@@ -525,7 +525,7 @@ discrete liquidation fee — an extra charge split between the insurance pool an
 treasury to keep insurance solvent and compensate makers who absorb forced flow —
 is a design intent that is not yet active. When it lands, liquidated accounts will
 pay it as part of the loss settled on close, flagged on the liquidation fills in
-[`userFills`](../api/rest/info.md#user_fills). See
+[`userFills`](../api/rest/info/orders-fills.md#user_fills). See
 [tiered liquidation](./tiered-liquidation.md) for the close mechanics.
 
 ## Core to EVM transfer fee {#core-evm-transfer-fee}
@@ -611,7 +611,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 - [Fee schedule](./fee-schedule.md) — the rate card: volume fee tiers, maker-rebate
   tiers, and staking discount tiers, and how the three combine
 - [Staking](./staking.md) — stake MTF for the validator-share dividend and the taker discount
-- [`POST /info fee_schedule`](../api/rest/info.md#fee_schedule) — the ladder, and the effective rate for one address
+- [`POST /info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) — the ladder, and the effective rate for one address
 - [Tiered liquidation](./tiered-liquidation.md) — liquidation mechanics
 - [Core ↔ EVM transfers](../evm/core-evm-transfers.md) — the lane the
   [Core to EVM transfer fee](#core-evm-transfer-fee) applies to

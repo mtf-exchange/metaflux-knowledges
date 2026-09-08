@@ -215,9 +215,9 @@ echoed on any per-account WS event. For a committed order, correlate by
 [`open_orders`](../api/ws/subscriptions.md#open_orders) instead. **No global, hash-keyed feed answers this any more.** The `explorer_txs` WS
 channel that carried the hash is
 [removed](../changelog/ids-and-wire-shapes.md#explorer-channels-removed), and
-its replacement [`recent_transactions`](../api/rest/info.md#recent_transactions)
+its replacement [`recent_transactions`](../api/rest/info/chain.md#recent_transactions)
 does not carry a hash. Correlate by `cloid`, or read
-[`action_outcome`](../api/rest/info.md#action_outcome) for the commit-time
+[`action_outcome`](../api/rest/info/account-history.md#action_outcome) for the commit-time
 verdict on one submitted action.
 
 ## Production recipes {#production-recipes}

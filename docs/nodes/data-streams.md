@@ -284,7 +284,7 @@ by [`modify`](../api/rest/exchange/orders.md#modify) or
 [CoreWriter `LimitOrder`](../evm/interacting-with-core.md), any order inside
 a [`multi_sig`](../concepts/multi-sig.md) envelope, and every clearing of a
 [frequent batch auction](../concepts/fba.md) each settle with no record —
-see [unrecorded fills](../api/rest/info.md#unrecorded-fills). Both legs are
+see [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills). Both legs are
 missing, so the maker loses its record as well. An archive folded from this
 stream inherits the gap, and a volume total from it reads low.
 
@@ -418,7 +418,7 @@ The public trade tape. One record per match, not per party. This stream carries
 
 Join `node_trades` to `node_fills` on `tid` when you need the parties.
 
-**This tape carries no [unrecorded fill](../api/rest/info.md#unrecorded-fills)**
+**This tape carries no [unrecorded fill](../api/rest/info/orders-fills.md#unrecorded-fills)**
 — no print from a `modify`, from a CoreWriter `LimitOrder`, from inside a
 `multi_sig` envelope, or from a
 [frequent batch auction](../concepts/fba.md) clearing. A volume total built
@@ -483,7 +483,7 @@ Every record above comes from an order the account **submitted**. A resting
 order that is HIT submits nothing in that block, so the node derives its record
 from the block's fills instead. That record is a maker execution record.
 **Except when the fill is an
-[unrecorded fill](../api/rest/info.md#unrecorded-fills)**. Node 0.9.5 records
+[unrecorded fill](../api/rest/info/orders-fills.md#unrecorded-fills)**. Node 0.9.5 records
 the `modify` and `multi_sig` lanes; a CoreWriter `LimitOrder` that crosses on
 placement and a batch-auction clearing still match against a resting order and
 derive nothing for it, until the next release.
@@ -503,7 +503,7 @@ and a TP/SL trigger leg that fired as a limit order. A chase's FIRST leg is not
 in this group: `chase_order` is a signed action and its opening leg does get a
 `resting` record. Only the legs a reprice rests are missing one. **`orig_sz` and
 `reduce_only` are not recoverable for these two orders.** The live-book read
-([`open_orders`](../api/rest/info.md#open_orders)) serves `null` for `orig_sz`,
+([`open_orders`](../api/rest/info/orders-fills.md#open_orders)) serves `null` for `orig_sz`,
 and no action ever submitted a request size for the leg. `reduce_only` on that
 read is a constant `false` on every book row, so it repeats the same wrong
 value. `tif` and `cloid` ARE real there: take them while the order still rests.
@@ -512,7 +512,7 @@ reduce-only; a fired trigger leg is always `"Gtc"` and always reduce-only, so
 `reduce_only: false` is wrong on exactly that record.
 
 The second group is any order that an
-[unrecorded-fill lane](../api/rest/info.md#unrecorded-fills) rested — a
+[unrecorded-fill lane](../api/rest/info/orders-fills.md#unrecorded-fills) rested — a
 CoreWriter `LimitOrder`, until the next release. It rests an order with no
 `resting` record. That order is an ordinary resting order after that, so an
 ordinary taker DOES give it a maker execution record later — and that record has
@@ -524,7 +524,7 @@ record at all.** An order inside a `multi_sig` envelope, an order placed by
 [frequent batch auction](../concepts/fba.md) clearing each write nothing to
 these streams: no `node_fills` print, no `node_trades` print, no status record
 of their own, and no maker execution record for the resting order they hit. The chain still matches the order and moves the money — see
-[unrecorded fills](../api/rest/info.md#unrecorded-fills). So a resting order
+[unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills). So a resting order
 with no `filled` record was not necessarily left alone.
 
 The node sums every match against one `oid` inside one block into ONE record.
@@ -538,7 +538,7 @@ None of them sends an action, and the maker each one hits still needs its
 record.
 
 The REST read built from this stream serves an absent key as `null` — see
-[`historical_orders`](../api/rest/info.md#historical_orders). Absent here and
+[`historical_orders`](../api/rest/info/account-history.md#historical_orders). Absent here and
 `null` there are the same record.
 
 ```json

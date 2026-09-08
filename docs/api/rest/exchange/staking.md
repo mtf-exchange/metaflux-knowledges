@@ -119,7 +119,7 @@ no money, and writes no ledger row.
 > described above. A client that reads the spot balance to confirm a claim
 > breaks at that boundary — read
 > `staking.summary.undelegated` on
-> [`account_state`](../info.md#account_state-overview) instead.
+> [`account_state`](../info/account.md#account_state-overview) instead.
 
 ---
 

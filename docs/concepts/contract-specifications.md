@@ -45,7 +45,7 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Max order value** | OI-cap-derived size ceiling + margin gate (no fixed per-order $ cap) | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` |
 | **Open-interest cap** | per-market OI ceiling + per-second OI velocity limit | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` vs [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest` |
 | **Margin modes** | Cross / Isolated / Strict-Iso (Strict-Iso also imposable at **market** level) | `strict_isolated` |
-| **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info.md#account_state) `abstraction` |
+| **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info/account.md#account_state) `abstraction` |
 | **FBA eligible** | whether [frequent batch auction](../concepts/fba.md) is enabled | `fba_enabled` |
 
 ## Reading a spec from the API {#reading-a-spec-from-the-api}

@@ -27,12 +27,12 @@ option order book.
   settles.
 - **A put settles in USDC. A call settles in the underlying coin.** The
   denomination is on every row as
-  [`settle_asset`](../api/rest/info.md#option_series). Read it. A client that
+  [`settle_asset`](../api/rest/info/options.md#option_series). Read it. A client that
   assumes dollars is wrong about every call.
 - The chain never computes an option price and never needs an implied volatility.
   The premium is the price two accounts agree on in an RFQ.
 
-Read the live series from [`option_series`](../api/rest/info.md#option_series).
+Read the live series from [`option_series`](../api/rest/info/options.md#option_series).
 Trade them with [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request),
 [`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote) and
 [`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept).
@@ -74,9 +74,9 @@ can never be liquidated**.
 On a call series, `escrow_per_unit` is `"1"`, the settlement payout is coin, and
 the writer's refund is coin. The number `"1"` is **one coin**, not one dollar.
 
-Read [`settle_asset`](../api/rest/info.md#option_series) on the row and use it as
+Read [`settle_asset`](../api/rest/info/options.md#option_series) on the row and use it as
 the currency of `escrow_per_unit`, of
-[`option_state.escrow`](../api/rest/info.md#option_state), and of every amount
+[`option_state.escrow`](../api/rest/info/options.md#option_state), and of every amount
 settlement moves. A caller that formats those figures as dollars is wrong by the
 whole asset class on every call.
 
@@ -186,14 +186,14 @@ rounds up.
 Both rates are governance parameters and both start UNSET, which charges nothing.
 The taker rate is capped at 1% of the notional by the same ceiling every other fee
 rate uses. Read the live values on
-[`/info fee_schedule`](../api/rest/info.md#fee_schedule), in the `option` row of
+[`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule), in the `option` row of
 `products`.
 
 ## The size plane {#the-size-plane}
 
 RFQ `size` is an integer on the `10^sz_decimals` plane of the series, exactly like
 a perpetual order size. `sz_decimals` is on every
-[`option_series`](../api/rest/info.md#option_series) row.
+[`option_series`](../api/rest/info/options.md#option_series) row.
 
 - Wire `size` = whole units × `10^sz_decimals`.
 - Premium in USDC = quoted `price` × whole units.
@@ -304,11 +304,11 @@ Two public reads cover the lane.
 
 | Read | Answers |
 |---|---|
-| [`option_series`](../api/rest/info.md#option_series) | Which series are live, the `signing_id` to sign against, the `settle_asset`, and the `escrow_per_unit` a writer locks |
-| [`option_state`](../api/rest/info.md#option_state) | What one account holds: units long, units written, and the escrow it has locked |
+| [`option_series`](../api/rest/info/options.md#option_series) | Which series are live, the `signing_id` to sign against, the `settle_asset`, and the `escrow_per_unit` a writer locks |
+| [`option_state`](../api/rest/info/options.md#option_state) | What one account holds: units long, units written, and the escrow it has locked |
 
 A fill writes no ledger row of its own. Between the fill and expiry,
-[`option_state`](../api/rest/info.md#option_state) is the only read where
+[`option_state`](../api/rest/info/options.md#option_state) is the only read where
 a writer sees the escrow it locked and a holder sees its units.
 
 :::danger[A position row carries TWO planes and TWO currencies]
@@ -319,13 +319,13 @@ a call's `escrow` as dollars, gets a wrong number that still parses.
 :::
 
 The account-wide `option.escrow` on
-[`account_state`](../api/rest/info.md#account_state) counts **put legs only**. It
+[`account_state`](../api/rest/info/account.md#account_state) counts **put legs only**. It
 is one USDC number, and coins cannot be added to dollars. `option.legs` still
 counts every leg. For the per-series denominations read
-[`option_state`](../api/rest/info.md#option_state).
+[`option_state`](../api/rest/info/options.md#option_state).
 
 There is still no public read for a series pot. The pot moves the same balances
-that [`account_state`](../api/rest/info.md#account_state) and the spot balances
+that [`account_state`](../api/rest/info/account.md#account_state) and the spot balances
 show leaving and returning.
 
 ## What changed {#what-changed}
@@ -350,8 +350,8 @@ the change, so no live position crosses the boundary.
 ## See also {#see-also}
 
 - [RFQ](../concepts/rfq.md) — the only way to trade an option
-- [`option_series`](../api/rest/info.md#option_series) — the live series registry
-- [`option_state`](../api/rest/info.md#option_state) — what one account holds in a series
+- [`option_series`](../api/rest/info/options.md#option_series) — the live series registry
+- [`option_state`](../api/rest/info/options.md#option_state) — what one account holds in a series
 - [`/exchange` RFQ actions](../api/rest/exchange/rfq-utility.md) — the field tables and the typed-data primary types
 - [Oracle prices](../concepts/oracle-prices.md) — the price source settlement reads
 - [MIP-4](../mip/mip-4.md) — the proposal this product came from

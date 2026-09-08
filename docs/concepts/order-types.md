@@ -332,7 +332,7 @@ field table and admission rules.
 wrong and the parent is admitted to the mempool and then rejected at commit. **The
 rejection is reported on no channel** — the HTTP reply already said
 `accepted: true`. Read `position_mode` from
-[`account_state`](../api/rest/info.md#account_state) before you submit. See
+[`account_state`](../api/rest/info/account.md#account_state) before you submit. See
 [`accepted` is not `committed`](../api/rest/exchange.md#accepted-is-not-committed).
 
 A hedge account's child slices inherit the leg the parent names. A one-way account

@@ -92,7 +92,7 @@ Delegating funds from the free pool credited by [`c_deposit`](#c_deposit--c_with
 unchanged. A three-word call omits it and lands on tier `0`, which earns no
 revenue share. A CoreWriter refusal is silent — the EVM receipt still reports
 Success — so read the stored tier back from
-[`staking_state`](../api/rest/info.md#staking_state).
+[`staking_state`](../api/rest/info/vaults-staking.md#staking_state).
 
 Undelegated stake does not return to your spot balance immediately: it sits
 in a per-delegator unbonding entry, still slashable, until the governed
@@ -155,7 +155,7 @@ Fee revenue is the ongoing source: per [the fee flywheel](./fees.md), net fee re
 Two separate durations apply, and only one is a per-delegation choice:
 
 - **Lock tier** (`lock_months`: `0`/`1`/`6`/`24`) — your own choice at delegate time. A locked row cannot start unbonding before it matures; a flexible (`0`) row can undelegate any time.
-- **Unbonding window** — governance-set (**7 days** on live testnet today; a vote can only raise it, never below a 7-day floor). Applies after undelegating, regardless of lock tier. Read your own entry's maturity from [`staking_state`](../api/rest/info.md#staking_state)'s `pending_unstakes[].matures_at_ts` rather than assuming a fixed value.
+- **Unbonding window** — governance-set (**7 days** on live testnet today; a vote can only raise it, never below a 7-day floor). Applies after undelegating, regardless of lock tier. Read your own entry's maturity from [`staking_state`](../api/rest/info/vaults-staking.md#staking_state)'s `pending_unstakes[].matures_at_ts` rather than assuming a fixed value.
 
 | State | Earns rewards? | Slashable? |
 |-------|:--------------:|:----------:|
@@ -213,7 +213,7 @@ Pick by:
 
 ## APR estimation {#apr-estimation}
 
-The [`staking_state`](../api/rest/info.md#staking_state) `/info` query type is **live** —
+The [`staking_state`](../api/rest/info/vaults-staking.md#staking_state) `/info` query type is **live** —
 it returns the effective bootstrap-reward APR the begin-block reward effect
 actually applies, plus its committed inputs:
 
@@ -295,8 +295,8 @@ sequenceDiagram
 ## See also {#see-also}
 
 - [`POST /exchange`](../api/rest/exchange.md) — `c_deposit` / `c_withdraw` / `token_delegate` / `claim_rewards`
-- [`POST /info staking_state`](../api/rest/info.md#staking_state)
-- [`POST /info staking_state`](../api/rest/info.md#staking_state) — one account's stake, plus the `reward_pool` inputs
+- [`POST /info staking_state`](../api/rest/info/vaults-staking.md#staking_state)
+- [`POST /info staking_state`](../api/rest/info/vaults-staking.md#staking_state) — one account's stake, plus the `reward_pool` inputs
 - [Fees](./fees.md) — fee revenue is one of the staking reward sources
 
 ## FAQ {#faq}

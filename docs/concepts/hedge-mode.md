@@ -131,8 +131,8 @@ When hedge mode is on, the `/info` position reads return **one position object
 per non-zero leg** for a market that has both legs, each labelled with its `side`
 (`"long"` / `"short"`). A one-way account returns a single *net* position with
 **no** `side` field. Market-level open interest stays a single net figure.
-Position rows live on [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state);
-`position_mode` itself stays on [`account_state`](../api/rest/info.md#account_state).
+Position rows live on [`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state);
+`position_mode` itself stays on [`account_state`](../api/rest/info/account.md#account_state).
 
 ## See also {#see-also}
 

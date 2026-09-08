@@ -75,7 +75,7 @@ stack on top. A maker-rebate tier can push the net maker rate **negative** (paid
 to make); a staking discount cuts the taker rate by up to 50%.
 
 Rates are governance parameters, so read the live card from
-[`/info fee_schedule`](../api/rest/info.md#fee_schedule) rather than a table.
+[`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) rather than a table.
 [Fee schedule](../concepts/fee-schedule.md) has the current tiers and how the
 three components combine.
 

@@ -119,7 +119,7 @@ rule, the in-kind referrer share and the sub-lot dust are in
 Spot fees are **per-pair**: a pair may set its own `taker_fee_bps` /
 `maker_fee_bps`, and when unset the global spot default applies. Spot uses a flat
 per-pair rate — the perp volume / maker-rebate / staking tiers do **not** apply to
-spot. Query the live values in the [`/info fee_schedule`](../api/rest/info.md#fee_schedule)
+spot. Query the live values in the [`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule)
 response; see [fees](../concepts/fees.md#spot-fees) for the settlement model.
 
 ## Time-in-force {#time-in-force}

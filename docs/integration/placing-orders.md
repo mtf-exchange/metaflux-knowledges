@@ -241,7 +241,7 @@ By default the signer is the trader. A spot order also accepts an optional
 ```
 
 List what is open with
-[`open_orders`](../api/rest/info.md#open_orders). Its rows carry `oid` and a
+[`open_orders`](../api/rest/info/orders-fills.md#open_orders). Its rows carry `oid` and a
 symbol `coin`, so map the symbol back to the numeric id from step 1 before you
 cancel. A cancel of an order that already filled or already cancelled is refused with
 `ORDER_NOT_FOUND` and is harmless.
@@ -376,7 +376,7 @@ parent that names none is refused, and a one-way parent that names one is refuse
 too. The refusal happens **at commit**, and a commit-time refusal of a non-order
 action is reported on no channel: the HTTP reply already said `accepted: true`,
 and the TWAP never starts. Read `position_mode` from
-[`account_state`](../api/rest/info.md#account_state) once at session start and
+[`account_state`](../api/rest/info/account.md#account_state) once at session start and
 set the field from it.
 
 The same commit-time silence applies to every non-order action. See

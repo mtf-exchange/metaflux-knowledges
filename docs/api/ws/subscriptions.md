@@ -17,7 +17,7 @@ channel is retired. Subscribing to `web_data` then returns
 `{"channel":"error","data":{"error":"unknown channel: web_data"}}`.
 
 **The REST read keeps serving as a depth on the account read.** Poll
-[`account_state`](../rest/info.md#account_state-overview) with
+[`account_state`](../rest/info/account.md#account_state-overview) with
 `detail: "overview"` — the same body the channel pushed. Only the push goes
 away.
 
@@ -69,10 +69,10 @@ Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unk
 not change it.** An order placed by `modify` or `batch_modify`, an order placed
 by CoreWriter `LimitOrder`, any order inside a `multi_sig` envelope, and every
 clearing of a [frequent batch auction](../../concepts/fba.md) each settle with
-no message on `trades`, on `fills` or on `order_updates` — for either party. **Fixed for `modify` and `multi_sig` in node 0.9.5; a CoreWriter order that crosses on placement and an FBA clearing follow in the next release.** See [unrecorded fills](../rest/info.md#unrecorded-fills). So a
+no message on `trades`, on `fills` or on `order_updates` — for either party. **Fixed for `modify` and `multi_sig` in node 0.9.5; a CoreWriter order that crosses on placement and an FBA clearing follow in the next release.** See [unrecorded fills](../rest/info/orders-fills.md#unrecorded-fills). So a
 market maker cannot read `fills` as the complete record of its own executions,
 and must reconcile its position from
-[`account_state`](../rest/info.md#account_state) instead.
+[`account_state`](../rest/info/account.md#account_state) instead.
 
 An account that SENDS a `modify` still gets an `open_orders` re-snapshot for
 it, because that channel re-emits on every `/exchange` action a subscribed
@@ -91,7 +91,7 @@ changed — gets no frame at all.
 when a fill touches an account, and these fills touch nothing. So a maker's
 `open_orders` view keeps the consumed order at its old size until some other
 event on that account forces a new frame. Poll
-[`open_orders`](../rest/info.md#open_orders) over REST to settle what is really
+[`open_orders`](../rest/info/orders-fills.md#open_orders) over REST to settle what is really
 resting.
 :::
 
@@ -120,13 +120,13 @@ same data.
 
 | Removed channel | Read this instead |
 |---|---|
-| `explorer_block` | [`recent_blocks`](../rest/info.md#recent_blocks) — an `/info` read, archive-backed, optional `limit` |
-| `explorer_txs` | [`recent_transactions`](../rest/info.md#recent_transactions) — the same |
+| `explorer_block` | [`recent_blocks`](../rest/info/chain.md#recent_blocks) — an `/info` read, archive-backed, optional `limit` |
+| `explorer_txs` | [`recent_transactions`](../rest/info/chain.md#recent_transactions) — the same |
 
 **Two fields do not survive the move**, and both are real losses:
 `recent_blocks` carries no `proposer`, and `recent_transactions` carries no
 `hash`. Correlate a submitted action by `cloid`, or read
-[`action_outcome`](../rest/info.md#action_outcome).
+[`action_outcome`](../rest/info/account-history.md#action_outcome).
 
 **Size a poll so it cannot gap.** The block cadence is about 100 ms, so 100 rows
 span roughly 10 seconds of chain and a 2-second poll always overlaps. Do not treat
@@ -416,7 +416,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 
 ### Per-account resting order snapshot {#open_orders}
 
-Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. **One exception, and it is shrinking: a resting order consumed by a still-[unrecorded fill](../rest/info.md#unrecorded-fills) produces no frame**, so that account's snapshot stays stale — showing the order at its old size — until some other event forces a re-emission. Two of the four lanes were fixed in node 0.9.5; the CoreWriter and FBA lanes follow in the next release, after which this exception is gone. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
+Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. **One exception, and it is shrinking: a resting order consumed by a still-[unrecorded fill](../rest/info/orders-fills.md#unrecorded-fills) produces no frame**, so that account's snapshot stays stale — showing the order at its old size — until some other event forces a re-emission. Two of the four lanes were fixed in node 0.9.5; the CoreWriter and FBA lanes follow in the next release, after which this exception is gone. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "open_orders", "user": "0x<address>" } }
@@ -433,7 +433,7 @@ The snapshot is an **array** of records, each in the same fixed shape as an [`or
 
 - Each element is one resting order: the nested `order` object (`coin`, `side`, `limit_px`, `sz` = remaining size, `orig_sz`, `oid`, `cloid`, `tif`, `reduce_only`), with `filled_sz` / `avg_px` / `reason` all `null` (a standing order, not an event) and `time` the order's insertion timestamp (consensus ms). On this snapshot `orig_sz` is `null` (the placed size is not re-derived for a standing order) and `reduce_only` is `false`; `cloid` is the client id or `null`. `limit_px` is whole-USDC, `sz` is size-plane.
 - Because every frame is a full snapshot, `is_snapshot` is always `true` here — treat each frame as the account's complete current resting set, not an incremental change.
-- A parked TP/SL leg renders the SAME `trigger` block the REST read serves, so a ladder leg carries `group` and a trailing leg carries `trail_px` here too. Both keys are absent on every other leg — see [`open_orders`](../rest/info.md#open_orders) for the rule.
+- A parked TP/SL leg renders the SAME `trigger` block the REST read serves, so a ladder leg carries `group` and a trailing leg carries `trail_px` here too. Both keys are absent on every other leg — see [`open_orders`](../rest/info/orders-fills.md#open_orders) for the rule.
 
 ### Per-account notices {#notifications}
 
@@ -553,14 +553,14 @@ address) — NOT a `coin`. **`address` is not an alias here**: a subscribe carry
 ``{"channel":"error","data":{"error":"`account_state` requires `user`"}}``, the
 same answer as sending nothing. Note the two surfaces differ — the WS
 subscription takes `user`, while the REST
-[`account_state`](../rest/info.md#account_state) read takes `address`. The body
-is built from the same builder as the REST [`account_state`](../rest/info.md#account_state) read,
+[`account_state`](../rest/info/account.md#account_state) read takes `address`. The body
+is built from the same builder as the REST [`account_state`](../rest/info/account.md#account_state) read,
 so a push never drifts from that read. The initial snapshot is the live state
 (zeroed for an account with no funds), not an empty array.
 
 **This four-lane frame is the live shape.** The earlier FLAT body — the position
 table and the balance array inside this frame — is gone from the wire. Parse the
-lanes. See [where every field went](../rest/info.md#account-state-lane-split).
+lanes. See [where every field went](../rest/info/account.md#account-state-lane-split).
 
 ```json
 { "method": "subscribe", "subscription": { "type": "account_state", "user": "0x<address>" } }
@@ -596,7 +596,7 @@ lanes. See [where every field went](../rest/info.md#account-state-lane-split).
   [`clearinghouse_state`](#clearinghouse_state) and [`option_state`](#option_state),
   each its own channel. Subscribe to the lane you render.
 - Every field, its plane and its rule are in the REST
-  [field reference](../rest/info.md#account-state-fields) — the two are one body.
+  [field reference](../rest/info/account.md#account-state-fields) — the two are one body.
   In short: the money figures are **whole-USDC** decimal strings; `tier` is a
   **string** (`"Safe"` / `"T0"` / `"T1"` / `"T2"` / `"T3"`), never a number;
   `health` is a **signed dollar figure, not a ratio**; `height` / `time` are bare
@@ -605,7 +605,7 @@ lanes. See [where every field went](../rest/info.md#account-state-lane-split).
   `spot.balances` always carries at least the USDC row. `option.next_expiry` is
   the one key that can be absent — it is omitted when `option.legs` is `0`.
 - There is no account-level `cross_maintenance_margin_used` on this frame. Poll
-  [`account_state` with `detail: "margin"`](../rest/info.md#account-state-detail-margin)
+  [`account_state` with `detail: "margin"`](../rest/info/account.md#account-state-detail-margin)
   for it. Its scope is the cross bucket: an isolated leg is margined and
   liquidated on its own and contributes nothing to it. That depth also names the
   held initial margin `total_margin_used`, where this frame calls it
@@ -652,7 +652,7 @@ Per-account **perp position detail** — the dex-keyed position table that left 
 `account_state` body. Requires `user`; a subscribe without one is refused with
 ``{"channel":"error","data":{"error":"`clearinghouse_state` requires `user`"}}``.
 Same builder as the REST
-[`clearinghouse_state`](../rest/info.md#clearinghouse_state) read, so the push and
+[`clearinghouse_state`](../rest/info/account.md#clearinghouse_state) read, so the push and
 the read never drift.
 
 :::warning Not live yet
@@ -660,7 +660,7 @@ The dex key changes from the deployer's address to the dex NAME with the next
 network upgrade, on this channel and on the REST read together — one builder
 serves both. Until that upgrade fires, a live node keys every non-core bucket by
 the deployer's lowercase `0x` address. The name rule, and the name each existing
-dex receives, are in [the dex key](../rest/info.md#dex-key).
+dex receives, are in [the dex key](../rest/info/account.md#dex-key).
 :::
 
 ```json
@@ -695,10 +695,10 @@ dex receives, are in [the dex key](../rest/info.md#dex-key).
 - `clearinghouse_state` is keyed by dex NAME — `""` is the core dex and is
   **always present**, else the name of one deployed dex. Every market on dex
   `NAME` has the symbol `NAME:SUFFIX`, so the key and the row's `coin` prefix are
-  the same string; see [the dex key](../rest/info.md#dex-key). Every row field is
-  in the REST [row table](../rest/info.md#clearinghouse_state). **`liq` is
+  the same string; see [the dex key](../rest/info/account.md#dex-key). Every row field is
+  in the REST [row table](../rest/info/account.md#clearinghouse_state). **`liq` is
   nullable** — `null` means no non-negative price liquidates the leg, and it is
-  never rendered as `"0"`. See [reading `liq`](../rest/info.md#reading-liq).
+  never rendered as `"0"`. See [reading `liq`](../rest/info/account.md#reading-liq).
 - **`side` is present only in hedge mode, and ABSENT — not `null` — in one-way
   mode.** Read `position_mode` on [`account_state`](#account_state) to know which
   shape to expect. The reason is what each mode can hold: hedge mode can hold a
@@ -711,7 +711,7 @@ dex receives, are in [the dex key](../rest/info.md#dex-key).
   the push always renders the default shape. The lamp ranks your seat against
   OTHER accounts, so an always-on lamp would re-emit your frame whenever a
   stranger's PnL crossed a quartile edge. Poll
-  [`clearinghouse_state` with `detail: "adl"`](../rest/info.md#account_state-adl)
+  [`clearinghouse_state` with `detail: "adl"`](../rest/info/account.md#account_state-adl)
   for it.
 - **The frame carries no account figures.** No `account_value`, no
   `withdrawable`, no `health`, no `balances`. Read those from
@@ -734,7 +734,7 @@ against one block even though they arrive as two frames.
 Per-account **option leg detail** — one row per series the account is party to.
 Requires `user`; a subscribe without one is refused with
 ``{"channel":"error","data":{"error":"`option_state` requires `user`"}}``. Same
-builder as the REST [`option_state`](../rest/info.md#option_state) read.
+builder as the REST [`option_state`](../rest/info/options.md#option_state) read.
 
 :::warning Renamed
 This channel was going to be called `option_positions`. That name is **not an
@@ -766,7 +766,7 @@ Subscribe to `option_state`.
 
 - `positions` is `[]` for an account party to nothing — that is the snapshot, not
   an error. Every row field is in the REST
-  [`option_state`](../rest/info.md#option_state) table. `signing_id` is served
+  [`option_state`](../rest/info/options.md#option_state) table. `signing_id` is served
   whole; never compute it.
 - **`escrow` is denominated in that row's `settle_asset`** — USDC on a put, the
   underlying COIN on a call, because a

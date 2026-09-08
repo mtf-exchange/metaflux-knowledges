@@ -65,7 +65,7 @@ tables and the EIP-712 typed-data primary types.
 ```
 
 `market` is the `signing_id` of a live series, from
-[`option_series`](../api/rest/info.md#option_series). **Serve it, never compute
+[`option_series`](../api/rest/info/options.md#option_series). **Serve it, never compute
 it** — the encoding behind the number is internal.
 
 `size` / `limit_px` are raw `u64` **numbers**, not decimal strings. `size` is on
@@ -134,7 +134,7 @@ An option fill moves three amounts and nothing else.
 | Property | RFQ option fill |
 |----------|-----------------|
 | Premium | Quoted `price` × whole units, from the buyer to the writer, **in USDC on both kinds**, truncated toward zero to micro-USDC |
-| Escrow | [`escrow_per_unit`](../api/rest/info.md#option_series) × whole units, from the writer's balance into the series pot, **in the row's [`settle_asset`](../api/rest/info.md#option_series)** |
+| Escrow | [`escrow_per_unit`](../api/rest/info/options.md#option_series) × whole units, from the writer's balance into the series pot, **in the row's [`settle_asset`](../api/rest/info/options.md#option_series)** |
 | Closing | A closing writer's escrow leaves the pot **exactly**. Each account's own legs net first |
 | Counter-party | One maker only — the chosen quote's signer |
 | Book impact | None. The trade matches against no resting order |
@@ -154,7 +154,7 @@ fired. Until it does, every series escrows and pays USDC, no series row carries
 
 **A put writer escrows USDC. A call writer escrows the underlying COIN — one coin
 per whole unit, whatever the strike.** The currency is on the series row as
-[`settle_asset`](../api/rest/info.md#option_series).
+[`settle_asset`](../api/rest/info/options.md#option_series).
 
 The call's denomination is forced, not chosen. A cash call pays `max(S* − K, 0)`,
 the price has no ceiling, so no finite cash escrow covers it. Read in the coin the
@@ -258,7 +258,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 | Field | Type | Meaning |
 |-------|------|---------|
 | `rfq_id` | uint64 | Session id. This is the number `rfq_quote` and `rfq_accept` take |
-| `signing_id` | uint32 | The option series, from [`option_series`](../api/rest/info.md#option_series) |
+| `signing_id` | uint32 | The option series, from [`option_series`](../api/rest/info/options.md#option_series) |
 | `side` | `"B"` / `"A"` | **The READ token, not the one you sent.** `rfq_request` takes `"Bid"` / `"Ask"`; this read answers `"B"` / `"A"`, the same token every other read uses for a side |
 | `sz` | Decimal string | Requested size in whole underlying units. The action takes a RAW `u64` on the series' `sz_decimals` plane; this read serves the human number |
 | `limit_px` | Decimal string \| null | The taker's worst acceptable price, `null` when it sent none |
@@ -307,8 +307,8 @@ An account party to nothing returns a 200 with both lists empty.
 ## See also {#see-also}
 
 - [Options](../products/options.md) — the product RFQ clears
-- [`option_series`](../api/rest/info.md#option_series) — the series registry, and the `signing_id` to sign
-- [`option_state`](../api/rest/info.md#option_state) — the units and escrow a fill leaves behind
+- [`option_series`](../api/rest/info/options.md#option_series) — the series registry, and the `signing_id` to sign
+- [`option_state`](../api/rest/info/options.md#option_state) — the units and escrow a fill leaves behind
 - [`/exchange` action catalog](../api/rest/exchange/rfq-utility.md) — the full parameter tables and typed-data primary types
 
 ## FAQ {#faq}
@@ -332,7 +332,7 @@ chosen maker. The CLOB engine is not involved.
 A: The premium in USDC, plus the escrow if you are the writer, plus a taker fee in
 USDC if you sent the request. The maker who quoted you pays nothing. On a call the
 escrow is ONE COIN per unit, not dollars — read
-[`settle_asset`](../api/rest/info.md#option_series). The fee is the smaller of a
+[`settle_asset`](../api/rest/info/options.md#option_series). The fee is the smaller of a
 rate on the option's strike face (`strike` x `size`) and a fraction of the
 premium — see [the option fee](../products/options.md#option-fee). Both rates
 start unset, which charges nothing.

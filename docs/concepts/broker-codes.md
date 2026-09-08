@@ -150,7 +150,7 @@ Fees accrue to a running balance. Claim it with:
 rule [`approve_broker_fee`](#approval) follows.
 
 **Read the balance before you claim it. The action reports no amount.** Query
-[`builder_state`](../api/rest/info.md#builder_state) with your address. That
+[`builder_state`](../api/rest/info/fees-credit.md#builder_state) with your address. That
 read keeps the `builder` spelling and is the only way to show a claimable
 figure. After the claim the balance is `0`, so a read afterwards cannot tell you
 what moved.

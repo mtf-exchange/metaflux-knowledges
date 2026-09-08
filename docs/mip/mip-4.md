@@ -6,7 +6,7 @@
 [RFQ](../concepts/rfq.md) only. A put settles in USDC; a call settles in the
 underlying coin and escrows one coin per contract. Read
 [Options](../products/options.md) for the product, and
-[`option_series`](../api/rest/info.md#option_series) for the wire.
+[`option_series`](../api/rest/info/options.md#option_series) for the wire.
 
 The **margined** options book this page originally scoped is NOT built. The
 constraints below are the reason, and the shipped design answers them by

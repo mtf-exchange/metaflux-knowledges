@@ -146,7 +146,7 @@ position, so free collateral is the full 15,000. `10499.00 <= 15000`, so the
 order is admitted.
 
 **After the fill**, the leg's own row under
-[`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) reads:
+[`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state) reads:
 
 | Field | Value | What it is |
 |---|---|---|
@@ -247,7 +247,7 @@ flowchart LR
 
 If `position_health` falls into a liquidation tier, the **per-position** ladder fires. The rest of the account is untouched.
 
-The `liq` field on an isolated position is solved on this bucket alone. A large cross balance does NOT push it away, because cross never rescues an isolated bucket. See [reading `liq`](../api/rest/info.md#reading-liq).
+The `liq` field on an isolated position is solved on this bucket alone. A large cross balance does NOT push it away, because cross never rescues an isolated bucket. See [reading `liq`](../api/rest/info/account.md#reading-liq).
 
 You can deposit/withdraw to the bucket while the position is open:
 

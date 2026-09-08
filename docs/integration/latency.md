@@ -27,7 +27,7 @@ the chain you trade on. The method is in the next section.
 
 ## Measure the cadence {#measure-the-cadence}
 
-[`account_state`](../api/rest/info.md#account_state) stamps the committed `height` it answers at
+[`account_state`](../api/rest/info/account.md#account_state) stamps the committed `height` it answers at
 and the **consensus** `time` of that block. It is the only read that does, and it is cheap: both
 stamps advance on every commit, even for an address that never traded, and `detail: "margin"`
 skips the position walk. Two reads give you the rate:
@@ -51,7 +51,7 @@ ms per block = (time_2 - time_1) / (height_2 - height_1)
 division needs no clock synchronisation and no correction for your network round-trip. Your local
 clock only decides how long you wait between the two reads.
 
-Want a block-by-block view? [`recent_blocks`](../api/rest/info.md#recent_blocks)
+Want a block-by-block view? [`recent_blocks`](../api/rest/info/chain.md#recent_blocks)
 returns the same `height` and timestamp for a window of recent blocks in one
 read, so one call gives many gaps to average. (The `explorer_block` WS channel
 that used to push them is

@@ -230,12 +230,12 @@ curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"account_state","address":"0x<addr>"}'
 ```
 
-The native [`account_state`](../api/rest/info.md#account_state) read exposes
+The native [`account_state`](../api/rest/info/account.md#account_state) read exposes
 `abstraction: "portfolio"` (whether PM is active for the account) alongside
 `perp.init_margin`, `health`, and `tier`; the account-level
 `cross_maintenance_margin_used` figure — which already reflects the PM-derived
 maintenance when enrolled — lives on the lighter
-[`account_state` with `detail: "margin"`](../api/rest/info.md#account_state):
+[`account_state` with `detail: "margin"`](../api/rest/info/account.md#account_state):
 
 ```json
 {
@@ -251,7 +251,7 @@ maintenance when enrolled — lives on the lighter
 > **Planned read.** The classical-vs-PM side-by-side and the worst-case scenario
 > breakdown (which price/vol shock combination drove the PM number) are **not yet
 > broken out** as separate fields in the
-> [`account_state`](../api/rest/info.md#account_state) response — the PM scenario
+> [`account_state`](../api/rest/info/account.md#account_state) response — the PM scenario
 > engine computes them internally, but only the final
 > `cross_maintenance_margin_used` is surfaced today. A future read (a per-scenario PM-details field on `account_state`) will
 > expose the breakdown.
@@ -295,7 +295,7 @@ A: Yes. Each sub is independent. A master can be PM-enrolled while its subs are 
 A: Larger than classical (scenario grid), but bounded. The protocol caches per-account scenario results and only re-computes on position changes or scenario-parameter updates.
 
 **Q: Is PM transparent — can I see the exact maint number before placing an order?**
-A: You can read the current PM-derived `cross_maintenance_margin_used` from [`/info account_state`](../api/rest/info.md#account_state) — see [Querying](#querying). There is no separate pre-trade "what would this order cost me" read; the per-scenario breakdown is not yet a surfaced field (see the note above).
+A: You can read the current PM-derived `cross_maintenance_margin_used` from [`/info account_state`](../api/rest/info/account.md#account_state) — see [Querying](#querying). There is no separate pre-trade "what would this order cost me" read; the per-scenario breakdown is not yet a surfaced field (see the note above).
 
 **Q: Do MIP-3 listings get PM credit?**
 A: The engine has no per-pair correlation matrix (see the corrections note above) — every enrolled position nets through the same scenario grid unless its market is governance-flagged strict-isolated, which excludes it. Check a market's live `strict_isolated` field on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta); new long-tail listings are likely candidates for that flag.

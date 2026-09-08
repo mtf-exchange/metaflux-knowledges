@@ -141,7 +141,7 @@ release timestamp; it is `null` for every other status.
 `bridge_user_outbox` request now answers `410`, and its `details.use` names
 `bridge_withdrawal_history` — which itself answers `400 unknown info type`
 today. No name currently serves these rows. See the notice at the
-[top of this page](#tldr).
+[top of this page](../info.md#tldr).
 :::
 
 **This read is the whole answer**, in flight and finished alike. It is served by

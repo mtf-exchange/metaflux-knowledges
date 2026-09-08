@@ -29,7 +29,7 @@ block, not committed synchronously.
 applies it, against the reserve balance and against a per-address cap held in
 committed state. A claim that passes every HTTP check can still be refused there,
 and nothing is returned to you when it is. Always confirm with
-[`account_state`](./info.md#account_state). Served as `POST /faucet` on the
+[`account_state`](./info/account.md#account_state). Served as `POST /faucet` on the
 gateway front door, alongside the native `/info` + `/exchange` default path.
 
 ## URL {#url}
@@ -93,7 +93,7 @@ curl -s -X POST https://api.testnet.mtf.exchange/faucet \
 prepended to the next proposed block. **Each one is re-checked when that block
 applies it, and either can be refused there** — see
 [refused after queueing](#refused-after-queueing). Poll
-[`account_state`](./info.md#account_state) ~1 block later to see the balance:
+[`account_state`](./info/account.md#account_state) ~1 block later to see the balance:
 
 ```json
 // account_state after the credit commits:

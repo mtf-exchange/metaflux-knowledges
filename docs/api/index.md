@@ -22,7 +22,7 @@ One MTF-native protocol, served by the gateway front door
 | make my first call in five minutes | [Quickstart](../integration/quickstart.md) |
 | place an order | [`submit_order`](./rest/exchange/orders.md#submit_order), then [placing orders](../integration/placing-orders.md) |
 | sign a request | [Signing](../integration/signing.md) · [typed data](../integration/typed-data-signing.md) |
-| read an account | [`account_state`](./rest/info.md#account_state) |
+| read an account | [`account_state`](./rest/info/account.md#account_state) |
 | stream the book or my fills | [WS subscriptions](./ws/subscriptions.md) |
 | find one action's fields | [the action catalog](./rest/exchange.md#action-catalog) |
 | know why a request was refused | [Errors](./errors.md) |

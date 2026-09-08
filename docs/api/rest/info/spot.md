@@ -7,7 +7,7 @@ description: POST /info read queries for spot markets, leveraged spot margin, an
 Read queries for [spot](../../../products/spot.md) markets, leveraged [spot margin](../../../products/spot-margin.md), and the [Earn](../../../concepts/earn.md) pool. Same `POST /info` endpoint and envelope as the [base page](../info.md).
 
 :::info
-**Plain spot token balances are on [`account_state`](../info.md#account_state).**
+**Plain spot token balances are on [`account_state`](./account.md#account_state).**
 Its `spot.balances` array carries every token the account holds — USDC and spot
 tokens alike — with `avg_entry_px` per row. There is no separate spot-balance
 read.
@@ -72,7 +72,7 @@ zero.**
 
 A spot pair's deployer may set a taker override. **If an override exists it
 WINS**, for every account, whatever the volume tier says. If none exists, the
-volume-tiered [`fee_schedule`](../info.md#fee_schedule) applies. That is the
+volume-tiered [`fee_schedule`](./fees-credit.md#fee_schedule) applies. That is the
 whole resolution rule, and this row is where it is now written down.
 
 Two encodings used to hide it, and both are fixed:
@@ -107,7 +107,7 @@ answer, not as an error.
 | `pairs[*].name` | string | Pair name (e.g. `"MTF/USDC"`) |
 | `pairs[*].base` / `quote` | uint32 | Base / quote asset id (equal for self-pairs) |
 | `pairs[*].sz_decimals` | uint8 | Size precision of the pair's base leg |
-| `pairs[*].taker_fee_bps` | bps string \| null | The pair's **deployer taker override**, decimal bps. **`null` means there is no override and the volume-tiered [`fee_schedule`](../info.md#fee_schedule) applies** — see the resolution rule below |
+| `pairs[*].taker_fee_bps` | bps string \| null | The pair's **deployer taker override**, decimal bps. **`null` means there is no override and the volume-tiered [`fee_schedule`](./fees-credit.md#fee_schedule) applies** — see the resolution rule below |
 | `pairs[*].min_notional` | Decimal string | Min notional (whole USDC); `"0"` if unset |
 | `pairs[*].active` | bool | Whether the pair is active for trading |
 | `pairs[*].deployer` | hex address | The account that registered the pair |

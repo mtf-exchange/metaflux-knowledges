@@ -178,7 +178,7 @@ Read a row's `changes[]` and `enacted_at` for what happened. Do **not** derive
   otherwise.** A vote that is still open therefore moves inside the window as
   new casts arrive; an enacted vote is pinned by its enactment.
 - Rows return oldest-first within the window, matching
-  [`user_fills`](../info.md#user_fills).
+  [`user_fills`](./orders-fills.md#user_fills).
 - Markets are addressed by `coin` symbol. There is no numeric market argument.
 - Competing payloads in one round are **separate rows**. Two validators voting
   different values in the same round do not tally together, so they do not
@@ -242,7 +242,7 @@ replaced by [`validator_votes`](#validator_votes).
 
 | Retired read | Use instead |
 |--------------|-------------|
-| `gov_state` | [`validator_votes`](#validator_votes) with `status: "voting"` for the open votes. Current parameter VALUES are on the reads that own them — a market's risk parameters on [`markets_meta`](./perpetuals.md#markets_meta), the fee ladder on [`fee_schedule`](../info.md#fee_schedule), global trading flags on [`exchange_status`](../info.md#exchange_status) |
+| `gov_state` | [`validator_votes`](#validator_votes) with `status: "voting"` for the open votes. Current parameter VALUES are on the reads that own them — a market's risk parameters on [`markets_meta`](./perpetuals.md#markets_meta), the fee ladder on [`fee_schedule`](./fees-credit.md#fee_schedule), global trading flags on [`exchange_status`](./node.md#exchange_status) |
 | `gov_proposals` | [`validator_votes`](#validator_votes) with `status: "voting"` — same rounds, same stake tallies, plus the per-cast detail and the time range |
 | `gov_history` | [`validator_votes`](#validator_votes) with `status: "enacted"` — every enactment, not a subset, with the asset, the voters and the prior value |
 
@@ -300,3 +300,21 @@ public gateway only; the node's own `/info` keeps serving `gov_state`,
 `gov_proposals` and `gov_history` for validator operators, who need the live
 vote machinery to cast a vote. They are not part of the public API.
 :::
+
+**The governance reads have their own page now:
+[governance queries](../info/governance.md).**
+
+One read serves the whole surface —
+[`validator_votes`](../info/governance.md#validator_votes). It reports votes
+that are still open and votes that already enacted, over a time range. It is
+the one place a caller learns that a governance action happened, who voted for
+it, and what the parameter was before.
+
+That matters because a governance vote can move a **margin** parameter. A
+two-thirds-stake vote once lowered `max_leverage` on BTC and ETH from 100 to
+20, and no public read reported that it had happened. Stake quorum is ⅔,
+stake-weighted; **jailed** validators are excluded from the denominator and
+from every tally.
+
+The three older governance reads are retired from the public gateway. Each
+answers `410 Gone` with a body naming `validator_votes`.

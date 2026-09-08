@@ -48,7 +48,7 @@ not a free choice:
   contract binding**, because the EVM-side USDC is reached through the
   collateral-plane id instead. `asset` defaults to `0`; leave it alone.
 - The spot market and balance surfaces — [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta),
-  [`account_state` `spot.balances[]`](../api/rest/info.md#account_state),
+  [`account_state` `spot.balances[]`](../api/rest/info/account.md#account_state),
   and every `*/USDC` pair's `quote` — use **`100`**.
 :::
 
@@ -106,8 +106,8 @@ budget as `withdrawable`, clamped:
 withdrawable = max(0, free collateral)
 ```
 
-Read it from [`account_state.withdrawable`](../api/rest/info.md#account_state)
-or the lighter [`account_state` with `detail: "margin"`](../api/rest/info.md#account_state). A
+Read it from [`account_state.withdrawable`](../api/rest/info/account.md#account_state)
+or the lighter [`account_state` with `detail: "margin"`](../api/rest/info/account.md#account_state). A
 `withdrawable` of `"0"` therefore means "nothing to take out", NOT "the account
 is broke" — see [account value](./account-value.md#withdrawable). Two rules
 behind the formula are worth stating:
@@ -197,7 +197,7 @@ nothing at all.
 
 ### `account_state` {#account-state}
 
-[`POST /info` `account_state`](../api/rest/info.md#account_state) is the read to
+[`POST /info` `account_state`](../api/rest/info/account.md#account_state) is the read to
 use.
 
 | Field | What it is | The rule behind it |
@@ -213,7 +213,7 @@ present, even at zero.
 
 ### One ledger, one read {#one-ledger}
 
-[`account_state` `spot.balances`](../api/rest/info.md#account_state) carries the WHOLE
+[`account_state` `spot.balances`](../api/rest/info/account.md#account_state) carries the WHOLE
 token ledger: the unified USDC pool in row 0, and every spot token after it.
 There is no second balance read to merge in.
 
@@ -224,7 +224,7 @@ USDC that margins an open perpetual position stays in `total` and never enters
 :::
 
 Cost basis rides on the same rows.
-[`avg_entry_px`](../api/rest/info.md#avg-entry-px) is the per-token acquisition
+[`avg_entry_px`](../api/rest/info/account.md#avg-entry-px) is the per-token acquisition
 price spot PnL needs. The USDC row always reads `null` — a cost basis on the
 quote asset in terms of itself has no meaning.
 

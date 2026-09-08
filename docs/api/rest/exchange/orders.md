@@ -136,7 +136,7 @@ grow a position.
 |-------|------|----------------|-------------|
 | `trigger.trigger_px` | uint64 | `> 0` | Trigger price in fixed-point tick units (widened to `i128`). The mark crossing this price fires the leg. For a **market** trigger it is also the fired price; for a **limit** trigger it drives the fire direction only (the resting price is `limit_px`) |
 | `trigger.is_market` | bool | — | Selects the fired exit. `true` = **market trigger**: fire a reduce-only slippage-bounded IOC. `false` = **limit trigger**: rest a reduce-only `gtc` limit at the order's `limit_px` (rules below) |
-| `trigger.tpsl` | enum | `"tp"` / `"sl"` | Take-profit / stop-loss label, surfaced in [`/info`](../info.md#order_status). The fire direction comes from the leg `side` versus the mark, not from this label |
+| `trigger.tpsl` | enum | `"tp"` / `"sl"` | Take-profit / stop-loss label, surfaced in [`/info`](../info/orders-fills.md#order_status). The fire direction comes from the leg `side` versus the mark, not from this label |
 | `trigger.trail_px` | uint64 | `> 0`, optional | **Optional — makes the leg a trailing stop.** The callback offset, in the same fixed-point tick units as `trigger_px`. The parked level ratchets toward the mark by this offset once per block and never away from it. It is **signed**: sending the key changes the EIP-712 type string and the digest, so omit it unless you want a trail. See [trailing stops](#trailing-stops) |
 
 :::info
@@ -193,7 +193,7 @@ Semantics:
 - **A fired limit gets a new `oid`.** At conversion the parked leg retires and the
   new resting limit is assigned a fresh `oid`; the parked `oid` reads terminal /
   unknown afterwards, and the resting limit appears in
-  [`open_orders`](../info.md#open_orders). `cloid` is **not** carried onto the fired
+  [`open_orders`](../info/orders-fills.md#open_orders). `cloid` is **not** carried onto the fired
   order.
 - **A resting fired limit persists** until it fills or you cancel it through the
   normal path.
@@ -255,8 +255,8 @@ by that offset, once per block, and never away from it.
 **The level you sign is a floor, not the fire price.** For a long's stop the
 level becomes `max(level, mark - trail_px)` on every mark update, so it rises
 with a winning position and holds when the mark falls back. The leg fires at the
-**ratcheted** level. This is why [`open_orders`](../info.md#open_orders) and
-[`order_status`](../info.md#order_status) serve a `trigger_px` that is not the one
+**ratcheted** level. This is why [`open_orders`](../info/orders-fills.md#open_orders) and
+[`order_status`](../info/orders-fills.md#order_status) serve a `trigger_px` that is not the one
 you sent — read the served value as the current high-water level, and `trail_px`
 as the offset that produced it.
 
@@ -375,8 +375,8 @@ shape**, and the three shapes behave differently:
 
 **The ladder is the new shape.** Its legs share a `group` handle — the `oid` of
 the ladder's first parked leg — which every leg reports on
-[`open_orders`](../info.md#open_orders) and
-[`order_status`](../info.md#order_status). Group the rows by that value to render
+[`open_orders`](../info/orders-fills.md#open_orders) and
+[`order_status`](../info/orders-fills.md#order_status). Group the rows by that value to render
 one ladder as one control. Legs of a ladder are **not** OCO: a fill of one leg
 does not cancel the others, which is the point of scaling out of a position in
 steps.
@@ -570,11 +570,11 @@ amend is still atomic — a replacement the pre-trade gates reject restores the
 original — but the order id changes on every successful amend. The replacement
 keeps the original's `cloid`, `tif` and reduce-only flag, so a client that
 tracks orders by `cloid` keeps its handle. A client that tracks by `oid` must
-re-read [`open_orders`](../info.md#open_orders): nothing else carries the new id.
+re-read [`open_orders`](../info/orders-fills.md#open_orders): nothing else carries the new id.
 
 **The replacement can cross the book on placement, and that fill is recorded
-nowhere.** See [unrecorded fills](../info.md#unrecorded-fills). A `modify` also
-writes no [`historical_orders`](../info.md#historical_orders) transition at all —
+nowhere.** See [unrecorded fills](../info/orders-fills.md#unrecorded-fills). A `modify` also
+writes no [`historical_orders`](../info/account-history.md#historical_orders) transition at all —
 not the fill, and not the replacement's rest — and no
 [`order_updates`](../../ws/subscriptions.md#order_updates) message.
 
@@ -664,7 +664,7 @@ commit**:
 **The rejection reaches you through no channel** — see
 [`accepted` is not `committed`](../exchange.md#accepted-is-not-committed). The `202` body still
 says `accepted: true`. Read `position_mode` from
-[`account_state`](../info.md#account_state) BEFORE you submit.
+[`account_state`](../info/account.md#account_state) BEFORE you submit.
 
 **The field's PRESENCE also selects the signing string**, so it is not only an
 admission rule — sign the payload you send. See
@@ -786,7 +786,7 @@ per-chain counter — it is **not** in the HTTP response, and the returned
 `action_hash` cannot be looked up. Confirm the TWAP by its EFFECT: an
 `activated` record on
 [`user_twap_history`](../../ws/subscriptions.md#user_twap_history) carries the
-`twapId`, and the parent appears on [`user_twaps`](../info.md#user_twaps). If
+`twapId`, and the parent appears on [`user_twaps`](../info/node.md#user_twaps). If
 neither shows the parent within a few blocks, the action was rejected. Slice
 fills ride [`user_twap_slice_fills`](../../ws/subscriptions.md#user_twap_slice_fills).
 
@@ -901,7 +901,7 @@ book is rejected in its own slot, and once free collateral runs out the remainin
 rungs are rejected while the earlier ones stay. The response echoes every rung's
 exact price, size, and assigned `oid` (or its error), in rung order, so you get
 the node-derived ladder back in one reply. You can also rebuild the ladder later
-from [`open_orders`](../info.md#open_orders) filtered by the shared `cloid`.
+from [`open_orders`](../info/orders-fills.md#open_orders) filtered by the shared `cloid`.
 
 **Seams to know:**
 
