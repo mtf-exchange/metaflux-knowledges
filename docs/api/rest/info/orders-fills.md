@@ -181,7 +181,7 @@ follow the new one. Read that id on [`open_orders`](#open_orders).
 | `limit` | uint32 | no | Cap on the number of most-recent records returned. Absent or `0` returns the full ring |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive), filtered on the fill `time`. Absent is an open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent is an open upper bound |
-| `aggregate` | bool | no | Default `false`. `true` folds the legs of ONE order's execution in ONE block into a single row and adds `n`. See [aggregated rows](#user_fills-aggregate) |
+| `aggregate` | bool | no | **Not live yet.** Default `false`. `true` folds the legs of ONE order's execution in ONE block into a single row and adds `n`. A node without it ignores the field silently — test for `n`, not for the row count. See [aggregated rows](#user_fills-aggregate) |
 
 Send `address` alone for the recent window, or add `start_time` / `end_time` to
 filter the same records by time. The response echoes both bounds back as
@@ -267,6 +267,18 @@ ring.
   nothing for them. From that release on, both windows agree.
 
 #### Aggregated rows: `aggregate` {#user_fills-aggregate}
+
+:::warning Not live yet
+**The node that serves this is not released.** The code has landed; the running
+node predates it. A live node does not reject `aggregate` — it **ignores** it and
+returns the per-leg rows with no `n` key, which is the failure a caller cannot
+see.
+
+**Detect it by the presence of `n`, never by the row count.** A response whose
+rows carry no `n` came from a node without this feature; a folded response always
+carries `n`, and `n` is `1` for a fill that stood alone. Code against this page,
+and switch when the release fires.
+:::
 
 One order that sweeps 24 resting orders writes 24 rows. Send `"aggregate":
 true` to get ONE row for that order instead, with a new field `n` that counts
