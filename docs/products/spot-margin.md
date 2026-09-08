@@ -1,14 +1,10 @@
 # Spot margin
 
 :::info
-**Cross-collateralized against your unified USDC account.** Leveraged spot trading
-funded by the [Earn](../concepts/earn.md) lending pool. [Plain spot](./spot.md) is
-balance-only (no leverage); spot margin is the overlay that adds borrow + leverage
-on top. The cross-collateralized model is **live** — the borrow → leveraged-buy → close loop and
-automatic [forced liquidation](#liquidation) run against your one unified USDC
-account. A pair enables only once governance calibrates its per-pair risk
-parameters, so treat it as a **preview**: per-pair **maintenance ratios are still
-being calibrated**. Do not assume production safety at scale.
+**Preview.** The borrow → leveraged-buy → close loop and automatic
+[forced liquidation](#liquidation) are live, but a pair enables only once
+governance calibrates its per-pair risk parameters, and **no pair is calibrated
+yet**. Do not assume production safety at scale.
 :::
 
 ## TL;DR {#tldr}
@@ -36,10 +32,7 @@ loss draw on the same collateral.
 4. Close: sell the base, repay borrow + accrued interest, keep the remainder.
 ```
 
-The buy is funded 100% by the borrow. Your **account-wide free collateral** backs
-the position — the open subtracts its initial-margin requirement from free
-collateral exactly like a perpetual open, so there is no separate collateral
-to post, and leverage ≈ `notional /` free collateral. The bought base is held in a
+Leverage is `notional /` free collateral. The bought base is held in a
 **segregated** holding on the margin account, never commingled with your spendable
 spot balances, so a close (or a later liquidation) touches exactly that base. The
 first release allows **one open position per `(account, pair)`** (no add-on); the

@@ -20,24 +20,16 @@ machinery they share — order types, margin, liquidation, fees — see
 | [Options](./options.md) | Standard European puts and calls, fully collateralized, traded through [RFQ](../concepts/rfq.md) only. A put settles in USDC; a call settles in the underlying coin | **Live** — series are listed by validator vote |
 | [CDS](./cds.md) | Credit-default-swap-style protection contracts | **Planned** |
 
-**Perpetuals** are the default market and where most leveraged trading happens —
-funding rates, mark prices, margin modes, and the liquidation ladder all assume
-perps unless noted. **Spot** is the balance-only baseline. **Spot margin** is the
-opt-in leverage overlay on spot, with the [Earn](../concepts/earn.md) pool as the
-lending supply side. **Options** are live on their own lane: they have no order
-book, no margin and no liquidation, and they trade only through
-[RFQ](../concepts/rfq.md). **CDS** is planned and has no committed wire surface
-yet — see its page for the current state.
+## Sharia compliance {#sharia}
 
 :::info
-**Non-leveraged spot only is Sharia-compliant.** Among the products here, only
-**non-leveraged** [spot](./spot.md) — buying and selling outright at full value,
-with **no leverage, no margin, no borrowing, and no funding** — is generally
-regarded as compatible with Islamic (Sharia) finance principles. The non-compliant
-products explicitly include **spot margin (leveraged spot trading)** alongside
-**perpetual futures** and every other leveraged or derivative product — the
-leverage and borrowing introduce interest (riba), speculation, and uncertainty
-(maysir, gharar). Informational, not religious or financial advice.
+Only **non-leveraged** [spot](./spot.md) — buying and selling outright at full
+value, with no leverage, margin, borrowing or funding — is generally regarded as
+compatible with Islamic finance principles. Every other product here is
+leveraged or derivative, **spot margin included**, and introduces interest
+(riba) and uncertainty (gharar, maysir).
+
+Informational, not religious or financial advice.
 :::
 
 ## See also {#see-also}

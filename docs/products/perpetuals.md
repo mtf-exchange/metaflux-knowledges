@@ -10,35 +10,29 @@ default — funding rates, mark prices, margin modes, and the liquidation ladder
 describe perps unless a page says otherwise.
 :::
 
-## TL;DR {#tldr}
+## What a perp is {#what-a-perp-is}
 
 A **perpetual future** ("perp") is a leveraged contract that tracks an asset's
-price with **no expiry** — you go long or short, post [margin](../concepts/margin-modes.md)
-to back the position, and hold it as long as it stays healthy. Because there is no
-settlement date, a periodic [funding](../concepts/funding-rates.md) payment between
-longs and shorts keeps the contract price tethered to the underlying. Positions are
-valued against a manipulation-resistant [mark price](../concepts/mark-prices.md),
-and a position that can no longer cover its margin is wound down by
-[tiered liquidation](../concepts/tiered-liquidation.md) rather than a single
-sudden close.
+price with **no expiry**. Buy to go long, sell to go short, post
+[margin](../concepts/margin-modes.md) to back the position, and hold it as long
+as it stays healthy. A perp position is exposure backed by collateral, not
+ownership of the asset — it is entirely separate from [spot](./spot.md).
 
-Perps are entirely separate from [spot](./spot.md): a perp position is a leveraged
-exposure backed by collateral, not ownership of the asset.
+Three mechanisms make that work:
 
-## How a perp works {#how-a-perp-works}
-
-- **Direction & leverage.** Buy to go long, sell to go short. [Leverage](../concepts/margin-modes.md)
-  lets a given amount of collateral control a larger position; it amplifies gains
-  and losses equally. Set per-asset leverage and the cross/isolated toggle with
-  [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage).
-- **No expiry.** A perp never settles to a delivery date — the position persists
-  until you close it or it is liquidated.
-- **Funding keeps it honest.** Every hour, longs and shorts exchange a
+- **Funding keeps the price honest.** Every hour longs and shorts exchange a
   [funding payment](../concepts/funding-rates.md) sized to pull the perp price
   toward the underlying. It is paid **between traders**, not to the exchange.
-- **Mark price drives risk.** Your margin, unrealized PnL, liquidation level, and
-  trigger orders are all computed against the [mark price](../concepts/mark-prices.md),
-  not the last trade — so a single stray print cannot distort your position.
+- **Mark price drives risk.** Margin, unrealized PnL, the liquidation level and
+  trigger orders are all computed against the
+  [mark price](../concepts/mark-prices.md), not the last trade, so a single stray
+  print cannot distort a position.
+- **Liquidation is graduated.** A position that can no longer cover its margin is
+  wound down by [tiered liquidation](../concepts/tiered-liquidation.md), not a
+  single sudden close.
+
+Set per-asset leverage and the cross/isolated toggle with
+[`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage).
 
 ## Trading actions {#trading-actions}
 
@@ -75,24 +69,18 @@ Perps share the platform's full margin and risk stack:
 
 ## Fees {#fees}
 
-Perp fills charge a **maker** and a **taker** fee. Your base rate comes from your
-trailing-30-day volume tier; a maker-rebate tier and a staking discount then stack
-on top (see [Fee schedule](../concepts/fee-schedule.md) for how the three combine).
+A perp fill charges a **maker** and a **taker** fee. Your base rate comes from
+your trailing-30-day volume tier; a maker-rebate tier and a staking discount then
+stack on top. A maker-rebate tier can push the net maker rate **negative** (paid
+to make); a staking discount cuts the taker rate by up to 50%.
 
-| 30-day volume | Taker | Maker |
-|---------------|------:|------:|
-| `< $5M`       | 0.0350% | 0.0100% |
-| `≥ $5M`       | 0.0300% | 0.0080% |
-| `≥ $25M`      | 0.0270% | 0.0060% |
-| `≥ $100M`     | 0.0250% | 0.0040% |
-| `≥ $500M`     | 0.0220% | 0.0020% |
-| `≥ $2B`       | 0.0200% | 0.0000% |
+Rates are governance parameters, so read the live card from
+[`/info fee_schedule`](../api/rest/info.md#fee_schedule) rather than a table.
+[Fee schedule](../concepts/fee-schedule.md) has the current tiers and how the
+three components combine.
 
-A maker-rebate tier (maker-volume share) can push your **net maker rate negative**
-(paid to make); a staking discount cuts your **taker rate by up to 50%**. Rates are
-governance parameters — query the live card with [`/info fee_schedule`](../api/rest/info.md#fee_schedule).
-**Funding is not a fee** — it is a periodic [long↔short payment](../concepts/funding-rates.md),
-not revenue to the exchange. See [Fees](../concepts/fees.md) for the full mechanics.
+**Funding is not a fee** — it is a periodic
+[long↔short payment](../concepts/funding-rates.md), not revenue to the exchange.
 
 ## Listing new perp markets {#listing-new-perp-markets}
 

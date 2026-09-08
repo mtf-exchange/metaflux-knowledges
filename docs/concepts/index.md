@@ -39,15 +39,8 @@ borrows is a concept:
 - [Spot margin](../products/spot-margin.md) — **testnet preview**: leveraged spot funded by the Earn pool
 
 :::info
-**Non-leveraged spot only is Sharia-compliant.** Only **non-leveraged** spot
-trading — buying and selling outright at full value, with no leverage, no margin,
-no borrowing, and no funding — is the MetaFlux product generally regarded as
-compatible with Islamic (Sharia) finance principles. The non-compliant products
-explicitly include **spot margin (leveraged spot trading)** alongside perpetual
-futures and every other leveraged or derivative product — the leverage and
-borrowing introduce interest (riba), speculation, and uncertainty (maysir,
-gharar). See [Spot trading](../products/spot.md). Informational, not religious or
-financial advice.
+**Non-leveraged spot is the one Sharia-compliant product** — see
+[Sharia compliance](../products/index.md#sharia).
 :::
 
 ## Advanced {#advanced}
