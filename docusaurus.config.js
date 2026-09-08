@@ -70,8 +70,8 @@ const config = {
   // 'warn' not 'throw': the machine-translated zh-Hans locale inevitably has some
   // relative-link / heading-anchor drift (e.g. bare `../bridge` links that don't carry
   // the locale prefix). The English locale builds clean; don't let zh drift block deploys.
-  onBrokenLinks: 'warn',
-  onBrokenAnchors: 'warn',
+  onBrokenLinks: 'throw',
+  onBrokenAnchors: 'throw',
 
   markdown: {
     // Treat .md as CommonMark (no JSX parsing) so JSON/`{type}`/`<T>` snippets don't break the build.

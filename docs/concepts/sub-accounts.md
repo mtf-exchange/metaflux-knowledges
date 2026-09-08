@@ -20,7 +20,7 @@ use neither:
 
 - It has no key, so it cannot sign for itself.
 - Its approved-agent set is always empty. `create_sub_account` never fills it,
-  and [`approve_agent`](../api/rest/exchange.md#approve_agent) adds an agent to
+  and [`approve_agent`](../api/rest/exchange/account.md#approve_agent) adds an agent to
   the **signer's** account. Only the sub could approve an agent of the sub, and
   the sub cannot sign.
 
@@ -141,7 +141,7 @@ For spot assets use `sub_account_spot_transfer` (adds an `asset` field).
 the [TL;DR warning](#tldr).
 
 **An agent does not open a path either, and the attempt fails silently.**
-[`approve_agent`](../api/rest/exchange.md#approve_agent) writes the agent under
+[`approve_agent`](../api/rest/exchange/account.md#approve_agent) writes the agent under
 the **recovered signer's** account. Its body carries `agent`, `name` and
 `expires_at_ms` — there is no owner field and no delegation field. So a master
 that signs `approve_agent` "for" a sub approves an agent on the **master**. The
@@ -182,7 +182,7 @@ flowchart LR
 ## Per-sub PM enrollment {#per-sub-pm-enrollment}
 
 :::warning
-**Not available.** [`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin)
+**Not available.** [`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin)
 enrols the **signing** account. Its body carries only `enroll` — there is no
 target field — and a sub cannot sign. So a sub cannot enrol in
 [portfolio margin](./portfolio-margin.md), and a master cannot enrol one on its

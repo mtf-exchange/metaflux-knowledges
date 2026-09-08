@@ -202,7 +202,7 @@ validator-only injection queue** (not the public mempool); the runtime drains it
 into the block payload exactly like the oracle feed, with the node's own
 validator address as sender so the `require_system_authority` check admits them.
 There is no code path from the public user mempool to this queue. See
-[never expose system actions on /exchange](./exchange.md#non-bridged-actions).
+[never expose system actions on /exchange](./exchange/transfers.md#non-bridged-actions).
 
 ## Determinism boundary {#determinism-boundary}
 

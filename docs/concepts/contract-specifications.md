@@ -143,7 +143,7 @@ default table until governance points the index at venues that list them).
   maintenance floor before [liquidation](../concepts/tiered-liquidation.md). The
   baseline is **3%**; a per-market dynamic-risk override replaces it.
 - **Leverage caps**: a market lists with `max_leverage` in `1..=50`; a per-account
-  [`update_leverage`](../api/rest/exchange.md#update_leverage) is bounded by the
+  [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) is bounded by the
   per-market cap and a global **100×** hard ceiling.
 
 ### Dynamic-risk margin tiers {#dynamic-risk-margin-tiers}

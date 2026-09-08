@@ -46,7 +46,7 @@ The fill price is **uniform** across all participants in the batch — no one is
 | Spot pairs | Continuous CLOB | Convention |
 | Index / structured products | FBA | Composite pricing needs synchronous clearing |
 
-Each market's matching mode is in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) as `fba_enabled`. Markets with FBA on accept `fba_submit` into the live batch window. See [`fba_submit`](../api/rest/exchange.md#fba_submit) for the full action.
+Each market's matching mode is in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) as `fba_enabled`. Markets with FBA on accept `fba_submit` into the live batch window. See [`fba_submit`](../api/rest/exchange/rfq-utility.md#fba_submit) for the full action.
 
 ## Batch interval {#batch-interval}
 
@@ -73,7 +73,7 @@ Faster intervals reduce the wait but increase computational cost.
 `size` / `price` are raw `u64` JSON numbers on the 1e8 plane, not decimal
 strings. There is no `batch_id` or `cloid` field — an `fba_submit` always
 joins whichever window is currently open for `market`; it cannot target a
-future batch. See [`fba_submit`](../api/rest/exchange.md#fba_submit) for the
+future batch. See [`fba_submit`](../api/rest/exchange/rfq-utility.md#fba_submit) for the
 full field table.
 
 ## Worked example {#worked-example}
@@ -226,7 +226,7 @@ Timestamp keys carry no `_ms` suffix; only a key naming a DURATION keeps it, whi
 ## See also {#see-also}
 
 - [Order types](./order-types.md)
-- [`fba_submit`](../api/rest/exchange.md#fba_submit) — the full action reference
+- [`fba_submit`](../api/rest/exchange/rfq-utility.md#fba_submit) — the full action reference
 - [MIP-3](../mip/mip-3.md) — markets opt into FBA at deploy
 - [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) — check `fba_enabled` per market
 

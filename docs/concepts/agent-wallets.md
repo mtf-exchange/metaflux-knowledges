@@ -141,7 +141,7 @@ if you want to check before signing.
 
 ## Approving an agent {#approving-an-agent}
 
-The master submits an [`approve_agent`](../api/rest/exchange.md#approve_agent)
+The master submits an [`approve_agent`](../api/rest/exchange/account.md#approve_agent)
 action via [`POST /exchange`](../api/rest/exchange.md). Sign it with the
 **master** key: the action has no `owner`, so the signer becomes the approving
 account.
@@ -196,7 +196,7 @@ approval set, and admits.
 }
 ```
 
-On [`batch_order`](../api/rest/exchange.md#batch_order) the routing `owner` sits
+On [`batch_order`](../api/rest/exchange/orders.md#batch_order) the routing `owner` sits
 at `params.owner`, the batch level. The per-leg `owner` is ignored.
 
 ## Propagation delay {#propagation-delay}

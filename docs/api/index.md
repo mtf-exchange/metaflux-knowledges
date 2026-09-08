@@ -15,10 +15,24 @@ One MTF-native protocol, served by the gateway front door
 > (`/info`, `/exchange`, `/ws`). Running the node yourself? It serves the same
 > native surface directly at `http://localhost:8080`.
 
+## Start here {#start-here}
+
+| I want to… | Go to |
+|---|---|
+| make my first call in five minutes | [Quickstart](../integration/quickstart.md) |
+| place an order | [`submit_order`](./rest/exchange/orders.md#submit_order), then [placing orders](../integration/placing-orders.md) |
+| sign a request | [Signing](../integration/signing.md) · [typed data](../integration/typed-data-signing.md) |
+| read an account | [`account_state`](./rest/info.md#account_state) |
+| stream the book or my fills | [WS subscriptions](./ws/subscriptions.md) |
+| find one action's fields | [the action catalog](./rest/exchange.md#action-catalog) |
+| know why a request was refused | [Errors](./errors.md) |
+| use a client library | [TypeScript](../integration/typescript-sdk.md) · [Rust](../integration/rust-sdk.md) |
+
 ## REST {#rest}
 
-- [`POST /exchange`](./rest/exchange.md) — MTF-native; full action catalog
-- [`POST /info`](./rest/info.md) — MTF-native; per-type schemas
+- [`POST /exchange`](./rest/exchange.md) — the envelope, signing, and the action
+  catalog. Each action's fields live on its lane's page, linked from the catalog.
+- [`POST /info`](./rest/info.md) — per-type read schemas
 
 ## WebSocket {#websocket}
 
@@ -35,3 +49,4 @@ One MTF-native protocol, served by the gateway front door
 - [Integration quickstart](../integration/quickstart.md) — 5-minute end-to-end
 - [Signing walkthrough](../integration/signing.md) — EIP-712 envelope
 - [Networks](../networks.md) — endpoints per network
+- [Changelog](../changelog/index.md) — what changed and at which block. Only needed for an existing client

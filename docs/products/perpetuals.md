@@ -30,7 +30,7 @@ exposure backed by collateral, not ownership of the asset.
 - **Direction & leverage.** Buy to go long, sell to go short. [Leverage](../concepts/margin-modes.md)
   lets a given amount of collateral control a larger position; it amplifies gains
   and losses equally. Set per-asset leverage and the cross/isolated toggle with
-  [`update_leverage`](../api/rest/exchange.md#update_leverage).
+  [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage).
 - **No expiry.** A perp never settles to a delivery date — the position persists
   until you close it or it is liquidated.
 - **Funding keeps it honest.** Every hour, longs and shorts exchange a
@@ -47,11 +47,11 @@ order surface is the shared CLOB used across MetaFlux.
 
 | Action | Effect |
 |---|---|
-| [`submit_order`](../api/rest/exchange.md#submit_order) | Place one perp order (limit / market / trigger), any [order type](../concepts/order-types.md) |
-| [`cancel_order`](../api/rest/exchange.md#cancel_order) / [`batch_cancel`](../api/rest/exchange.md#batch_cancel) | Cancel by `oid`, one or many per signature |
-| [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) / [`cancel_all_orders`](../api/rest/exchange.md#cancel_all_orders) | Cancel by client id, or cancel all (optional asset filter) |
-| [`update_leverage`](../api/rest/exchange.md#update_leverage) | Change leverage or toggle isolated margin on an asset |
-| [`set_position_mode`](../api/rest/exchange.md#set_position_mode) | Toggle one-way vs. [hedge mode](../concepts/hedge-mode.md) (long + short at once) |
+| [`submit_order`](../api/rest/exchange/orders.md#submit_order) | Place one perp order (limit / market / trigger), any [order type](../concepts/order-types.md) |
+| [`cancel_order`](../api/rest/exchange/orders.md#cancel_order) / [`batch_cancel`](../api/rest/exchange/orders.md#batch_cancel) | Cancel by `oid`, one or many per signature |
+| [`cancel_by_cloid`](../api/rest/exchange/orders.md#cancel_by_cloid) / [`cancel_all_orders`](../api/rest/exchange/orders.md#cancel_all_orders) | Cancel by client id, or cancel all (optional asset filter) |
+| [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) | Change leverage or toggle isolated margin on an asset |
+| [`set_position_mode`](../api/rest/exchange/account.md#set_position_mode) | Toggle one-way vs. [hedge mode](../concepts/hedge-mode.md) (long + short at once) |
 
 `submit_order` returns a **synchronous** per-order status once it commits — the
 assigned `oid` with a `resting` / `filled` / `error` entry, or `pending` if no
@@ -116,6 +116,6 @@ price, and cannot be liquidated.
 - [Order types](../concepts/order-types.md) — TIF, STP, triggers, TWAP, scale
 - [Margin modes](../concepts/margin-modes.md) — Cross / Isolated / Strict-Iso
 - [Tiered liquidation](../concepts/tiered-liquidation.md) — the liquidation ladder
-- [`submit_order`](../api/rest/exchange.md#submit_order) — the wire action and field tables
+- [`submit_order`](../api/rest/exchange/orders.md#submit_order) — the wire action and field tables
 - [MIP-3](../mip/mip-3.md) — permissionless perp market deploy
 - [Spot](./spot.md) — the non-leveraged, ownership-based market

@@ -263,7 +263,7 @@ term is the whole unified USDC pool, and under multi-collateral it also folds
 haircut-valued spot balances, so it is the PM twin of `account_value`. A client
 that sums the lanes to rebuild the account would count the same USDC twice. The
 fourth figure, `cross_maintenance_margin_used`, is on `detail: "margin"` only.
-See the [lane split](../api/migration.md#account-state-lane-split).
+See the [lane split](../changelog/migrations.md#account-state-lane-split).
 
 ## Edge cases {#edge-cases}
 

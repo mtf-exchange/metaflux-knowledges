@@ -33,9 +33,9 @@ option order book.
   The premium is the price two accounts agree on in an RFQ.
 
 Read the live series from [`option_series`](../api/rest/info.md#option_series).
-Trade them with [`rfq_request`](../api/rest/exchange.md#rfq_request),
-[`rfq_quote`](../api/rest/exchange.md#rfq_quote) and
-[`rfq_accept`](../api/rest/exchange.md#rfq_accept).
+Trade them with [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request),
+[`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote) and
+[`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept).
 
 ## The two kinds {#the-two-kinds}
 
@@ -352,6 +352,6 @@ the change, so no live position crosses the boundary.
 - [RFQ](../concepts/rfq.md) — the only way to trade an option
 - [`option_series`](../api/rest/info.md#option_series) — the live series registry
 - [`option_state`](../api/rest/info.md#option_state) — what one account holds in a series
-- [`/exchange` RFQ actions](../api/rest/exchange.md#rfq-fba--utility-actions) — the field tables and the typed-data primary types
+- [`/exchange` RFQ actions](../api/rest/exchange/rfq-utility.md) — the field tables and the typed-data primary types
 - [Oracle prices](../concepts/oracle-prices.md) — the price source settlement reads
 - [MIP-4](../mip/mip-4.md) — the proposal this product came from

@@ -37,7 +37,7 @@ between products — see [what standard is not](#standard-is-not-two-wallets).
 ## `unified` {#unified}
 
 The default. Every account starts here, and an account that has never sent
-[`user_set_abstraction`](../api/rest/exchange.md#user_set_abstraction) is in it.
+[`user_set_abstraction`](../api/rest/exchange/account.md#user_set_abstraction) is in it.
 
 One USDC balance backs every product. A perp loss, a spot-margin loss and an
 option premium all draw on it, and any of them can consume what another was
@@ -85,7 +85,7 @@ and its own liquidation, and it needs no mode at all.
 ## `portfolio` {#portfolio}
 
 Portfolio margin, for accounts that qualify. Enrol with
-[`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin). Two
+[`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin). Two
 things change:
 
 **Eligible spot tokens become collateral.** A token whose governance

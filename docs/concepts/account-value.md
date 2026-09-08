@@ -30,7 +30,7 @@ skipping that walk — so it is on the full read only, as `perp.total_ntl_pos`.
 **The held initial margin has two names, one per depth.** `detail: "margin"`
 serves it as `total_margin_used` at the top level. The full read serves it as
 `perp.init_margin`. Same number; read the name your depth serves. See the
-[lane split](../api/migration.md#account-state-lane-split).
+[lane split](../changelog/migrations.md#account-state-lane-split).
 :::
 
 ## The scalars {#the-scalars}

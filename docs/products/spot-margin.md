@@ -48,14 +48,14 @@ only what the buy actually spent.
 
 ### Action surface {#action-surface}
 
-Two [`/exchange`](../api/rest/exchange.md#spot-margin--earn-actions) actions (both
+Two [`/exchange`](../api/rest/exchange/spot-margin.md) actions (both
 sender-authorized) drive the loop. Confirm committed state via
 [`/info` `spot_margin_state`](../api/rest/info/spot.md#spot_margin_state).
 
 | Action | Effect |
 |---|---|
-| [`spot_margin_open`](../api/rest/exchange.md#spot_margin_open) | Borrow + IOC-buy base on leverage; gated by the account-wide initial-margin requirement |
-| [`spot_margin_close`](../api/rest/exchange.md#spot_margin_close) | IOC-sell the held base, repay principal + interest, return the remainder to your account |
+| [`spot_margin_open`](../api/rest/exchange/spot-margin.md#spot_margin_open) | Borrow + IOC-buy base on leverage; gated by the account-wide initial-margin requirement |
+| [`spot_margin_close`](../api/rest/exchange/spot-margin.md#spot_margin_close) | IOC-sell the held base, repay principal + interest, return the remainder to your account |
 
 
 ### Margin {#margin}

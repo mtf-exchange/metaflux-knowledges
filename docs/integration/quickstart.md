@@ -129,7 +129,7 @@ where `order.json` is the signed MTF-native envelope you assembled.
 
 [Spot](../products/spot.md) is a token-for-token CLOB, separate from
 perps — no leverage, no positions. Place a spot order with the native
-[`spot_order`](../api/rest/exchange.md#spot_order) action: it takes a **spot pair
+[`spot_order`](../api/rest/exchange/spot.md#spot_order) action: it takes a **spot pair
 id** (not a perp `market`), a `side`, a `limit_px`, a `size`, and a `tif`. A
 resting `gtc`/`alo` order locks reserved-balance escrow; `ioc` never rests.
 
@@ -151,7 +151,7 @@ resting `gtc`/`alo` order locks reserved-balance escrow; `ioc` never rests.
 The synchronous response carries the assigned `oid` with a `resting` or `filled`
 entry (the same status union as a perp order). Read your spot balances and open
 spot orders back via [`POST /info`](../api/rest/info.md); cancel with
-[`spot_cancel`](../api/rest/exchange.md#spot_cancel), which refunds the escrow.
+[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel), which refunds the escrow.
 
 ## Step 3 — Check the order is on the book {#step-3--check-the-order-is-on-the-book}
 

@@ -170,7 +170,7 @@ either way**. See [USDC](../concepts/usdc.md#moving-usdc).
 ### Core → EVM {#core--evm}
 
 Two actions move value from the Core ledger to MetaFluxEVM. See
-[which one to use](../api/rest/exchange.md#core-evm-which-action).
+[which one to use](../api/rest/exchange/transfers.md#core-evm-which-action).
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -198,7 +198,7 @@ Notes on specific fields:
   things: a `source_dex` other than `0`, `to_perp: true`, a
   `destination_chain_id` that is neither `0` nor the local EVM chain id, `data`
   over 4096 bytes, and an amount that truncates to a zero EVM credit. See
-  [the action](../api/rest/exchange.md#send_to_evm_with_data) for each rule.
+  [the action](../api/rest/exchange/transfers.md#send_to_evm_with_data) for each rule.
 
 ### Account, staking & vault {#account-staking--vault}
 
@@ -226,7 +226,7 @@ Notes on specific fields:
 - `claim_rewards`: `validator` = the zero address means **claim across all
   delegations**.
 - `create_vault`: `kind` is `0` = User, `1` = Metaliquidity.
-- [`noop`](../api/rest/exchange.md#noop): the chain tag and the envelope nonce are
+- [`noop`](../api/rest/exchange/rfq-utility.md#noop): the chain tag and the envelope nonce are
   the **only** signed fields, because the action carries no params. It touches no
   state; it burns the nonce. Use it to invalidate an in-flight action signed with
   the same nonce.
@@ -304,7 +304,7 @@ flatten to the same digest and the node refuses the ambiguity.
 `expiresAtMs` is **always** in the digest, even though `expires_at_ms` is
 optional on the wire. **Omitting it signs as `0`** — encode `expiresAtMs = 0`.
 Sign a non-zero value and the approval carries that expiry. See
-[`register_metaliquidity_operator`](../api/rest/exchange.md#register_metaliquidity_operator).
+[`register_metaliquidity_operator`](../api/rest/exchange/vaults.md#register_metaliquidity_operator).
 
 ### Spot margin {#spot-margin}
 
@@ -326,7 +326,7 @@ integers.
 
 There is **no typed struct for `createEarnPool`**. It is a validator governance
 vote, not a user action, and it is
-[not on `/exchange`](../api/rest/exchange.md#non-bridged-actions).
+[not on `/exchange`](../api/rest/exchange/transfers.md#non-bridged-actions).
 
 ### BOLE pool {#bole-pool}
 
@@ -341,11 +341,11 @@ decimal string.
 
 `"Borrow"` is refused unless the sender is an approved liquidator. The other three
 kinds are open to any account. See
-[`borrow_lend`](../api/rest/exchange.md#non-bridged-actions).
+[`borrow_lend`](../api/rest/exchange/transfers.md#non-bridged-actions).
 
 ### Spot deployment (MIP-1) {#spot-deployment}
 
-The six [spot deployer](../api/rest/exchange.md#spot-deployment-actions) actions.
+The six [spot deployer](../api/rest/exchange/deploy-spot.md) actions.
 Each is sender-authorized, so **no struct carries an `owner`** — the recovered
 signer is the deployer.
 
@@ -372,7 +372,7 @@ digest moves: a signature built over the old struct, without `name`, is invalid
 after the upgrade, and a signature over the new struct is invalid before it.
 :::
 
-The [perp deployer](../api/rest/exchange.md#perp-deployment-actions) actions. Each
+The [perp deployer](../api/rest/exchange/deploy-perp.md) actions. Each
 is sender-authorized: the recovered signer is the deployer, and per-market
 authority is checked against the market's deployer and the permission bits its
 delegates hold.
@@ -395,7 +395,7 @@ delegates hold.
 - **`PerpSetSubDeployerPerms` is new.** It grants a delegate an exact permission
   mask instead of every power. `permissions` is in the digest, so one signature
   binds one (market, delegate, mask) triple. The bit table is on
-  [`perp_set_sub_deployers`](../api/rest/exchange.md#perp_set_sub_deployers).
+  [`perp_set_sub_deployers`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
 - **`PerpSetOracle` is retired.** The type string is NOT deleted and every
   committed payload still decodes, but the node refuses the action after the
   release. Stop signing it. The mask it wrote has no reader.
@@ -410,7 +410,7 @@ the dex, and `symbol` must start with `name` plus `:`. Both strings are hashed,
 so one signature binds one (dex, symbol) pair and cannot be re-aimed at another
 dex. `name` is required on your first registration and write-once after it — the
 rejection rules are on
-[`perp_register_asset`](../api/rest/exchange.md#perp_register_asset).
+[`perp_register_asset`](../api/rest/exchange/deploy-perp.md#perp_register_asset).
 
 **Fee units differ inside one struct.** `takerFeeDbps` and `makerFeeDbps` are
 DECI-bps; `deployerFeeBps` is bps. A value moved between the two fields is off by
@@ -455,7 +455,7 @@ Notes on specific fields:
 
 ### Scale ladder {#scale-ladder}
 
-The [scale ladder](../api/rest/exchange.md#scale_order) actions bind the **compact
+The [scale ladder](../api/rest/exchange/orders.md#scale_order) actions bind the **compact
 request** — you sign the range and the distribution, not the expanded rungs. Each
 has an owner-less primary type and a `_WITH_OWNER` twin; the twin is used **only**
 when the wire carries an `owner` (an agent / operator acting for another account),
@@ -485,7 +485,7 @@ Notes on specific fields:
 
 ### Chase {#chase}
 
-A [chase order](../api/rest/exchange.md#chase_order) binds one self-repricing
+A [chase order](../api/rest/exchange/orders.md#chase_order) binds one self-repricing
 leg: you sign the intent, the node re-prices the resting leg to track the touch.
 Like the scale ladder it has an owner-less primary type and a `_WITH_OWNER` twin
 (`owner` right after `metafluxChain`).
@@ -750,7 +750,7 @@ release lands.
 :::
 
 A trigger leg may carry a **trailing callback**,
-[`trigger.trail_px`](../api/rest/exchange.md#trailing-stops). That field moves
+[`trigger.trail_px`](../api/rest/exchange/orders.md#trailing-stops). That field moves
 WHERE a position closes, so it is a control field and it is **signed**. It is
 folded into the order type strings the same presence-selected way
 [`expiresAfter`](#action-expiry-expiresafter) is folded into every action: **no

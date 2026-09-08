@@ -43,13 +43,13 @@ sequenceDiagram
 ## Action flow {#action-flow}
 
 The three actions are fully specified in the
-[`/exchange` action catalog](../api/rest/exchange.md#rfq-fba--utility-actions) —
+[`/exchange` action catalog](../api/rest/exchange/rfq-utility.md) —
 this section is a conceptual walkthrough. Follow the links for the full field
 tables and the EIP-712 typed-data primary types.
 
 ### Taker — request a quote {#taker--request-an-rfq}
 
-[`rfq_request`](../api/rest/exchange.md#rfq_request):
+[`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request):
 
 ```json
 {
@@ -85,7 +85,7 @@ committed effect: read it back from [`rfq_user`](#querying-open-rfqs).
 
 ### Maker — submit a quote {#maker--submit-a-quote}
 
-[`rfq_quote`](../api/rest/exchange.md#rfq_quote):
+[`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote):
 
 ```json
 {
@@ -115,7 +115,7 @@ separate quote id, and there is no cancel-quote action.
 
 ### Taker — accept {#taker--accept}
 
-[`rfq_accept`](../api/rest/exchange.md#rfq_accept):
+[`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept):
 
 ```json
 {
@@ -309,7 +309,7 @@ An account party to nothing returns a 200 with both lists empty.
 - [Options](../products/options.md) — the product RFQ clears
 - [`option_series`](../api/rest/info.md#option_series) — the series registry, and the `signing_id` to sign
 - [`option_state`](../api/rest/info.md#option_state) — the units and escrow a fill leaves behind
-- [`/exchange` action catalog](../api/rest/exchange.md#rfq-fba--utility-actions) — the full parameter tables and typed-data primary types
+- [`/exchange` action catalog](../api/rest/exchange/rfq-utility.md) — the full parameter tables and typed-data primary types
 
 ## FAQ {#faq}
 

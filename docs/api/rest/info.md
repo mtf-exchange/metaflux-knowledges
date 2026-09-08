@@ -482,7 +482,7 @@ three share are `address` and the `height` / `time` stamp. See
 | `health` | Decimal string | `account_value − cross_maintenance_margin_used` (signed dollar figure; can be negative) — **not a ratio** |
 | `health_deferred` | `true` \| absent | Present, and only ever `true`, when the risk engine cannot price a leg. **The risk numbers are then not a solvency statement** — see [account value](../../concepts/account-value.md). Absent is the normal case; treat absent as `false` |
 | `tier` | enum **string** | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../concepts/tiered-liquidation.md). It is a STRING, never a number |
-| `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (per-product reservations — see [`user_set_abstraction`](../rest/exchange.md#user_set_abstraction)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
+| `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (per-product reservations — see [`user_set_abstraction`](../rest/exchange/account.md#user_set_abstraction)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
 | `reservations` | object \| **absent** | The per-product reservation ledger. Present **only when `abstraction` is `"standard"`** — see [`reservations`](#account-state-reservations) below. **Served from the release after 0.9.6**; a 0.9.6 node omits it in every mode |
 | `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled. **Account-scoped, so it is NOT under `perp`** — see the warning above |
 | `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) — see [hedge mode](../../concepts/hedge-mode.md) |
@@ -508,7 +508,7 @@ The three `pm_*` figures are always present and are **meaningful only when
 |-------|------|-------------|
 | `spot.balances` | array | The **whole** spot token ledger, one row per token held. Never empty: row 0 is USDC unconditionally |
 | `spot.balances[*].name` | string | Token symbol (`"USDC"` for row 0). Rows are keyed and joined by `name` |
-| `spot.balances[*].signing_id` | uint32 | The number you place in the `asset` field of a signed [`send_asset`](../rest/exchange.md#send_asset), and in `asset` of an `earn_deposit`. `100` for USDC. It has no other meaning on the read plane. **Not `spot_send`** — no such action exists; that name is a [ledger record kind](../ws/subscriptions.md#ledger_updates) |
+| `spot.balances[*].signing_id` | uint32 | The number you place in the `asset` field of a signed [`send_asset`](../rest/exchange/transfers.md#send_asset), and in `asset` of an `earn_deposit`. `100` for USDC. It has no other meaning on the read plane. **Not `spot_send`** — no such action exists; that name is a [ledger record kind](../ws/subscriptions.md#ledger_updates) |
 | `spot.balances[*].total` | Decimal string | The **whole** holding of that token, escrow included. **Not** the spendable amount — perp margin sits inside it too. Use `withdrawable` |
 | `spot.balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). **A part OF `total`, not a second bucket beside it** — never add the two. Spot escrow only; it never holds perp margin |
 | `spot.balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset). See [cost basis](#avg-entry-px) |
@@ -578,7 +578,7 @@ is older", not as "this account reserved nothing".
 :::
 
 Present **only when `abstraction` is `"standard"`**. The other two modes have no
-ledger: [`user_set_abstraction`](../rest/exchange.md#user_set_abstraction) clears
+ledger: [`user_set_abstraction`](../rest/exchange/account.md#user_set_abstraction) clears
 the reservations when an account returns to `"unified"`, and refuses to set one in
 any mode but `"standard"`. Branch on `abstraction`, which is in the same body.
 
@@ -755,11 +755,11 @@ An **unknown address** answers **200** with every sub-object honest-empty, NOT a
 | `role` | `"missing" \| "user" \| "agent" \| "vault" \| "sub_account"` | Derived role. Precedence: `vault` (the address is a vault) → `sub_account` → `agent` (an approved agent of some master) → `user` (has account, config or spot state) → `missing` |
 | `vault.equities[*].vault_id` | uint64 | Vault id |
 | `vault.equities[*].vault_address` | hex address | Vault address |
-| `vault.equities[*].shares` | Decimal string | The account's share count in **WHOLE shares**, not the raw 10¹⁸ integer. Send this exact string back to [`vault_withdraw`](./exchange.md#vault_withdraw) — read and write use one plane |
+| `vault.equities[*].shares` | Decimal string | The account's share count in **WHOLE shares**, not the raw 10¹⁸ integer. Send this exact string back to [`vault_withdraw`](./exchange/vaults.md#vault_withdraw) — read and write use one plane |
 | `vault.equities[*].equity` | Decimal string | `shares × share_price`, truncated — whole-USDC. Share price is mark-to-market NAV per share, so this is what a redemption pays now, not a high-water-mark figure |
 | `vault.vaults[*]` | object | One [`vault_state`](#vault_state) body per vault the account **follows or leads**, field-identical to that read. A leader with no deposit still gets a row |
 | `staking.state` | object | A [`staking_state`](#staking_state) body for this account, minus the repeated `address` |
-| `staking.summary.undelegated` | Decimal string | The free staking pool: MTF moved in with [`c_deposit`](./exchange.md#c_deposit) and **not yet delegated** (whole-MTF) |
+| `staking.summary.undelegated` | Decimal string | The free staking pool: MTF moved in with [`c_deposit`](./exchange/staking.md#c_deposit) and **not yet delegated** (whole-MTF) |
 | `staking.summary.total_delegated` | Decimal string | Sum of active delegations (whole-MTF) |
 | `staking.summary.pending_withdrawal` | Decimal string | Sum of pending undelegations (whole-MTF) |
 | `staking.summary.claimable_rewards` | Decimal string | Accumulated delegator rewards (whole-MTF) |
@@ -1065,7 +1065,7 @@ Returns a snapshot of one vault: TVL, share price, and strategy.
 **Rules**
 
 - `strategy` is the vault's kind, `"User"` or `"Metaliquidity"`. It is not a free-text strategy label.
-- `tvl` and `share_price` are mark-to-market NAV: settled cash, plus unrealised PnL on every open position at the latest oracle mark, plus unrealised funding. The Metaliquidity backstop vault also subtracts its pending-loss reserve. This is the same NAV that [`vault_withdraw`](exchange.md#vault_withdraw) burns shares against, so the read and the payout agree.
+- `tvl` and `share_price` are mark-to-market NAV: settled cash, plus unrealised PnL on every open position at the latest oracle mark, plus unrealised funding. The Metaliquidity backstop vault also subtracts its pending-loss reserve. This is the same NAV that [`vault_withdraw`](exchange/vaults.md#vault_withdraw) burns shares against, so the read and the payout agree.
 - `high_water_mark` is not NAV. It is a ratchet for performance-fee accounting: profit raises it, a deposit raises it, a withdrawal lowers it, and a trading loss never changes it. In drawdown, `high_water_mark` sits above `share_price` — the gap is the profit the vault must re-earn before it charges a performance fee again. Never price a redemption off `high_water_mark`.
 
 ### Per-account staking and delegation state {#staking_state}
@@ -1132,9 +1132,9 @@ Returns one account's staking, delegation, and unbonding state.
 
 - **This read serves no APR, on purpose.** The emission era is over: rewards are funded from fees, not minted on a curve, so there is no annual rate to publish. Do not derive one. `pending_validator_pool_usdc` is a snapshot of accrued fees, not a rate — it depends on trading volume that has not happened yet.
 - **A pool that does not move is not a stalled read.** `reward_source` is `"fee_funded_on_book_buy"`, and the second half of that name is a real step: the distribution spends the pooled USDC on the MTF/USDC book, then pays the MTF it ACQUIRED out by stake weight. It never credits USDC into an MTF-denominated reward, so a buy that fills nothing pays nothing. **With no resting asks on MTF/USDC the buy acquires nothing, the distribution is skipped, and the pool carries forward unchanged.** The pool is not spent and not stranded; it waits. A pool above the floor therefore does NOT mean a payout is due — check `height` on another read to tell a waiting pool from a frozen connection.
-- **This read does NOT serve the undelegated free pool.** [`c_deposit`](./exchange.md#c_deposit) credits a free pool and [`c_withdraw`](./exchange.md#c_withdraw) debits it, and stake can sit in that pool undelegated for as long as the holder likes. No field on this read reports it. `total_staked` therefore **under-reports** what an account holds: it counts delegated stake only, so an account with a funded free pool and no delegation reads `"0"`. Do not present `total_staked` as the account's whole staked balance.
+- **This read does NOT serve the undelegated free pool.** [`c_deposit`](./exchange/staking.md#c_deposit) credits a free pool and [`c_withdraw`](./exchange/staking.md#c_withdraw) debits it, and stake can sit in that pool undelegated for as long as the holder likes. No field on this read reports it. `total_staked` therefore **under-reports** what an account holds: it counts delegated stake only, so an account with a funded free pool and no delegation reads `"0"`. Do not present `total_staked` as the account's whole staked balance.
 - The free pool is not the same as `pending_unstakes`. Undelegated stake is already free. `pending_unstakes` is stake still inside its unbonding window, not withdrawable until `matures_at_ts`.
-- `total_staked` and `pending_unstakes` are disjoint. `token_delegate` moves stake out of the free pool into `total_staked`; undelegating moves it out of `total_staked` into `pending_unstakes` for the unbonding window. Only the free pool is the figure [`c_withdraw`](./exchange.md#c_withdraw) returns to spot with no unbonding window.
+- `total_staked` and `pending_unstakes` are disjoint. `token_delegate` moves stake out of the free pool into `total_staked`; undelegating moves it out of `total_staked` into `pending_unstakes` for the unbonding window. Only the free pool is the figure [`c_withdraw`](./exchange/staking.md#c_withdraw) returns to spot with no unbonding window.
 - `total_stake` and `total_staked` are different figures with near-identical names. `total_stake` is chain-wide; `total_staked` is this account. Do not swap them.
 
 ### Volume-tiered maker and taker fees {#fee_schedule}
@@ -1351,14 +1351,14 @@ One account's claimable referral credit, and the referrer it is bound to.
 **Rules**
 
 - **Read the credit here before you claim it. The claim action reports no
-  amount.** [`claim_referral_rewards`](./exchange.md#claim_referral_rewards)
+  amount.** [`claim_referral_rewards`](./exchange/account.md#claim_referral_rewards)
   drains the whole balance and answers with no figure, so this read is the only
   way to show a claimable balance or to decide whether a claim is worth sending.
 - **`claimable_rewards` of `"0"` is normal, not an error state.** Claiming with
   nothing accrued claims `0` and succeeds. Do not block the button on it.
 - **`referrer: null` means the account never bound one.** It does not mean the
   node is old and it does not mean the referrer is unknown. A referrer is bound
-  once with [`set_referrer`](./exchange.md#set_referrer) and is immutable after
+  once with [`set_referrer`](./exchange/account.md#set_referrer) and is immutable after
   that, so `null` is a durable answer until the account sends that action.
 - **This read cannot list the accounts YOU referred.** The referral graph is
   address-based and one-directional: the chain stores each referee's referrer,
@@ -1512,7 +1512,7 @@ optional needs no change when they first appear on a leg; a decoder that
 makes them required fails on every ordinary trigger.
 
 **`group` — the scaled TP/SL ladder.** A
-[`positionTpsl`](./exchange.md#position-tpsl-ladder) batch of three or more
+[`positionTpsl`](./exchange/orders.md#position-tpsl-ladder) batch of three or more
 protective legs parks a ladder: the legs share one `group`, and they are not
 OCO — a fill of one leg does not cancel the others, which is the point of
 scaling out in steps. One or two legs stay the older shapes: a lone trigger,
@@ -1526,7 +1526,7 @@ is present, `trigger_px` is the ratcheted level, not the level the owner
 sent — do not render it as a static order the user placed. A trailing leg is
 always a stop-loss; the chain refuses a trailing take-profit, which would
 chase its level away from a winning position. `trail_px` is submittable —
-see [trailing stops](./exchange.md#trailing-stops), and sending it
+see [trailing stops](./exchange/orders.md#trailing-stops), and sending it
 changes the order's signing digest.
 ### Recent fill history for an account {#user_fills}
 
@@ -1545,7 +1545,7 @@ carried it, for either party. All four are fixed:
 
 | The order was placed by | Fixed in |
 |---|---|
-| [`modify`](./exchange.md#modify) / [`batch_modify`](./exchange.md#batch_modify), when the replacement crosses on placement | node 0.9.5 |
+| [`modify`](./exchange/orders.md#modify) / [`batch_modify`](./exchange/orders.md#batch_modify), when the replacement crosses on placement | node 0.9.5 |
 | a [`multi_sig`](../../concepts/multi-sig.md) envelope holding an order action | node 0.9.5 |
 | [CoreWriter `LimitOrder`](../../evm/interacting-with-core.md) from MetaFluxEVM, when it crosses on placement | the next release |
 | a [frequent batch auction](../../concepts/fba.md) clearing | the next release |
@@ -1684,7 +1684,7 @@ field gets the per-leg rows unchanged, with no `n` key.
 `side`, `hash`, `fee_token`, `cause`, `liquidated_user`, `mark_px`, `broker`
 and `twap_id`. **`time` alone is NOT the key**, and this is the rule callers
 get wrong: `time` is the block's consensus timestamp, one value for the whole
-block. A [`batch_order`](./exchange.md#batch_order) places several orders under
+block. A [`batch_order`](./exchange/orders.md#batch_order) places several orders under
 one timestamp, and an account whose resting order is hit in the same block it
 takes in has two orders at one timestamp. Keying on time alone merges orders
 that have nothing to do with each other, and merges opposite sides.
@@ -2529,7 +2529,7 @@ The history archive serves it — see [the archive lane](#archive-lane). Read
   whatever the order carried. Join to that order's own `resting` record on the
   same `oid` for the real values.
   **A `resting` record exists only for an order that a signed
-  [`order`](./exchange.md#submit_order), `batch_order`, `scale_order`,
+  [`order`](./exchange/orders.md#submit_order), `batch_order`, `scale_order`,
   `spot_order` or `chase_order` placed**, so for two groups of order the join
   has no target.
   The first group is the two the node rests by itself:
@@ -2573,8 +2573,8 @@ The history archive serves it — see [the archive lane](#archive-lane). Read
   and reports only its own outcome, so an inner `order`, `spot_order`,
   `batch_order`, `scale_order`, `modify` or `batch_modify` produces no
   `resting`, no `filled` and no `error` record.
-  A [`modify`](./exchange.md#modify) or
-  [`batch_modify`](./exchange.md#batch_modify) sent on its own records no
+  A [`modify`](./exchange/orders.md#modify) or
+  [`batch_modify`](./exchange/orders.md#batch_modify) sent on its own records no
   transition either — not the fill, and not the replacement's rest. **The
   replacement's new `oid` appears only on [`open_orders`](#open_orders)**, so
   poll that read after an amend if you track order ids.
@@ -2697,7 +2697,7 @@ No parameters beyond `address`, which is required (hex address).
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `claimable_rewards` | Decimal string | What a claim-all ([`claim_rewards`](./exchange.md#claim_rewards) without `validator`) pays the delegator now: the sum of every row's `unclaimed`, plus the account's legacy reward roll-up bucket, which drains on claim. Delegator side only — the separate validator-commission credit a claim also pays out is not delegator-claimable, and is excluded |
+| `claimable_rewards` | Decimal string | What a claim-all ([`claim_rewards`](./exchange/staking.md#claim_rewards) without `validator`) pays the delegator now: the sum of every row's `unclaimed`, plus the account's legacy reward roll-up bucket, which drains on claim. Delegator side only — the separate validator-commission credit a claim also pays out is not delegator-claimable, and is excluded |
 | `rewards[*].validator` | hex address | Validator the delegation accrues under |
 | `rewards[*].unclaimed` | Decimal string | Live unclaimed reward accrued on this delegation, whole MTF |
 | `rewards[*].last_claim_time` | uint64 | Last claim timestamp on this delegation, consensus ms. `0` if never claimed |
@@ -2713,7 +2713,7 @@ No parameters beyond `address`, which is required (hex address).
 Recent blocks and recent order-lifecycle events, served by the gateway from the
 standalone history archive. **They are the replacement for the removed
 `explorer_block` / `explorer_txs` WS channels** — see the
-[upgrade notice](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed)
+[upgrade notice](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed)
 for why a validator no longer pushes that firehose.
 
 Both answer in the [history-archive envelope](#archive-lane): `type` sits beside
@@ -2969,7 +2969,7 @@ is the live set, not history. For slice-fill history, use
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `twaps[*].twap_id` | uint64 | Parent TWAP id (pass to [`twap_cancel`](./exchange.md#twap_cancel)) |
+| `twaps[*].twap_id` | uint64 | Parent TWAP id (pass to [`twap_cancel`](./exchange/orders.md#twap_cancel)) |
 | `twaps[*].coin` | string | Market symbol |
 | `twaps[*].side` | `"B"` / `"A"` | Side token — the same `"B"`/`"A"` form as [`user_fills`](#user_fills) |
 | `twaps[*].sz` | Decimal string | Parent total size (whole units) |
@@ -3246,7 +3246,7 @@ state and is not folded into the AppHash.
 Each name here answers `UNKNOWN_TYPE`. The read surface is cut so that **each
 question has exactly one read**: two reads for one question force a choice, and
 a wrong choice is silent. For the release a removal landed in, see
-[migration](../migration.md).
+[migration](../../changelog/migrations.md).
 
 The status splits the two kinds of removal:
 
@@ -3268,7 +3268,7 @@ Read the value as prose for a human, not as a type you can post back.
 | `account_overview`, `web_data` | [`account_state`](#account_state) with `detail: "overview"` — the same body |
 | `action_outcome` | [`POST /exchange`](./exchange.md) — the submit call already waits for the commit and returns the verdict. See [the section above](#action_outcome) |
 | `agents` | [`account_state`](#account_state) with `detail: "overview"` — `agents` |
-| `block_info` | [`account_state`](#account_state) for the committed `height` / `time` stamp; the archive-backed `recent_blocks` read for the block head. (The `explorer_block` WS channel that used to answer this is [removed](../upgrade-notice-ids-and-shapes.md#explorer-channels-removed) — a validator must not serve a per-block firehose) |
+| `block_info` | [`account_state`](#account_state) for the committed `height` / `time` stamp; the archive-backed `recent_blocks` read for the block head. (The `explorer_block` WS channel that used to answer this is [removed](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed) — a validator must not serve a per-block firehose) |
 | `bridge_chain_configs` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) — `withdrawals_halted` and `configs` |
 | `bridge_finalized_cosignatures`, `bridge_outbound_queue` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) for one account's own withdrawals. The whole-chain queue and the raw validator cosignature bytes are not part of this API |
 | `delegator_history` | Nothing. No delegation event log is committed |

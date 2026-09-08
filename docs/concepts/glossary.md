@@ -36,7 +36,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **chainId.** EIP-712 domain field selecting the network. `31337` a node you run yourself, `114514` testnet, `8964` mainnet. See [networks](../networks.md).
 
-**Cloid — Client Order ID.** 16-byte identifier set by the client; enables `cancel_by_cloid` and order idempotency. See [exchange.md `submit_order`](../api/rest/exchange.md#submit_order).
+**Cloid — Client Order ID.** 16-byte identifier set by the client; enables `cancel_by_cloid` and order idempotency. See [exchange.md `submit_order`](../api/rest/exchange/orders.md#submit_order).
 
 **Clearing price (FBA).** The single uniform price at which an FBA batch settles. See [FBA](./fba.md).
 

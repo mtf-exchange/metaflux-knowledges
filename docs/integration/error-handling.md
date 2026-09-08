@@ -214,7 +214,7 @@ echoed on any per-account WS event. For a committed order, correlate by
 `cloid` on [`order_updates`](../api/ws/subscriptions.md#order_updates) /
 [`open_orders`](../api/ws/subscriptions.md#open_orders) instead. **No global, hash-keyed feed answers this any more.** The `explorer_txs` WS
 channel that carried the hash is
-[removed](../api/upgrade-notice-ids-and-shapes.md#explorer-channels-removed), and
+[removed](../changelog/ids-and-wire-shapes.md#explorer-channels-removed), and
 its replacement [`recent_transactions`](../api/rest/info.md#recent_transactions)
 does not carry a hash. Correlate by `cloid`, or read
 [`action_outcome`](../api/rest/info.md#action_outcome) for the commit-time

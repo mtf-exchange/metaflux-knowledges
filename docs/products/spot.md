@@ -34,8 +34,8 @@ you own. A resting spot order locks the funds it would owe on fill into a
 or refunded to you on cancel.
 
 A spot order is just another [`/exchange`](../api/rest/exchange.md) action —
-[`spot_order`](../api/rest/exchange.md#spot_order) to place,
-[`spot_cancel`](../api/rest/exchange.md#spot_cancel) to cancel. Both are
+[`spot_order`](../api/rest/exchange/spot.md#spot_order) to place,
+[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) to cancel. Both are
 **sender-authorized by default** (omit `owner` and the recovered signer is the
 trader); both also take an **optional** `owner` so an approved
 [agent wallet](../concepts/agent-wallets.md) can trade for the account it is
@@ -156,7 +156,7 @@ may use any `tif`.
 
 ## Lifecycle — cancel refunds escrow {#lifecycle--cancel-refunds-escrow}
 
-[`spot_cancel`](../api/rest/exchange.md#spot_cancel) retires one of **your**
+[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) retires one of **your**
 resting orders by `oid` on a pair and refunds the escrow it locked back to your
 spendable balance.
 
@@ -187,7 +187,7 @@ Spot balances and open spot orders are queryable via
 per-order status once it commits — the real assigned `oid` with a `resting` or
 `filled` entry (or `error`), or `pending` if no commit lands within the
 order-wait window — the same status union as the perp
-[`submit_order`](../api/rest/exchange.md#submit_order).
+[`submit_order`](../api/rest/exchange/orders.md#submit_order).
 
 ## Relationship to spot-margin and Earn {#relationship-to-spot-margin-and-earn}
 
@@ -203,7 +203,7 @@ Both are **opt-in overlays**; plain spot is unaffected by them.
 
 ## See also {#see-also}
 
-- [`spot_order`](../api/rest/exchange.md#spot_order) / [`spot_cancel`](../api/rest/exchange.md#spot_cancel) — the wire actions and field tables
+- [`spot_order`](../api/rest/exchange/spot.md#spot_order) / [`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) — the wire actions and field tables
 - [Order types](../concepts/order-types.md) — TIF and STP semantics shared with perps
 - [Fees](../concepts/fees.md#spot-fees) — the spot fee schedule and quote-side charging
 - [Spot margin](./spot-margin.md) — the planned leveraged spot track

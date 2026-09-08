@@ -24,7 +24,7 @@ A vault created with `kind: "Metaliquidity"` (gated to an MLP-whitelisted leader
 There are two distinct ways cash moves into a vault, and they are **not**
 interchangeable:
 
-- **[`vault_transfer`](../api/rest/exchange.md#vault_transfer)** — the
+- **[`vault_transfer`](../api/rest/exchange/vaults.md#vault_transfer)** — the
   vault's own **leader** moves cash between their main account and the
   vault, either direction, via a `deposit: true`/`false` flag. This is
   **leader-only**: the handler rejects any other sender with `401`.
@@ -55,7 +55,7 @@ deposit).
 ```
 
 `vault_id` is the numeric id returned by [`create_vault`](#deploy) — not the
-vault's `0x` address. `amount` is whole USD. See [`vault_transfer`](../api/rest/exchange.md#vault_transfer) for the full field table.
+vault's `0x` address. `amount` is whole USD. See [`vault_transfer`](../api/rest/exchange/vaults.md#vault_transfer) for the full field table.
 
 ### Withdrawing {#withdrawing}
 
@@ -71,7 +71,7 @@ the vault — this is the follower's own exit path and is fully live:
 
 Burns `shares` shares at the current `share_price`; pays out the USD
 proceeds at the next block. `shares` is a whole-share decimal, not a raw
-1e8-scaled integer. See [`vault_withdraw`](../api/rest/exchange.md#vault_withdraw) for the full field table.
+1e8-scaled integer. See [`vault_withdraw`](../api/rest/exchange/vaults.md#vault_withdraw) for the full field table.
 
 ### Lock-up {#lock-up}
 
@@ -137,7 +137,7 @@ The vault address is an account in the state machine — it has its own position
 | `parent` | must be `null` | User vaults have no parent |
 | `kind` | `"User"` (default) / `"Metaliquidity"` | `Metaliquidity` requires the leader to be MLP-whitelisted |
 
-Response carries the assigned `vault_id` and derived `vault_address`. See [`create_vault`](../api/rest/exchange.md#create_vault) for the full request/response shape.
+Response carries the assigned `vault_id` and derived `vault_address`. See [`create_vault`](../api/rest/exchange/vaults.md#create_vault) for the full request/response shape.
 
 ### Pricing {#pricing}
 
@@ -147,7 +147,7 @@ share_price = NAV(vault) / total_shares
 
 `NAV` is marked to market: settled cash, plus unrealised PnL on every open position at the latest oracle mark, plus unrealised funding. The Metaliquidity backstop vault also subtracts its pending-loss reserve. Pricing updates every commit — a deposit or withdrawal executes at the **post-commit** share price, not the price at request time.
 
-The reads carry that same NAV. [`vault_state`](../api/rest/info.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info.md#vault_summaries) `tvl`, and [`account_state`](../api/rest/info.md#account_state-overview) `vault.equities[*].equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange.md#vault_withdraw) pays.
+The reads carry that same NAV. [`vault_state`](../api/rest/info.md#vault_state) `tvl` / `share_price`, [`vault_summaries`](../api/rest/info.md#vault_summaries) `tvl`, and [`account_state`](../api/rest/info.md#account_state-overview) `vault.equities[*].equity` all price off it, so what a depositor reads is what [`vault_withdraw`](../api/rest/exchange/vaults.md#vault_withdraw) pays.
 
 #### `high_water_mark` is not NAV {#high-water-mark}
 
@@ -170,7 +170,7 @@ Never price a redemption off `high_water_mark`. It answers "has the leader beate
 }
 ```
 
-Leader-only. `new_lock_period_secs` is **always rejected** if it is non-null and differs from the vault's current lock (anti-rug: a leader cannot shorten the lock after the fact). See [`vault_modify`](../api/rest/exchange.md#vault_modify) for the full field table.
+Leader-only. `new_lock_period_secs` is **always rejected** if it is non-null and differs from the vault's current lock (anti-rug: a leader cannot shorten the lock after the fact). See [`vault_modify`](../api/rest/exchange/vaults.md#vault_modify) for the full field table.
 
 ### Risk {#risk}
 

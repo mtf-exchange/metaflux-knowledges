@@ -222,7 +222,7 @@ T+29d+1h  old agent expires; bot has fully migrated
 ## See also {#see-also}
 
 - [Agent wallets](../concepts/agent-wallets.md) — concepts
-- [`POST /exchange approve_agent`](../api/rest/exchange.md#approve_agent)
+- [`POST /exchange approve_agent`](../api/rest/exchange/account.md#approve_agent)
 - [Signing walkthrough](./signing.md) — what the SDK does internally
 - [Idempotency](./idempotency.md) — nonce semantics for concurrent agents
 - [Sub-accounts](../concepts/sub-accounts.md) — sub-level agent setup

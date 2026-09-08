@@ -93,7 +93,7 @@ lifecycle actions on a market it deployed.
 A delegate holds **one permission bit per handler**, so a grant names the
 handlers, not the person: you can hand out the price push without handing out the
 fee rates. The nine bits and the two granting lanes are on
-[`perp_set_sub_deployers`](../api/rest/exchange.md#perp_set_sub_deployers).
+[`perp_set_sub_deployers`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
 
 Two rules bound it:
 
@@ -118,7 +118,7 @@ exactly as before.
 
 From the next release the node refuses it. Nothing replaces it, because it never
 did anything: the deployer price control is
-[`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) (action 210), a
+[`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) (action 210), a
 different action that stays. The mask field remains in market state, still with no
 reader, until the next re-genesis.
 
@@ -141,9 +141,9 @@ shared set means those controls cannot reach a trader who never opted in.
 
 A deployed market does not price from the validator oracle median. Its index
 price is pushed by its **deployer**, through the
-[`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) action (210).
+[`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) action (210).
 The deployer, or a delegate holding [permission bit
-0](../api/rest/exchange.md#perp_set_sub_deployers), signs each push.
+0](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers), signs each push.
 
 Because the deployer operates the oracle for its own market, treat any
 builder-deployed market as carrying **deployer price risk**. This is the reason
@@ -176,7 +176,7 @@ reason is what tells you how to size your own push cadence.
 1. **Register and activate the market first.** A push at an asset that is not a
    MIP-3 market is refused. Registration also fixes who may push: the
    `deployer`, plus any delegate granted [permission bit
-   0](../api/rest/exchange.md#perp_set_sub_deployers).
+   0](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
 
 2. **Choose the first price with care.** A push must sit within **±10 %** of the
    committed anchor — the last committed oracle price, or the market's committed
@@ -230,7 +230,7 @@ window.
 **Price units.** `px` is a **whole-USDC decimal string**, never the `1e8` book
 plane, and it is signed **verbatim** — the exact bytes you send are the bytes
 inside the signature digest. See
-[`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) for the frozen
+[`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) for the frozen
 signing type and the full rejection table.
 
 ## Limits {#limits}

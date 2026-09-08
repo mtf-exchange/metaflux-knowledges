@@ -87,8 +87,8 @@ remaining shares and pool totals via
 
 | Action | Effect |
 |---|---|
-| [`earn_deposit`](../api/rest/exchange.md#earn_deposit) | Supply quote → pool shares (1:1 on a fresh pool, else priced off NAV) |
-| [`earn_withdraw`](../api/rest/exchange.md#earn_withdraw) | Redeem shares → quote, **clamped to idle liquidity** |
+| [`earn_deposit`](../api/rest/exchange/spot-margin.md#earn_deposit) | Supply quote → pool shares (1:1 on a fresh pool, else priced off NAV) |
+| [`earn_withdraw`](../api/rest/exchange/spot-margin.md#earn_withdraw) | Redeem shares → quote, **clamped to idle liquidity** |
 
 **Idle bound.** A withdrawal is instant but **bounded by idle liquidity**
 (`total_supplied − total_borrowed`): a redemption larger than idle pays exactly

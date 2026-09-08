@@ -101,7 +101,25 @@ const sidebars = {
           type: 'category',
           label: 'REST',
           items: [
-            'api/rest/exchange',
+            {
+              type: 'category',
+              label: 'exchange',
+              link: {type: 'doc', id: 'api/rest/exchange'},
+              items: [
+                'api/rest/exchange/orders',
+                'api/rest/exchange/spot',
+                'api/rest/exchange/spot-margin',
+                'api/rest/exchange/margin-risk',
+                'api/rest/exchange/rfq-utility',
+                'api/rest/exchange/account',
+                'api/rest/exchange/staking',
+                'api/rest/exchange/vaults',
+                'api/rest/exchange/transfers',
+                'api/rest/exchange/utility',
+                'api/rest/exchange/deploy-spot',
+                'api/rest/exchange/deploy-perp',
+              ],
+            },
             {
               type: 'category',
               label: 'info',
@@ -123,18 +141,8 @@ const sidebars = {
           link: {type: 'doc', id: 'api/ws/index'},
           items: ['api/ws/subscriptions'],
         },
-        {
-          type: 'category',
-          label: 'Reference',
-          items: [
-            'api/errors',
-            'api/rate-limits',
-            'api/migration',
-            'api/upgrade-notice-ids-and-shapes',
-            'api/activation-notice-13350001',
-            'api/activation-notice',
-          ],
-        },
+        'api/errors',
+        'api/rate-limits',
       ],
     },
 
@@ -173,6 +181,18 @@ const sidebars = {
           label: 'SDKs',
           items: ['integration/typescript-sdk', 'integration/rust-sdk'],
         },
+      ],
+    },
+
+    {
+      type: 'category',
+      label: 'Changelog',
+      link: {type: 'doc', id: 'changelog/index'},
+      items: [
+        'changelog/migrations',
+        'changelog/ids-and-wire-shapes',
+        'changelog/block-13350001',
+        'changelog/block-7400000',
       ],
     },
 

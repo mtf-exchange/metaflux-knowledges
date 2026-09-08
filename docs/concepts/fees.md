@@ -254,7 +254,7 @@ split. The credit is paid per fill to that address. Typical uses:
 - an automated risk service that placed protective orders.
 
 The trader must approve the broker first (see
-[`approve_broker_fee`](../api/rest/exchange.md#approve_builder_fee)). An order
+[`approve_broker_fee`](../api/rest/exchange/account.md#approve_builder_fee)). An order
 that names an unapproved broker is **rejected before it rests**. So is an order
 whose rate is above the trader's approved ceiling or above the protocol cap. The
 broker credit is taker-only, with a per-order cap. It does not change the maker
@@ -284,7 +284,7 @@ joins the split at its full amount — the maker side never carries a referrer
 carve, positive or negative.
 
 Referrals are single-level (no multi-level chain — anti-Ponzi). A referrer is set
-once with [`set_referrer`](../api/rest/exchange.md#set_referrer) and is immutable
+once with [`set_referrer`](../api/rest/exchange/account.md#set_referrer) and is immutable
 thereafter; setting yourself as your own referrer is rejected.
 
 A broker credit and a referrer credit can both apply to the same fill — they pay
@@ -293,10 +293,10 @@ out independently.
 **Where to read each balance.** They are two separate accumulators with two
 separate claims. Read the referrer balance with
 [`referral_state`](../api/rest/info.md#referral_state) and claim it with
-[`claim_referral_rewards`](../api/rest/exchange.md#claim_referral_rewards); read
+[`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards); read
 the broker balance with [`builder_state`](../api/rest/info.md#builder_state) and
 claim it with
-[`claim_broker_rewards`](../api/rest/exchange.md#claim_builder_rewards).
+[`claim_broker_rewards`](../api/rest/exchange/account.md#claim_builder_rewards).
 Neither claim action reports an amount, so read the balance first.
 
 ## Where fees go {#where-fees-go}
@@ -541,8 +541,8 @@ carries `changes[*].field: "fee.core_evm_fee_mtf"`.
 
 A transfer from the Core ledger to MetaFluxEVM charges its own fee. Both actions
 that make the move —
-[`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) and
-[`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) — charge
+[`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) and
+[`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) — charge
 it under one rule, so neither lane is cheaper.
 
 **The fee is a quantity of MTF, charged on top of the amount you move.** It is a
@@ -560,7 +560,7 @@ are moving.** MTF is priced from its own book, so the USDC step needs that
 reference price. When that price is not usable the chain refuses the transfer
 instead of charging at a guessed price. Hold enough spot MTF to cover the fee and
 the reference price is never read. The rejection strings are on
-[the fee](../api/rest/exchange.md#core-evm-fee).
+[the fee](../api/rest/exchange/transfers.md#core-evm-fee).
 :::
 
 ### The governance parameter {#core-evm-fee-parameter}

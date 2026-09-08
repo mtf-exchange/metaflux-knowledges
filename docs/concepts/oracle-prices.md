@@ -49,10 +49,10 @@ A market also carries a **source-subset mask** — one bit per slot, committed p
 
 **Nobody can rewrite a market's mask any more.** The action that wrote it, `perp_set_oracle`, is [retired](../mip/mip-3.md#perp-set-oracle-retired) and refused from the next release, precisely because the mask has no reader: the write returned OK and changed no price. The committed value stays frozen until the next re-genesis.
 
-**The deployer price control is a different action.** A [MIP-3](../mip/mip-3.md) deployer sets its market's index price with the [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) overlay. That action is unrelated to the source mask and it stays.
+**The deployer price control is a different action.** A [MIP-3](../mip/mip-3.md) deployer sets its market's index price with the [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) overlay. That action is unrelated to the source mask and it stays.
 
 :::warning
-**There is a second price lane, and this page does not describe it.** Everything above is the **venue-weighted-median** lane: validators feed it, governance owns the weights, and no deployer can touch either. A market deployed through [MIP-3](../mip/mip-3.md) does **not** use it. That market prices from a **deployer-operated oracle**: the deployer pushes the index price itself, through [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px).
+**There is a second price lane, and this page does not describe it.** Everything above is the **venue-weighted-median** lane: validators feed it, governance owns the weights, and no deployer can touch either. A market deployed through [MIP-3](../mip/mip-3.md) does **not** use it. That market prices from a **deployer-operated oracle**: the deployer pushes the index price itself, through [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px).
 
 So "deployers cannot choose their own price" is true of this lane only. On a MIP-3 market the deployer **is** the price source. That is why such a market is isolated from the shared collateral pool and why its deploy bond is slashable. The push is bounded (±10 % per push against the committed anchor, an absolute ceiling, and a staleness window that flips the market reduce-only), but the party choosing the number is the deployer.
 
@@ -74,7 +74,7 @@ therefore the deployer's decision, not the protocol's, and BOTH answers are supp
 What you may not do is push a price you do not believe. The push is bounded, but inside those bounds
 the number is yours, and the deploy bond is slashable.
 
-That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. A [`mip3_set_oracle_px`](../api/rest/exchange.md#mip3_set_oracle_px) push is refused with `mip3_deployer_oracle feature not active` on a chain where it is off, so a test push tells you the posture. See [MIP-3 — oracle](../mip/mip-3.md#oracle) for the operator rules.
+That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. A [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) push is refused with `mip3_deployer_oracle feature not active` on a chain where it is off, so a test push tells you the posture. See [MIP-3 — oracle](../mip/mip-3.md#oracle) for the operator rules.
 :::
 
 ## Reliability rules {#reliability-rules}

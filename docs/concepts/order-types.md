@@ -7,8 +7,8 @@
 ## TL;DR {#tldr}
 
 **There is one perp order shape, not a list of order types.** You send
-[`submit_order`](../api/rest/exchange.md#submit_order) (or
-[`batch_order`](../api/rest/exchange.md#batch_order) for many at once) and pick
+[`submit_order`](../api/rest/exchange/orders.md#submit_order) (or
+[`batch_order`](../api/rest/exchange/orders.md#batch_order) for many at once) and pick
 the behaviour with fields on the order body:
 
 | You want | Set this | Not a separate action |
@@ -23,7 +23,7 @@ the behaviour with fields on the order body:
 Only four behaviours need their **own** action, because the node holds state for
 them or runs them over time: [TWAP](#twap), [scale](#scale-orders),
 [chase](#chase-orders), and the spot book
-([`spot_order`](../api/rest/exchange.md#spot_order), a separate engine).
+([`spot_order`](../api/rest/exchange/spot.md#spot_order), a separate engine).
 
 This page describes the fields. For the end-to-end request see
 [placing orders](../integration/placing-orders.md).
@@ -175,7 +175,7 @@ stop: the level ratchets toward the mark by that callback offset once per block
 and never away from it, so it fires at the ratcheted level, not the one you sent.
 Only the stop-loss leg may trail. `trail_px` is part of the signed order —
 sending it changes the EIP-712 type string — so see
-[`POST /exchange` → trailing stops](../api/rest/exchange.md#trailing-stops)
+[`POST /exchange` → trailing stops](../api/rest/exchange/orders.md#trailing-stops)
 before you build a write path.
 
 Trigger state machine:
@@ -191,12 +191,12 @@ stateDiagram-v2
 
 Triggers are evaluated on every mark-price update (each commit). They survive
 across blocks and across restarts. See
-[`POST /exchange` → trigger orders](../api/rest/exchange.md#trigger-orders-stop_loss--take_profit)
+[`POST /exchange` → trigger orders](../api/rest/exchange/orders.md#trigger-orders-stop_loss--take_profit)
 for the wire fields.
 
 ## Grouping {#grouping}
 
-`grouping` on [`batch_order`](../api/rest/exchange.md#batch_order) links legs into
+`grouping` on [`batch_order`](../api/rest/exchange/orders.md#batch_order) links legs into
 a family. It is the one **camelCase** corner of an otherwise snake_case wire.
 
 | `grouping` | Meaning |
@@ -260,11 +260,11 @@ Placement is **not** all-or-nothing — each rung runs the full order gate on it
 own, and the response echoes every rung's price, size, and `oid`.
 
 **Cancel the whole ladder** with
-[`cancel_scale`](../api/rest/exchange.md#cancel_scale) — one action cancels every
+[`cancel_scale`](../api/rest/exchange/orders.md#cancel_scale) — one action cancels every
 resting rung that carries the shared `cloid`, no `oid` needed. A parked trigger leg
 that carries the same `cloid` is **not** swept, so keep trigger legs on their own
 handle. Use a fresh handle per ladder — the SDKs tag ladder handles with a `0x5c`
-prefix. See [`POST /exchange` → scale_order](../api/rest/exchange.md#scale_order)
+prefix. See [`POST /exchange` → scale_order](../api/rest/exchange/orders.md#scale_order)
 for the full field table and admission rules.
 
 ## Chase orders {#chase-orders}
@@ -315,14 +315,14 @@ the remaining size. A reprice that would cross the book, a book too thin to peg
 against, or a halted market **pauses** the leg at its current price and retries
 later.
 
-**Cancel a chase** with [`cancel_chase`](../api/rest/exchange.md#cancel_chase),
+**Cancel a chase** with [`cancel_chase`](../api/rest/exchange/orders.md#cancel_chase),
 passing the `chase_oid` handle returned when you placed it (the handle is stable;
 the leg `oid` is not). There is **no chase-specific WS channel** — the placement and
 every reprice ride the account
 [`order_updates`](../api/ws/subscriptions.md#order_updates) and
 [`open_orders`](../api/ws/subscriptions.md#open_orders) feeds as an ordinary cancel
 plus a new resting order. See
-[`POST /exchange` → chase_order](../api/rest/exchange.md#chase_order) for the full
+[`POST /exchange` → chase_order](../api/rest/exchange/orders.md#chase_order) for the full
 field table and admission rules.
 
 ## TWAP {#twap}
@@ -345,7 +345,7 @@ size. The node fires them; there is nothing for the client to do after the
 parent is accepted. A spot pair is also accepted — see
 [The three on a spot pair](#synth-on-spot).
 
-[`twap_order`](../api/rest/exchange.md#twap_order) carries six required fields —
+[`twap_order`](../api/rest/exchange/orders.md#twap_order) carries six required fields —
 `market`, `side`, `total_size`, `slice_count`, `delay_ms`, `reduce_only` — plus
 two optional ones, `position_side` and `randomize`.
 
@@ -379,7 +379,7 @@ string**, so sign the payload you send.
 
 Slice fills ride the dedicated [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) WS channel; parent lifecycle transitions (activated / finished / terminated) ride [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history), which is where the `twapId` first appears.
 
-TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange.md#twap_cancel); already-filled slices stay filled, future slices stop.
+TWAP is cancellable mid-run via [`twap_cancel`](../api/rest/exchange/orders.md#twap_cancel); already-filled slices stay filled, future slices stop.
 
 ## The three on a spot pair {#synth-on-spot}
 
@@ -416,7 +416,7 @@ you did not sign, so the chain refuses instead. Clear the field, then re-sign.
 parents (default `100`) counts your perp parents and your spot parents **together**
 — it is one allowance per account, not one per market class.
 
-[`twap_cancel`](../api/rest/exchange.md#twap_cancel) takes a spot parent's id with
+[`twap_cancel`](../api/rest/exchange/orders.md#twap_cancel) takes a spot parent's id with
 no change to the wire: the id is looked up in both homes. So one cancel path
 covers both.
 
@@ -498,8 +498,8 @@ next TWAP slice due at once, and the chase reprices on its next pass. The parent
 picks up exactly where it stopped.
 
 **Your escrow is never trapped.** Spot cancels are ungated at every halt, and
-[`cancel_chase`](../api/rest/exchange.md#cancel_chase) and
-[`twap_cancel`](../api/rest/exchange.md#twap_cancel) both work through it. A
+[`cancel_chase`](../api/rest/exchange/orders.md#cancel_chase) and
+[`twap_cancel`](../api/rest/exchange/orders.md#twap_cancel) both work through it. A
 chase whose `ttl_ms` or `max_reprices` runs out DURING a halt still retires and
 refunds normally — that is ordinary expiry, not a halt refund.
 
@@ -509,7 +509,7 @@ retained, not cancelled, so cancel them yourself if you do not want them.
 **A spot scale** floors every rung price onto the pair's tick grid and every rung
 size onto its lot grid. Each rung runs the spot admission on its own, so **a
 rejected rung does not abort the ladder** — the rest still rest.
-[`cancel_scale`](../api/rest/exchange.md#cancel_scale) then sweeps every resting
+[`cancel_scale`](../api/rest/exchange/orders.md#cancel_scale) then sweeps every resting
 spot order on that pair that carries the shared `cloid`. That includes an ordinary
 `spot_order` you happened to send under the same handle, so **use a fresh handle
 per ladder**.

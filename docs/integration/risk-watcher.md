@@ -195,6 +195,6 @@ sequenceDiagram
 - [`notifications` WS](../api/ws/subscriptions.md#notifications) — tier transitions ride this channel
 - [`account_state` WS](../api/ws/subscriptions.md#account_state) — continuous margin values
 - [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state) — the position rows an unwind needs
-- [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin)
+- [`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin)
 - [Agent wallets](../concepts/agent-wallets.md) — watcher needs its own approved agent
 - [Error handling](./error-handling.md) — for the deposit submission retry logic

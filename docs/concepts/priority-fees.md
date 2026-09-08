@@ -235,4 +235,4 @@ and when it committed. The charge itself appears with the fill it was taken on.
 - [Broker codes](./broker-codes.md) — the other extra fee on an order, and what it really buys
 - [Fees](./fees.md) — the base maker/taker schedule and the protocol split the charge joins
 - [Order types](./order-types.md) — the order the bid applies to
-- [`POST /exchange`](../api/rest/exchange.md#priority_bid) — the wire shape and field table
+- [`POST /exchange`](../api/rest/exchange/utility.md#priority_bid) — the wire shape and field table

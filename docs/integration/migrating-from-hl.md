@@ -27,9 +27,9 @@ There is one MTF-native surface; you call it through the SDK or build the envelo
 
 | You used on HL | MTF-native equivalent |
 |----------------|-----------------------|
-| `POST /exchange` `order` | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
-| `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
-| `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `POST /exchange` `order` | [`submit_order`](../api/rest/exchange/orders.md#submit_order) / [`batch_order`](../api/rest/exchange/orders.md#batch_order) |
+| `POST /exchange` `cancel` | [`cancel_order`](../api/rest/exchange/orders.md#cancel_order) / [`cancel_by_cloid`](../api/rest/exchange/orders.md#cancel_by_cloid) |
+| `POST /exchange` `modify` / `batchModify` | [`modify`](../api/rest/exchange/orders.md#modify) / [`batch_modify`](../api/rest/exchange/orders.md#batch_modify) |
 | `POST /info` `meta` | [`markets`](../api/rest/info/perpetuals.md#markets) |
 | `POST /info` `clearinghouseState` | **Two reads, not one.** [`account_state`](../api/rest/info.md#account_state) for the collateral and margin health, [`clearinghouse_state`](../api/rest/info.md#clearinghouse_state) for the position rows. HL keeps positions inside the account read; MetaFlux does not — see below |
 | `POST /info` `spotClearinghouseState` | [`account_state`](../api/rest/info.md#account_state) — the `spot.balances` array. There is no separate spot read |
@@ -86,7 +86,7 @@ If your bot listens for liquidation events to trigger margin top-ups, **add a ha
 
 ### 7. Agent wallet semantics {#7-agent-wallet-semantics}
 
-An agent is a key with no withdrawal authority — same model as HL (see [agent wallets](../concepts/agent-wallets.md)). The action is [`approve_agent`](../api/rest/exchange.md#approve_agent). The one mechanical difference: MTF's agent approval becomes effective **one block after commit**, vs HL's typically two-block latency. Slightly faster; same warm-up dance.
+An agent is a key with no withdrawal authority — same model as HL (see [agent wallets](../concepts/agent-wallets.md)). The action is [`approve_agent`](../api/rest/exchange/account.md#approve_agent). The one mechanical difference: MTF's agent approval becomes effective **one block after commit**, vs HL's typically two-block latency. Slightly faster; same warm-up dance.
 
 ### 8. Vaults {#8-vaults}
 
@@ -108,7 +108,7 @@ Translate each action your bot sends to its MTF-native equivalent (see the table
 
 - Read `account_state` with `detail: "overview"` if you operate sub-accounts (MTF allows up to 32 subs per master); the sub-account list is one of its facets.
 - Add a handler for T0 yellow-card events on the [`notifications`](../api/ws/subscriptions.md#notifications) WS channel (kind `yellow_card`).
-- If you depend on portfolio margin, enroll on MTF with [`user_portfolio_margin`](../api/rest/exchange.md#user_portfolio_margin). The threshold and scenario set are network parameters — see [portfolio margin](../concepts/portfolio-margin.md).
+- If you depend on portfolio margin, enroll on MTF with [`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin). The threshold and scenario set are network parameters — see [portfolio margin](../concepts/portfolio-margin.md).
 
 ### Day 3+ — adopt MTF-only features {#day-3--adopt-mtf-only-features}
 
@@ -225,17 +225,17 @@ Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are al
 
 | Action you used on HL | MTF-native action |
 |-----------------------|-------------------|
-| `order` (place limit / IOC / ALO) | [`submit_order`](../api/rest/exchange.md#submit_order) / [`batch_order`](../api/rest/exchange.md#batch_order) |
-| `cancel` (by OID) | [`cancel_order`](../api/rest/exchange.md#cancel_order) |
-| `cancelByCloid` | [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) |
-| `modify` / `batchModify` | [`modify`](../api/rest/exchange.md#modify) / [`batch_modify`](../api/rest/exchange.md#batch_modify) |
+| `order` (place limit / IOC / ALO) | [`submit_order`](../api/rest/exchange/orders.md#submit_order) / [`batch_order`](../api/rest/exchange/orders.md#batch_order) |
+| `cancel` (by OID) | [`cancel_order`](../api/rest/exchange/orders.md#cancel_order) |
+| `cancelByCloid` | [`cancel_by_cloid`](../api/rest/exchange/orders.md#cancel_by_cloid) |
+| `modify` / `batchModify` | [`modify`](../api/rest/exchange/orders.md#modify) / [`batch_modify`](../api/rest/exchange/orders.md#batch_modify) |
 | `usdSend` / spot transfers | native spot transfer actions |
-| `withdraw3` | [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) |
-| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) (same field names) — or [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer). Both are live. **Read the note below.** |
-| `approveAgent` | [`approve_agent`](../api/rest/exchange.md#approve_agent) |
-| `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) |
-| `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user) |
-| `setReferrer` / `createReferral` | [`set_referrer`](../api/rest/exchange.md#set_referrer) (semantics may differ) |
+| `withdraw3` | [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) |
+| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) (same field names) — or [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer). Both are live. **Read the note below.** |
+| `approveAgent` | [`approve_agent`](../api/rest/exchange/account.md#approve_agent) |
+| `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin) |
+| `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange/account.md#convert_to_multi_sig_user) |
+| `setReferrer` / `createReferral` | [`set_referrer`](../api/rest/exchange/account.md#set_referrer) (semantics may differ) |
 
 ### `sendToEvmWithData` — a copied payload will be refused {#send-to-evm-with-data-note}
 
@@ -249,17 +249,17 @@ payload across unchanged. **Do not.** Three fields that HL accepts and ignores a
 - **`to_perp` must be `false`.** The EVM side has no perp account to credit.
 - **`destination_chain_id` must be `0` or the local EVM chain id.** Any other
   value is refused. It is **not** a cross-chain lane — use
-  [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) to leave the chain.
+  [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) to leave the chain.
 
 Two more things before you port it:
 
 - **The action is live.** An earlier version of this page said the network refused
   it and told you to port to `core_evm_transfer` instead. That is no longer true.
 - **It debits the spot ledger only.** It cannot move USDC held as perp collateral.
-  [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) can, and it is
+  [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) can, and it is
   live now, so it is the better target for most ports.
 
-Full rules: [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data).
+Full rules: [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data).
 
 ## Getting help {#getting-help}
 

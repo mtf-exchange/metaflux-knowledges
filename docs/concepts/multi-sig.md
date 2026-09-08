@@ -184,7 +184,7 @@ user-bound struct for any bundle submitted at/after the upgrade.
 available :::
 
 There is no separate "update" action. To rotate the roster, the account's current
-signers **re-run [`convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)
+signers **re-run [`convert_to_multi_sig_user`](../api/rest/exchange/account.md#convert_to_multi_sig_user)
 wrapped in `multi_sig`** — it requires `threshold` signatures from the **current**
 set and overwrites the stored roster with the new `{ threshold, signers }`:
 
@@ -288,7 +288,7 @@ sequenceDiagram
 
 ## See also {#see-also}
 
-- [`POST /exchange convert_to_multi_sig_user`](../api/rest/exchange.md#convert_to_multi_sig_user)
+- [`POST /exchange convert_to_multi_sig_user`](../api/rest/exchange/account.md#convert_to_multi_sig_user)
 - [`/exchange` signed-by semantics](../api/rest/exchange.md#signed-by-semantics) — multi-sig wrapper envelope
 - [Agent wallets](./agent-wallets.md) — combine multi-sig with agent delegation
 - [Sub-accounts](./sub-accounts.md) — multi-sig accounts can have subs

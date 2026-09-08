@@ -337,7 +337,7 @@ BTC, the top-level ladder said `"50"` where the override ladder said `"0.005"`.
 A caller that read the override as bps computed a maintenance margin four orders
 of magnitude too small and believed an unsafe position was safe. One concept now
 has one plane. See the
-[upgrade notice](../../upgrade-notice-ids-and-shapes.md#one-plane) — this row
+[upgrade notice](../../../changelog/ids-and-wire-shapes.md#one-plane) — this row
 changes when that release lands.
 :::
 

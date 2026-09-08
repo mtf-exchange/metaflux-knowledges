@@ -93,7 +93,7 @@ Every validator must submit a byte-equal proposal for it to tally.
 
 The proposal fixes the asset, the `variant` and the contract. It does **not** set
 the token's decimals: a credit lands in the token's own `wei_decimals`, chosen
-once at [`spot_register_token`](../api/rest/exchange.md#spot_register_token) and
+once at [`spot_register_token`](../api/rest/exchange/deploy-spot.md#spot_register_token) and
 never changed after. So the SIZE of every credit on this lane is decided at
 registration, and the binding only decides where the credit goes.
 
@@ -103,7 +103,7 @@ no decimals field, so a validator voting on a binding cannot see the scale it is
 blessing without reading the token registry separately. An upcoming release adds
 the bound token's `wei_decimals` to the proposal, and pairs it with a `1`–`18`
 bound at registration (see the
-[register-token notice](../api/rest/exchange.md#spot_register_token)). It becomes
+[register-token notice](../api/rest/exchange/deploy-spot.md#spot_register_token)). It becomes
 part of the tallied payload, so validators that send different values will not
 tally together. Until that release ships, read
 [`spot_meta`](../api/rest/info/spot.md#spot_meta) for the value before voting on
@@ -139,15 +139,15 @@ A contract's CoreWriter call reaches Core, subject to the atomicity rule above.
 
 | Action | Field shape | Debits | Availability |
 |---|---|---|---|
-| [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) | MTF-native | the perp collateral pool for `asset: 0`, else the spot ledger | **live at every height** |
-| [`send_to_evm_with_data`](../api/rest/exchange.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | **live** |
+| [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | MTF-native | the perp collateral pool for `asset: 0`, else the spot ledger | **live at every height** |
+| [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | **live** |
 
 Use `core_evm_transfer` if you have a choice. Both are live, and it is the only one
 of the two that can move USDC out of the perp collateral pool — the balance
 `account_value` / `withdrawable` report. Reach for `send_to_evm_with_data` when you
 are porting a client that already builds the Hyperliquid field shape. The full
 comparison is
-[which Core → EVM action to use](../api/rest/exchange.md#core-evm-which-action).
+[which Core → EVM action to use](../api/rest/exchange/transfers.md#core-evm-which-action).
 
 Both debit the sender's exchange ledger the moment the action commits, and queue
 one EVM credit that the node mints on the next EVM block. Because the debit lands
@@ -189,7 +189,7 @@ reference price is never read.
 :::
 
 The rule, the rejection strings and the governance parameter are in
-[the fee](../api/rest/exchange.md#core-evm-fee) and
+[the fee](../api/rest/exchange/transfers.md#core-evm-fee) and
 [Fees](../concepts/fees.md#core-evm-transfer-fee).
 
 ## Core → EVM (system pseudo-transactions) {#core--evm-system-pseudo-transactions}

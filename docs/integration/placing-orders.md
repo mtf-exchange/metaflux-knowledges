@@ -18,11 +18,11 @@ what to skip. For the field-level schema of any action, follow its link into
 
 ## TL;DR {#tldr}
 
-- One perp order is [`submit_order`](../api/rest/exchange.md#submit_order). It
+- One perp order is [`submit_order`](../api/rest/exchange/orders.md#submit_order). It
   returns the real `oid` in the HTTP response.
-- Many perp orders are [`batch_order`](../api/rest/exchange.md#batch_order) —
+- Many perp orders are [`batch_order`](../api/rest/exchange/orders.md#batch_order) —
   **one** action, one signature, **one status per leg**.
-- Spot uses [`spot_order`](../api/rest/exchange.md#spot_order) on a separate id
+- Spot uses [`spot_order`](../api/rest/exchange/spot.md#spot_order) on a separate id
   space. **Spot cannot batch**: send one action per spot order.
 - A production client signs with an [agent key](./agent-wallets-howto.md), not
   with the master key.
@@ -107,7 +107,7 @@ This buys `0.1` BTC at `50000.00`, good-till-cancelled.
 | `owner` | hex address | The account the order trades for. The recovered signer must equal it, or be an approved agent of it. **Required.** |
 | `market` | uint32 | The numeric market id from step 1 |
 | `side` | `"bid"` / `"ask"` | `bid` buys, `ask` sells |
-| `kind` | `"limit"` / `"market"` | Use `"limit"`. The trigger kinds need a `trigger` block — see [trigger orders](../api/rest/exchange.md#trigger-orders-stop_loss--take_profit) |
+| `kind` | `"limit"` / `"market"` | Use `"limit"`. The trigger kinds need a `trigger` block — see [trigger orders](../api/rest/exchange/orders.md#trigger-orders-stop_loss--take_profit) |
 | `size` | uint64 | Quantity on the `10^sz_decimals` plane |
 | `limit_px` | uint64 | Price on the `1e8` plane |
 | `tif` | `"gtc"` / `"ioc"` / `"alo"` | Rest, take-then-cancel, or post-only. `"aon"` is rejected |
@@ -147,7 +147,7 @@ fabricate an `oid`.
 
 ### Many perp orders in one action {#many-perp-orders}
 
-[`batch_order`](../api/rest/exchange.md#batch_order) carries up to **1000** perp
+[`batch_order`](../api/rest/exchange/orders.md#batch_order) carries up to **1000** perp
 orders under **one signature and one nonce**:
 
 ```json
@@ -196,7 +196,7 @@ otherwise snake_case wire. See [order types](../concepts/order-types.md#grouping
 ### A spot order {#spot-order}
 
 Spot is a token-for-token book with its own id space. It uses
-[`spot_order`](../api/rest/exchange.md#spot_order), which takes a **`pair` id**,
+[`spot_order`](../api/rest/exchange/spot.md#spot_order), which takes a **`pair` id**,
 not a `market` id:
 
 ```json
@@ -233,8 +233,8 @@ By default the signer is the trader. A spot order also accepts an optional
 
 | Goal | Action | Address the order by |
 |------|--------|----------------------|
-| Cancel one perp order | [`cancel_order`](../api/rest/exchange.md#cancel_order) | `market` + `oid` |
-| Cancel one spot order | [`spot_cancel`](../api/rest/exchange.md#spot_cancel) | `pair` + `oid` |
+| Cancel one perp order | [`cancel_order`](../api/rest/exchange/orders.md#cancel_order) | `market` + `oid` |
+| Cancel one spot order | [`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) | `pair` + `oid` |
 
 ```json
 { "type": "cancel_order", "cancel": { "owner": "0x…", "market": 0, "oid": 12345 } }
@@ -307,7 +307,7 @@ The read side also renames things. A resting order comes back as
 Real integrations do not sign orders with the master key. The master key approves
 an **agent key** once; the agent key signs every order after that.
 
-1. The master signs [`approve_agent`](../api/rest/exchange.md#approve_agent) for
+1. The master signs [`approve_agent`](../api/rest/exchange/account.md#approve_agent) for
    the agent address.
 2. Wait one block.
 3. The agent key signs each order. The body still names the master at `owner`
@@ -325,11 +325,11 @@ Read tier 1. Skip the rest until you need it.
 
 | Action | Reach for it when |
 |--------|-------------------|
-| [`submit_order`](../api/rest/exchange.md#submit_order) | You place one perp order |
-| [`batch_order`](../api/rest/exchange.md#batch_order) | You place two or more perp orders together |
-| [`spot_order`](../api/rest/exchange.md#spot_order) | You place one spot order |
-| [`cancel_order`](../api/rest/exchange.md#cancel_order) | You cancel one perp order and you know its `oid` |
-| [`spot_cancel`](../api/rest/exchange.md#spot_cancel) | You cancel one spot order |
+| [`submit_order`](../api/rest/exchange/orders.md#submit_order) | You place one perp order |
+| [`batch_order`](../api/rest/exchange/orders.md#batch_order) | You place two or more perp orders together |
+| [`spot_order`](../api/rest/exchange/spot.md#spot_order) | You place one spot order |
+| [`cancel_order`](../api/rest/exchange/orders.md#cancel_order) | You cancel one perp order and you know its `oid` |
+| [`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) | You cancel one spot order |
 
 ### Tier 2 — order lifecycle {#tier-2}
 
@@ -337,12 +337,12 @@ Reach for these once you keep orders resting.
 
 | Action | Reach for it when |
 |--------|-------------------|
-| [`batch_cancel`](../api/rest/exchange.md#batch_cancel) | You cancel many perp orders under one signature |
-| [`cancel_by_cloid`](../api/rest/exchange.md#cancel_by_cloid) | You must cancel before the `oid` reaches you |
-| [`cancel_all_orders`](../api/rest/exchange.md#cancel_all_orders) | You flatten the whole book, or one market |
-| [`modify`](../api/rest/exchange.md#modify) | You re-price or re-size a resting order in place |
-| [`batch_modify`](../api/rest/exchange.md#batch_modify) | You re-price a whole quote ladder at once |
-| [`schedule_cancel`](../api/rest/exchange.md#schedule_cancel) | You want a dead-man's switch that cancels all at a future block |
+| [`batch_cancel`](../api/rest/exchange/orders.md#batch_cancel) | You cancel many perp orders under one signature |
+| [`cancel_by_cloid`](../api/rest/exchange/orders.md#cancel_by_cloid) | You must cancel before the `oid` reaches you |
+| [`cancel_all_orders`](../api/rest/exchange/orders.md#cancel_all_orders) | You flatten the whole book, or one market |
+| [`modify`](../api/rest/exchange/orders.md#modify) | You re-price or re-size a resting order in place |
+| [`batch_modify`](../api/rest/exchange/orders.md#batch_modify) | You re-price a whole quote ladder at once |
+| [`schedule_cancel`](../api/rest/exchange/orders.md#schedule_cancel) | You want a dead-man's switch that cancels all at a future block |
 
 ### Tier 3 — the node runs the order for you {#tier-3}
 
@@ -350,9 +350,9 @@ One signature buys a behaviour that would otherwise cost a client loop.
 
 | Action | Reach for it when | Availability |
 |--------|-------------------|--------------|
-| [`twap_order`](../api/rest/exchange.md#twap_order) · [`twap_cancel`](../api/rest/exchange.md#twap_cancel) | You spread one large order over time | live — **one-way accounts only**, see below |
-| [`scale_order`](../api/rest/exchange.md#scale_order) · [`cancel_scale`](../api/rest/exchange.md#cancel_scale) | You want N rungs across a price band from one signature | live |
-| [`chase_order`](../api/rest/exchange.md#chase_order) · [`cancel_chase`](../api/rest/exchange.md#cancel_chase) | You want one post-only leg the node re-prices to the touch | live |
+| [`twap_order`](../api/rest/exchange/orders.md#twap_order) · [`twap_cancel`](../api/rest/exchange/orders.md#twap_cancel) | You spread one large order over time | live — **one-way accounts only**, see below |
+| [`scale_order`](../api/rest/exchange/orders.md#scale_order) · [`cancel_scale`](../api/rest/exchange/orders.md#cancel_scale) | You want N rungs across a price band from one signature | live |
+| [`chase_order`](../api/rest/exchange/orders.md#chase_order) · [`cancel_chase`](../api/rest/exchange/orders.md#cancel_chase) | You want one post-only leg the node re-prices to the touch | live |
 
 ## Grid snapping on a synthesized fire {#deferred-fill-notice}
 
@@ -391,9 +391,9 @@ limit order.
 
 | Action | Reach for it when | Availability |
 |--------|-------------------|--------------|
-| [`rfq_request`](../api/rest/exchange.md#rfq_request) · [`rfq_quote`](../api/rest/exchange.md#rfq_quote) · [`rfq_accept`](../api/rest/exchange.md#rfq_accept) | You negotiate a block trade off the book | live |
-| [`fba_submit`](../api/rest/exchange.md#fba_submit) | You want a uniform batch clearing price instead of the book | market must set `fba_enabled` |
-| [`submit_encrypted_order`](../api/rest/exchange.md#submit_encrypted_order) | You hide an order until a target block | testnet preview |
+| [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request) · [`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote) · [`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept) | You negotiate a block trade off the book | live |
+| [`fba_submit`](../api/rest/exchange/rfq-utility.md#fba_submit) | You want a uniform batch clearing price instead of the book | market must set `fba_enabled` |
+| [`submit_encrypted_order`](../api/rest/exchange/utility.md#submit_encrypted_order) | You hide an order until a target block | testnet preview |
 
 ### Not order actions {#not-order-actions}
 
@@ -402,9 +402,9 @@ them:
 
 | Action | What it really is |
 |--------|-------------------|
-| [`update_leverage`](../api/rest/exchange.md#update_leverage) | Margin setting for a market |
-| [`vault_modify`](../api/rest/exchange.md#vault_modify) | Vault configuration for a vault leader |
-| [`noop`](../api/rest/exchange.md#noop) | A deliberate no-op that burns a nonce |
+| [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) | Margin setting for a market |
+| [`vault_modify`](../api/rest/exchange/vaults.md#vault_modify) | Vault configuration for a vault leader |
+| [`noop`](../api/rest/exchange/rfq-utility.md#noop) | A deliberate no-op that burns a nonce |
 
 ## Common first-run errors {#common-errors}
 

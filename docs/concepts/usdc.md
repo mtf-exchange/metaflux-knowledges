@@ -17,7 +17,7 @@ the spendable spot-USDC balance are the same number.
   surfaces, `asset: 100` on spot market and balance surfaces, an ERC-20 on the
   EVM, and a separate contract on every external chain.
 - Two number planes. `/info` and most `/exchange` fields are **whole-USDC decimal
-  strings**. [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) and the EVM
+  strings**. [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and the EVM
   token are **6-decimal integers**. Mixing them is an error of 10⁶.
 - [`usd_class_transfer`](#moving-usdc) is **rejected**. There is no second pool
   to move to.
@@ -29,7 +29,7 @@ any code that names USDC.
 
 | Surface | How USDC is addressed | Number plane |
 |---------|----------------------|--------------|
-| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `withdrawable`. Bridge deposits, [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) and [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
+| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `withdrawable`. Bridge deposits, [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
 | **Spot token** | Asset id **`100`** — the `quote` of every `*/USDC` pair and the id of the `USDC` row in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `tokens[]` and in `account_state` `spot.balances[]` | whole-USDC decimal string |
 | **EVM token** | ERC-20 at the fixed predeploy `0x0000000000000000000000000000000000010000` | **6-decimal integer** |
 | **External chains** | Each chain's own USDC contract, held in [MetaBridge](../bridge/index.md) custody | 6-decimal integer on the MTF wire |
@@ -41,8 +41,8 @@ bridge and withdraw paths use; `100` is the spot-ledger token id the market and
 balance surfaces use. Which id an action wants is **fixed per action** — it is
 not a free choice:
 
-- [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) and
-  [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) take **`0`**.
+- [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and
+  [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) take **`0`**.
   On `core_evm_transfer`, `asset: 100` is rejected with
   `asset not linked to an EVM contract` — the spot USDC token id carries **no EVM
   contract binding**, because the EVM-side USDC is reached through the
@@ -86,7 +86,7 @@ All of them spend the pool. What differs is the **gate**.
 | Place a **spot sell** | the base token on the spot ledger | you must own the base |
 | Deposit to [Earn](./earn.md) | the pool | amount ≤ free collateral |
 | Open a [spot-margin](../products/spot-margin.md) position | the pool | its initial margin is held against the pool |
-| [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) / [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) / a send | the pool | amount ≤ free collateral |
+| [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) / [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) / a send | the pool | amount ≤ free collateral |
 
 **Free collateral** is the one budget every debit above is measured against:
 
@@ -132,10 +132,10 @@ Cancel the bid and the escrow returns to the pool.
 |------|-----|---------------|
 | Perp ↔ spot class | — | **Rejected.** See below |
 | To another MetaFlux account | [`send_asset`](../integration/typed-data-signing.md#transfers) | No protocol fee |
-| Parent ↔ sub-account | [`sub_account_transfer`](../api/rest/exchange.md#sub_account_transfer) / [`sub_account_spot_transfer`](../api/rest/exchange.md#sub_account_spot_transfer) | No protocol fee |
-| Core → EVM | [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer) | No protocol fee; the amount is rescaled ×10⁶ |
+| Parent ↔ sub-account | [`sub_account_transfer`](../api/rest/exchange/account.md#sub_account_transfer) / [`sub_account_spot_transfer`](../api/rest/exchange/account.md#sub_account_spot_transfer) | No protocol fee |
+| Core → EVM | [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | No protocol fee; the amount is rescaled ×10⁶ |
 | EVM → Core | An EVM **burn** transaction — **not** an `/exchange` action | EVM gas |
-| Off the network | [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) | A bridge withdraw fee, withheld from the released amount |
+| Off the network | [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) | A bridge withdraw fee, withheld from the released amount |
 
 :::warning
 **`usd_class_transfer` is rejected**, with
@@ -247,7 +247,7 @@ real ERC-20 — `balanceOf`, `transfer`, `approve` — and, being the Circle
 implementation, it carries `permit` (EIP-2612) and `transferWithAuthorization`
 (EIP-3009).
 
-**Core → EVM** is [`core_evm_transfer`](../api/rest/exchange.md#core_evm_transfer).
+**Core → EVM** is [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer).
 The Core debit is atomic at commit and the EVM credit is minted on the next EVM
 block, so the queued credit is always fully backed. Optional calldata attached to
 the transfer **never unwinds the credit**: if it reverts, the transfer still
@@ -269,7 +269,7 @@ active validator stake. There is no Circle CCTP path.
 
 - A **deposit** credits the pool directly — it lands as collateral, ready to
   margin a perp or fund a spot buy, with no second step.
-- A **withdrawal** is [`bridge_withdraw`](../api/rest/exchange.md#bridge_withdraw) with
+- A **withdrawal** is [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) with
   `asset: 0`. Only USDC is bridgeable today; any other asset id is rejected.
 - The destination-chain release is asynchronous: the Core debit is immediate at
   commit, the payout follows co-signing and relay.

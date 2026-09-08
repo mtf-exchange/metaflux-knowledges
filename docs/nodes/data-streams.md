@@ -279,8 +279,8 @@ fire, a spot-margin forced close — is recorded on the block it executed in,
 with an empty `hash`. No user signed it, so there is no hash to record.
 
 **Some order lanes produce a fill this stream does NOT carry.** An order placed
-by [`modify`](../api/rest/exchange.md#modify) or
-[`batch_modify`](../api/rest/exchange.md#batch_modify), an order placed by
+by [`modify`](../api/rest/exchange/orders.md#modify) or
+[`batch_modify`](../api/rest/exchange/orders.md#batch_modify), an order placed by
 [CoreWriter `LimitOrder`](../evm/interacting-with-core.md), any order inside
 a [`multi_sig`](../concepts/multi-sig.md) envelope, and every clearing of a
 [frequent batch auction](../concepts/fba.md) each settle with no record —

@@ -65,7 +65,7 @@ account that reads `withdrawable: "0"`. See
 
 `effective_lev` resolves in this order, and is never below 1:
 
-1. your own leverage preference for the asset, set with [`update_leverage`](../api/rest/exchange.md#update_leverage);
+1. your own leverage preference for the asset, set with [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage);
 2. tightened by the market's dynamic-risk override when governance has set one — with a margin-tier ladder, the rung your notional falls into decides the cap, so a larger position gets less leverage;
 3. bounded by the market's own maximum.
 
@@ -129,7 +129,7 @@ selects the NEXT row — a position of exactly 100,000 notional gets the 20× /
 
 **Opening the position.** BTC trades at 61,750.00. You have set your own
 leverage preference for BTC to 20× with
-[`update_leverage`](../api/rest/exchange.md#update_leverage), and you buy 3.4 BTC:
+[`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage), and you buy 3.4 BTC:
 
 ```
 notional      = px × size = 61750.00 × 3.4 = 209950.00
@@ -174,7 +174,7 @@ needs no initial margin at all — `required_init` is `0`, and free collateral
 is never tested.
 
 **The isolated case.** Fund the bucket first:
-[`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin)
+[`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin)
 with a positive `delta` moves USDC out of cross balance into this asset's
 bucket. That transfer debits
 `cross_account_value` directly, so it has already left `withdrawable` before
@@ -256,7 +256,7 @@ You can deposit/withdraw to the bucket while the position is open:
 { "type":"update_isolated_margin", "params": { "asset": 0, "delta": "500" } }
 ```
 
-`delta` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected. Flipping the position itself into isolated mode is a separate step — the `is_isolated` flag on [`update_leverage`](../api/rest/exchange.md#update_leverage); see [Transitions](#transitions).
+`delta` can be **positive** (move cross → bucket) or **negative** (withdraw bucket → cross). Withdrawal that would push the position into a worse tier is rejected. Flipping the position itself into isolated mode is a separate step — the `is_isolated` flag on [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage); see [Transitions](#transitions).
 
 ## Strict-Iso {#strict-iso}
 
@@ -320,7 +320,7 @@ For multi-strategy isolation, [sub-accounts](./sub-accounts.md) are usually a be
 ## Transitions {#transitions}
 
 Switching between Cross and Isolated uses the
-[`update_leverage`](../api/rest/exchange.md#update_leverage) action's
+[`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) action's
 `is_isolated` flag — there is no separate margin-mode action, and no way to
 request Strict-Iso (see [above](#strict-iso)).
 
@@ -377,7 +377,7 @@ sequenceDiagram
 <details>
 <summary>Show edge cases</summary>
 
-- **Auto-deposit on margin add.** Isolated positions take maintenance shortfall from the bucket only — once the bucket is depleted, the position liquidates. Cross does NOT auto-cover an Isolated bucket; you must top it up yourself with [`update_isolated_margin`](../api/rest/exchange.md#update_isolated_margin) and a positive `delta`.
+- **Auto-deposit on margin add.** Isolated positions take maintenance shortfall from the bucket only — once the bucket is depleted, the position liquidates. Cross does NOT auto-cover an Isolated bucket; you must top it up yourself with [`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin) and a positive `delta`.
 - **Closing an Isolated position.** Closing the full position releases the bucket back into cross balance.
 - **Mode of a fresh asset.** New positions default to Cross, unless governance has flagged the market strict-isolated — then every position on it opens in [Strict-Iso](#strict-iso), whatever you prefer. There is no per-asset "isolated only" field on the market metadata; the flag lives on the market's governance risk parameters.
 - **Isolated under PM master.** PM netting credit applies to Cross positions only. Isolated positions are summed classically. A PM-enrolled master with one giant Isolated position and tiny Cross book sees almost no PM benefit.
@@ -389,7 +389,7 @@ sequenceDiagram
 - [Portfolio margin](./portfolio-margin.md) — PM-vs-classical math
 - [Tiered liquidation](./tiered-liquidation.md) — per-scope ladders
 - [Sub-accounts](./sub-accounts.md) — full account-level isolation
-- [`update_leverage`](../api/rest/exchange.md#update_leverage) — margin mode is the `is_isolated` flag here; there is no separate margin-mode action
+- [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) — margin mode is the `is_isolated` flag here; there is no separate margin-mode action
 
 ## FAQ {#faq}
 

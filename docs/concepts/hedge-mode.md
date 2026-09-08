@@ -59,7 +59,7 @@ holding any open position is rejected (a clean no-op that mutates nothing), so a
 net position can never be silently re-interpreted as a stranded leg. Setting the
 mode to the value it already has, while flat, is a no-op success.
 
-See [`set_position_mode`](../api/rest/exchange.md#set_position_mode) in the
+See [`set_position_mode`](../api/rest/exchange/account.md#set_position_mode) in the
 `/exchange` reference for the request/response detail.
 
 ## Placing orders in hedge mode {#placing-orders-in-hedge-mode}
@@ -139,7 +139,7 @@ Position rows live on [`clearinghouse_state`](../api/rest/info.md#clearinghouse_
 - [Margin modes](./margin-modes.md) — cross / isolated / strict-iso, applied per leg
 - [Portfolio margin](./portfolio-margin.md) — where future leg-netting credit would live
 - [Tiered liquidation](./tiered-liquidation.md) — per-leg ladders
-- [`/exchange` reference](../api/rest/exchange.md#set_position_mode) — the action wire format
+- [`/exchange` reference](../api/rest/exchange/account.md#set_position_mode) — the action wire format
 
 ## FAQ {#faq}
 

@@ -49,15 +49,15 @@ strings. The field names do not change.
 
 | Surface | Fields |
 |---|---|
-| [`user_fills`](rest/info.md#user_fills) | `fills[*].oid`, `fills[*].tid` |
-| [`trades`](rest/info/perpetuals.md#trades) | `trades[*].tid` |
-| [`order_status`](rest/info.md#order_status) | `order.oid`, `trigger.oid`, `fills[*].oid`, `fills[*].tid`, `outcome.oid` |
-| [`open_orders`](rest/info.md#open_orders) | each row's `oid` |
-| [`historical_orders`](rest/info.md#historical_orders) | `orders[*].oid` |
-| [`user_ledger_updates`](rest/info.md#user_ledger_updates) | a trade row's `tid` |
+| [`user_fills`](../api/rest/info.md#user_fills) | `fills[*].oid`, `fills[*].tid` |
+| [`trades`](../api/rest/info/perpetuals.md#trades) | `trades[*].tid` |
+| [`order_status`](../api/rest/info.md#order_status) | `order.oid`, `trigger.oid`, `fills[*].oid`, `fills[*].tid`, `outcome.oid` |
+| [`open_orders`](../api/rest/info.md#open_orders) | each row's `oid` |
+| [`historical_orders`](../api/rest/info.md#historical_orders) | `orders[*].oid` |
+| [`user_ledger_updates`](../api/rest/info.md#user_ledger_updates) | a trade row's `tid` |
 | The RFQ / FBA read | `oid` |
-| [`/exchange`](rest/exchange.md) | EVERY id in the ACK union — `resting.oid`, `filled.oid`, `chase.chase_oid`, `chase.leg_oid` |
-| WS [`trades`](ws/subscriptions.md#trades), [`fills`](ws/subscriptions.md#fills), [`order_updates`](ws/subscriptions.md#order_updates), [`user_twap_slice_fills`](ws/subscriptions.md#user_twap_slice_fills) | `oid`, `tid` |
+| [`/exchange`](../api/rest/exchange.md) | EVERY id in the ACK union — `resting.oid`, `filled.oid`, `chase.chase_oid`, `chase.leg_oid` |
+| WS [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills), [`order_updates`](../api/ws/subscriptions.md#order_updates), [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) | `oid`, `tid` |
 
 **Requests take either.** Wherever a request body carries an `oid` — the
 `order_status` lookup above all — a JSON number and a decimal-digit string are
@@ -186,7 +186,7 @@ committed state. Two consequences, and both are the honest kind:
   not a history.
 - **`unknown` is not proof the order never existed.** It says this node cannot
   see it. For the archive answer, read
-  [`historical_orders`](rest/info.md#historical_orders).
+  [`historical_orders`](../api/rest/info.md#historical_orders).
 
 This is the same retention contract `historical_orders` already documents.
 
@@ -219,12 +219,12 @@ balance credit. See
 ## The spot taker fee is lossless, and `null` means "the schedule applies" {#spot-taker-fee}
 
 Two reads disagreed, and neither said why. A pair served
-`taker_fee_bps: "5"` while [`fee_schedule`](rest/info.md#fee_schedule) said
+`taker_fee_bps: "5"` while [`fee_schedule`](../api/rest/info.md#fee_schedule) said
 `"3.5"`.
 
 **The resolution rule.** A spot pair's deployer may set a taker override. If an
 override exists it WINS, for every account, whatever the volume tier says. If no
-override exists the volume-tiered [`fee_schedule`](rest/info.md#fee_schedule)
+override exists the volume-tiered [`fee_schedule`](../api/rest/info.md#fee_schedule)
 applies.
 
 Two things made that undiscoverable, and both change:
@@ -277,17 +277,17 @@ silent wrong answer costs more than an error.
 
 | Surface | Was | Is |
 |---|---|---|
-| [`candle_snapshot`](rest/info/perpetuals.md#candle_snapshot) with an unknown `coin` | `200` with an empty `candles` array — the same answer a quiet window gives | `400`, naming the coin as unknown |
-| [`candle_snapshot`](rest/info/perpetuals.md#candle_snapshot) with an unknown `interval` | `200` with an empty `candles` array | `400`, naming the accepted set: `1m` `5m` `15m` `1h` `4h` `1d` |
+| [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) with an unknown `coin` | `200` with an empty `candles` array — the same answer a quiet window gives | `400`, naming the coin as unknown |
+| [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot) with an unknown `interval` | `200` with an empty `candles` array | `400`, naming the accepted set: `1m` `5m` `15m` `1h` `4h` `1d` |
 | `portfolio` with an unrecognized `interval` | `400 invalid interval: <value>`, naming no valid value | `400`, naming the accepted value: **`1d`** |
-| [`markets`](rest/info/perpetuals.md#markets) / [`markets_meta`](rest/info/perpetuals.md#markets_meta) with an unrecognized `kind` | Silently ignored — a typo returned BOTH sections, a superset, with no diagnostic | `400`, naming the accepted values: `perp` and `spot` |
+| [`markets`](../api/rest/info/perpetuals.md#markets) / [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) with an unrecognized `kind` | Silently ignored — a typo returned BOTH sections, a superset, with no diagnostic | `400`, naming the accepted values: `perp` and `spot` |
 
 The `candle_snapshot` rows close a surface that disagreed with itself:
-[`l2_book`](rest/info/perpetuals.md#l2_book) already answered `404` for the same
+[`l2_book`](../api/rest/info/perpetuals.md#l2_book) already answered `404` for the same
 unknown coin.
 
 **A quiet window is still a `200` with an empty array**, and its
-[coverage envelope](rest/info/perpetuals.md#candle_snapshot) still tells you so.
+[coverage envelope](../api/rest/info/perpetuals.md#candle_snapshot) still tells you so.
 The change separates "you asked for something that does not exist" from "nothing
 happened in that window". They were the same answer; they are two answers now.
 
@@ -334,7 +334,7 @@ and both take an optional `limit`:
 }
 ```
 
-Both reads answer in the [history-archive envelope](rest/info.md#archive-lane) —
+Both reads answer in the [history-archive envelope](../api/rest/info.md#archive-lane) —
 `type` sits beside `data` until the next gateway release, and inside it after.
 Read `body.data.type ?? body.type` and both answers work.
 
@@ -343,9 +343,9 @@ Read `body.data.type ?? body.type` and both answers work.
 - **`recent_blocks` carries no `proposer`.** The WS header did. If you display the
   proposing validator, you no longer have it from this read.
 - **`recent_transactions` carries no `hash`.** The WS row did, and
-  [`/exchange`](rest/exchange.md) pointed at it as the hash-keyed way to check a
+  [`/exchange`](../api/rest/exchange.md) pointed at it as the hash-keyed way to check a
   submitted action. Correlate by `cloid` instead, or read
-  [`action_outcome`](rest/info.md#action_outcome).
+  [`action_outcome`](../api/rest/info.md#action_outcome).
 
 **Size the poll so it cannot gap.** The block cadence is about 100 ms, so 100
 rows span roughly 10 seconds of chain. A poll every 2 seconds with `limit: 100`
@@ -360,14 +360,14 @@ an answer.
 
 It is now backed. The record shape is the one this reference already locked —
 `{twap_id, fill}`, where `fill` is a full
-[`user_fills`](rest/info.md#user_fills) record — so the envelope does not change.
+[`user_fills`](../api/rest/info.md#user_fills) record — so the envelope does not change.
 
 **It is a node-local retention window, with the same caveat as the terminal order
 states above:** a node restart empties it, and an empty window after a restart is
 not the same fact as "this account has never run a TWAP". The read carries its
 coverage envelope so the two are distinguishable.
 
-The [WS channel](ws/subscriptions.md#user_twap_slice_fills) of the same name is
+The [WS channel](../api/ws/subscriptions.md#user_twap_slice_fills) of the same name is
 unchanged and remains the live path.
 
 ## The EVM JSON-RPC keeps receipts, and stops answering the wrong block {#evm-rpc}
