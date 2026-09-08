@@ -11,3 +11,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Playwright MCP writes screenshots and page snapshots here. This repo is
+# PUBLIC, so a stray capture is a leak, not clutter.
+.playwright-mcp/
