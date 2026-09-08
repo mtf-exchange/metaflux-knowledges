@@ -64,7 +64,7 @@ therefore the deployer's decision, not the protocol's, and BOTH answers are supp
 - **Keep pushing through the closed hours**, at whatever price your own discovery produces, and the
   market trades continuously. A push must land at least once per staleness window
   (`stale_threshold_ms`, read it from
-  the operator-lane `mip3_deployer_oracle` read; **60 s** on the live devnet),
+  the operator-lane `mip3_deployer_oracle` read; **60 s** on the live chain),
   for every market you operate.
 - **Or stop, and let the market FREEZE.** Past the window it goes reduce-only, so no one may open,
   and liquidation defers rather than run at a price nobody trusts. Open positions sit untouched
@@ -102,7 +102,7 @@ The composed `oracle_px` is published **once per block**, derived from the conse
 The composed `oracle_px` is reported on the **whole-USDC plane** (e.g. `"67042.335"`) by the [`markets`](../api/rest/info/perpetuals.md#markets) read, alongside `mark_px`:
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"markets","coin":"BTC"}'
 ```
@@ -123,7 +123,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 A [MIP-3](../mip/mip-3.md) market prices from its deployer instead. A deployer monitors that feed with the operator-lane `mip3_deployer_oracle` read, which reports the last pushed price, the staleness window, whether the market is currently reduce-only for opens, and who may push:
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"mip3_deployer_oracle","coin":"WIF"}'
 ```

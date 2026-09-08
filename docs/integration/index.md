@@ -50,7 +50,7 @@ The gateway (`https://api.<net>.mtf.exchange`) is the single public front door.
 |------|--------|---------|
 | `POST /info` · `POST /exchange` · `GET /ws` | MTF-native | Native snake_case surface |
 | `POST /evm` | EVM JSON-RPC | EVM sidechain RPC |
-| `POST /faucet` | Faucet | devnet/testnet test tap |
+| `POST /faucet` | Faucet | testnet test tap |
 
 Production deployments terminate TLS at the gateway and front it with a CDN; the
 node is intentionally not internet-facing — it sits behind the gateway. Running

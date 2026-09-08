@@ -1,9 +1,9 @@
 # Staking
 
 :::info
-**Live on devnet.** Deposit, delegation, undelegation, rewards claiming, and
+**Live on testnet.** Deposit, delegation, undelegation, rewards claiming, and
 validator registration are active and verified end-to-end across consensus
-on the 4-node devnet.
+on testnet.
 :::
 
 ## TL;DR {#tldr}
@@ -185,7 +185,7 @@ Mitigations:
 ## Validator selection {#validator-selection}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
+curl -X POST https://api.testnet.mtf.exchange/info -d '{"type":"validator_summaries"}'
 ```
 
 Returns the active validator set (`{epoch, total_stake, n_active, validators[]}`);
@@ -218,7 +218,7 @@ it returns the effective bootstrap-reward APR the begin-block reward effect
 actually applies, plus its committed inputs:
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"staking_state","address":"0x<addr>"}'
+curl -X POST https://api.testnet.mtf.exchange/info -d '{"type":"staking_state","address":"0x<addr>"}'
 ```
 
 ```json

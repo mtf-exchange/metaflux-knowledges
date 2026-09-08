@@ -21,7 +21,7 @@ MetaFlux reserves a small set of **well-known addresses** with special protocol 
 | `0x0000000000000000000000000000000000000000` | Null | The zero / null address — an unset or absent value | Nobody (sentinel) |
 | `0x2222222222222222222222222222222222222222` | System | Generic protocol/system-authority sender for internal writes | Protocol |
 | `0x3333333333333333333333333333333333333333` | Oracle feeder | The system sender that publishes oracle price updates | Protocol |
-| `0x5555555555555555555555555555555555555555` | Faucet | Testnet / devnet faucet that funds test accounts | Protocol (test networks only) |
+| `0x5555555555555555555555555555555555555555` | Faucet | Testnet faucet that funds test accounts | Protocol (test networks only) |
 | `0x7777777777777777777777777777777777777777` | Treasury | Protocol treasury — holds the treasury fee share and buyback MTF; the mint / burn point for supply changes | Protocol |
 | `0x8888888888888888888888888888888888888888` | Assistance fund | Holds collected fee USDC destined for buyback and executes the on-market MTF buy | Protocol |
 | `0x000000000000000000000000000000000000dead` | Burn | Reserved, provably-unspendable sink | Nobody — spends **from** it are always rejected |
@@ -45,7 +45,7 @@ The **oracle price feeder**. The protocol's oracle updates — the per-block ref
 
 ### Faucet — `0x5555…5555` {#faucet--0x55555555}
 
-The **test-network faucet**. On testnet and devnet it funds test accounts so integrators can exercise the API without real funds. It is keyless and protocol-operated. **On mainnet the faucet does not dispense** — there is no free mint of real assets.
+The **test-network faucet**. On testnet it funds test accounts so integrators can exercise the API without real funds. It is keyless and protocol-operated. **On mainnet the faucet does not dispense** — there is no free mint of real assets.
 
 This address is also the faucet's **reserve**: a claim TRANSFERS out of the balance held here, and creates nothing. The address is keyless, so the reserve accepts a pre-fund but no signer can spend it. An empty reserve refuses every claim — read its `account_state` to see whether the faucet can pay. See [`POST /faucet`](../api/rest/faucet.md#reserve).
 
@@ -127,7 +127,7 @@ A: No. These are not derived from any public key; they are fixed constants. Reco
 **Q: Can I send tokens to the burn address to destroy them?**
 A: The burn address is reserved but not wired into the active supply path today — supply reductions happen by governance reducing the treasury balance, not by sending here. Treat the burn address as reserved.
 
-**Q: The faucet gave me funds on devnet. Will it on mainnet?**
+**Q: The faucet gave me funds on testnet. Will it on mainnet?**
 A: No. The faucet only credits on test networks. On mainnet there is no faucet dispense.
 
 **Q: I see a balance at the assistance fund on the explorer — whose is it?**

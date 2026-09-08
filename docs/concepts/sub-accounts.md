@@ -201,7 +201,7 @@ use two master accounts.
 ## Querying {#querying}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"account_state","address":"0x<master>","detail":"overview"}'
 ```
 

@@ -56,7 +56,7 @@ per-market record — the same shape [`markets_meta`](../api/rest/info/perpetual
 returns for a single market by `coin`. One such record:
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"markets"}'
 ```

@@ -1,9 +1,9 @@
 # Vaults
 
 :::info
-**Live on devnet.** Vault creation, the leader's own seed transfer, config
+**Live on testnet.** Vault creation, the leader's own seed transfer, config
 update, follower share redemption, and a third party's own self-service
-deposit are all implemented and exercised on devnet — see
+deposit are all implemented and exercised on testnet — see
 [Depositing into a vault](#depositing).
 :::
 
@@ -185,7 +185,7 @@ The vault address is on-chain forever; even an empty vault sticks around (gas-pa
 ### Querying {#querying}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"vault_state","vault":"0x<vault>"}'
 ```
 

@@ -1,11 +1,11 @@
 ---
-description: Devnet/testnet test faucet — one-shot transfer of test USDC + MTF from a funded reserve. Refused on mainnet.
+description: Testnet test faucet — one-shot transfer of test USDC + MTF from a funded reserve. Refused on mainnet.
 ---
 
-# `POST /faucet` — devnet/testnet test funds
+# `POST /faucet` — testnet test funds
 
 :::warning
-**Devnet / testnet only.** It is **structurally refused on mainnet** (chain id
+**Test networks only.** It is **structurally refused on mainnet** (chain id
 `8964`): the route is never even mounted there. Never depend on it in a
 production flow.
 :::
@@ -63,7 +63,7 @@ structurally unreachable from the `/exchange` handler tree.
 | `amount` | uint64 (whole USDC) | no | Optional USDC grant; **caps DOWNWARD** at the configured max (3000) — a larger value clamps to 3000, never above. `0` is rejected. MTF (10) is fixed regardless. |
 
 ```bash
-curl -s -X POST https://api.devnet.mtf.exchange/faucet \
+curl -s -X POST https://api.testnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x00000000000000000000000000000000000ca11e"}'
 ```
@@ -182,7 +182,7 @@ anything.
 ## Limits {#limits}
 
 - **Once-ever per address.** The HTTP layer tracks it in an in-memory set (resets
-  on node restart; devnet is ephemeral), so a second claim for the same address —
+  on node restart; testnet state is ephemeral), so a second claim for the same address —
   even from a different IP, even much later — returns `429 address already
   funded`. A *rejected* request does NOT consume the in-memory slot. **That set is
   only a cheap early refusal.** The limit that binds is the per-address cap in

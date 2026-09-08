@@ -14,7 +14,7 @@ npm install @metaflux-dex/client
 import { Client } from '@metaflux-dex/client';
 
 const client = new Client({
-  baseUrl: 'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl: 'https://api.testnet.mtf.exchange', // MTF-native is the gateway default path
   privateKey: Buffer.from(process.env.PRIVATE_KEY!.replace(/^0x/, ''), 'hex'), // 32 bytes; omit for a read-only client
 });
 

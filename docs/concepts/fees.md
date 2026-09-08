@@ -580,10 +580,10 @@ The value is a quantity, so the fee does not scale with the amount transferred: 
 
 ```bash
 # tier overview (MTF-native — gateway default path; running the node yourself: localhost:8080)
-curl -X POST https://api.devnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
+curl -X POST https://api.testnet.mtf.exchange/info -d '{"type":"fee_schedule"}'
 
 # your effective tier and recent volume — same read, with an address
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"fee_schedule","address":"0x<addr>"}'
 ```
 

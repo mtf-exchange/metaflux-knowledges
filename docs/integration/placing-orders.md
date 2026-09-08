@@ -39,7 +39,7 @@ price and size grids, from
 [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta):
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"markets_meta","coin":"BTC"}'
 ```
@@ -77,7 +77,7 @@ snapping would execute a price you never signed.
 ### Step 3 — sign and post the action {#post-the-order}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/exchange \
+curl -X POST https://api.testnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d '{
   "signature": "0x<65-byte r||s||v>",
@@ -393,7 +393,7 @@ limit order.
 |--------|-------------------|--------------|
 | [`rfq_request`](../api/rest/exchange.md#rfq_request) · [`rfq_quote`](../api/rest/exchange.md#rfq_quote) · [`rfq_accept`](../api/rest/exchange.md#rfq_accept) | You negotiate a block trade off the book | live |
 | [`fba_submit`](../api/rest/exchange.md#fba_submit) | You want a uniform batch clearing price instead of the book | market must set `fba_enabled` |
-| [`submit_encrypted_order`](../api/rest/exchange.md#submit_encrypted_order) | You hide an order until a target block | devnet preview |
+| [`submit_encrypted_order`](../api/rest/exchange.md#submit_encrypted_order) | You hide an order until a target block | testnet preview |
 
 ### Not order actions {#not-order-actions}
 

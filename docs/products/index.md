@@ -16,7 +16,7 @@ machinery they share — order types, margin, liquidation, fees — see
 |---|---|---|
 | [Perpetuals](./perpetuals.md) | Leveraged long/short on an asset's price, no expiry, anchored by funding | **Live** |
 | [Spot](./spot.md) | Token-for-token CLOB, settled against your balance, no leverage | **Live** |
-| [Spot margin](./spot-margin.md) | Leveraged spot funded by the [Earn](../concepts/earn.md) lending pool | **Devnet preview** — no pair is calibrated for borrowing yet |
+| [Spot margin](./spot-margin.md) | Leveraged spot funded by the [Earn](../concepts/earn.md) lending pool | **Testnet preview** — no pair is calibrated for borrowing yet |
 | [Options](./options.md) | Standard European puts and calls, fully collateralized, traded through [RFQ](../concepts/rfq.md) only. A put settles in USDC; a call settles in the underlying coin | **Live** — series are listed by validator vote |
 | [CDS](./cds.md) | Credit-default-swap-style protection contracts | **Planned** |
 

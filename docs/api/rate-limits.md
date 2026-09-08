@@ -76,7 +76,7 @@ ladder is the one input that comes from committed chain state.
 | `POST /exchange` | 5 |
 | `POST /evm` (single request) | 1 |
 | `POST /evm` (batch array) | 1 per element, minimum 1 |
-| `POST /faucet` (devnet / testnet) | 1 |
+| `POST /faucet` (testnet) | 1 |
 | WS upgrade, `subscribe`, `unsubscribe`, pushed message | 0 |
 | WS [`post`](./ws/index.md) frame | the weight of the route it lowers onto |
 
@@ -232,7 +232,7 @@ A: No. A subscribe costs nothing at all, so it cannot exhaust the bucket an `/in
 **Q: How do I read `retry_after_ms` off a 429?**
 A: You cannot — the gateway does not send one. Derive the wait from the refill rate: 20 weight per second.
 
-**Q: What about devnet?**
-A: Devnet runs the same defaults unless the operator raises them. Do not tune your client against devnet; budget against the table above for the network you will deploy to.
+**Q: What about testnet?**
+A: Testnet runs the same defaults unless the operator raises them. Do not tune your client against testnet; budget against the table above for the network you will deploy to.
 
 </details>

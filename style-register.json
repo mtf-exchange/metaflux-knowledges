@@ -1,7 +1,15 @@
 {
   "$comment": "The approved-term register. Every rule is evidence-based: it was added because the drift it names was measured in this repository, not because it sounded like a rule. Each rule carries a positive control the checker asserts before it scans, so a dead regex cannot read as an all-clear.",
-  "scan": ["docs", "src"],
-  "skipDirs": ["node_modules", "build", ".docusaurus", "i18n"],
+  "scan": [
+    "docs",
+    "src"
+  ],
+  "skipDirs": [
+    "node_modules",
+    "build",
+    ".docusaurus",
+    "i18n"
+  ],
   "rules": [
     {
       "id": "postfix-live",
@@ -22,7 +30,7 @@
       "pattern": "\\b(simply|note that|please note|it is worth noting|needless to say|at the end of the day|as you can see|of course,)\\b",
       "flags": "gi",
       "control": "Note that absent components simply drop out",
-      "say": "Filler. Delete it — the sentence says the same thing. \"Note that X\" is just \"X\"."
+      "say": "Filler. Delete it \u2014 the sentence says the same thing. \"Note that X\" is just \"X\"."
     },
     {
       "id": "mannered",
@@ -43,7 +51,7 @@
       "pattern": "\\b(top(?:ping|ped)? up|orderbook|cancellation|test network|sub[- ]account wallet|API server)\\b",
       "flags": "gi",
       "control": "top up the orderbook on the test network",
-      "say": "Use the approved term: deposit / order book / cancel / devnet or testnet / sub-account / gateway. One term per concept — see STYLE.md."
+      "say": "Use the approved term: deposit / order book / cancel / testnet / sub-account / gateway. One term per concept \u2014 see STYLE.md."
     },
     {
       "id": "exclamation",
@@ -57,8 +65,20 @@
       "pattern": "\\bfirst-class\\b",
       "flags": "gi",
       "control": "a first-class account",
-      "say": "Say what it actually has: \"has its own balance, positions and orders\". `concepts/sub-accounts.md` is exempt — it defines the term there and the definition is load-bearing.",
-      "allowFiles": ["concepts/sub-accounts.md"]
+      "say": "Say what it actually has: \"has its own balance, positions and orders\". `concepts/sub-accounts.md` is exempt \u2014 it defines the term there and the definition is load-bearing.",
+      "allowFiles": [
+        "concepts/sub-accounts.md"
+      ]
+    },
+    {
+      "id": "dead-endpoint",
+      "pattern": "api\\.devnet\\.mtf\\.exchange|devnet-gateway\\.mtf\\.exchange|testnet-gateway\\.mtf\\.exchange|status\\.mtf\\.exchange",
+      "flags": "g",
+      "control": "https://api.devnet.mtf.exchange/info",
+      "say": "Dead host. The public endpoint is `api.testnet.mtf.exchange`. `api.devnet` answers but its faucet reserve is empty and its books are one-sided; the two `*-gateway` aliases and `status.mtf.exchange` do not resolve at all. `docs/networks.md` is the one page allowed to name the dead endpoint, to say it is not the one to use.",
+      "allowFiles": [
+        "docs/networks.md"
+      ]
     }
   ]
 }

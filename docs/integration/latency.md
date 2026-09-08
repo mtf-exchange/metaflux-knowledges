@@ -34,11 +34,11 @@ skips the position walk. Two reads give you the rate:
 
 ```bash
 ADDR=0x0000000000000000000000000000000000000001
-curl -s -X POST https://api.devnet.mtf.exchange/info \
+curl -s -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"'$ADDR'","detail":"margin"}'
 sleep 60
-curl -s -X POST https://api.devnet.mtf.exchange/info \
+curl -s -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"'$ADDR'","detail":"margin"}'
 ```
@@ -60,7 +60,7 @@ that used to push them is
 Sample over at least 30 seconds. A short sample measures jitter, not cadence.
 
 :::info
-**Worked example, not a constant.** Two samples taken on the devnet chain on 2026-08-07 gave
+**Worked example, not a constant.** Two samples taken on the hosted chain on 2026-08-07 gave
 160.2 ms and 159.9 ms per block. That figure is an illustration of the method. It is not a value to
 build against, and it will not match what you measure. Re-measure per network, and re-measure after
 any release.

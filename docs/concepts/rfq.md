@@ -227,7 +227,7 @@ session names an option series, and a series is not a coin.
 quotes:
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_open"}'
 ```
@@ -270,7 +270,7 @@ curl -X POST https://api.devnet.mtf.exchange/info \
 (sessions the account opened) and `quoted` (sessions it quoted on):
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"rfq_user","address":"0x..."}'
 ```

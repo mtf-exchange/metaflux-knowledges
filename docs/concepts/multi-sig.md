@@ -244,7 +244,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 ## Querying {#querying}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"account_state","address":"0x<multisig>","detail":"overview"}'
 ```
 

@@ -34,7 +34,7 @@ Defined terms used throughout the docs. Cross-linked where the topic has its own
 
 **CCTP — Cross-Chain Transfer Protocol.** Circle's Cross-Chain Transfer Protocol. MetaFlux does **not** use CCTP; instead USDC is bridged via [MetaBridge](../bridge/) (a validator-signed custody bridge).
 
-**chainId.** EIP-712 domain field selecting the network. `31337` devnet, `114514` testnet, `8964` mainnet. See [networks](../networks.md).
+**chainId.** EIP-712 domain field selecting the network. `31337` a node you run yourself, `114514` testnet, `8964` mainnet. See [networks](../networks.md).
 
 **Cloid — Client Order ID.** 16-byte identifier set by the client; enables `cancel_by_cloid` and order idempotency. See [exchange.md `submit_order`](../api/rest/exchange.md#submit_order).
 

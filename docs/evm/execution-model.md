@@ -1,7 +1,7 @@
 # Execution model
 
 :::tip
-**Live on devnet.** The unified block model — one EVM block per fixed period,
+**Live on testnet.** The unified block model — one EVM block per fixed period,
 with parallel conflict-strata execution inside each block — is operational and
 tested. Cadence and gas values may still be tuned before launch. The
 [bridge](../bridge/) is live.

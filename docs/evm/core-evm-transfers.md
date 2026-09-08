@@ -1,7 +1,7 @@
 # Core ↔ EVM transfers
 
 :::tip
-**Live on devnet.** The EVM→Core value-transfer actions (`SpotSend`, `SendAsset`,
+**Live on testnet.** The EVM→Core value-transfer actions (`SpotSend`, `SendAsset`,
 `UsdClassTransfer`, `VaultTransfer` via CoreWriter) and Core→EVM credit
 materialization are operational and tested. The [bridge](../bridge/) (cross-chain
 custody) is live.

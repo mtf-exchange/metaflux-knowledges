@@ -1,7 +1,7 @@
 # Interaction timings
 
 :::tip
-**Live on devnet.** Block cadence and interaction timings — CoreWriter action
+**Live on testnet.** Block cadence and interaction timings — CoreWriter action
 delays and Core→EVM credit materialization — are operational as described.
 Cadence and budgets may still be tuned before launch.
 :::

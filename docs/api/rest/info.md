@@ -3367,7 +3367,7 @@ sequenceDiagram
 ## See also {#see-also}
 
 - [`POST /exchange`](./exchange.md) — write path
-- [`POST /faucet`](./faucet.md) — devnet/testnet test-fund grant (USDC + MTF)
+- [`POST /faucet`](./faucet.md) — testnet test-fund grant (USDC + MTF)
 - [WS subscriptions](../ws/subscriptions.md) — push equivalents
 
 ## FAQ {#faq}

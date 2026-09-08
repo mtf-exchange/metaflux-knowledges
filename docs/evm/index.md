@@ -1,7 +1,7 @@
 # EVM
 
 :::tip
-**Live on devnet.** EVM execution and CoreWriter actions are operational, as are
+**Live on testnet.** EVM execution and CoreWriter actions are operational, as are
 the stateless MTF derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed
 read precompiles (querying the chain's own positions / book directly) are upcoming.
 The [bridge](../bridge/) is live.

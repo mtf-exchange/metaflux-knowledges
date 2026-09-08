@@ -1,5 +1,5 @@
 ---
-description: What changes on devnet chain 114514 at block 13,350,001 — a future-nonce refusal, TWAP slices that finally fill, cancel-all that reaches TWAP parents, an isolated extend that posts margin, a bounded EVM block, and the buyback drip.
+description: What changes on chain 114514 at block 13,350,001 — a future-nonce refusal, TWAP slices that finally fill, cancel-all that reaches TWAP parents, an isolated extend that posts margin, a bounded EVM block, and the buyback drip.
 ---
 
 # Activation notice — block 13,350,001

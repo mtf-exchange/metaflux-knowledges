@@ -230,7 +230,7 @@ quote asset in terms of itself has no meaning.
 
 ### A worked check {#worked-check}
 
-Claim the devnet [faucet](../networks.md#faucet), which grants 3000 USDC and
+Claim the testnet [faucet](../networks.md#faucet), which grants 3000 USDC and
 10 MTF, then read `account_state`:
 
 - `account_value: "3000"`, and `spot.balances` carries the USDC row (`signing_id 100`,

@@ -3937,7 +3937,7 @@ change how the order matches, and it does not skip a risk check.
 
 ### Submit a threshold-encrypted order {#submit_encrypted_order}
 
-**Status: available on devnet (preview).** The action is accepted and the
+**Status: available on testnet (preview).** The action is accepted and the
 pending-pool mechanics below apply, but the threshold-encrypted order pipeline
 is still a preview surface — expect changes before it is production-grade.
 

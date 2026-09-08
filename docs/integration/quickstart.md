@@ -1,27 +1,27 @@
 # Quickstart — 5-minute end-to-end
 
 :::info
-**Status.** **stable** wire surface. Devnet endpoints, no mainnet warranty.
+**Status.** **stable** wire surface. Testnet endpoints, no mainnet warranty.
 :::
 
-Deposit, place an order, cancel, withdraw. By the end of this page your TypeScript / Python / curl session has done a complete round-trip against devnet.
+Deposit, place an order, cancel, withdraw. By the end of this page your TypeScript / Python / curl session has done a complete round-trip against testnet.
 
 ## Prerequisites {#prerequisites}
 
-- An EVM private key (any 32-byte hex; for devnet, generate fresh — don't reuse a mainnet key)
-- USDC on a MetaBridge source chain (Base or Arbitrum) — devnet allows the faucet route instead
+- An EVM private key (any 32-byte hex; generate a fresh one — never reuse a mainnet key)
+- USDC on a MetaBridge source chain (Base or Arbitrum) — on testnet the faucet replaces this
 - `curl` or any HTTP client
 
 ## Endpoints {#endpoints}
 
 The gateway is the single public front door, serving the MTF-native surface.
 
-| Service | URL (devnet) |
+| Service | URL (testnet) |
 |---------|--------------|
-| Gateway front door | `https://api.devnet.mtf.exchange` |
+| Gateway front door | `https://api.testnet.mtf.exchange` |
 | MTF-native | `POST /info` · `POST /exchange` · `GET /ws` |
 | EVM JSON-RPC | `POST /evm` |
-| Faucet (devnet) | `POST /faucet` |
+| Faucet | `POST /faucet` |
 | Explorer | `https://app.mtf.exchange/explorer` |
 
 > The faucet is **not** a separate service — it's the `POST /faucet` route on the
@@ -31,10 +31,10 @@ The gateway is the single public front door, serving the MTF-native surface.
 
 See [networks](../networks.md) for the full list including testnet and (post-launch) mainnet.
 
-## Step 1 — Get devnet USDC {#step-1--get-devnet-usdc}
+## Step 1 — Get testnet USDC {#step-1-get-testnet-usdc}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/faucet \
+curl -X POST https://api.testnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
   -d '{"address":"0x<YOUR_ADDRESS>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
@@ -42,19 +42,19 @@ curl -X POST https://api.devnet.mtf.exchange/faucet \
 
 One claim grants **3000 USDC** cross-collateral **and 10 MTF** spot tokens —
 **once ever per address** (a second claim returns `429 address already funded`),
-rate-limited at 1 / minute / IP. The optional `amount` only caps the USDC grant
+rate-limited to one claim per IP per day, crossed with the per-address rule. The optional `amount` only caps the USDC grant
 *downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
-:::warning
-**Check the balance; do not trust `"queued"`.** The faucet transfers out of a
-reserve account, and the claim is re-checked when the block applies it. **The
-reserve is empty on the live chain today**, so the claim above returns
-`200 queued` and credits nothing until governance funds it. If no balance
-appears, that is why — see [the reserve](../api/rest/faucet.md#reserve).
+:::info
+**`"queued"` means staged, not credited.** The faucet transfers out of a reserve
+account rather than creating tokens, so the grant lands about one block later.
+The reserve is checked before the response, so a `200` means it could pay at that
+moment. Confirm with `account_state` below before you trade — see
+[the reserve](../api/rest/faucet.md#reserve).
 :::
 
-> The faucet is a **devnet/testnet convenience only**. To fund a real account
+> The faucet is a **test-network convenience only**. To fund a real account
 > with bridged USDC, deposit through the MetaBridge custody bridge — call the
 > source chain's `deposit(mtfDest, amount)` (never a plain transfer to the
 > custody address). See [bridge → deposit](../bridge/index.md#deposit-source-chain--metaflux).
@@ -64,7 +64,7 @@ The raw curls below speak **MTF-native** on the gateway (snake_case types like
 same native surface — the SDK just builds the signed envelope for you.
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -85,7 +85,7 @@ The full signing flow is in [signing](./signing.md). For this quickstart use the
 import { Client } from '@metaflux-dex/client';
 
 const client = new Client({
-  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.testnet.mtf.exchange', // MTF-native is the gateway default path
   privateKey: Buffer.from(process.env.PRIVATE_KEY!.replace(/^0x/, ''), 'hex'), // 32 bytes
 });
 
@@ -118,7 +118,7 @@ if (result.route === 'batch_order') {
 Raw curl (MTF-native shape — you build the signature yourself; see [signing](./signing.md)):
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/exchange \
+curl -X POST https://api.testnet.mtf.exchange/exchange \
   -H 'content-type: application/json' \
   -d @order.json
 ```
@@ -156,7 +156,7 @@ spot orders back via [`POST /info`](../api/rest/info.md); cancel with
 ## Step 3 — Check the order is on the book {#step-3--check-the-order-is-on-the-book}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
@@ -185,7 +185,7 @@ if (result.route === 'batch_order') {
 
 ```bash
 # raw curl
-curl -X POST https://api.devnet.mtf.exchange/exchange \
+curl -X POST https://api.testnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 
@@ -249,7 +249,7 @@ sequenceDiagram
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `401 signer is not the sender` | Wrong EIP-712 domain chain id | The SDK signs against `MTF_CHAIN_ID` (testnet/devnet `114514`, mainnet `8964`) by default — don't override `chainId` on a call unless you mean to target a different network |
+| `401 signer is not the sender` | Wrong EIP-712 domain chain id | The SDK signs against `MTF_CHAIN_ID` (testnet `114514`, mainnet `8964`) by default — don't override `chainId` on a call unless you mean to target a different network |
 | `400 action: <parse error>` | Wrong field name, wrong type, or a missing required field | Check the action's entry in the catalog |
 | `404 unknown user` on info | Address has no on-chain state yet | Deposit first (faucet) |
 | `429 rate limit` | Too many requests | See [rate limits](../api/rate-limits.md); back off |
@@ -259,7 +259,7 @@ sequenceDiagram
 
 ## See also {#see-also}
 
-- [Networks](../networks.md) — devnet / testnet / mainnet endpoints + chainIds
+- [Networks](../networks.md) — testnet and mainnet endpoints + chainIds
 - [Signing](./signing.md) — the full envelope spec
 - [`POST /exchange`](../api/rest/exchange.md)
 - [`POST /info`](../api/rest/info.md)

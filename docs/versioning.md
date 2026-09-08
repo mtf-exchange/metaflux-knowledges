@@ -135,7 +135,6 @@ An SDK's `1.x` API surface targets a specific protocol MAJOR. When the protocol 
 ## Pre-mainnet caveats {#pre-mainnet-caveats}
 
 Until mainnet launch:
-- Devnet may break wire shape with 24h notice.
 - Testnet runs the latest protocol MINOR/MAJOR ahead of mainnet's planned release; breakage on testnet is expected.
 - Status banners in each doc reflect what's stable vs preview vs planned.
 

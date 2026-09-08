@@ -36,7 +36,7 @@ no account application, no gatekeeper.
 - **Hold two-way (hedge) positions** — keep a long and a short position open in
   the same market at the same time. See [hedge mode](concepts/hedge-mode.md).
 
-Also live in devnet preview:
+Also in preview on testnet:
 
 - **Supply idle USDC** to [Earn](concepts/earn.md), a lending pool that pays the
   interest spot-margin borrowers owe. **It pays zero today** — the borrow rate is
@@ -126,8 +126,8 @@ section.
 network and endpoints.
 :::
 
-- **Pick a network.** [Networks & chain IDs](networks.md) lists the devnet,
-  testnet, and mainnet endpoints and their chain IDs. Start on devnet or testnet if
+- **Pick a network.** [Networks & chain IDs](networks.md) lists the testnet
+  and mainnet endpoints and their chain IDs. Start on testnet if
   you want to practice with no real funds at risk.
 - **Building or running a bot?** The developer
   [integration quickstart](integration/quickstart.md) walks you from deposit to

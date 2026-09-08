@@ -128,7 +128,7 @@ These are MTF-native actions on `POST /exchange`; see the [API overview](../api/
 import { Client } from '@metaflux-dex/client';
 
 const client = new Client({
-  baseUrl:    'https://api.devnet.mtf.exchange',
+  baseUrl:    'https://api.testnet.mtf.exchange',
   privateKey: Buffer.from(process.env.PRIVATE_KEY!.replace(/^0x/, ''), 'hex'),
 });
 const owner = '0x<YOUR_ADDRESS>';

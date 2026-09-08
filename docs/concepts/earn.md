@@ -103,7 +103,7 @@ Earn is **not risk-free**. If a [spot-margin](../products/spot-margin.md) positi
 at a loss that the borrower's collateral cannot cover, the **shortfall is socialized
 to suppliers**: the pool's `total_supplied` is reduced (floored at zero), which
 lowers `share_value`. The pool's protection is the **automatic liquidator** (live
-on devnet): every block, underwater margin accounts are
+on testnet): every block, underwater margin accounts are
 [forced-closed](../products/spot-margin.md#liquidation) at the maintenance floor, so a
 position is unwound while there is normally still enough value to repay the loan.
 The conservative per-pair maintenance ratio (still being calibrated) sizes that

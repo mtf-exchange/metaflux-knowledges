@@ -34,9 +34,9 @@ The tradeable markets now live under [Products](../products/index.md) — see
 [Spot margin](../products/spot-margin.md). The lending pool that funds spot-margin
 borrows is a concept:
 
-- [Earn](./earn.md) — **devnet preview**: USDC lending pool that funds spot-margin borrows
+- [Earn](./earn.md) — **testnet preview**: USDC lending pool that funds spot-margin borrows
 - [Spot](../products/spot.md) — **live**: token-for-token CLOB, reserved-balance escrow, no leverage
-- [Spot margin](../products/spot-margin.md) — **devnet preview**: leveraged spot funded by the Earn pool
+- [Spot margin](../products/spot-margin.md) — **testnet preview**: leveraged spot funded by the Earn pool
 
 :::info
 **Non-leveraged spot only is Sharia-compliant.** Only **non-leveraged** spot

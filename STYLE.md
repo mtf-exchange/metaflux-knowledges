@@ -34,7 +34,7 @@ document.
 | deposit / add margin | top up | "Top up" is consumer-app register. Say which one: you *deposit* USDC, you *add margin* to a bucket. |
 | order book | orderbook | One spelling. |
 | cancel | cancellation | The action is `cancel`; the noun form invites a second term for one concept. |
-| devnet / testnet | test network | Name the network. The two behave differently. |
+| testnet | devnet, test network | One hosted network, one name. `api.devnet.mtf.exchange` is a second chain that answers but cannot be traded on. |
 | sub-account | sub-account wallet | A sub-account cannot sign, so calling it a wallet is wrong, not just inconsistent. |
 | gateway | API server, front door | `gateway` is the component's name. |
 
@@ -69,6 +69,16 @@ varying", "internally".
 **"in order to"** — write "to".
 
 **Exclamation marks.** A reference reads flat.
+
+**Dead hosts.** The public endpoint is `api.testnet.mtf.exchange`. Do not name
+`api.devnet.mtf.exchange` (it answers, but its faucet reserve is empty and its
+books are one-sided), the `*-gateway.mtf.exchange` aliases, or
+`status.mtf.exchange` — the last three do not resolve. `docs/networks.md` is the
+one page allowed to name the dead endpoint, to say it is not the one to use.
+
+`"Devnet"` stays where it is a **protocol value**: it is the signed
+`metafluxChain` tag for chain id `31337`, so the typed-data table and the chain-id
+tables are correct as written.
 
 **"first-class"** — say what the thing actually has: "it has its own balance,
 positions and orders". `concepts/sub-accounts.md` is the one exemption: it

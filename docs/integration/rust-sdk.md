@@ -22,7 +22,7 @@ use metaflux_client::{
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let wallet = Wallet::from_hex(&std::env::var("PRIVATE_KEY")?)?;
-    let client = Client::new("https://api.devnet.mtf.exchange")?;
+    let client = Client::new("https://api.testnet.mtf.exchange")?;
 
     let markets = client.rest().info().markets().await?;
     println!("{} markets available", markets.len());
@@ -149,7 +149,7 @@ use metaflux_client::{
     ws::{Subscription, WsClient, WsMessage},
 };
 
-let ws = WsClient::connect("wss://api.devnet.mtf.exchange/ws").await?;
+let ws = WsClient::connect("wss://api.testnet.mtf.exchange/ws").await?;
 let mut rx = ws.messages();
 
 ws.subscribe_trades(MarketId(1)).await?;
@@ -215,7 +215,7 @@ use metaflux_client::types::{
 
 let master_wallet = Wallet::from_hex(&std::env::var("MASTER_KEY")?)?;
 let agent_wallet = Wallet::from_hex(&std::env::var("AGENT_KEY")?)?;
-let client = Client::new("https://api.devnet.mtf.exchange")?;
+let client = Client::new("https://api.testnet.mtf.exchange")?;
 
 client.exchange().approve_agent(&master_wallet, &ApproveAgent {
     agent: agent_wallet.address(),

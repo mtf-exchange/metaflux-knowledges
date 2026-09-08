@@ -1,7 +1,7 @@
 # Portfolio margin
 
 :::info
-**Live on devnet.** The scenario engine is fully operational: users enroll via the
+**Live on testnet.** The scenario engine is fully operational: users enroll via the
 `user_portfolio_margin` action (equity-gated, default ≥ 100 K USDC), and the
 SPAN-style scenario grid (±5/10/20 % price × ±20/50 % vol) computes maintenance in
 real time. Both the action surface and the scenario engine are shipped and tested
@@ -225,7 +225,7 @@ A more balanced book where no single asset exceeds 50 % of net value pays **no**
 ## Querying {#querying}
 
 ```bash
-curl -X POST https://api.devnet.mtf.exchange/info \
+curl -X POST https://api.testnet.mtf.exchange/info \
   -H 'content-type: application/json' \
   -d '{"type":"account_state","address":"0x<addr>"}'
 ```

@@ -1,7 +1,7 @@
 # Interacting with Core
 
 :::tip
-**Live on devnet.** CoreWriter actions are operational, as are the stateless MTF
+**Live on testnet.** CoreWriter actions are operational, as are the stateless MTF
 derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed read precompiles —
 querying the chain's own positions / book directly — are upcoming. The bridge
 ([Bridge](../bridge/)) is live.

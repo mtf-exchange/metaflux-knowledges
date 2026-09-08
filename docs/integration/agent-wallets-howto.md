@@ -48,7 +48,7 @@ The master must sign this — it's the **only time** the master signs (per sessi
 import { Client } from '@metaflux-dex/client';
 
 const master = new Client({
-  baseUrl:    'https://api.devnet.mtf.exchange', // MTF-native is the gateway default path
+  baseUrl:    'https://api.testnet.mtf.exchange', // MTF-native is the gateway default path
   privateKey: Buffer.from(process.env.MASTER_KEY!.replace(/^0x/, ''), 'hex'),
 });
 // `Client` has no `.address` getter — the master's own address comes from
@@ -105,7 +105,7 @@ There is no `signerAddress` / `senderAddress` constructor option. A **separate `
 ```typescript
 // A separate Client, signing with the agent's key.
 const agent = new Client({
-  baseUrl:    'https://api.devnet.mtf.exchange',
+  baseUrl:    'https://api.testnet.mtf.exchange',
   privateKey: agentPrivateKey,
 });
 
