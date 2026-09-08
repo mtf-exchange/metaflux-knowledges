@@ -37,7 +37,7 @@ after JSON.parse:         16613428288414605000     <- off by 24
 > MAX_SAFE_INTEGER:       true
 ```
 
-Nothing raises an error. The digits are simply wrong, and every use that
+Nothing raises an error. The digits are wrong, and every use that
 COMPARES ids fails silently: a `user_fills` to `trades` join by `tid` matches
 nothing, and fill de-duplication by `tid` drops nothing.
 

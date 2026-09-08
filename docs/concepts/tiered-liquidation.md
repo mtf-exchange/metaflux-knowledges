@@ -269,7 +269,7 @@ Most public derivatives chains transition straight from "healthy" to "partial cl
 
 T0 is a **one-block hysteresis layer**. You enter the band; the chain freezes your resting open orders (ALO only — see below) and notifies your client, but nothing of yours is sold. You have until the next consensus block to:
 
-- top up margin via `Deposit` (or `UpdateIsolatedMargin` to add to a bucket),
+- add margin via `Deposit` (or `UpdateIsolatedMargin` to add to a bucket),
 - close part of the position manually,
 - or do nothing — in which case T1 fires on the next eval.
 
@@ -387,7 +387,7 @@ when account enters T3 (or parked un-fillable lots exist):
 Counterparties drafted into the netting keep **every cent of PnL** (realized
 at mark) — they only lose the open position. No fee is charged on either side.
 A netting without a usable mark price, or without any profitable opposite
-side, simply waits — the chain never force-sells into an empty book.
+side, waits — the chain never force-sells into an empty book.
 
 ### The Metaliquidity vault takes the first bite {#mlp-first-bite}
 
@@ -460,7 +460,7 @@ This prevents "free" intra-block manipulation where a user adds risk between beg
 
 | Scenario | Strategy |
 |----------|----------|
-| Headed for T0 | Top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross). Pre-position trigger orders before stress. |
+| Headed for T0 | Add margin via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross). Pre-position trigger orders before stress. |
 | Already at T0 | Same. ALO orders are already cancelled; place fresh limits at protective levels. |
 | Bouncing in/out of T0 | Tighten your internal ratio alert toward `1.2` (the derived ratio from `account_value` / `cross_maintenance_margin_used` — see [two meanings of health](#two-meanings-of-health), not the wire `health` field). Look at what's driving it — funding payment? mark band edge? oracle outage? |
 | T1 partial just fired | Re-eval. Position is 50% smaller; consider closing the remainder voluntarily before cooldown's full-close escalation. |

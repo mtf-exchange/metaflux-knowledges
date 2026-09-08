@@ -86,7 +86,7 @@ The aggregator is built to degrade rather than lie. Per tick, in order:
 - **Renormalize on the survivors.** Absent venues are treated as weight 0 and the remaining weights are renormalized.
 - **Minimum-coverage hold.** If **less than 50 %** of the total configured weight is present in a tick, the oracle slot is **not updated** — the previous good value persists. This is the hard floor that stops one or two surviving venues from defining the price during a market-wide feed outage.
 
-A venue whose weight is set to 0 (e.g. delisted for that symbol) is simply never requested.
+A venue whose weight is set to 0 (e.g. delisted for that symbol) is never requested.
 
 ## Publication {#publication}
 

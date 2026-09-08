@@ -32,7 +32,7 @@ with three components:
 | **C2** (internal book) | `mid(best_bid, best_ask)` — best bid/ask **only**. Requires both sides and an uncrossed book, else `None`. It deliberately **excludes the last trade** (folding the last trade back in would make the recompute self-referential and could freeze a thin one-sided book). |
 | **C3** (external perps) | `median(external perp mids)` over the **5 perp venues** (Binance, OKX, Bybit, Gate, MEXC); requires **≥ 2** venues present, else `None` |
 
-The outer median is robust to a single outlier. **Absent components simply drop out** — with two present the mark is their midpoint, with one it's that value. With no internal book and no external perps, `mark = C1 = oracle + EMA(basis)`, degrading gracefully toward the spot oracle rather than freezing.
+The outer median tolerates one outlier component. **Absent components drop out** — with two present the mark is their midpoint, with one it's that value. With no internal book and no external perps, `mark = C1 = oracle + EMA(basis)`, degrading gracefully toward the spot oracle rather than freezing.
 
 **A lone C2 is rejected.** If the *only* present component is the internal quote-mid (no oracle, no external perps), the mark is left untouched rather than letting a single resting spread — which an adversary controls — define the liquidation/funding price. A lone C1 (external oracle) or a lone C3 (already a ≥ 2-venue median) is allowed.
 
@@ -75,7 +75,7 @@ It is **normal and expected** for the mark to sit far from the oracle. The oracl
 - **C2** is the MetaFlux perp book mid, **C3** is the external *perp* median — both reflect perp, not spot.
 - **C1** is `oracle + EMA(quote_mid − oracle)` — the basis EMA pulls even the oracle anchor toward the perp's running premium, so all three components track the perp.
 
-So when a perp trades at, say, a 30 % discount to its spot index, `mark ≈ perp` and `oracle ≈ spot` legitimately diverge by ~30 %. That gap is exactly what **[funding](./funding-rates.md)** is there to close — and note that if the oracle itself is unreliable, funding is *gated off and decays to 0* even while the mark/oracle gap is wide (so a large gap with ~0 funding means the oracle for that market is being distrusted, not that funding is broken). See [funding gating](./funding-rates.md#gating-when-the-oracle-is-untrusted).
+So when a perp trades at, say, a 30 % discount to its spot index, `mark ≈ perp` and `oracle ≈ spot` legitimately diverge by ~30 %. That gap is exactly what **[funding](./funding-rates.md)** is there to close — and if the oracle itself is unreliable, funding is *gated off and decays to 0* even while the mark/oracle gap is wide (so a large gap with ~0 funding means the oracle for that market is being distrusted, not that funding is broken). See [funding gating](./funding-rates.md#gating-when-the-oracle-is-untrusted).
 
 ## Sanity bands {#sanity-bands}
 

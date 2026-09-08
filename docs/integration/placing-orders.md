@@ -375,7 +375,7 @@ account must omit it.** The slices inherit the leg the parent names, so a hedge
 parent that names none is refused, and a one-way parent that names one is refused
 too. The refusal happens **at commit**, and a commit-time refusal of a non-order
 action is reported on no channel: the HTTP reply already said `accepted: true`,
-and the TWAP simply never starts. Read `position_mode` from
+and the TWAP never starts. Read `position_mode` from
 [`account_state`](../api/rest/info.md#account_state) once at session start and
 set the field from it.
 

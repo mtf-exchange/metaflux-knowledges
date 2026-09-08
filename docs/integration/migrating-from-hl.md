@@ -190,7 +190,7 @@ MTF's oracle composition is governed per-market (committed `SetOracleWeights`) â
 
 ### 4. Multi-account / institutional setup {#4-multi-account--institutional-setup}
 
-HL: master + agents per host. MTF: same, plus first-class **multi-sig accounts**.
+HL: master + agents per host. MTF: same, plus **multi-sig accounts**.
 
 ```typescript
 // existing: master + agents (each host is its own Client with its own key;

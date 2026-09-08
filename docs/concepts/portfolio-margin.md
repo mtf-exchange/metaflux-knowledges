@@ -47,7 +47,7 @@ BTC +10%, ETH -10%:   long BTC gains $10, short ETH gains $10  → net +$20
 
 Worst-case loss: $20 — but only in the decorrelation scenario. Probability-weighted, the decorrelation shock is rare (BTC/ETH 30-day correlation ≈ 0.85). PM's calibrated scenario set weights this realistically; the actual maint is usually ~$5–10 rather than the naive $20.
 
-Classical's $10 simply has no view on correlation. PM does.
+Classical's $10 has no view on correlation. PM does.
 
 ## How PM works {#how-pm-works}
 

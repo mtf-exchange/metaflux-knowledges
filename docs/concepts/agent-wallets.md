@@ -230,7 +230,7 @@ For agent-signed requests, the nonce space is keyed off the **master** (the reso
 
 ## Production checklist {#production-checklist}
 
-Battle-tested patterns for running an agent-key fleet in production:
+Patterns for running an agent-key fleet in production:
 
 | Item | Why |
 |------|-----|

@@ -10,7 +10,7 @@ Production trading bots that hold positions overnight should run one. The protoc
 
 ## TL;DR {#tldr}
 
-Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values, top up via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before the maintenance requirement becomes binding.
+Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values, add margin via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before the maintenance requirement becomes binding.
 
 ## Architecture {#architecture}
 

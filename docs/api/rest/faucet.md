@@ -128,7 +128,7 @@ applies it, and either can be refused there** — see
 The HTTP checks are **not** the binding ones. The two credits are ordinary
 consensus actions, and each is validated again at the moment the block applies
 it. There is no reply channel from that point, so a refusal is silent: the
-`200 queued` you already hold does not change, and the balance simply never
+`200 queued` you already hold does not change, and the balance never
 moves.
 
 Four rules refuse a queued claim. All four are evaluated on committed state:

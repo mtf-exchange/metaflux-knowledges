@@ -133,7 +133,7 @@ Response:
 
 For spot assets use `sub_account_spot_transfer` (adds an `asset` field).
 
-**Transfer must leave the sub in Safe tier** — a withdrawal that would push the sub into T0+ is rejected with `MARGIN_INSUFFICIENT`. Top up first, then withdraw the excess.
+**Transfer must leave the sub in Safe tier** — a withdrawal that would push the sub into T0+ is rejected with `MARGIN_INSUFFICIENT`. Add margin first, then withdraw the excess.
 
 ## Trading from a sub {#trading-from-a-sub}
 

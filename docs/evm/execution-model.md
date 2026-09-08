@@ -60,7 +60,7 @@ path**.
 
 ## MEV-resistant trading (opt-in, per market) {#mev-resistant-trading-opt-in-per-market}
 
-Market microstructure is a first-class concern, so MEV resistance is a property of
+Market microstructure is a primary design concern, so MEV resistance is a property of
 **block construction**, not a fee-market afterthought — and it is opt-in per market:
 
 - A market in **frequent-batch-auction (FBA)** mode collects its order intents for

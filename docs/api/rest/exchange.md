@@ -1076,7 +1076,7 @@ Same per-entry response shape as `cancel_order`.
 ### Cancel an order by client ID {#cancel_by_cloid}
 
 Cancel by client order id. Useful when the caller hasn't seen the server-side
-`oid` yet (race between the `submit_order` response and a cancellation decision).
+`oid` yet (race between the `submit_order` response and a decision to cancel).
 **Sender-authorized by default** — omit `owner` and the recovered signer is the
 actor; an approved agent may cancel **as** an `owner` it acts for.
 
@@ -1562,7 +1562,7 @@ Cancel a **whole ladder** in one action — every one of your resting orders on
 | `owner` | hex address \| null | 40 hex chars | Optional: cancel **as** this account (approved agents only). **Digest-bound** when present |
 
 **Semantics.** Only **resting** orders are swept. Rungs that already filled are
-simply gone. A ladder with no live rungs left returns `order not found`. A cancel
+gone. A ladder with no live rungs left returns `order not found`. A cancel
 by a signer who is not the owner is rejected.
 
 **Seam — a parked trigger sharing the handle survives.** `cancel_scale` reaches
@@ -2771,7 +2771,7 @@ Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
 ### Add margin to a strict-isolated position {#top_up_isolated_only_margin}
 
 Add margin to a strict-isolated position. Top-up direction only (positive amount).
-**Sender-authorized by default**; an approved agent may top up **as** an `owner`
+**Sender-authorized by default**; an approved agent may add margin **as** an `owner`
 it acts for.
 
 ```json
@@ -2783,7 +2783,7 @@ it acts for.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `owner` | hex address \| omitted | Optional: top up **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
+| `owner` | hex address \| omitted | Optional: add margin **as** this account (approved agents only). **Not** digest-bound — resolved at admission |
 | `asset` | uint32 | Target asset |
 | `amount` | decimal (string or number) | Positive amount to add |
 
@@ -3498,7 +3498,7 @@ but the chain does not compare them.
 |----------|--------|
 | `user` has no registered roster, or a zero threshold | **Rejected** — `user not multi-sig` / `multi-sig threshold zero` |
 | An empty `inner_action_blob` | **Rejected**, `InvalidParams` — `empty inner_action_blob` |
-| A signature of the wrong length, or from a non-roster key | **Silently skipped.** One malformed entry must not block an otherwise valid quorum, so it is not an error — it simply does not count |
+| A signature of the wrong length, or from a non-roster key | **Silently skipped.** One malformed entry must not block an otherwise valid quorum, so it is not an error — it does not count |
 | Fewer than `threshold` **distinct** roster signers recovered | **Rejected**, `AUTH_UNAUTHORIZED` |
 | A stale or replayed `params.nonce` | **Rejected** — `stale or replayed multi-sig nonce` |
 | An inner action outside the executable set: a governance vote, a system write, or a nested `multi_sig` | **Rejected**, `AUTH_UNAUTHORIZED` — and `user`'s nonce has **already advanced**. This is deliberate: a valid quorum cannot retry the same nonce with a privileged body swapped in |

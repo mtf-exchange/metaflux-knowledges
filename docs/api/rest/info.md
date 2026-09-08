@@ -1526,7 +1526,7 @@ is present, `trigger_px` is the ratcheted level, not the level the owner
 sent — do not render it as a static order the user placed. A trailing leg is
 always a stop-loss; the chain refuses a trailing take-profit, which would
 chase its level away from a winning position. `trail_px` is submittable —
-see [trailing stops](./exchange.md#trailing-stops), and note that sending it
+see [trailing stops](./exchange.md#trailing-stops), and sending it
 changes the order's signing digest.
 ### Recent fill history for an account {#user_fills}
 
@@ -1588,6 +1588,7 @@ follow the new one. Read that id on [`open_orders`](#open_orders).
 | `limit` | uint32 | no | Cap on the number of most-recent records returned. Absent or `0` returns the full ring |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive), filtered on the fill `time`. Absent is an open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent is an open upper bound |
+| `aggregate` | bool | no | Default `false`. `true` folds the legs of ONE order's execution in ONE block into a single row and adds `n`. See [aggregated rows](#user_fills-aggregate) |
 
 Send `address` alone for the recent window, or add `start_time` / `end_time` to
 filter the same records by time. The response echoes both bounds back as
@@ -1627,9 +1628,9 @@ is identical either way.
 }
 ```
 
-Records are ordered oldest-first (newest last). The ring is bounded, so this is
-a recent window, not the account's full history. An account with no fills
-returns `"fills": []`.
+Records are ordered newest-first (the most recent fill is `fills[0]`). The ring
+is bounded, so this is a recent window, not the account's full history. An
+account with no fills returns `"fills": []`.
 
 A request whose `start_time` is older than the oldest ring record is answered
 from the archive instead. A request with no time bound always answers from the
@@ -1645,11 +1646,11 @@ ring.
 | `fills[*].time` | uint64 | Fill timestamp (consensus ms) |
 | `fills[*].oid` | decimal-digit string | This party's order id |
 | `fills[*].tid` | decimal-digit string | Deterministic trade id, shared by both legs of the print. It is a 64-bit hash-derived value and routinely exceeds 2^53, so it is a STRING: a JSON number loses its low digits in JavaScript, and a `user_fills` to `trades` join by `tid` then matches nothing, silently. Compare it as a string, or convert it with `BigInt` |
-| `fills[*].fee` | Decimal string | Fee this party paid. **Read `fee_token` for the denomination — it is not always USDC** |
+| `fills[*].fee` | Decimal string | Fee this party paid. **Read `fee_token` for the denomination — it is not always USDC.** ⚠️ On a SPOT fill this field reads `"0"` on BOTH legs today. The seller's USDC fee IS charged — it leaves the unified balance — but the spot lane records no fee on the fill, so the row cannot report it. Derive a spot fee from the balance delta, or from the pair's rate times the notional; do not read `"0"` as free. A node release will record it |
 | `fills[*].fee_token` | string | Coin symbol the `fee` is charged in. A perp fill and a spot SELL pay `"USDC"`; a **spot BUY pays the BASE token**, so a `BTC/USDC` buy pays its fee in BTC. That rule has been live since block 6,565,000; the field is derived per record, so an older fill correctly reports `"USDC"` on both sides. **Without it, summing `fee` across a spot account adds one token to another.** On a spot BUY it also warns you that `fee` is not the whole story: the base fee is NETTED out of the size delivered, not debited, so `fee` can read `"0"` while the real charge is the gap between `sz` and the balance credit — see [a spot BUY pays its fee in the base token](../../concepts/fees.md#spot-buy-fee-in-base) |
-| `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **decimal USDC** (signed) |
-| `fills[*].dir` | string | Direction label: `"Open Long"`, `"Close Short"`, `"Open Short"`, or `"Close Long"` |
-| `fills[*].start_position` | Decimal string | Signed leg size before the fill, **base units** (whole-unit, signed) |
+| `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **decimal USDC** (signed). Always `"0"` on a spot fill — spot holds no position, so it realizes no PnL |
+| `fills[*].dir` | string | Direction label. A PERP fill uses six tokens: `"Open Long"`, `"Close Long"`, `"Open Short"`, `"Close Short"`, and — when the fill crosses through zero — `"Long > Short"` or `"Short > Long"`. A SPOT fill uses `"Buy"` (side `"B"`) or `"Sell"` (side `"A"`): spot holds no position, so no open/close token applies. Switch on `side` for spot and on this field for perps |
+| `fills[*].start_position` | Decimal string | Signed leg size before the fill, **base units** (whole-unit, signed). Always `"0"` on a spot fill — spot holds no position leg |
 | `fills[*].block` | uint64 | Committed block height the fill settled in |
 | `fills[*].cause` | string | Present only when this leg did not execute by its own order crossing. `"forced_close_partial"` / `"forced_close_full"` — the liquidation ladder; `"forced_close_isolated"` — an isolated leg breached its own bucket; `"forced_close_governance"` — a validator-quorum forced close settled against the book; `"trigger"` — a TP/SL fired; `"twap"` — a TWAP slice. Absent on an ordinary fill and on every maker leg: a counterparty that was merely hit is not itself forced. `forced_close_governance` is a forced close that is NOT a liquidation — it charges no liquidation fee and does not count toward liquidation totals |
 | `fills[*].liquidated_user` | hex address | Present on a forced-close leg only, on both sides of the print. The account whose position was closed — so a taker can see whose liquidation it absorbed |
@@ -1671,6 +1672,46 @@ ring.
   reached the stream the archive folds. So a ring-window read has always
   returned them, and an archive-window read over that earlier period returns
   nothing for them. From that release on, both windows agree.
+
+#### Aggregated rows: `aggregate` {#user_fills-aggregate}
+
+One order that sweeps 24 resting orders writes 24 rows. Send `"aggregate":
+true` to get ONE row for that order instead, with a new field `n` that counts
+the legs folded into it. The default is `false`, and a request that omits the
+field gets the per-leg rows unchanged, with no `n` key.
+
+**Rows fold only when they agree on ALL of** `oid`, `block`, `time`, `coin`,
+`side`, `hash`, `fee_token`, `cause`, `liquidated_user`, `mark_px`, `broker`
+and `twap_id`. **`time` alone is NOT the key**, and this is the rule callers
+get wrong: `time` is the block's consensus timestamp, one value for the whole
+block. A [`batch_order`](./exchange.md#batch_order) places several orders under
+one timestamp, and an account whose resting order is hit in the same block it
+takes in has two orders at one timestamp. Keying on time alone merges orders
+that have nothing to do with each other, and merges opposite sides.
+
+| Field | How it folds |
+|---|---|
+| `px` | Size-weighted average: `Σ(px × sz) / Σsz`, truncated toward zero — the same rule the chain uses for an order's own average fill price. A plain mean of the leg prices is wrong whenever the legs differ in size |
+| `sz` | Sum of the leg sizes |
+| `fee` | Sum. Safe because `fee_token` is part of the key, so one row never adds two tokens |
+| `closed_pnl` | Sum. Each leg is already priced against the entry average at that leg, so the sum is the group's realized PnL exactly |
+| `broker_fee` | Sum, when `broker` is present |
+| `dir` | Classified from the WHOLE folded size, not copied from a leg. A sweep from −10 to +14 records `Close Short`, `Short > Long`, `Open Long` on its three legs; the folded row reads `Short > Long` |
+| `start_position` | The position the order STARTED from — the first leg's, not the newest leg's |
+| `tid` | The first leg's `tid`. A folded row therefore joins [`trades`](./info/perpetuals.md#trades) on ONE of its `n` prints, not all of them. Read `n` before you treat a `tid` as the whole fill |
+| `n` | uint — the number of legs folded. `1` on a fill that stands alone |
+| everything else | Shared by every leg in the group, so it carries over unchanged |
+
+`limit` counts the rows you receive, so it applies AFTER the fold: `"limit":
+10` with `"aggregate": true` returns up to 10 orders, not 10 legs. `start_time`
+/ `end_time` apply before it, and a group never straddles a bound because every
+leg in it shares one `time`.
+
+> ⚠️ **Use `aggregate` on the recent window only, for now.** A window old
+> enough to be answered from the archive returns the archive's rows per-leg
+> beside the folded ring rows. Send `aggregate` with no time bound, or with a
+> `start_time` inside the ring, until a later release folds the archive side
+> too.
 
 ### A single order's lifecycle {#order_status}
 
@@ -3193,7 +3234,7 @@ node's internal dial list, and no address from that dial list can appear here.
 
 **A node that advertises nothing is absent from the rows.** There is no
 fallback. A validator can run, vote and serve while publishing no address — it
-simply does not appear. An empty `peers` array is therefore the honest answer
+does not appear. An empty `peers` array is therefore the honest answer
 for a deployment that advertises nothing, not an error and not a sign of an
 unhealthy node.
 

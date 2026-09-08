@@ -32,7 +32,7 @@ A node not following these rules is not a valid validator; consensus rejects it.
 | Layer | User responsibility |
 |-------|--------------------|
 | Private-key storage | Cold storage for master; hot storage for agents; rotation hygiene |
-| Off-chain bot logic | What orders to place, when to top up, when to unwind |
+| Off-chain bot logic | What orders to place, when to add margin, when to unwind |
 | Risk management | Position sizing relative to bucket / equity |
 | Bridge counterparty risk | Choice of source-chain wallet & bridge route |
 
@@ -52,7 +52,7 @@ The principle: trust is minimised, not eliminated. Where shared trust is unavoid
 
 - A user signs an order they regret.
 - A user's hot key is stolen and the thief signs trades (this is why agents have no withdrawal authority).
-- A user fails to top up margin and gets liquidated under the documented tiered ladder.
+- A user fails to add margin and gets liquidated under the documented tiered ladder.
 - A user accepts an RFQ quote at a bad price.
 - A user deposits into a vault that loses money.
 - A governance-set parameter changes within its bounds and affects a user's position.

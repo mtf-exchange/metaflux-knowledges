@@ -576,7 +576,7 @@ and `newHeads` never rewinds.
 > transactions the instant they **commit** in a new block — the same timing as
 > `newHeads`, not the pre-confirmation timing a geth mempool feed gives. If you call
 > `watchPendingTransactions()` (viem) / `eth_subscribe(["newPendingTransactions"])`
-> expecting pre-confirmation hashes, note that on MetaFlux they arrive at commit.
+> expecting pre-confirmation hashes: on MetaFlux they arrive at commit.
 
 `eth_subscribe` / `eth_unsubscribe` are **WebSocket-only**; calling them over
 `POST /evm` returns a JSON-RPC error directing you to a WebSocket connection.

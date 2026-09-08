@@ -65,7 +65,7 @@ content and answer `{"data": null}`. Test whether `error` is PRESENT.
 | **Signing bug** | `AUTH_BAD_SIGNATURE`, `AUTH_UNAUTHORIZED` | DO NOT retry — verify chainId / key / owner |
 | **Auth state** | `AUTH_AGENT_FORBIDDEN` | The approval is missing or expired. Re-approve, then retry |
 | **Order shape** | `ORDER_INVALID_PRICE`, `ORDER_INVALID_SIZE`, `ORDER_ZERO_SIZE`, `ORDER_BELOW_MIN_NOTIONAL` | Compute the right value from `details.limit`; retry |
-| **State** | `MARGIN_INSUFFICIENT`, `ASSET_INSUFFICIENT_BALANCE`, `MARKET_INACTIVE`, `MARKET_OI_CAP`, `PRECONDITION_FAILED` | Top up, or wait for the state to change; then retry |
+| **State** | `MARGIN_INSUFFICIENT`, `ASSET_INSUFFICIENT_BALANCE`, `MARKET_INACTIVE`, `MARKET_OI_CAP`, `PRECONDITION_FAILED` | Add margin, or wait for the state to change; then retry |
 | **Not found** | `ORDER_NOT_FOUND`, `MARKET_NOT_FOUND`, `NOT_FOUND` | Don't retry; check the resource |
 | **Ours, not yours** | `INTERNAL`, `UNAVAILABLE` | Retry with backoff, then report |
 

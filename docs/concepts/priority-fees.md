@@ -155,7 +155,7 @@ to the perpetual order path only.
 
 **The asset is not validated.** A bid names an asset id and the handler stores it
 without checking that a market exists. A bid on an id with no market is accepted
-and simply sits there, because no order will ever consume it.
+and sits there, because no order will ever consume it.
 
 ## Priority fee vs broker fee {#vs-broker}
 

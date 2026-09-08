@@ -8,7 +8,7 @@ on the 4-node devnet.
 
 ## TL;DR {#tldr}
 
-Hold MTF, move it into the staking pool, delegate to a validator, earn staking rewards. The ongoing source is protocol fee revenue: fees fund validators — the **20% validator share** of the [fee buyback](./fees.md) — and validators fund stakers, passing that share down minus commission, already converted to MTF before it reaches you (see [Reward sources](#reward-sources)). Early on this is topped up by a finite treasury-funded bootstrap budget (never new issuance). A flexible (untiered) delegation unstakes any time; a locked delegation must first mature its lock tier. Either way, undelegated stake then serves a **governed unbonding window** before it is free to withdraw. Slashing applies to validators who misbehave; delegators face partial slash exposure.
+Hold MTF, move it into the staking pool, delegate to a validator, earn staking rewards. The ongoing source is protocol fee revenue: fees fund validators — the **20% validator share** of the [fee buyback](./fees.md) — and validators fund stakers, passing that share down minus commission, already converted to MTF before it reaches you (see [Reward sources](#reward-sources)). Early on this is supplemented by a finite treasury-funded bootstrap budget (never new issuance). A flexible (untiered) delegation unstakes any time; a locked delegation must first mature its lock tier. Either way, undelegated stake then serves a **governed unbonding window** before it is free to withdraw. Slashing applies to validators who misbehave; delegators face partial slash exposure.
 
 ## Actors {#actors}
 
@@ -78,8 +78,8 @@ One action handles both directions via `is_undelegate`:
 
 `lock_months` is one of `0` (flexible), `1`, `6`, `24` — ignored on undelegate.
 A locked tier (`> 0`) is only admitted for a governance-allowlisted validator,
-and re-locks the row's maturity on every top-up (so a top-up never shortens
-an in-flight lock). **A row holds ONE tier.** Topping up an existing delegation
+and re-locks the row's maturity on every addition (so an addition never shortens
+an in-flight lock). **A row holds ONE tier.** Adding to an existing delegation
 with a different `lock_months` is refused; undelegate the row first, or use a
 second validator. A **locked** row cannot start unbonding until its own
 lock matures; a **flexible** row (`lock_months: 0`) can undelegate any time.

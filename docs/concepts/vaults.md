@@ -114,7 +114,7 @@ sequenceDiagram
     Note over chain: a follower who already holds shares (however they were credited) redeems — vault_withdraw { vault_id, shares }
 ```
 
-The vault address is a first-class account in the state machine — it has its own positions, balance, and orders. The leader signs trades **as the vault** (the vault address is the `sender` the fill settles against; the leader's own key produces the signature).
+The vault address is an account in the state machine — it has its own positions, balance, and orders. The leader signs trades **as the vault** (the vault address is the `sender` the fill settles against; the leader's own key produces the signature).
 
 ### Deploy {#deploy}
 

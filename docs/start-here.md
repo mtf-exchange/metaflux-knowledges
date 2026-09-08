@@ -68,7 +68,7 @@ a *limit order* waits at a price you set. MetaFlux supports many
 **Leverage & margin.** *Margin* is the collateral you put up to back a position.
 *Leverage* lets that collateral control a larger position — 10x leverage means a
 $100 deposit can hold a $1,000 position. Leverage amplifies gains **and** losses,
-so it is powerful and risky in equal measure. How your collateral is shared or
+so it raises both in equal measure. How your collateral is shared or
 walled off between positions is your *margin mode* — see
 [margin modes](concepts/margin-modes.md).
 
@@ -86,7 +86,7 @@ pay shorts; when more are short, shorts pay longs. This is the
 traders, not to the exchange.
 
 **Mark price.** Rather than trusting the last trade — which a single large or
-stray order could distort — MetaFlux values your positions against a robust,
+stray order could distort — MetaFlux values your positions against a
 manipulation-resistant reference called the [mark price](concepts/mark-prices.md).
 It is what drives your margin, your liquidation level, and your unrealized profit
 and loss.
@@ -127,7 +127,7 @@ network and endpoints.
 :::
 
 - **Pick a network.** [Networks & chain IDs](networks.md) lists the devnet,
-  testnet, and mainnet endpoints and their chain IDs. Start on a test network if
+  testnet, and mainnet endpoints and their chain IDs. Start on devnet or testnet if
   you want to practice with no real funds at risk.
 - **Building or running a bot?** The developer
   [integration quickstart](integration/quickstart.md) walks you from deposit to

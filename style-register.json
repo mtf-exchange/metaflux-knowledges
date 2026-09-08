@@ -1,0 +1,64 @@
+{
+  "$comment": "The approved-term register. Every rule is evidence-based: it was added because the drift it names was measured in this repository, not because it sounded like a rule. Each rule carries a positive control the checker asserts before it scans, so a dead regex cannot read as an all-clear.",
+  "scan": ["docs", "src"],
+  "skipDirs": ["node_modules", "build", ".docusaurus", "i18n"],
+  "rules": [
+    {
+      "id": "postfix-live",
+      "pattern": "\\b(on-chain|onchain|testnet|devnet|mainnet|node|protocol|exchange|gateway|indexer) live\\b",
+      "flags": "gi",
+      "control": "the node live ring",
+      "say": "No postfix `live` modifier. Write \"the node's live ring\", or name what happened: \"the halt the 0.2.9 deploy caused on testnet\". Predicate and adverb uses are fine: \"keeps the chain live\", \"follow the chain live\", \"chain liveness\"."
+    },
+    {
+      "id": "hype",
+      "pattern": "\\b(powerful|blazing(?:ly)?|seamless(?:ly)?|cutting-edge|state-of-the-art|battle-tested|robust|world-class|best-in-class|lightning-fast|effortless|revolutionary|game-chang\\w+|next-generation|unparalleled)\\b",
+      "flags": "gi",
+      "control": "a robust, battle-tested oracle",
+      "say": "Marketing adjective. State the property instead: not \"robust\", but \"tolerates one outlier component\"; not \"battle-tested\", but \"in production since <date>\"."
+    },
+    {
+      "id": "filler",
+      "pattern": "\\b(simply|note that|please note|it is worth noting|needless to say|at the end of the day|as you can see|of course,)\\b",
+      "flags": "gi",
+      "control": "Note that absent components simply drop out",
+      "say": "Filler. Delete it — the sentence says the same thing. \"Note that X\" is just \"X\"."
+    },
+    {
+      "id": "mannered",
+      "pattern": "\\b(worth (?:turning|having|its salt)|under the hood|out of the box|heavy lifting|secret sauce|the magic|a dial|moving parts|first and foremost|make no mistake)\\b",
+      "flags": "gi",
+      "control": "a dial worth turning",
+      "say": "Mannered prose. Write the plain thing: \"a parameter worth varying\", \"internally\", \"by default\"."
+    },
+    {
+      "id": "in-order-to",
+      "pattern": "\\bin order to\\b",
+      "flags": "gi",
+      "control": "in order to place an order",
+      "say": "Write \"to\"."
+    },
+    {
+      "id": "term-drift",
+      "pattern": "\\b(top(?:ping|ped)? up|orderbook|cancellation|test network|sub[- ]account wallet|API server)\\b",
+      "flags": "gi",
+      "control": "top up the orderbook on the test network",
+      "say": "Use the approved term: deposit / order book / cancel / devnet or testnet / sub-account / gateway. One term per concept — see STYLE.md."
+    },
+    {
+      "id": "exclamation",
+      "pattern": "[a-z)\"'][!]( |$)",
+      "flags": "g",
+      "control": "It works!",
+      "say": "No exclamation marks in a reference. A terminal reads flat."
+    },
+    {
+      "id": "first-class",
+      "pattern": "\\bfirst-class\\b",
+      "flags": "gi",
+      "control": "a first-class account",
+      "say": "Say what it actually has: \"has its own balance, positions and orders\". `concepts/sub-accounts.md` is exempt — it defines the term there and the definition is load-bearing.",
+      "allowFiles": ["concepts/sub-accounts.md"]
+    }
+  ]
+}
