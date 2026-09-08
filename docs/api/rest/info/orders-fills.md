@@ -173,7 +173,7 @@ follow the new one. Read that id on [`open_orders`](#open_orders).
 | `limit` | uint32 | no | Cap on the number of most-recent records returned. Absent or `0` returns the full ring |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive), filtered on the fill `time`. Absent is an open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent is an open upper bound |
-| `aggregate` | bool | no | **Not live yet.** Default `false`. `true` folds the legs of ONE order's execution in ONE block into a single row and adds `n`. A node without it ignores the field silently — test for `n`, not for the row count. See [aggregated rows](#user_fills-aggregate) |
+| `aggregate` | bool | no | Default `false`. `true` folds the legs of ONE order's execution in ONE block into a single row and adds `n`. A node without it ignores the field silently — test for `n`, not for the row count. See [aggregated rows](#user_fills-aggregate) |
 
 Send `address` alone for the recent window, or add `start_time` / `end_time` to
 filter the same records by time. The response echoes both bounds back as
@@ -235,7 +235,7 @@ ring.
 | `fills[*].fee_token` | string | Coin symbol the `fee` is charged in. A perp fill and a spot SELL pay `"USDC"`; a **spot BUY pays the BASE token**, so a `BTC/USDC` buy pays its fee in BTC. That rule has been live since block 6,565,000; the field is derived per record, so an older fill correctly reports `"USDC"` on both sides. **Without it, summing `fee` across a spot account adds one token to another.** On a spot BUY it also warns you that `fee` is not the whole story: the base fee is NETTED out of the size delivered, not debited, so `fee` can read `"0"` while the real charge is the gap between `sz` and the balance credit — see [a spot BUY pays its fee in the base token](../../../concepts/fees.md#spot-buy-fee-in-base) |
 | `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **decimal USDC** (signed). Always `"0"` on a spot fill — spot holds no position, so it realizes no PnL |
 | `fills[*].dir` | string | Direction label. A PERP fill uses six tokens: `"Open Long"`, `"Close Long"`, `"Open Short"`, `"Close Short"`, and — when the fill crosses through zero — `"Long > Short"` or `"Short > Long"`. A SPOT fill uses `"Buy"` (side `"B"`) or `"Sell"` (side `"A"`): spot holds no position, so no open/close token applies. Switch on `side` for spot and on this field for perps |
-| `fills[*].start_position` | Decimal string | Signed leg size before the fill, **base units** (whole-unit, signed). A spot fill holds no position leg, so the value is zero. It renders at the market's `sz_decimals`, the same plane as `sz`: a two-decimal market reads `"0.00"`. **Not live yet.** The node before 0.9.7 renders a bare `"0"` on a spot row |
+| `fills[*].start_position` | Decimal string | Signed leg size before the fill, **base units** (whole-unit, signed). A spot fill holds no position leg, so the value is zero. It renders at the market's `sz_decimals`, the same plane as `sz`: a two-decimal market reads `"0.00"`. Live from node 0.9.7; an older node renders a bare `"0"` on a spot row |
 | `fills[*].block` | uint64 | Committed block height the fill settled in |
 | `fills[*].cause` | string | Present only when this leg did not execute by its own order crossing. `"forced_close_partial"` / `"forced_close_full"` — the liquidation ladder; `"forced_close_isolated"` — an isolated leg breached its own bucket; `"forced_close_governance"` — a validator-quorum forced close settled against the book; `"trigger"` — a TP/SL fired; `"twap"` — a TWAP slice. Absent on an ordinary fill and on every maker leg: a counterparty that was merely hit is not itself forced. `forced_close_governance` is a forced close that is NOT a liquidation — it charges no liquidation fee and does not count toward liquidation totals |
 | `fills[*].liquidated_user` | hex address | Present on a forced-close leg only, on both sides of the print. The account whose position was closed — so a taker can see whose liquidation it absorbed |
@@ -260,17 +260,11 @@ ring.
 
 #### Aggregated rows: `aggregate` {#user_fills-aggregate}
 
-:::warning Not live yet
-**The node that serves this is not released.** The code has landed; the running
-node predates it. A live node does not reject `aggregate` — it **ignores** it and
-returns the per-leg rows with no `n` key, which is the failure a caller cannot
-see.
-
-**Detect it by the presence of `n`, never by the row count.** A response whose
-rows carry no `n` came from a node without this feature; a folded response always
-carries `n`, and `n` is `1` for a fill that stood alone. Code against this page,
-and switch when the release fires.
-:::
+Live from node 0.9.7. An older node does not reject `aggregate` — it **ignores**
+it and returns the per-leg rows with no `n` key, which is the failure a caller
+cannot see. **Detect it by the presence of `n`, never by the row count.** A
+response whose rows carry no `n` came from a node without this feature; a folded
+response always carries `n`, and `n` is `1` for a fill that stood alone.
 
 One order that sweeps 24 resting orders writes 24 rows. Send `"aggregate":
 true` to get ONE row for that order instead, with a new field `n` that counts

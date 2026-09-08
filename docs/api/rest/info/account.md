@@ -227,8 +227,8 @@ three share are `address` and the `height` / `time` stamp. See
 | `health_deferred` | `true` \| absent | Present, and only ever `true`, when the risk engine cannot price a leg. **The risk numbers are then not a solvency statement** — see [account value](../../../concepts/account-value.md). Absent is the normal case; treat absent as `false` |
 | `tier` | enum **string** | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../../concepts/tiered-liquidation.md). It is a STRING, never a number |
 | `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (per-product reservations — see [`user_set_abstraction`](../../rest/exchange/account.md#user_set_abstraction)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
-| `reservations` | object \| **absent** | The per-product reservation ledger. Present **only when `abstraction` is `"standard"`** — see [`reservations`](#account-state-reservations) below. **Served from the release after 0.9.6**; a 0.9.6 node omits it in every mode |
-| `split` | bool \| **absent** | Present **only when `abstraction` is `"standard"`**. `true` = the account holds two USDC wallets (it entered `standard` under the live split gate); `false` = one pooled balance, the posture of an account that entered before the arm. Read it before you interpret `reservations.spot` and the USDC row — see [the standard-mode split](../../../concepts/usdc.md#standard-split). **Not live yet**: served from node 0.9.7; an older node omits the key in every mode |
+| `reservations` | object \| **absent** | The per-product reservation ledger. Present **only when `abstraction` is `"standard"`** — see [`reservations`](#account-state-reservations) below. Live from node 0.9.7; a 0.9.6 node omits it in every mode |
+| `split` | bool \| **absent** | Present **only when `abstraction` is `"standard"`**. `true` = the account holds two USDC wallets (it entered `standard` under the live split gate); `false` = one pooled balance, the posture of an account that entered before the arm. Read it before you interpret `reservations.spot` and the USDC row — see [the standard-mode split](../../../concepts/usdc.md#standard-split). Served from node 0.9.7; an older node omits the key in every mode |
 | `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled. **Account-scoped, so it is NOT under `perp`** — see the warning above |
 | `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) — see [hedge mode](../../../concepts/hedge-mode.md) |
 | `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
@@ -254,7 +254,7 @@ The three `pm_*` figures are always present and are **meaningful only when
 | `spot.balances` | array | The **whole** spot token ledger, one row per token held. Never empty: row 0 is USDC unconditionally |
 | `spot.balances[*].name` | string | Token symbol (`"USDC"` for row 0). Rows are keyed and joined by `name` |
 | `spot.balances[*].signing_id` | uint32 | The number you place in the `asset` field of a signed [`send_asset`](../../rest/exchange/transfers.md#send_asset), and in `asset` of an `earn_deposit`. `100` for USDC. It has no other meaning on the read plane. **Not `spot_send`** — no such action exists; that name is a [ledger record kind](../../ws/subscriptions.md#ledger_updates) |
-| `spot.balances[*].total` | Decimal string | The **whole** holding of that token, escrow included. **Not** the spendable amount — perp margin sits inside it too. Use `withdrawable`. **Split `standard` account (not live yet):** the USDC row is the spot wallet alone, and perp margin is NOT inside it — see [the standard-mode split](../../../concepts/usdc.md#standard-split) |
+| `spot.balances[*].total` | Decimal string | The **whole** holding of that token, escrow included. **Not** the spendable amount — perp margin sits inside it too. Use `withdrawable`. **Split `standard` account:** the USDC row is the spot wallet alone, and perp margin is NOT inside it — see [the standard-mode split](../../../concepts/usdc.md#standard-split) |
 | `spot.balances[*].hold` | Decimal string | Amount locked behind a resting spot order (escrow). **A part OF `total`, not a second bucket beside it** — never add the two. Spot escrow only; it never holds perp margin |
 | `spot.balances[*].avg_entry_px` | Decimal string \| null | Average cost basis for the token; `null` when there is none (always `null` on the USDC row — USDC is the quote asset). See [cost basis](#avg-entry-px) |
 
@@ -316,11 +316,9 @@ The chain never prices an option, so this lane carries no mark-priced figure. Se
 
 #### `reservations` — the standard-mode ledger {#account-state-reservations}
 
-:::warning NOT ON 0.9.6
-`reservations` is served from the release AFTER 0.9.6. A 0.9.6 node omits the
-field in every mode, `"standard"` included, so read a missing field as "this node
-is older", not as "this account reserved nothing".
-:::
+Live from node 0.9.7. A 0.9.6 node omits the field in every mode, `"standard"`
+included, so read a missing field as "this node is older", not as "this account
+reserved nothing".
 
 Present **only when `abstraction` is `"standard"`**. The other two modes have no
 ledger: [`user_set_abstraction`](../../rest/exchange/account.md#user_set_abstraction) clears
@@ -349,7 +347,7 @@ So a scope can read `"0"` while `reserved` still exceeds `held` — the other sc
 have promised the rest of the pool away. **This is the figure that explains a
 margin rejection on an account that holds USDC.**
 
-**Split `standard` account (not live yet).** From the node 0.9.7 swap an account
+**Split `standard` account.** From node 0.9.7 an account
 that enters `standard` holds a separate spot wallet, so its `spot` row changes
 meaning: `reserved` reads `"0"`, `held` is unchanged, and `available` is the spot
 wallet itself. Setting a spot reservation on such an account is refused. A

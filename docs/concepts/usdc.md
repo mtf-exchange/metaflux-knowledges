@@ -6,8 +6,8 @@ description: Where a trader's USDC lives on MetaFlux — one unified balance, fo
 
 :::tip
 **Stable.** USDC is **one balance** on MetaFlux. The perp collateral account and
-the spendable spot-USDC balance are the same number. One exception is coming: a
-`standard`-mode account will hold two — see [the standard-mode split](#standard-split).
+the spendable spot-USDC balance are the same number. One exception: a
+`standard`-mode account holds two — see [the standard-mode split](#standard-split).
 :::
 
 ## TL;DR {#tldr}
@@ -130,9 +130,9 @@ Cancel the bid and the escrow returns to the pool.
 
 ## The standard-mode split {#standard-split}
 
-:::warning Not live yet
-This ships with the node 0.9.7 freeze-swap. Until then every account, `standard`
-included, holds one USDC balance and behaves as the rest of this page says.
+:::info
+**Live from node 0.9.7, block 5,710,001.** An account already in `standard` at the
+swap keeps one balance until it leaves the mode and enters again.
 :::
 
 From the swap, an account that **enters** `standard` mode holds **two** USDC

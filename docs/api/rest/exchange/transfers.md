@@ -33,7 +33,7 @@ Its EIP-712 [typed-data](../exchange.md#signing) primary type is
 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
-| `source_dex` | uint32 | `0` = spot, `1`+ = a perp dex | Which ledger the amount leaves. **Split `standard` sender, USDC (not live yet):** with `to_perp: false` the amount leaves the spot wallet (`insufficient spot balance` when short); with `to_perp: true` it leaves the perp wallet whatever `source_dex` says — see [the standard-mode split](../../../concepts/usdc.md#standard-split) |
+| `source_dex` | uint32 | `0` = spot, `1`+ = a perp dex | Which ledger the amount leaves. **Split `standard` sender, USDC:** with `to_perp: false` the amount leaves the spot wallet (`insufficient spot balance` when short); with `to_perp: true` it leaves the perp wallet whatever `source_dex` says — see [the standard-mode split](../../../concepts/usdc.md#standard-split) |
 | `destination_dex` | uint32 | same | Which ledger it arrives on |
 | `asset` | uint32 | a `signing_id` | The token. `100` is USDC — this is the `signing_id` from [`spot.balances[*]`](../info.md), not the market index |
 | `destination` | hex address | 40 hex chars | Recipient |
@@ -76,9 +76,9 @@ Its EIP-712 [typed-data](../exchange.md#signing) primary type is
 | `ntl` | decimal string | `> 0` | Amount in the **whole-USDC** plane |
 | `to_perp` | bool | | `true` = spot to perp (post collateral); refused when the spot wallet is short (`insufficient spot balance`). `false` = perp to spot, gated on **free collateral**: refused when the perp wallet cannot spare the amount (`insufficient free collateral`) |
 
-:::warning Not live yet
+:::info
 Accepted only by a `standard` account that **entered** the mode at or after the
-split arm (the node 0.9.7 swap). Every other account — `unified`, `portfolio`,
+split arm (node 0.9.7, block 5,710,001). Every other account — `unified`, `portfolio`,
 and a `standard` account that entered before the arm — holds ONE USDC balance and
 is refused: there is no second wallet to move to. See
 [the standard-mode split](../../../concepts/usdc.md#standard-split).
