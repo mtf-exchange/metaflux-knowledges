@@ -569,7 +569,7 @@ writer's spot balance. Read
 The chain never prices an option, so this lane carries no mark-priced figure. See
 [options](../../products/options.md).
 
-**`reservations` — the standard-mode ledger.** {#account-state-reservations}
+#### `reservations` — the standard-mode ledger {#account-state-reservations}
 
 :::warning NOT ON 0.9.6
 `reservations` is served from the release AFTER 0.9.6. A 0.9.6 node omits the

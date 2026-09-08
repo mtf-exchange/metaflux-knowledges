@@ -4,6 +4,12 @@
 **Stable.**
 :::
 
+:::caution Two different things are called a "mode"
+This page is about the **position** setting: where one position's collateral
+comes from. The **account** mode — `unified`, `standard`, `portfolio` — is a
+separate axis and lives in [account modes](./account-modes.md).
+:::
+
 ## TL;DR {#tldr}
 
 Three modes per-asset: **Cross**, **Isolated**, **Strict-Iso**. Cross pools collateral across all your positions; Isolated walls off margin per asset; Strict-Iso additionally excludes that asset from any [portfolio-margin](./portfolio-margin.md) netting.
