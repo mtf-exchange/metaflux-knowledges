@@ -637,15 +637,6 @@ the `height` of both frames before you treat them as one instant.
 
 #### The dex key is the dex NAME {#dex-key}
 
-:::warning Not live yet
-The dex key changes from the deployer's address to the dex NAME with the next
-network upgrade. Until that upgrade fires, a live node still keys every non-core
-bucket by the deployer's lowercase `0x` address. There is no window in which both
-forms answer. A client that reads the key opaquely and joins it to
-[`perp_dexs`](../info/perpetuals.md#perp_dexs) survives the change; a client that
-parses the key as an address does not.
-:::
-
 The map key is the **dex name**. `""` is the core dex and is always present.
 Every other key is the name of one deployed perp dex.
 

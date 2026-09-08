@@ -165,12 +165,11 @@ next window opens
 ```
 
 FBA fills settle into each account's positions and balances like any other
-fill, but they carry **no live public event** today: they do not appear on
-[`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills),
-and there is no
-`/info` read that lists past fills for a closed window. A batch clearing is one
-of the [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills) **until the next node release, which records it**; that page lists
-every lane with the same gap, and what a caller does about it. Observe a settlement
+fill. Node 0.9.6 records a batch clearing on
+[`trades`](../api/ws/subscriptions.md#trades) and [`fills`](../api/ws/subscriptions.md#fills);
+an older node did not — see
+[every order lane records its fill](../api/rest/info/orders-fills.md#unrecorded-fills).
+There is no `/info` read that lists past fills for a closed window. Confirm a settlement
 by diffing [`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state)
 before and after, and [`account_state`](../api/ws/subscriptions.md#account_state)
 for the balance side.

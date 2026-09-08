@@ -101,11 +101,6 @@ haircut collateral. `abstraction` tells you which class the account is in.
 
 **This is the number that surprises people, so here is the whole of it.**
 
-> ⬆️ **Upgrade notice — the unrealized-loss term is not live yet.** It ships
-> with the next node release. On the live chain today `withdrawable` folds
-> neither side of unrealized PnL, so an account holding a losing position reads
-> HIGHER than the formula below. Everything else on this page is live.
-
 ```
 withdrawable = max(0,  settled cash
                      - unrealized funding you OWE (debit side only)

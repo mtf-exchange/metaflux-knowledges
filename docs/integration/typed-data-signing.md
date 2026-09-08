@@ -390,15 +390,15 @@ delegates hold.
 | `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
 | `perp_set_sub_deployer_perms` | `MetaFluxTransaction:PerpSetSubDeployerPerms(string metafluxChain,uint32 asset,address subDeployer,uint16 permissions,uint64 nonce)` |
 
-**Two rows move in the next release; the other eight do not.**
+**Both rows are live.**
 
 - **`PerpSetSubDeployerPerms` is new.** It grants a delegate an exact permission
   mask instead of every power. `permissions` is in the digest, so one signature
   binds one (market, delegate, mask) triple. The bit table is on
   [`perp_set_sub_deployers`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
 - **`PerpSetOracle` is retired.** The type string is NOT deleted and every
-  committed payload still decodes, but the node refuses the action after the
-  release. Stop signing it. The mask it wrote has no reader.
+  committed payload still decodes, but the node refuses the action. Stop signing
+  it. The mask it wrote has no reader.
 
 **`PerpSetSubDeployers` itself does not change.** Its type string, its digest and
 its meaning are the same before and after: `add: true` grants every permission
@@ -740,14 +740,6 @@ EIP-712 typed-data way. Their action-body shapes are in the
 [`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
 
 ### Order type strings and the trailing fold {#order-type-strings-and-the-trailing-fold}
-
-:::info
-**Not live yet.** The trailing fold is written here ahead of activation. The
-network REFUSES an order carrying `trail_px` until the release that binds it
-activates. The type strings and digests below are the target, and they are
-already exact — build against them, but do not submit a trailing order until the
-release lands.
-:::
 
 A trigger leg may carry a **trailing callback**,
 [`trigger.trail_px`](../api/rest/exchange/orders.md#trailing-stops). That field moves

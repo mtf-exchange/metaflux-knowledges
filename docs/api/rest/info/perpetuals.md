@@ -337,8 +337,7 @@ BTC, the top-level ladder said `"50"` where the override ladder said `"0.005"`.
 A caller that read the override as bps computed a maintenance margin four orders
 of magnitude too small and believed an unsafe position was safe. One concept now
 has one plane. See the
-[upgrade notice](../../../changelog/ids-and-wire-shapes.md#one-plane) — this row
-changes when that release lands.
+[upgrade notice](../../../changelog/ids-and-wire-shapes.md#one-plane).
 :::
 
 **The two `margin_tiers` ladders still band on different keys.**
@@ -716,7 +715,7 @@ Read `v`, `q` and `n`. Treat any other volume-looking key as absent.
 
 > ⬆️ **Upgrade notice — landed, not yet released.** The bar cap below is
 > written, tested and merged. It is **not on the live chain**: a wide window is
-> still answered in full there. The cap goes live with the next node release.
+> still answered in full there. The cap goes live with the next gateway release.
 > Page your queries now, and that release changes nothing for you.
 
 A response carries at most **5000 bars**. Over that, the answer keeps the **5000
@@ -984,14 +983,6 @@ top tier. A `margin_table` request now returns
 The perp DEX(es) plus the governance-set permissionless-deploy (MIP-3) and
 per-market limit configuration. The unit planes are load-bearing and
 deliberately explicit in the field names.
-
-:::warning Not live yet
-`name` and `deployer` land with the next network upgrade, in the same release
-that keys [`clearinghouse_state`](./account.md#clearinghouse_state) by name. Until
-that upgrade fires, each row carries `index`, `n_assets` and `assets` only. The
-name rule, the name each existing dex receives, and the re-join for a cached
-address key are all in [the dex key](./account.md#dex-key).
-:::
 
 **Request**
 

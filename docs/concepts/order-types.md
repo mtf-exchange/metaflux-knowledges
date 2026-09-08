@@ -483,7 +483,7 @@ on the same cadence a perp chase uses. Two spot-only outcomes:
 
 A spot pair stops trading in two ways: the pair itself is delisted or deactivated,
 or governance throws the global spot kill switch. **Both do the same thing to an
-in-flight TWAP or chase, starting the next release.**
+in-flight TWAP or chase.**
 
 | What | Behaviour during the halt |
 |---|---|

@@ -4,16 +4,6 @@ description: Options on MetaFlux — standard European puts and calls, fully col
 
 # Options
 
-:::warning Not live yet
-This page describes the **standard European** option lane. The release that
-carries it has not fired. Until it does, a live node still serves the previous
-lane: a call answers a THIRD `kind` token instead of `"call"`, its series row
-carries an extra `cap` field and no `settle_asset`, and every escrow and payout is
-USDC. Treat any `kind` outside `"put"` and `"call"` as the pre-release lane. Read
-[what changed](#what-changed) for the field-by-field move, and ship your client
-change **with** the release, not before it.
-:::
-
 ## TL;DR {#tldr}
 
 A MetaFlux option is a **standard European, fully collateralized** contract on a

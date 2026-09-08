@@ -12,8 +12,7 @@ reads). Subscribing to `web_data2` now returns
 :::
 
 :::warning
-**The WS `web_data` channel goes away at the next node release.** The push
-channel is retired. Subscribing to `web_data` then returns
+**The WS `web_data` channel is retired.** A subscribe returns
 `{"channel":"error","data":{"error":"unknown channel: web_data"}}`.
 
 **The REST read keeps serving as a depth on the account read.** Poll
@@ -45,11 +44,11 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 |---------|:-------:|--------|
 | `l2_book` | `coin` (required) | committed book, on change |
 | `bbo` | `coin` (required) | committed book, on change |
-| `trades` | `coin` (required) | committed-block fills, on new fills — from the next node release this includes forced-close, TWAP-slice and trigger fills |
+| `trades` | `coin` (required) | committed-block fills, on new fills — this includes forced-close, TWAP-slice and trigger fills |
 | `markets` | none | per-market dynamic state (mark / oracle / mid / premium / funding / OI / 24h ticker / halted) — full snapshot, then changed-row deltas |
-| `fills` | `user`/`address` (required) | committed-block fills for that account — from the next node release this includes forced-close, TWAP-slice and trigger fills |
+| `fills` | `user`/`address` (required) | committed-block fills for that account — this includes forced-close, TWAP-slice and trigger fills |
 | `candles` | `coin` + `interval` (both required), `candle_type` (optional) | **gateway only** — price samples or trades folded into OHLCV bars, on change |
-| `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change — from the next node release a resting order hit by a forced close, a TWAP slice or a trigger also reports its fill |
+| `order_updates` | `user`/`address` (required) | per-account order lifecycle (place / fill / cancel / reject), on change — a resting order hit by a forced close, a TWAP slice or a trigger also reports its fill |
 | `open_orders` | `user`/`address` (required) | per-account resting-order set — a FULL snapshot re-emitted on every change |
 | `notifications` | `user`/`address` (required) | per-account margin / liquidation notices, on change |
 | `ledger_updates` | `user`/`address` (required) | per-account money movement (deposit / withdraw / transfer), on change |
@@ -65,14 +64,16 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 Subscribing to any other `type` returns `{"channel":"error","data":{"error":"unknown channel: <name>"}}`.
 
 :::warning
-**Some order lanes send a fill to NONE of these channels, and that release does
-not change it.** An order placed by `modify` or `batch_modify`, an order placed
-by CoreWriter `LimitOrder`, any order inside a `multi_sig` envelope, and every
-clearing of a [frequent batch auction](../../concepts/fba.md) each settle with
-no message on `trades`, on `fills` or on `order_updates` — for either party. **Fixed for `modify` and `multi_sig` in node 0.9.5; a CoreWriter order that crosses on placement and an FBA clearing follow in the next release.** See [unrecorded fills](../rest/info/orders-fills.md#unrecorded-fills). So a
-market maker cannot read `fills` as the complete record of its own executions,
-and must reconcile its position from
-[`account_state`](../rest/info/account.md#account_state) instead.
+**Four order lanes used to send a fill to NONE of these channels.** An order
+placed by `modify` or `batch_modify`, an order placed by CoreWriter `LimitOrder`,
+any order inside a `multi_sig` envelope, and every clearing of a
+[frequent batch auction](../../concepts/fba.md) settled with no message on
+`trades`, on `fills` or on `order_updates` — for either party. Node 0.9.5 fixed
+`modify` and `multi_sig`; node 0.9.6 records all four lanes. See
+[every order lane records its fill](../rest/info/orders-fills.md#unrecorded-fills).
+A market maker still reconciles its position from
+[`account_state`](../rest/info/account.md#account_state): a fill stream is a
+report, and a report can be behind.
 
 An account that SENDS a `modify` still gets an `open_orders` re-snapshot for
 it, because that channel re-emits on every `/exchange` action a subscribed
@@ -243,13 +244,6 @@ empty only if the market has never traded). Snapshot rows carry **`users: null`*
 **Live pushes** (`is_snapshot: false`) — the new prints from the just-committed
 block; each row's `users` carries the AGGRESSOR ONLY:
 
-> ⬆️ **Upgrade notice — `users` drops to ONE element at the next node
-> release.** It carried `[taker, maker]`; it will carry `[taker]`. The taker
-> chose to cross and is named; the resting maker did not choose to be hit and
-> is not. `users[0]` is unchanged, so a caller that reads only the aggressor
-> needs no change. A caller that reads `users[1]` must stop.
-
-
 ```json
 { "channel": "trades", "is_snapshot": false, "data": [
   { "coin": "BTC", "side": "B", "px": "6700000000000", "sz": "10000000", "time": 1735689600123, "tid": "1234567890", "users": ["0x..taker"] }
@@ -408,7 +402,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 ```
 
 - `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`) / `noop` (+`reason`, null `oid`).
-- **`noop` is a SUCCESS, not a rejection** — a `reduce_only` order with nothing left to reduce. It placed nothing and it must not be retried; `rejected` is the one to act on. Branch on `status`, never on `reason`. **Not live yet**: it ships with the next node release, and until then the same outcome arrives as `rejected`. See [`noop`](../rest/exchange.md#statuses-noop).
+- **`noop` is a SUCCESS, not a rejection** — a `reduce_only` order with nothing left to reduce. It placed nothing and it must not be retried; `rejected` is the one to act on. Branch on `status`, never on `reason`. See [`noop`](../rest/exchange.md#statuses-noop).
 - `order.oid` is a **decimal-digit string**, or `null` on a rejected placement.
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `time` is consensus-ms; unknown fields are `null`.
@@ -416,7 +410,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 
 ### Per-account resting order snapshot {#open_orders}
 
-Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. **One exception, and it is shrinking: a resting order consumed by a still-[unrecorded fill](../rest/info/orders-fills.md#unrecorded-fills) produces no frame**, so that account's snapshot stays stale — showing the order at its old size — until some other event forces a re-emission. Two of the four lanes were fixed in node 0.9.5; the CoreWriter and FBA lanes follow in the next release, after which this exception is gone. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
+Per-account resting-order **set**. Requires `user` (the 0x address; `address` is also accepted) — NOT a `coin`. Unlike [`order_updates`](#order_updates) (per-event deltas), **every** `open_orders` frame is a FULL snapshot of the account's current resting orders — `is_snapshot` is `true` on the on-subscribe frame **and on every re-emission**. The node re-emits the complete set whenever any order-lifecycle change touches it (place / fill / cancel / modify / engine-initiated cancel), so a client **replaces its whole open-order set on each frame**; there are no partial deltas to reconcile. This sidesteps the [`order_updates`](#order_updates) gap where `modify` / `batchModify` / engine-initiated cancels carry no per-order delta.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "open_orders", "user": "0x<address>" } }
@@ -459,10 +453,6 @@ Per-account notices. The margin / liquidation kinds are derived by diffing conse
 
 #### `action_dropped` {#notifications-action_dropped}
 
-> **NOT LIVE YET.** This record ships in the next node release. Until then the
-> channel emits the risk kinds only. It adds no field to a record you already
-> receive, so a client can switch on it before that release.
-
 The commit loop dropped a committed action **before it dispatched**. The action consumed no nonce and changed no state, so it produces no `order_updates` status, no fill and no `ledger_updates` record — this notice is the only push that carries it. `action_hash` is the value [`/exchange`](../rest/exchange.md) returned, so a caller joins on that.
 
 `code` is a closed vocabulary:
@@ -489,7 +479,7 @@ Per-account money movement, attributed to its **cause**. A record appears only w
 ```
 
 - **These `kind` values are RECORD NAMES, not action names.** `usd_send` and `spot_send` describe what a committed transfer did; neither is an `/exchange` action, and sending one gets `unknown variant`. The actions are [`send_asset`](../rest/exchange/transfers.md#send_asset) and [`usd_class_transfer`](../rest/exchange/transfers.md#usd_class_transfer).
-- `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver). Two more kinds arrive next release — see [Two record sources arrive next release](#ledger_updates-incoming).
+- `kind` ∈ `usd_send` / `usd_receive`, `spot_send` / `spot_receive` (+`token`), `asset_send` / `asset_receive` (+`asset`, `to_perp`), `withdraw` (`via`: `cctp` | `metabridge`), `system_credit`, `sub_account_transfer`, `sub_account_spot_transfer`, `vault_transfer`. A transfer emits one record per party (sender + receiver). Two more kinds, `deposit` and `liquidation`, are below — see [Two more record sources](#ledger_updates-incoming).
 - **Every `amount` is a whole-token decimal string**, `withdraw` included — there is no raw base-unit field on any record. `amount` is UNSIGNED on every kind listed above; read the direction from the `kind` (the incoming `liquidation` kind below is the one signed exception). Inbound bridge credit amounts and delayed contract calls (which dispatch in a later block) are not yet attributed. The ORDER of records inside one block's array is not part of the contract and it changed this release; correlate on `time` and `kind`, never on position.
 
 #### Two more record sources {#ledger_updates-incoming}
@@ -502,7 +492,7 @@ Both close a gap the bullet above names. Neither renames or removes an existing
 
 | `kind` | Emitted for | Fields |
 |--------|-------------|--------|
-| `deposit` | A **bridge inbound credit**, at the block the cosigner quorum credits it. This channel emits no `deposit` record today | `kind`, `coin`, `amount`, `chain`, `via`, `time` |
+| `deposit` | A **bridge inbound credit**, at the block the cosigner quorum credits it | `kind`, `coin`, `amount`, `chain`, `via`, `time` |
 | `liquidation` | A **liquidation settlement** — the signed balance change a forced close leaves on the account. New `kind` | `kind`, `coin`, `amount`, `market`, `cause`, `time`, optional `mark_px` |
 
 Field rules for the two new kinds:
@@ -655,14 +645,6 @@ Per-account **perp position detail** — the dex-keyed position table that left 
 Same builder as the REST
 [`clearinghouse_state`](../rest/info/account.md#clearinghouse_state) read, so the push and
 the read never drift.
-
-:::warning Not live yet
-The dex key changes from the deployer's address to the dex NAME with the next
-network upgrade, on this channel and on the REST read together — one builder
-serves both. Until that upgrade fires, a live node keys every non-core bucket by
-the deployer's lowercase `0x` address. The name rule, and the name each existing
-dex receives, are in [the dex key](../rest/info/account.md#dex-key).
-:::
 
 ```json
 { "method": "subscribe", "subscription": { "type": "clearinghouse_state", "user": "0x<address>" } }

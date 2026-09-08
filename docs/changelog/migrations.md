@@ -12,11 +12,9 @@ the read surface move. Work through the checklists before upgrading a client.
 
 ## The account-state lane split {#account-state-lane-split}
 
-:::warning Not live yet
-This migration is written ahead of the release that carries it. A live node still
-answers the OLD flat shape, and answers `clearinghouse_state` and `option_state`
-with `unknown info type`. Prepare your client against this page, then switch when
-the release fires.
+:::info
+**Live.** The node answers the four-lane shape and serves `clearinghouse_state`
+and `option_state`. A 0.9.6 node does both.
 :::
 
 :::info

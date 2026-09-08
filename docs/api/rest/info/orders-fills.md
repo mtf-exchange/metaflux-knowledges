@@ -140,16 +140,8 @@ carried it, for either party. All four are fixed:
 |---|---|
 | [`modify`](../exchange/orders.md#modify) / [`batch_modify`](../exchange/orders.md#batch_modify), when the replacement crosses on placement | node 0.9.5 |
 | a [`multi_sig`](../../../concepts/multi-sig.md) envelope holding an order action | node 0.9.5 |
-| [CoreWriter `LimitOrder`](../../../evm/interacting-with-core.md) from MetaFluxEVM, when it crosses on placement | the next release |
-| a [frequent batch auction](../../../concepts/fba.md) clearing | the next release |
-
-> **Other pages still describe all four lanes as unrecorded.** This section is
-> the current answer; where another page enumerates four, read it as the two
-> above that are not yet live.
-
-> ⚠️ **The last two ship with the NEXT node release.** Until it swaps, a
-> CoreWriter order that crosses on placement and an FBA clearing still record
-> nothing. The two rows above them are live now.
+| [CoreWriter `LimitOrder`](../../../evm/interacting-with-core.md) from MetaFluxEVM, when it crosses on placement | node 0.9.6 |
+| a [frequent batch auction](../../../concepts/fba.md) clearing | node 0.9.6 |
 
 So a fill reaches this read, [`historical_orders`](./account-history.md#historical_orders), the
 [public trade tape](../info/perpetuals.md#trades), the WS

@@ -47,7 +47,7 @@ The default table is a fallback. A governance-only `SetOracleWeights { asset_id,
 
 A market also carries a **source-subset mask** — one bit per slot, committed per market. The mask is **recorded, not enforced**: the aggregator does not filter its inputs by it today, so every market composes its price from the same source set. Source filtering is a change to price formation, so it needs its own hard-fork boundary; it is not scheduled. Do not size risk on the mask.
 
-**Nobody can rewrite a market's mask any more.** The action that wrote it, `perp_set_oracle`, is [retired](../mip/mip-3.md#perp-set-oracle-retired) and refused from the next release, precisely because the mask has no reader: the write returned OK and changed no price. The committed value stays frozen until the next re-genesis.
+**Nobody can rewrite a market's mask any more.** The action that wrote it, `perp_set_oracle`, is [retired](../mip/mip-3.md#perp-set-oracle-retired) and refused, precisely because the mask has no reader: the write returned OK and changed no price. The committed value stays frozen until the next re-genesis.
 
 **The deployer price control is a different action.** A [MIP-3](../mip/mip-3.md) deployer sets its market's index price with the [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) overlay. That action is unrelated to the source mask and it stays.
 
@@ -134,11 +134,6 @@ one to its exact [permission mask](../mip/mip-3.md#delegation) as an integer.
 Read the mask, not the list, before you decide who can push a price: a delegate
 appears in `sub_deployers` whether it holds bit 0 or only the fee bits. A
 delegate granted before the release reads back as `511`, the full mask.
-
-:::warning Not live yet
-`sub_deployer_perms` lands with the next release. Until it fires the field is
-absent, and every address in `sub_deployers` holds every deployer power.
-:::
 
 ## Edge cases {#edge-cases}
 

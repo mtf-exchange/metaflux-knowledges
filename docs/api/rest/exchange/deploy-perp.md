@@ -15,8 +15,7 @@ whether the running build carries them and whether the governance off-switch
 `mip3_enabled` is open, so a call can still be refused. Build against these
 shapes now; probe one call on your target network before you depend on it.
 
-**One row still moves.** [`perp_set_oracle`](#perp_set_oracle) is RETIRED: the
-node still accepts it today and refuses it after the next release.
+[`perp_set_oracle`](#perp_set_oracle) is RETIRED: the node refuses it.
 [`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) has **shipped** — the
 node accepts it now. Every other wire shape and signing type on this page is
 unchanged.
@@ -39,14 +38,6 @@ or above 1000, never in the primary dex.
 per deploy epoch — see [Limits](../../../mip/mip-3.md#limits). `0` means uncapped.
 
 ### Register a perp asset {#perp_register_asset}
-
-:::warning Not live yet
-`name`, and the symbol rule that goes with it, land with the next network
-upgrade. `name` is inside the signature digest, so a call signed over the new
-struct is refused before the upgrade, and a call signed over the old struct is
-refused after it. See
-[typed-data signing](../../../integration/typed-data-signing.md#perp-deployer-actions).
-:::
 
 This action also CREATES your dex, on your first call. That is why it carries the
 dex name: there is no separate create-dex action.
@@ -95,8 +86,7 @@ every named dex disjoint, so one symbol never belongs to two dexes.
 ### Set the market oracle — RETIRED {#perp_set_oracle}
 
 :::danger Retired — do not call
-**`perp_set_oracle` is removed in the next release.** The node then refuses it
-with:
+The node refuses `perp_set_oracle` with:
 
 ```text
 perp_set_oracle is retired: oracle_source_subset_mask has no reader. Use mip3SetOraclePx (action 210) for the deployer price push.

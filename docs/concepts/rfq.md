@@ -145,13 +145,6 @@ An option fill moves three amounts and nothing else.
 
 ### The escrow rule {#the-escrow-rule}
 
-:::warning Not live yet
-The coin escrow lands with the **standard European** option release, which has not
-fired. Until it does, every series escrows and pays USDC, no series row carries
-`settle_asset`, and the two coin-lane refusals below cannot be reached. See
-[what changed](../products/options.md#what-changed).
-:::
-
 **A put writer escrows USDC. A call writer escrows the underlying COIN — one coin
 per whole unit, whatever the strike.** The currency is on the series row as
 [`settle_asset`](../api/rest/info/options.md#option_series).

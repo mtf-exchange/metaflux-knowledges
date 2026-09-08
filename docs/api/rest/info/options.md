@@ -112,13 +112,6 @@ it answers `unknown info type`, the same as a name that never existed. Send the
 new name.
 :::
 
-:::warning Not live yet
-`settle_asset` and the coin-denominated `escrow` land with the same release as
-the [`option_series`](#option_series) shape above. Until then a live node answers
-the retired call token in `kind`, omits `settle_asset`, and renders every `escrow`
-in USDC.
-:::
-
 For the account-wide totals — escrow, leg count and nearest expiry — read the
 `option` lane of [`account_state`](./account.md#account_state) instead. This read is the
 per-leg detail behind that summary, and it is the **only** read that gives a call

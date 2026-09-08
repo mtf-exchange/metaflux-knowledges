@@ -35,7 +35,7 @@ order-book state.
 | [`node_bridge_outbox`](#node_bridge_outbox) | `<data_dir>/node_bridge_outbox/` | Bridge withdrawal outbox: admissions, status moves, deployment rows |
 | [`node_equity_snapshots`](#node_equity_snapshots) | `<data_dir>/node_equity_snapshots/` | Hourly account-value samples |
 | [`node_asset_ctxs`](#node_asset_ctxs) | `<data_dir>/node_asset_ctxs/` | Per-market mark and oracle price samples, every 5 s |
-| [`node_actions`](#node_actions) | `<data_dir>/node_actions/` | One record per action in a block payload, applied and rejected. **Not live yet** |
+| [`node_actions`](#node_actions) | `<data_dir>/node_actions/` | One record per action in a block payload, applied and rejected |
 | [`node_blocks`](#node_blocks) | `<data_dir>/node_blocks/` | One block head per committed block, including an empty one |
 | [`replica_cmds`](#replica_cmds) | `<data_dir>/replica_cmds/` | One block envelope per block, header plus events |
 | [`l4_book_diffs`](#l4_book_diffs) | `<data_dir>/l4_book_diffs.jsonl` | Per-order book diffs, with owner |
@@ -83,9 +83,6 @@ write_order_statuses = true
 ```
 
 A disabled stream creates no directory and no file.
-
-`write_actions` is **not live yet**. A node on the current release ignores
-the flag and records nothing. See [`node_actions`](#node_actions).
 
 ### Recording on a validator {#validator-refusal}
 
@@ -482,11 +479,10 @@ the trader asked for.
 Every record above comes from an order the account **submitted**. A resting
 order that is HIT submits nothing in that block, so the node derives its record
 from the block's fills instead. That record is a maker execution record.
-**Except when the fill is an
-[unrecorded fill](../api/rest/info/orders-fills.md#unrecorded-fills)**. Node 0.9.5 records
-the `modify` and `multi_sig` lanes; a CoreWriter `LimitOrder` that crosses on
-placement and a batch-auction clearing still match against a resting order and
-derive nothing for it, until the next release.
+**Every order lane records the maker's fill.** Node 0.9.5 records the `modify`
+and `multi_sig` lanes. Node 0.9.6 records all four lanes: a CoreWriter
+`LimitOrder` that crosses on placement and a batch-auction clearing also derive
+the maker record. See [every order lane records its fill](../api/rest/info/orders-fills.md#unrecorded-fills).
 
 **A fill describes the fill, not the order.** `tif` and `cloid` are absent,
 `reduce_only` is `false` and `orig_sz` is `"0"`, whatever the order carried.
@@ -513,7 +509,7 @@ reduce-only; a fired trigger leg is always `"Gtc"` and always reduce-only, so
 
 The second group is any order that an
 [unrecorded-fill lane](../api/rest/info/orders-fills.md#unrecorded-fills) rested — a
-CoreWriter `LimitOrder`, until the next release. It rests an order with no
+CoreWriter `LimitOrder` that rested before node 0.9.6. It rested an order with no
 `resting` record. That order is an ordinary resting order after that, so an
 ordinary taker DOES give it a maker execution record later — and that record has
 nothing to join to. All four fields stay missing for its whole life.
@@ -1055,13 +1051,6 @@ series: a bar exists in every window the samples cover, whether or not anything
 traded.
 
 ## `node_actions` {#node_actions}
-
-> ⬆️ **Upgrade notice — landed, not yet released.** This stream is written,
-> tested and merged. It is **not on the live chain**. A node on the current
-> release ignores `write_actions`, creates no `node_actions` directory, and
-> raises no error for the unknown flag — so an enabled flag looks like a stream
-> that records nothing. The stream ships with the next node release. Read this
-> section as the shape to build against, not as a tape you can read today.
 
 One record per action in a committed block payload — **every** action, the ones
 the chain applied and the ones it dropped. This is the per-action tape: it
@@ -1679,10 +1668,6 @@ bootstrap. Diff lines then apply on top.
 | `block_time` | uint64 | ms | Consensus block timestamp of `block_number` |
 | `orders` | array | — | Full resting set. Present on `"snapshot"` |
 | `events` | array | — | Changed orders only. Present on `"diff"` |
-
-> ⚠️ **NOT LIVE YET.** `from_block` ships with the next node release. Until then
-> every line carries `block_number` only, and a batch is indistinguishable from
-> a single round.
 
 **One line can cover several rounds, and `from_block` is how you tell.** The node
 writes these from committed state, which a state-sync batch has already advanced

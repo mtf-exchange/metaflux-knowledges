@@ -187,9 +187,6 @@ Every open borrow, with what it costs. One read for every lane that charges
 interest — spot margin today, and anything added later joins the same `borrows`
 array rather than getting a query type of its own.
 
-> ⚠️ **NOT LIVE YET.** The node read is landed and unreleased. A live node
-> answers `unknown info type` until the next swap.
-
 **The request key is `user`, NOT `address`.** It follows
 [`spot_margin_state`](../info/spot.md#spot_margin_state), not the account-history reads.
 
@@ -322,10 +319,10 @@ A resting order that is HIT gets a `filled` record too, with one exception.
 This page calls that a **maker execution record**. The maker sent no action in
 that block, so the node derives the record from the fill. A liquidation, a TWAP
 slice and a trigger order all produce the same record for the maker they hit.
-**The exception is a still-[unrecorded fill](./orders-fills.md#unrecorded-fills)**. Node 0.9.5
-records the `modify` and `multi_sig` lanes; a CoreWriter `LimitOrder` that
-crosses on placement and a batch-auction clearing still match against a resting
-order and derive nothing for it, until the next release.
+**Every order lane records the maker's fill.** Node 0.9.5 records the `modify`
+and `multi_sig` lanes. Node 0.9.6 records all four lanes: a CoreWriter
+`LimitOrder` that crosses on placement and a batch-auction clearing also derive
+the maker record. See [every order lane records its fill](./orders-fills.md#unrecorded-fills).
 
 **Request**
 
@@ -440,7 +437,7 @@ The history archive serves it — see [the archive lane](../info.md#archive-lane
   rests.
   **The second group is any order an
   [unrecorded-fill lane](./orders-fills.md#unrecorded-fills) rested** — a CoreWriter
-  `LimitOrder`, until the next release. It rests an order with no `resting`
+  `LimitOrder` that rested before node 0.9.6. It rested an order with no `resting`
   record. That order is an ordinary resting order after that, so an ordinary
   taker DOES give it a maker execution record later — and that record has
   nothing to join to. Its `tif`, `cloid`,

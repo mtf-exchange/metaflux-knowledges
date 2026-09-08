@@ -43,8 +43,7 @@ basis point). They differ by a factor of 10. A fee is rejected if it exceeds
 either the deci-bps per-market cap of `500` (50 bps) or the bps ceiling, whenever
 that ceiling is non-zero.
 
-**Enforcement of both params activates in the next release.** Today they are
-served on `/info` and bind nothing.
+**Both params bind admission.**
 
 ---
 
@@ -70,7 +69,7 @@ record only — it has no trading pair and no supply yet. Charges the
 |-------|------|----------------|-------------|
 | `symbol` | string | non-empty, ≤ 32 chars, not already in use | Token symbol. Checked against every existing spot **and** perp symbol |
 | `sz_decimals` | uint8 | `0`–`6` | Display / size precision. A value above `6` is rejected |
-| `wei_decimals` | uint8 | `1`–`255` today; **`1`–`18` from the next release** | Native token decimals. See the two notices below |
+| `wei_decimals` | uint8 | `1`–`18` | Native token decimals. See the two notices below |
 | `max_deploy_fee` | decimal string | `≥ 0` | Highest deploy fee you accept, in whole USDC. Sent as a JSON string |
 
 :::info
@@ -82,13 +81,10 @@ precision. This reject cannot repair a token registered with `0` before it lande
 :::
 
 :::warning
-**An upper bound of `18` is coming. NOT LIVE YET.** Today admission enforces only
-the `≥ 1` floor, so a `wei_decimals` above `18` is accepted and stored. Do not
-use one. `wei_decimals` sets the scale of every credit on the
+**Admission refuses `wei_decimals` above `18` with `wei_decimals exceeds 18`.**
+`wei_decimals` sets the scale of every credit on the
 [Core-to-EVM lane](../../../evm/core-evm-transfers.md), and no real ERC-20 exceeds
-`18`; a value above it has no valid use and a later release will refuse it at
-admission. A token already registered above `18` is not repaired by that release.
-Register in `1`–`18`.
+`18`. A token registered above `18` before this reject landed is not repaired by it.
 :::
 
 **Gating.** Rejected if `symbol` is empty, longer than 32 characters, or already
@@ -186,8 +182,8 @@ registration rather than a trading pair, if either fee is at or above `1000`
 deci-bps or above the `500` cap, if `min_notional_cents` is `0`, or if it exceeds
 `100000000` cents. A `0` floor is refused because it would let the pair activate
 with no dust floor; the upper cap stops one mis-signed intent from making a live
-pair untradeable. From the next release a non-zero `mip3_fee_ceiling_bps` also
-binds here — see [Deploy rate limits](#deploy-rate-limits).
+pair untradeable. A non-zero `mip3_fee_ceiling_bps` also binds here — see
+[Deploy rate limits](#deploy-rate-limits).
 
 ---
 

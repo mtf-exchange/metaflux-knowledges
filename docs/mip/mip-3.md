@@ -76,7 +76,7 @@ market lifecycle:
 | `perp_set_fba_mode` | Set the matching venue: `0` returns the market to the CLOB, `100`-`5000` runs a frequent batch auction with that period in ms |
 | `perp_set_sub_deployers` | Grant or revoke a delegate, all powers at once. Deployer-authority only |
 | `perp_set_sub_deployer_perms` | Grant a delegate an exact permission mask. Deployer-authority only |
-| `perp_set_oracle` | **RETIRED.** Refused from the next release — see below |
+| `perp_set_oracle` | **RETIRED.** Refused — see below |
 
 :::info
 **Ten, not nine, and not eight.** Older copies of this page listed eight and
@@ -116,7 +116,7 @@ The action wrote a market's oracle source-subset mask, and **nothing read the
 mask**. The call returned OK, committed state changed, and the market priced
 exactly as before.
 
-From the next release the node refuses it. Nothing replaces it, because it never
+The node refuses it. Nothing replaces it, because it never
 did anything: the deployer price control is
 [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) (action 210), a
 different action that stays. The mask field remains in market state, still with no
@@ -256,8 +256,7 @@ can move any of them, so confirm the current value through
 controls. The **off-switch** is `mip3_enabled`, a separate governance flag that
 closes the whole lane. Never read a `0` cap as "deployment is closed".
 
-Enforcement of `mip3_fee_ceiling_bps` and `mip3_max_deploys_per_epoch` **begins
-in the next release**; today both are served on `/info` and bind nothing.
+`mip3_fee_ceiling_bps` and `mip3_max_deploys_per_epoch` **both bind admission today**.
 :::
 
 **Unit trap.** `mip3_fee_ceiling_bps` is in basis points; the fee fields on the
@@ -284,9 +283,8 @@ They decide how a failing account on that market is closed.
 deployer oracle.
 
 :::caution
-**Starting the next release, a vote that sets `deficit_cap` to any non-zero value
-is REFUSED.** This is not live yet; the current node still accepts the value and
-ignores it. The refusal is deliberate. A capped deficit leaves the remainder with
+**A vote that sets `deficit_cap` to a non-zero value is refused:
+`deficit_cap must be 0 (no cap)`.** The refusal is deliberate. A capped deficit leaves the remainder with
 no owner: the shortfall above the cap is neither paid by the treasury nor
 assigned to anyone, so the books do not balance. `0` means "no cap", which is the
 only sound setting. `Capped` and `Enabled` therefore stay behaviourally

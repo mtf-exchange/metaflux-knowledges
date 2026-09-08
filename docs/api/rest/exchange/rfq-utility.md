@@ -211,14 +211,6 @@ session — this binding is why the RFQ `owner` is part of the signed digest.
 
 #### What the fill moves {#rfq_accept-effects}
 
-:::warning Not live yet
-The coin-settled call lane below lands with the **standard European** option
-release, which has not fired. Until it does, every series escrows and pays USDC,
-the series row carries no `settle_asset`, the fee notional on a call is its
-strike-to-ceiling width, and the two coin-lane refusals cannot be reached. See
-[what changed](../../../products/options.md#what-changed).
-:::
-
 The accept settles one option fill. It moves three amounts and nothing else.
 
 1. The **premium** goes from the buyer to the writer. Premium in USDC = quoted
