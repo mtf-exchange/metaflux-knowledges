@@ -10,12 +10,12 @@ description: Testnet test faucet — one-shot transfer of test USDC + MTF from a
 production flow.
 :::
 
-:::danger
-**The reserve is EMPTY on the live chain, so every claim is refused today.** The
-faucet no longer creates tokens; it moves them out of a reserve account that must
-be funded first, by two separate ⅔-stake governance votes. Until both land, a
-claim returns `200 queued` and then quietly credits nothing. See
-[the reserve](#reserve).
+:::warning
+**The reserve is finite, and an empty reserve refuses every claim.** The faucet
+no longer creates tokens. It moves them out of a reserve account that ⅔-stake
+governance votes fund. Read the reserve balance before you blame the endpoint:
+testnet held **276,000 USDC + 920 MTF** on 2026-09-09 (about 92 grants), and
+devnet holds nothing. See [the reserve](#reserve).
 :::
 
 ## TL;DR {#tldr}
@@ -60,7 +60,14 @@ structurally unreachable from the `/exchange` handler tree.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `address` | `0x`-hex 20-byte address | yes | Recipient. Accepts 40 or 42 chars (`0x` optional). The zero address is rejected. |
-| `amount` | uint64 (whole USDC) | no | Optional USDC grant; **caps DOWNWARD** at the configured max (3000) — a larger value clamps to 3000, never above. `0` is rejected. MTF (10) is fixed regardless. |
+| `amount` | uint64 (whole USDC) | no | Optional USDC grant; **caps DOWNWARD** at the configured max (3000) — a larger value clamps to 3000, never above. `0` is rejected. MTF (10) is fixed regardless. **After the next release a small `amount` forfeits the rest of the grant** — read the paragraph below. |
+
+> ⬆️ **Upgrade notice — NOT LIVE YET. Ask for the full grant.** After the next
+> release the first claim closes the address forever, whatever its size.
+> `{"address":"0x…","amount":1}` takes 1 USDC and forfeits the other 2999. The
+> address cannot come back for them, on either lane. Send `amount` only when you
+> want a smaller grant and accept losing the rest. Until that release the live
+> chain still lets such an address claim the remainder. See [Limits](#limits).
 
 ```bash
 curl -s -X POST https://api.testnet.mtf.exchange/faucet \
@@ -113,9 +120,10 @@ applies it, and either can be refused there** — see
 | 400 | `{"error":"invalid address: <detail>"}` | `address` not valid `0x`-hex (e.g. wrong length) |
 | 400 | `{"error":"zero address not allowed"}` | Recipient is the zero address |
 | 400 | `{"error":"amount must be positive"}` | Explicit `amount` of `0` |
-| 429 | `{"error":"address already funded"}` | This address claimed before (**once-ever**, permanent for the node's lifetime) |
-| 429 | `{"error":"rate limit: this IP requested too recently"}` | Source IP claimed within the per-IP cool-down (default 1/min/IP) |
+| 429 | `{"error":"address already funded"}` | This address claimed before (**once-ever**). **Today** the faucet node answers this from a set it holds in memory, so a restart clears it. **After the next release** the refusal reads a committed row and survives a restart — see [Limits](#limits) |
+| 429 | `{"error":"rate limit: this IP requested too recently"}` | Source IP claimed inside the per-IP window. **Today one grant per minute; one per day after the next release** — see [Limits](#limits) |
 | 403 | `{"error":"faucet disabled on this network"}` | Defensive guard (should be unreachable — mainnet never mounts the route) |
+| 503 | `{"error":"faucet reserve is empty; ask an operator to refill it"}` | The reserve cannot pay this grant. The node checks it before it queues, so the claim is refused, not silently dropped — see [the reserve](#reserve) |
 | 503 | `{"error":"faucet backlog full; retry shortly"}` | Injection queue saturated (transient backpressure; retry) |
 
 ```json
@@ -136,7 +144,7 @@ Four rules refuse a queued claim. All four are evaluated on committed state:
 | Rule | Effect |
 |---|---|
 | **The reserve must hold the amount.** The lane debits a reserve account; it never creates tokens | A claim larger than the reserve balance is refused **whole**. It is not partly filled and not clamped down |
-| **A per-address lifetime cap, in committed state.** 3000 USDC on the USDC leg, 10 tokens per token id on the spot leg | Cumulative, not per-request. Once an address has taken its cap, every later claim for that address is refused forever — including after a node restart |
+| **A per-address rule, in committed state.** One row per lane: the USDC leg, and each spot token id | **Today** the row is cumulative and bounds a lifetime VALUE: 3000 USDC, 10 tokens. **After the next release** it bounds a claim COUNT: the first claim of any size closes that lane forever, and one claim above 3000 USDC / 10 tokens is refused whole. Either rule survives a node restart |
 | **The recipient must not be the reserve itself** | Refused |
 | **The amount must be positive** | Refused |
 
@@ -149,6 +157,14 @@ its once-ever address set are host-local: the flag gates the HTTP route only, an
 the set is in memory and resets on restart. Neither is read when the block
 applies the action, so neither can bound what the lane hands out. Only the
 committed cap can, so that is where the binding limit sits.
+
+> ⬆️ **Upgrade notice — NOT LIVE YET.** After the next release the handler reads
+> those committed rows **before** it queues. A used address then gets `429
+> address already funded` from any node process, not only the one that served the
+> first claim, and that refusal no longer spends the IP window. The handler also
+> clamps the grant to the committed cap, so a `200` cannot promise more than the
+> chain pays. The rows themselves already bind today — the change is where you
+> learn about the refusal.
 
 ## The reserve, and how it gets funded {#reserve}
 
@@ -174,23 +190,40 @@ validator governance votes fund it, one per leg:
 Both appear on [`governance_history`](./info/governance.md) under those `action`
 names once they land, so that read is how you confirm the reserve was funded.
 
-Until both land, every claim returns `200 queued` and credits nothing. If you are
+A claim the reserve cannot pay is refused, and nothing is credited. If you are
 integrating against a network whose faucet appears dead, this is the first thing
 to check: read `account_state` for `0x5555…5555` and see whether the reserve holds
-anything.
+anything. Testnet held 276,000 USDC + 920 MTF on 2026-09-09; devnet holds
+nothing.
 
 ## Limits {#limits}
 
-- **Once-ever per address.** The HTTP layer tracks it in an in-memory set (resets
-  on node restart; testnet state is ephemeral), so a second claim for the same address —
-  even from a different IP, even much later — returns `429 address already
-  funded`. A *rejected* request does NOT consume the in-memory slot. **That set is
-  only a cheap early refusal.** The limit that binds is the per-address cap in
-  committed state, which survives a restart and refuses on the apply path.
-- **Per-IP throttle.** Default 1 request / minute / source IP. Distinct addresses
-  from the same IP within the window get `429 rate limit`.
+> ⬆️ **Upgrade notice — NOT LIVE YET.** The faucet node runs the old limits until
+> it restarts, and it restarts at a release. Each bullet below says what the live
+> chain does **today** and what holds **after the next release**. Build against the
+> stricter rule: it costs you nothing today and it is what you get tomorrow.
+
+- **Once ever per address.** A second claim for the same address returns `429
+  address already funded`, even from another IP, even much later. **After the next
+  release the first claim of any size closes both lanes forever** — that is what
+  "once" means, and a partial claim forfeits the rest. **Today** the committed row
+  accumulates toward a value cap of 3000 USDC / 10 MTF, so an address that asked
+  for less keeps a remainder, and only a node-local set stops the repeat. That set
+  resets on restart, so a release re-opens such an address. A `400` or `429` refusal
+  records nothing. A `503` is different: the node has already marked the address and
+  advanced the IP window by the time the queue refuses it, so that node refuses the
+  address until it restarts. No committed row is written, so the address can claim
+  again after that restart.
+- **Per-IP window. After the next release, one grant per IP per day** (86400 seconds);
+  **today, one per minute.** Distinct addresses behind one IP inside the window get
+  `429 rate limit`. **This window is a speed bump, not an anti-sybil control.** It
+  lives in the faucet node's memory, it is not chain-wide, and it resets when that
+  node restarts — every release restarts it. What bounds the give-away is the
+  committed per-address rule and the reserve balance.
 - **USDC cap.** The optional `amount` only caps downward; you can never get more
-  than the configured 3000 USDC.
+  than the configured 3000 USDC. After the next release the handler also clamps the
+  queued grant to the committed cap, so the `200` cannot name a number the chain
+  will not pay.
 
 ## Why this is NOT on `/exchange` {#why-this-is-not-on-exchange}
 

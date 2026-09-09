@@ -42,8 +42,11 @@ curl -X POST https://api.testnet.mtf.exchange/faucet \
 
 One claim grants **3000 USDC** cross-collateral **and 10 MTF** spot tokens —
 **once ever per address** (a second claim returns `429 address already funded`),
-rate-limited to one claim per IP per day, crossed with the per-address rule. The optional `amount` only caps the USDC grant
-*downward* (≤ 3000); MTF is fixed. The grant is `"queued"` — it lands ~1 block
+rate-limited per source IP (one claim per minute today, one per day after the
+next release) and crossed with the per-address rule. The optional `amount` only
+caps the USDC grant *downward* (≤ 3000); MTF is fixed. **After the next release a
+small `amount` forfeits the rest of the grant** — see
+[Limits](../api/rest/faucet.md#limits). The grant is `"queued"` — it lands ~1 block
 later, so wait a moment before confirming the balance:
 
 :::info
