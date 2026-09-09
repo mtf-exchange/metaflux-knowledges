@@ -868,8 +868,8 @@ is prose and it can change.
 | `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer or sell | Check the free balance; a held balance is not spendable |
 | `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |
 
-Two `PRECONDITION_FAILED` cases are worth naming, because the fix is not obvious
-from the sentence:
+Three `PRECONDITION_FAILED` cases are worth naming, because the fix is not
+obvious from the sentence:
 
 - **`trail_px: 0`** on a `trigger` block. Presence of the key selects the
   trailing signing type, so an explicit `0` is a *present* trail, not an absent
@@ -877,6 +877,16 @@ from the sentence:
 - **A trailing leg on the take-profit side.** The ratchet follows a winning
   position, so only the stop-loss may trail. Put `trail_px` on the protective
   leg.
+- **`this node is not on the exchange-serving allowlist`.** Nothing in your
+  request is wrong, and the message carries no address. The node you reached
+  does not serve `POST /exchange` writes. Treat it as a **routing** failure:
+  retry the identical bytes against another endpoint. Re-signing, a new nonce,
+  or waiting changes nothing.
+
+  A node can start refusing at any time, with no restart and no version change,
+  so handle this on every write rather than only at startup. The public endpoint
+  is `api.testnet.mtf.exchange`; an aggregator you run yourself can point at a
+  node that does not serve writes.
 
 ### `401 Unauthorized` — signature / authorization failed {#401-unauthorized--signature--authorization-failed}
 

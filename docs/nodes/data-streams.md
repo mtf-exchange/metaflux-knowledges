@@ -48,6 +48,14 @@ order-book state.
 two look alike and are off by a large power of ten.
 :::
 
+## Joining the validator set {#joining-the-validator-set}
+
+Anyone can run a MetaFlux node and read its streams. Membership of the validator
+set is separate, and it is controlled: staking MTF does not by itself make a node
+a validator.
+
+To apply, write to **validators@mtf.exchange**.
+
 ## Operations {#operations}
 
 ### Enable a stream {#enable-a-stream}
@@ -1381,6 +1389,9 @@ the other.
 **Treat an unknown value as data, not as an error.** A new action appends a new
 name, and a reader that rejects unknown names breaks on the next release. Store
 the string.
+
+The list below names the kinds a caller can act on. Node-operations kinds also
+appear on the tape and are not listed here.
 
 - **Trading** — `Order`, `Cancel`, `CancelByCloid`, `Modify`, `BatchModify`, `ScheduleCancel`, `TwapOrder`, `TwapCancel`, `Liquidate`, `BatchOrder`, `BatchCancel`, `CancelAllOrders`, `ChaseOrder`, `CancelChase`, `ScaleOrder`, `CancelScale`, `SubmitEncryptedOrder`, `SubmitDecryptionShare`, `RfqRequest`, `RfqQuote`, `RfqAccept`, `FbaSubmit`
 - **Spot and Earn** — `SpotOrder`, `SpotCancel`, `SpotSend`, `SpotMarginDeposit`, `SpotMarginWithdraw`, `SpotMarginOpen`, `SpotMarginClose`, `EarnDeposit`, `EarnWithdraw`, `SpotGenesis`
