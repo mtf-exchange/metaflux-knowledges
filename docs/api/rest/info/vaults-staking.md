@@ -85,6 +85,8 @@ Returns one account's staking, delegation, and unbonding state.
       {
         "validator":        "0x<val_addr>",
         "amount":           "500000000",
+        "lock_months":      6,
+        "reward_weight":    "1250000000",
         "since_ts":         1735000000000,
         "pending_rewards":  "1000000"
       }
@@ -110,8 +112,10 @@ Returns one account's staking, delegation, and unbonding state.
 | `total_staked` | Decimal string | This account's delegated stake only, whole-MTF — the sum of `delegations[*].amount`. It is `"0"` for an account that delegates nothing |
 | `delegations[*].validator` | hex address | Validator the stake is delegated to |
 | `delegations[*].amount` | Decimal string | Stake delegated to this validator, whole-MTF |
+| `delegations[*].lock_months` | uint8 | The row's lock tier in committed state: `0` flexible, or `1`, `6`, `24`. It tells a delegator what to change. Do not compute `reward_weight` from it |
+| `delegations[*].reward_weight` | Decimal string | This row's weight in its validator's reward split, on the same whole-MTF plane as `amount`. The row's share of a distribution is this weight over the sum of weights at that validator, before the validator's commission. It is a weight, not a payable amount. **It is not derivable from `lock_months`** — see the rules below |
 | `delegations[*].since_ts` | uint64 | **Last reward-claim time, consensus ms — not the time the delegation began.** Committed state keeps the last-claim stamp only. Do not compute a delegation age from it |
-| `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards, whole-MTF |
+| `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards, whole-MTF. A row whose `reward_weight` is `"0"` never accrues here — see the rules below |
 | `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window, whole-MTF |
 | `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable, consensus ms |
 | `total_stake` | Decimal string | Total staked MTF across the **whole chain**, whole-MTF — the denominator this account's delegated stake competes in. Chain-wide, not per-account |
@@ -121,6 +125,14 @@ Returns one account's staking, delegation, and unbonding state.
 
 **Rules**
 
+- **`reward_weight` is served, not derived. Do not rebuild it from `lock_months`.**
+  Three inputs set the weight, and the read carries only the result.
+  1. **The lock tier.** A flexible row (`lock_months: 0`) weighs `"0"`. A locked row weighs `amount × 1.0` at 1 month, `× 2.5` at 6 months, and `× 4.0` at 24 months.
+  2. **The multiplier the row stored at delegate time.** A governance retune of the ladder never rewrites an existing row. So a row can hold a multiplier the current ladder no longer gives.
+  3. **The locked-stake allowlist.** A locked row whose validator is not in that allowlist is capped to `amount × 1.0`, whatever the tier. A 24-month row off the allowlist weighs the same as a 1-month row, not four times it. Governance can drop a validator from the allowlist after you delegate, so a correctly admitted row reaches this state without doing anything.
+
+  A caller that rebuilds the ladder from `lock_months` alone misses the allowlist fallback and over-states the row's share. Read the served value.
+- **A `reward_weight` of `"0"` beside a non-zero `amount` is not a late payment.** The row earns nothing from a distribution, and it earns nothing from the next one either. `pending_rewards` never grows on that row, so waiting does not change the number. A delegator changes it by locking, not by waiting: undelegate the row, wait out the unbonding window, then delegate again with `lock_months` of `1`, `6` or `24`. The undelegated stake sits in `pending_unstakes` until that window matures and only then reaches the free pool a new delegation draws on, so this is not a same-block swap. Pick a validator on the locked-stake allowlist — a validator off it refuses a locked tier at delegate time.
 - **This read serves no APR, on purpose.** The emission era is over: rewards are funded from fees, not minted on a curve, so there is no annual rate to publish. Do not derive one. `pending_validator_pool_usdc` is a snapshot of accrued fees, not a rate — it depends on trading volume that has not happened yet.
 - **A pool that does not move is not a stalled read.** `reward_source` is `"fee_funded_on_book_buy"`, and the second half of that name is a real step: the distribution spends the pooled USDC on the MTF/USDC book, then pays the MTF it ACQUIRED out by stake weight. It never credits USDC into an MTF-denominated reward, so a buy that fills nothing pays nothing. **With no resting asks on MTF/USDC the buy acquires nothing, the distribution is skipped, and the pool carries forward unchanged.** The pool is not spent and not stranded; it waits. A pool above the floor therefore does NOT mean a payout is due — check `height` on another read to tell a waiting pool from a frozen connection.
 - **This read does NOT serve the undelegated free pool.** [`c_deposit`](../exchange/staking.md#c_deposit) credits a free pool and [`c_withdraw`](../exchange/staking.md#c_withdraw) debits it, and stake can sit in that pool undelegated for as long as the holder likes. No field on this read reports it. `total_staked` therefore **under-reports** what an account holds: it counts delegated stake only, so an account with a funded free pool and no delegation reads `"0"`. Do not present `total_staked` as the account's whole staked balance.
