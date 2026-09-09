@@ -61,8 +61,8 @@ flowchart TD
     D --> E["market accepts orders"]
 ```
 
-Perp deployment is dispatched by sub-variant, **ten** of them, covering the full
-market lifecycle:
+Perp deployment is dispatched by sub-variant, **eleven** of them, covering the
+full market lifecycle:
 
 | Action tag | Purpose |
 |------------|---------|
@@ -81,8 +81,8 @@ market lifecycle:
 :::info
 **Ten, not nine, and not eight.** Older copies of this page listed eight and
 omitted `perp_set_sub_deployers`; a later copy listed nine and omitted
-`perp_set_fba_mode`. The node dispatches ten today and eleven after the next
-release, of which `perp_set_oracle` is refused. Ten are callable either way.
+`perp_set_fba_mode`. The table lists eleven tags, of which `perp_set_oracle` is
+refused. Ten are callable.
 :::
 
 ## Delegation is per handler {#delegation}

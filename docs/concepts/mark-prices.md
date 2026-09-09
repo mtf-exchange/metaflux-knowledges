@@ -79,7 +79,7 @@ So when a perp trades at, say, a 30 % discount to its spot index, `mark ≈ perp
 
 ## Sanity bands {#sanity-bands}
 
-> **Implementation status:** the 3-component median (absent components dropping out, lone-C2 rejected) is implemented today. The per-block clamp described in this section (a `clamp(candidate, prior ± max_step)` ramp on top of the median) is a **design specification, not yet a discrete clamp in the mark computer** — the structural median is currently the primary manipulation defence. The closest live guard copies the oracle into a stale book's `last_mark_px` rather than ramping. Treat the numbers below as the intended band design; verify against the live values before relying on exact clamp numbers.
+> **What this section is.** The mark computer runs the 3-component median: absent components drop out, and a lone C2 is rejected. It does **not** run the per-block clamp this section describes — the `clamp(candidate, prior ± max_step)` ramp is a design specification, and the structural median is the primary manipulation defence. The closest guard in the code copies the oracle into a stale book's `last_mark_px` rather than ramping. Read the numbers below as the intended band design, and check them against the values a market reports before you rely on them.
 
 Even with composition, an adversary can push two of three sources simultaneously. Mark therefore is intended to enforce **bands** per block:
 

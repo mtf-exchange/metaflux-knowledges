@@ -373,7 +373,7 @@ One fill record, taker leg:
    fill. Treat absent as "no settlement data", not as zero.
 3. Two fields are reserved and carry constants: `feeTrialEscrow` and
    `deployerFee`. Do not read them as data. The other six in that group are
-   real — read the rows above and the upgrade notice.
+   real — read the rows above.
 :::
 
 ## `node_trades` {#node_trades}

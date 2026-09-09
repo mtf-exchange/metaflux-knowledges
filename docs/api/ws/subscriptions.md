@@ -133,7 +133,7 @@ same data.
 span roughly 10 seconds of chain and a 2-second poll always overlaps. Do not treat
 that cadence as a constant — it moves between releases.
 
-See the [upgrade notice](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed).
+See [Ids and wire shapes](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed).
 :::
 
 ---
@@ -754,8 +754,7 @@ Subscribe to `option_state`.
 - **`escrow` is denominated in that row's `settle_asset`** — USDC on a put, the
   underlying COIN on a call, because a
   [call escrows one coin](../../products/options.md#why-a-call-escrows-one-coin)
-  per unit. `settle_asset` lands with the standard European option release; it is
-  absent, and every `escrow` is USDC, until that release fires.
+  per unit. Read `settle_asset` before you render or sum an `escrow`.
 - For the account totals — escrow, leg count, nearest expiry — read the `option`
   lane of [`account_state`](#account_state). That summary's `escrow` counts PUT
   legs only, because coins cannot be added to dollars, so this channel is the only

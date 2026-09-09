@@ -77,8 +77,7 @@ FiatToken predeploy, and the **native gas token**, which is the EVM balance
 itself rather than a contract.
 
 :::info
-**A binding is permanent.** ⚠️ **Corrected — an earlier version of this page said
-the bound address rotates. It does not.** The binding vote is first-write-wins:
+**A binding is permanent.** The binding vote is first-write-wins:
 it refuses an asset that already has a binding, and refuses a contract already
 bound to another asset. Nothing removes one. Read the address from
 `markets_meta` anyway, because a token can gain its FIRST binding at any time, and
@@ -98,16 +97,12 @@ never changed after. So the SIZE of every credit on this lane is decided at
 registration, and the binding only decides where the credit goes.
 
 :::warning
-**`wei_decimals` on the binding vote — NOT LIVE YET.** Today the proposal carries
-no decimals field, so a validator voting on a binding cannot see the scale it is
-blessing without reading the token registry separately. An upcoming release adds
-the bound token's `wei_decimals` to the proposal, and pairs it with a `1`–`18`
-bound at registration (see the
-[register-token notice](../api/rest/exchange/deploy-spot.md#spot_register_token)). It becomes
-part of the tallied payload, so validators that send different values will not
-tally together. Until that release ships, read
-[`spot_meta`](../api/rest/info/spot.md#spot_meta) for the value before voting on
-a binding.
+**The proposal carries no decimals field.** The tallied payload folds the
+registry's `wei_decimals` and the `node_gov` cast record shows it, and a bind
+above 18 is refused — but the proposal a validator reads carries no scale of its
+own. Read the token's `wei_decimals` from
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `kind: "spot"`
+before you vote on a binding.
 :::
 
 Offer the transfer only for the assets that resolve. An asset the chain cannot
@@ -170,9 +165,9 @@ is credited, so no sub-quantum remainder is destroyed in transit.
 
 ### Both lanes charge a fee, and the fee is MTF {#core-to-evm-fee}
 
-**No fee is charged today: the parameter is `0`.** A two-thirds-stake governance
-vote sets it, and charging starts as soon as a vote enacts a value above `0`. Once
-it does, both actions charge the same fee, so neither lane is cheaper.
+**The fee parameter is `0`, so the chain charges no fee.** A two-thirds-stake
+governance vote sets it, and charging starts as soon as a vote enacts a value
+above `0`. Both actions then charge the same fee, so neither lane is cheaper.
 
 The fee is a **quantity of MTF**, debited on top of the amount, and it is
 independent of the asset you move: a transfer of USDC debits USDC for the amount

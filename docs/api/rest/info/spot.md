@@ -86,8 +86,8 @@ Two encodings used to hide it, and both are fixed:
 So `null` sends you to `fee_schedule`. A `"0"`, should you see one, is a real
 zero-rate override. Measured live before the fix: a pair served `"5"` while
 `fee_schedule` said `"3.5"`, and nothing on either read explained which one
-charged. See the
-[upgrade notice](../../../changelog/ids-and-wire-shapes.md#spot-taker-fee).
+charged. See
+[Ids and wire shapes](../../../changelog/ids-and-wire-shapes.md#spot-taker-fee).
 :::
 
 :::info

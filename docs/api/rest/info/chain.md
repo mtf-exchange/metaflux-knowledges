@@ -12,13 +12,14 @@ to every query here.
 
 Recent blocks and recent order-lifecycle events, served by the gateway from the
 standalone history archive. **They are the replacement for the removed
-`explorer_block` / `explorer_txs` WS channels** — see the
-[upgrade notice](../../../changelog/ids-and-wire-shapes.md#explorer-channels-removed)
+`explorer_block` / `explorer_txs` WS channels** — see
+[Ids and wire shapes](../../../changelog/ids-and-wire-shapes.md#explorer-channels-removed)
 for why a validator no longer pushes that firehose.
 
-Both answer in the [history-archive envelope](../info.md#archive-lane): `type` sits beside
-`data` until the next gateway release, and inside it after. A gateway with no
-archive configured answers an empty array with a `flag`, never an error.
+Both answer in the standard `/info` envelope, with `type` inside `data`. The
+[history-archive lane](../info.md#archive-lane) differs in its rejection shape
+only. A gateway with no archive configured answers an empty array with a `flag`,
+never an error.
 
 ### Recent committed blocks {#recent_blocks}
 
@@ -37,6 +38,7 @@ archive configured answers an empty array with a `flag`, never an error.
 ```json
 {
   "data": {
+    "type": "recent_blocks",
     "blocks": [
       { "height":       26616908,
         "block_hash":   "0x3bbcfeea4bcebded111b4407fe46ea2fbda57457fad926e27de9012eceabd583",
@@ -44,8 +46,7 @@ archive configured answers an empty array with a `flag`, never an error.
         "action_count": 0,
         "fill_count":   0 }
     ]
-  },
-  "type": "recent_blocks"
+  }
 }
 ```
 
@@ -84,6 +85,7 @@ One row per order TRANSITION, not per order. A single order emits several rows
 ```json
 {
   "data": {
+    "type": "recent_transactions",
     "txns": [
       { "oid":    "34143530",
         "user":   "0x0c4ec1cba7310669b08145f17a29b1048d9196ab",
@@ -93,8 +95,7 @@ One row per order TRANSITION, not per order. A single order emits several rows
         "side":   0,
         "time":   1788169342234 }
     ]
-  },
-  "type": "recent_transactions"
+  }
 }
 ```
 

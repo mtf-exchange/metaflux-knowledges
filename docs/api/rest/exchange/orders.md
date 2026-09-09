@@ -1055,16 +1055,6 @@ for the next block, so a busy chain can stretch your effective interval past
 cancelled and nothing takes liquidity. Treat `interval_blocks` as a **floor** on
 the gap between reprices, never as a guarantee.
 
-> ⬆️ **Upgrade notice — not live yet.** The reprice schedule is moving from a
-> block count to **consensus time**. The floor becomes **500 ms of consensus
-> time** per chase, and the shared per-block work budget is derived from a
-> per-second intent, so the reprice rate a user gets stops moving when the
-> chain's cadence moves. The change is **not on the live chain** and has **no
-> activation height yet**. Until it activates, the block-count rules above are
-> what the chain enforces. `interval_blocks` keeps
-> its name and its `2 … 28800` range across the change — an existing signed
-> request stays valid.
-
 **Termination.** The chase ends and its leg is cancelled when `ttl_ms` elapses or
 `max_reprices` is reached. If the leg fills completely, or is cancelled by any
 other path, the chase ends and is **not** re-placed. A partial fill keeps the chase

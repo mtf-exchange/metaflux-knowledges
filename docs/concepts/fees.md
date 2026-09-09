@@ -523,9 +523,8 @@ Four consequences a caller must handle:
 Liquidation closes route through the standard taker-fee path described above. A
 discrete liquidation fee — an extra charge split between the insurance pool and
 treasury to keep insurance solvent and compensate makers who absorb forced flow —
-is a design intent that is not yet active. When it lands, liquidated accounts will
-pay it as part of the loss settled on close, flagged on the liquidation fills in
-[`userFills`](../api/rest/info/orders-fills.md#user_fills). See
+is a design intent. The protocol charges no such fee: a liquidated account pays
+the loss settled on close and nothing beyond it. See
 [tiered liquidation](./tiered-liquidation.md) for the close mechanics.
 
 ## Core to EVM transfer fee {#core-evm-transfer-fee}

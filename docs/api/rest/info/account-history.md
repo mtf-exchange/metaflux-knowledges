@@ -104,10 +104,6 @@ Per UTC day, the whole exchange's traded volume beside this account's own maker
 and taker volume, plus the account's trailing 14-day maker share. It is the read
 behind a "Your Volume History" panel.
 
-> ⚠️ **NOT LIVE YET.** The archive serves it and the gateway routes it, but
-> neither is released. A live gateway answers `400 UNKNOWN_TYPE` until the next
-> release. Read [`fee_schedule`](./fees-credit.md#fee_schedule) for volume you can query today.
-
 **Request**
 
 ```json
@@ -248,16 +244,16 @@ error. That is a fact about the account.
 
 ### Balance ledger update history {#user_ledger_updates}
 
-> ⚠️ **This read answers `[]` today, and it is not scheduled.** The node keeps
+> ⚠️ **This read answers `[]`.** The node keeps
 > no per-account ledger history for REST. The archive does retain the deltas,
 > but in the node stream's own record shape: a signed `delta` and a numeric
 > token id. The locked record shape below instead matches the
 > [`ledger_updates` WS record](../../ws/subscriptions.md#ledger_updates), which
 > carries an unsigned `amount` and a fine-grained `kind`. The gateway will not
-> route the archive's data through a shape it does not match. This opens when
-> the archive stores the matching record shape, not before.
+> route the archive's data through a shape it does not match. The read opens
+> when the archive stores the matching record shape.
 
-**Neither side can answer this read today.** The node emits each balance delta
+**Neither side can answer this read.** The node emits each balance delta
 once, on the [`ledger_updates` WS channel](../../ws/subscriptions.md#ledger_updates),
 and keeps nothing after. The archive keeps the deltas, in the different shape
 above. Use the WS channel for live movement; there is no REST history for it
@@ -344,8 +340,8 @@ rejected — see [malformed requests](../info.md#malformed-request).
 
 ```json
 {
-  "type": "historical_orders",
   "data": {
+    "type": "historical_orders",
     "address": "0x<addr>",
     "orders": [
       {
@@ -373,9 +369,9 @@ rejected — see [malformed requests](../info.md#malformed-request).
 }
 ```
 
-**`type` sits at the TOP level on this read until the next gateway release.**
-The history archive serves it — see [the archive lane](../info.md#archive-lane). Read
-`body.data.type ?? body.type` and both answers work.
+The history archive serves this read. `type` sits inside `data`, the same as
+every other `/info` read. The lane differs in its rejection shape only — see
+[the archive lane](../info.md#archive-lane).
 
 | Field | Type | Meaning |
 |-------|------|---------|

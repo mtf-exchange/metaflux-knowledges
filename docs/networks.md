@@ -96,12 +96,10 @@ curl -X POST https://api.testnet.mtf.exchange/faucet \
 - Grants **3000 USDC** cross-collateral and **10 MTF** spot — **once ever per
   address** (a second claim returns `429 address already funded`).
 - `amount` is optional (whole USDC) and caps the USDC grant *downward* (≤ 3000).
-  The MTF grant is fixed. **After the next release a small `amount` forfeits the
-  rest of the grant**, so ask for the full 3000 — see
-  [Limits](api/rest/faucet.md#limits).
-- Per source IP: one claim per minute today, **one claim per day after the next
-  release**. The per-IP window crosses with the per-address rule: a new address
-  behind a used IP waits, and a used address is refused from any IP.
+  The MTF grant is fixed — see [Limits](api/rest/faucet.md#limits).
+- Per source IP: one claim per minute. The per-IP window crosses with the
+  per-address rule: a new address behind a used IP waits, and a used address is
+  refused from any IP.
 - `400` invalid address · `429` already funded or IP-throttled · `503` backlog
   full — body `{"error":"…"}`.
 

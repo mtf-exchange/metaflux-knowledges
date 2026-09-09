@@ -105,14 +105,12 @@ dedicated spot fee account, separate from the perp fee pool.
 | **Taker** | your spendable quote balance | pair `taker_fee_bps`, else the global spot default |
 | **Maker** | your spendable quote balance | pair `maker_fee_bps`, else the global spot default |
 
-:::caution Scheduled change — a BUY will pay its fee in the BASE token
-Built, not yet active; it switches on at one announced block height. From that
-height a **buy** is credited the base token **minus** its fee, taker and maker
-alike, and a **sell** keeps paying from the USDC it receives. So the fill `sz`
-stays gross while the balance credit is net — **read the balance, never the sum
-of fill sizes**. Buy admission also stops reserving quote fee headroom, so a
-given quote balance admits a slightly larger buy than it does today. The full
-rule, the in-kind referrer share and the sub-lot dust are in
+:::caution A BUY pays its fee in the BASE token
+A **buy** is credited the base token **minus** its fee, taker and maker alike,
+and a **sell** pays from the USDC it receives. So the fill `sz` stays gross while
+the balance credit is net — **read the balance, never the sum of fill sizes**.
+Buy admission reserves no quote fee headroom. The full rule, the in-kind referrer
+share and the sub-lot dust are in
 [fees](../concepts/fees.md#spot-buy-fee-in-base).
 :::
 

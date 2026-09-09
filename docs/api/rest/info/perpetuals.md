@@ -328,16 +328,12 @@ has, `risk_override` is an object naming the replaced values; when it has not,
 | `margin_tiers` | array | The override ladder — each `{lower_bound_notional, max_leverage, maint_margin_ratio}`, `maint_margin_ratio` a bps string on the same plane as everywhere else on this row |
 
 :::info
-**`maint_margin_ratio` is decimal basis points EVERYWHERE on this row.** It used
-not to be. `perp[*].maint_margin_ratio` was bps while
-`perp[*].risk_override.maint_margin_ratio` was a raw fraction — the same rung
-under the same name, **10,000x apart**, inside one response. Measured live on
-BTC, the top-level ladder said `"50"` where the override ladder said `"0.005"`.
-
-A caller that read the override as bps computed a maintenance margin four orders
-of magnitude too small and believed an unsafe position was safe. One concept now
-has one plane. See the
-[upgrade notice](../../../changelog/ids-and-wire-shapes.md#one-plane).
+**`maint_margin_ratio` is decimal basis points EVERYWHERE on this row.**
+`perp[*].maint_margin_ratio` and `perp[*].risk_override.maint_margin_ratio` are
+the same rung on the same plane. A caller that reads either one as a raw
+fraction computes a maintenance margin four orders of magnitude too small, and
+believes an unsafe position is safe. The change is recorded in
+[Ids and wire shapes](../../../changelog/ids-and-wire-shapes.md#one-plane).
 :::
 
 **The two `margin_tiers` ladders still band on different keys.**
@@ -713,12 +709,7 @@ Read `v`, `q` and `n`. Treat any other volume-looking key as absent.
 
 #### The bar cap, and how to page past it {#candle_snapshot-max-bars}
 
-> ⬆️ **Upgrade notice — landed, not yet released.** The bar cap below is
-> written, tested and merged. It is **not on the live chain**: a wide window is
-> still answered in full there. The cap goes live with the next gateway release.
-> Page your queries now, and that release changes nothing for you.
-
-A response carries at most **5000 bars**. Over that, the answer keeps the **5000
+A response carries at most **500 bars**. Over that, the answer keeps the **500
 most recent** and drops the older ones. The cap exists because the window is
 caller-chosen and otherwise unbounded: one request for years of `1m` bars would
 fold and serialize an arbitrarily large series, and a few of those in parallel
@@ -726,12 +717,12 @@ are enough to hurt every other caller on the node.
 
 **The cap trims the OLD end, not the new one.** A default chart load asks for the
 recent window and is unaffected. You only meet the cap when you ask for more
-history than 5000 bars of your chosen `interval` — about 3.5 days at `1m`, or
-about 13 years at `1d`.
+history than 500 bars of your chosen `interval` — about 8 hours at `1m`, or
+about 16 months at `1d`.
 
 **No history is unreachable.** Walk backwards with `start_time` and `end_time`:
 take the oldest `t` you received, ask again with `end_time` set to it, and repeat.
-Each page returns its own 5000 most recent bars within the window you named. A
+Each page returns its own 500 most recent bars within the window you named. A
 wider `interval` reaches further per request.
 
 :::warning

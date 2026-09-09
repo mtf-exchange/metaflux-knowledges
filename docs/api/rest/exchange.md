@@ -669,8 +669,8 @@ the response carries the real `oid` + resting/filled status. On timeout it
 returns a `pending` entry — **never a fabricated oid**.
 
 **The echoed `oid` is a decimal-digit STRING.** Every id on a response is, so a
-JavaScript client cannot lose digits — see the
-[upgrade notice](../../changelog/ids-and-wire-shapes.md#id-strings). The `oid` you
+JavaScript client cannot lose digits — see
+[Ids and wire shapes](../../changelog/ids-and-wire-shapes.md#id-strings). The `oid` you
 put inside a SIGNED cancel or modify payload stays a `uint64` number: the typed
 digest binds `uint64 oid` and is consensus-frozen. A
 `batch_order` / `scale_order` resolves to **one entry per placed leg or rung**; a

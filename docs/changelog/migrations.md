@@ -264,7 +264,7 @@ The four shapes of the change:
 
 | Shape | What to do |
 |---|---|
-| **A read merged into a bigger one** — `agents`, `sub_accounts`, `user_to_multi_sig_signers`, `user_vault_equities`, `delegator_summary`, `user_role`, `pm_summary`, `evm_contract_bindings`, `bridge_chain_configs` | Call the read that owns the question. [`account_state`](../api/rest/info/account.md#account_state) with `detail: "overview"` carries the first six as named sub-objects; `account_state` already carries the PM figures; the EVM binding rides [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `kind: "spot"`; the bridge config rows ride [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) |
+| **A read merged into a bigger one** — `agents`, `sub_accounts`, `user_to_multi_sig_signers`, `user_vault_equities`, `delegator_summary`, `user_role`, `pm_summary`, `evm_contract_bindings`, `bridge_chain_configs` | Call the read that owns the question. [`account_state`](../api/rest/info/account.md#account_state) with `detail: "overview"` carries the first six as named sub-objects; `account_state` already carries the PM figures; the EVM binding rides [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `kind: "spot"`; no public read carries the deployment row — a node publishes it on its [`node_bridge_outbox`](../nodes/data-streams.md#node_bridge_outbox-configs) stream, and the custody address per chain is in [Deployments](../bridge/index.md#deployments) |
 | **A read became a PARAMETER** — `market_info`, `margin_summary`, `account_overview` (and its old name `web_data`), `user_fills_by_time`, `trades_by_time`, `max_builder_fee` | Same question, one read, one argument: `coin` on [`markets`](../api/rest/info/perpetuals.md#markets), `detail: "margin"` or `detail: "overview"` on [`account_state`](../api/rest/info/account.md#account_state), `start_time` / `end_time` on [`user_fills`](../api/rest/info/orders-fills.md#user_fills) and [`trades`](../api/rest/info/perpetuals.md#trades) |
 | **A read was RENAMED** — `spot_deploy_state` → [`spot_deploy_auction`](../api/rest/info/spot.md#spot_deploy_auction), `recent_trades` → [`trades`](../api/rest/info/perpetuals.md#trades) | Change the `type` string. The payload is the same |
 | **A read a change made UNNECESSARY** — `encode_action` | The multisig inner blob now accepts the ordinary `{type, params}` wire action, so there is nothing left to encode. UTF-8 encode the action you would post to `/exchange` and let every member sign those bytes. See [signing the inner action](../concepts/multi-sig.md#signing-the-inner-action) |
@@ -410,8 +410,8 @@ Each `perp[]` element carries a market's **dynamic** fields only. The **static**
   (`payment` signed whole-USDC: negative = paid, positive = received).
 - **`explorer_txs` and `explorer_block` are REMOVED.** Read
   [`recent_transactions`](../api/rest/info/chain.md#recent_transactions) and
-  [`recent_blocks`](../api/rest/info/chain.md#recent_blocks) instead — see the
-  [upgrade notice](./ids-and-wire-shapes.md#explorer-channels-removed).
+  [`recent_blocks`](../api/rest/info/chain.md#recent_blocks) instead — see
+  [Ids and wire shapes](./ids-and-wire-shapes.md#explorer-channels-removed).
 - **`order_updates`**: on a `filled` record, the `order.sz` is the **FILLED** size
   and `order.orig_sz` the **original** order size.
 - **Active channels**: see the [channels at a glance](../api/ws/subscriptions.md#channels-at-a-glance)
@@ -446,8 +446,8 @@ See [rate limits](../api/rate-limits.md).
 - **`oid` / `tid` are NO LONGER unchanged.** Both became decimal-digit
   **strings** on every response, because `tid` exceeds 2⁵³ and a JSON number
   loses its low digits. A request still accepts either form, and the signed
-  action payload still binds a `uint64` `oid`. See the
-  [upgrade notice](./ids-and-wire-shapes.md#id-strings).
+  action payload still binds a `uint64` `oid`. See
+  [Ids and wire shapes](./ids-and-wire-shapes.md#id-strings).
 - **Signed `/exchange` actions**: the typed-action digests are
   **consensus-frozen** — `asset` remains a numeric `u32` in signed actions. The
   `coin`/`address` change is a **read-API** change only; it does **not** affect

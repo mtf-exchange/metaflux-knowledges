@@ -100,9 +100,6 @@ exactly as before. An interface that lies is worse than a missing one.
 control is [`mip3_set_oracle_px`](#mip3_set_oracle_px) (action 210). That is a
 different action, it is the real price push, and it stays.
 
-**Until that release fires the live chain still accepts this call** and still
-writes the mask. The write changes no price. Stop sending it now.
-
 The `PerpSetOracle` signing type is not deleted, so every committed payload still
 decodes. Only the handler refuses. The mask field stays in market state, still
 with no reader, until the next re-genesis.

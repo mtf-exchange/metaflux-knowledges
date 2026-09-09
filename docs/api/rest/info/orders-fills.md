@@ -231,7 +231,7 @@ ring.
 | `fills[*].time` | uint64 | Fill timestamp (consensus ms) |
 | `fills[*].oid` | decimal-digit string | This party's order id |
 | `fills[*].tid` | decimal-digit string | Deterministic trade id, shared by both legs of the print. It is a 64-bit hash-derived value and routinely exceeds 2^53, so it is a STRING: a JSON number loses its low digits in JavaScript, and a `user_fills` to `trades` join by `tid` then matches nothing, silently. Compare it as a string, or convert it with `BigInt` |
-| `fills[*].fee` | Decimal string | Fee this party paid. **Read `fee_token` for the denomination — it is not always USDC.** ⚠️ On a SPOT fill this field reads `"0"` on BOTH legs today. The seller's USDC fee IS charged — it leaves the unified balance — but the spot lane records no fee on the fill, so the row cannot report it. Derive a spot fee from the balance delta, or from the pair's rate times the notional; do not read `"0"` as free. A node release will record it |
+| `fills[*].fee` | Decimal string | Fee this party paid. **Read `fee_token` for the denomination — it is not always USDC.** ⚠️ On a SPOT fill this field reads `"0"` on BOTH legs today. The seller's USDC fee IS charged — it leaves the unified balance — but the spot lane records no fee on the fill, so the row cannot report it. Derive a spot fee from the balance delta, or from the pair's rate times the notional; do not read `"0"` as free |
 | `fills[*].fee_token` | string | Coin symbol the `fee` is charged in. A perp fill and a spot SELL pay `"USDC"`; a **spot BUY pays the BASE token**, so a `BTC/USDC` buy pays its fee in BTC. That rule has been live since block 6,565,000; the field is derived per record, so an older fill correctly reports `"USDC"` on both sides. **Without it, summing `fee` across a spot account adds one token to another.** On a spot BUY it also warns you that `fee` is not the whole story: the base fee is NETTED out of the size delivered, not debited, so `fee` can read `"0"` while the real charge is the gap between `sz` and the balance credit — see [a spot BUY pays its fee in the base token](../../../concepts/fees.md#spot-buy-fee-in-base) |
 | `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, **decimal USDC** (signed). Always `"0"` on a spot fill — spot holds no position, so it realizes no PnL |
 | `fills[*].dir` | string | Direction label. A PERP fill uses six tokens: `"Open Long"`, `"Close Long"`, `"Open Short"`, `"Close Short"`, and — when the fill crosses through zero — `"Long > Short"` or `"Short > Long"`. A SPOT fill uses `"Buy"` (side `"B"`) or `"Sell"` (side `"A"`): spot holds no position, so no open/close token applies. Switch on `side` for spot and on this field for perps |
@@ -252,11 +252,12 @@ ring.
   `twap_id`, `hash`) but never `cause`. Classify a forced close by
   `liquidated_user` and a TWAP slice by `twap_id` — both work on every row; a
   `cause` test silently misses archive-era rows.
-- **The archive holds no forced-close, TWAP-slice or trigger row before the
-  next node release.** Those fills reach the committed ring, but they never
-  reached the stream the archive folds. So a ring-window read has always
-  returned them, and an archive-window read over that earlier period returns
-  nothing for them. From that release on, both windows agree.
+- **Rows the archive folded before node 0.9.7 carry no forced close, TWAP slice
+  or trigger.** Those fills reached the committed ring but not the stream the
+  archive folds, so an archive window over that period returns nothing for them
+  while a ring window over the same period returns them. From 0.9.7 the two
+  windows agree. Read the ring window when your window reaches back past that
+  release.
 
 #### Aggregated rows: `aggregate` {#user_fills-aggregate}
 
@@ -298,11 +299,10 @@ that have nothing to do with each other, and merges opposite sides.
 / `end_time` apply before it, and a group never straddles a bound because every
 leg in it shares one `time`.
 
-> ⚠️ **Use `aggregate` on the recent window only, for now.** A window old
-> enough to be answered from the archive returns the archive's rows per-leg
-> beside the folded ring rows. Send `aggregate` with no time bound, or with a
-> `start_time` inside the ring, until a later release folds the archive side
-> too.
+> ⚠️ **Use `aggregate` on the recent window only.** The fold runs on the ring.
+> A window old enough to be answered from the archive returns the archive's rows
+> per-leg beside the folded ring rows. Send `aggregate` with no time bound, or
+> with a `start_time` inside the ring.
 
 ### A single order's lifecycle {#order_status}
 

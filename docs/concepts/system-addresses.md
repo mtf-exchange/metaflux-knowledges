@@ -75,7 +75,7 @@ trigger — only the buyback's own schedule does that. See
 
 The canonical EVM **burn sink**. It is keyless and, uniquely on this page, **provably unspendable**: the protocol rejects every attempted transfer whose source is the burn address, under any path. Nothing can ever move value out of it.
 
-It is **reserved, not yet active.** Today, supply is reduced by **decreasing the treasury balance** through a governance vote — not by sending tokens to this address. The burn address is defined and set aside for a possible future explicit "send-to-burn" mechanism; until then you will not see the active burn path route through it.
+The address is **reserved**. Supply is reduced by **decreasing the treasury balance** through a governance vote, not by sending tokens here. No burn path routes through this address.
 
 ### Spot backstop — `0x0000…5b07` {#spot-backstop--0x00005b07}
 
@@ -100,11 +100,11 @@ Keyless, and provably so: landing on this fixed image of eighteen zero bytes
 followed by `0x5b07` would take a `2^160` preimage search, so no signer can ever
 act as it.
 
-:::warning Live behaviour today
-The portfolio-margin seizure path is NOT live. It needs a governance vote that
-sets a collateral haircut, and no such vote has ever been enacted on either
-running chain (measured 2026-09-03 over the full archive). Until it is, only the
-spot-margin waterfall credits this address.
+:::warning
+The portfolio-margin seizure path needs a governance vote that sets a collateral
+haircut. No such vote has ever been enacted on either running chain (measured
+2026-09-03 over the full archive), so only the spot-margin waterfall credits this
+address.
 :::
 
 ## Two categories {#two-categories}

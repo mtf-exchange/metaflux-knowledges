@@ -2,15 +2,13 @@
 description: Every row on this page is LIVE. One release turned every `oid` and `tid` into a decimal-digit string, gave `order_status` all its fill legs and real terminal states, labelled the token a fill's fee is charged in, put margin and funding on one plane, rejected four inputs that used to pass, removed the two explorer WS channels, made EVM receipts and logs survive a restart, and stopped the EVM RPC answering a non-tip block reference with the tip.
 ---
 
-# Upgrade notice — id strings and wire shapes
+# Ids and wire shapes
 
 :::tip
-**LIVE. Every row below has shipped.** This page was written ahead of the
-release so the reference and the two client SDKs moved as one batch. The
-release has landed, and each row was re-measured on the public testnet
-afterwards. Code against it.
+**Every row below is live.** Each row was measured on the public testnet after
+the release landed.
 
-It stays published as the record of what changed and when, for anyone whose
+This page is the record of what changed and when, for anyone whose
 client still assumes the old shapes. If your client reads `tid` as a JSON
 number, or treats a spot `taker_fee_bps` of `null` as a zero rate, read
 [Ids become decimal-digit strings](#id-strings) and
@@ -334,9 +332,9 @@ and both take an optional `limit`:
 }
 ```
 
-Both reads answer in the [history-archive envelope](../api/rest/info.md#archive-lane) —
-`type` sits beside `data` until the next gateway release, and inside it after.
-Read `body.data.type ?? body.type` and both answers work.
+Both reads answer in the standard `/info` envelope, with `type` inside `data`.
+The [history-archive lane](../api/rest/info.md#archive-lane) differs in its
+rejection shape only.
 
 **Two facts a poller must plan for, because they are real losses.**
 
@@ -376,10 +374,11 @@ Three rows. All three are live, and all three were re-measured after the release
 
 ### Receipts survive a restart, and a release {#evm-receipts-durable}
 
-**A receipt lives in memory today, so a release forgets it.** Every validator
-halts, swaps its binary and resumes, and the in-memory record starts empty.
-`eth_getTransactionReceipt` then answers `null` for a transaction that certainly
-landed, and an indexer cannot tell that answer apart from "never existed".
+**A receipt lived in memory, so a release forgot it.** Every validator halts,
+swaps its binary and resumes, and the in-memory record started empty.
+`eth_getTransactionReceipt` then answered `null` for a transaction that
+certainly landed, and an indexer could not tell that answer apart from "never
+existed".
 
 **Each node now writes every receipt and every log to disk.** A restart keeps
 them, and so does a release. Three reads move with them:

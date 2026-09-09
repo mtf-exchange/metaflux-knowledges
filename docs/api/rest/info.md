@@ -56,9 +56,8 @@ before is still at `body.data.fills`. Only `type` moved: it was a sibling of
 `data`, and it is now the first key of `data`.
 
 **Every read carries `type` inside `data`, the history-archive reads included.**
-Until the next gateway release the archive lane still answers with `type` at the
-top level, so read `body.data.type ?? body.type` while that window is open. See
-[the archive lane](#archive-lane) below.
+The archive lane differs from the envelope above in one place only: the shape of
+a rejection. See [the archive lane](#archive-lane) below.
 
 A success has **no** `error` key. Do not test `error === null` — test whether
 the key is present.
@@ -92,10 +91,10 @@ Two common `/info` failures: an unknown `type` answers `400` with
 `UNKNOWN_TYPE`; an unknown named resource, such as a vault id, answers `404`
 with `NOT_FOUND`.
 
-#### The history-archive reads answer in the OLD envelope {#archive-lane}
+#### The history-archive reads reject with a bare string {#archive-lane}
 
-A group of reads is served by the history archive rather than by the node, and
-the archive was not migrated to the envelope above.
+A group of reads is served by the history archive rather than by the node. A
+success answers in the envelope above. A rejection does not.
 
 The lane is `portfolio`, `historical_orders`, `user_funding`,
 `user_funding_by_time`, `user_position_history`,
@@ -108,30 +107,9 @@ The lane is `portfolio`, `historical_orders`, `user_funding`,
 value: **`1d`**. Any other value is rejected `400 invalid interval: <value>`,
 and the rejection now names `1d`.
 
-**Difference 1 — `type` sits at the top level, beside `data`, not inside it.
-NOT YET LIVE: this is fixed in the gateway but not released.**
-
-Today, on the deployed gateway:
-
-```json
-{ "data": { "address": "0x<addr>", "fundings": [] }, "type": "user_funding" }
-```
-
-After the next gateway release, and on every other `/info` read already:
-
-```json
-{ "data": { "type": "user_funding", "address": "0x<addr>", "fundings": [] } }
-```
-
-Read `body.data.type ?? body.type` and both answers work. **A read used to
-change shape with its content**: with no archive configured the SAME read
-answered `type` inside `data`, so a client that dispatched on `data.type` worked
-only while the result was empty. That is gone — one read now answers one shape,
-empty or not.
-
-**Difference 2 — a rejection puts a bare STRING in `error`,** not the
-`{code, message}` object. This applies to the reads in the lane that take an
-`address`. Two strings occur, both with status `400`:
+**A rejection puts a bare STRING in `error`,** not the `{code, message}`
+object. This applies to the reads in the lane that take an `address`. Two
+strings occur, both with status `400`:
 
 | String | Cause |
 |--------|-------|
@@ -197,14 +175,10 @@ you. Map it with [`markets_meta`](./info/perpetuals.md#markets_meta).
 move MTF between what it can withdraw and what it cannot, and that is a
 movement this read must show.
 
-> ⚠️ **The seven staking and Earn kinds are NOT LIVE YET.** The code is landed
-> and the next release carries it. Until that release, a staking or Earn
-> movement produces no row, and this read answers as if it did not happen. The
-> other four kinds are live today. Write the handler for the full table now;
-> a `kind` your client does not know must never throw.
+> ⚠️ Handle the full table. A `kind` your client does not know must never throw.
 
 Membership of this lane is a deployment fact, not a wire guarantee. Do not
-hard-code the list; write one handler that tolerates both shapes.
+hard-code the list; write one handler that accepts both rejection shapes.
 
 #### A malformed request body answers with no `error` key at all {#malformed-request}
 
@@ -310,7 +284,7 @@ Read the value as prose for a human, not as a type you can post back.
 | `action_outcome` | [`POST /exchange`](./exchange.md) — the submit call already waits for the commit and returns the verdict. See [the section above](./info/account-history.md#action_outcome) |
 | `agents` | [`account_state`](./info/account.md#account_state) with `detail: "overview"` — `agents` |
 | `block_info` | [`account_state`](./info/account.md#account_state) for the committed `height` / `time` stamp; the archive-backed `recent_blocks` read for the block head. (The `explorer_block` WS channel that used to answer this is [removed](../../changelog/ids-and-wire-shapes.md#explorer-channels-removed) — a validator must not serve a per-block firehose) |
-| `bridge_chain_configs` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) — `withdrawals_halted` and `configs` |
+| `bridge_chain_configs` | Nothing. No public read carries the deployment row. A node publishes it on its [`node_bridge_outbox`](../../nodes/data-streams.md#node_bridge_outbox-configs) stream, and the custody address per chain is in the [Deployments](../../bridge/index.md#deployments) table |
 | `bridge_finalized_cosignatures`, `bridge_outbound_queue` | [`bridge_withdrawal_history`](./info/bridge.md#bridge_withdrawal_history) for one account's own withdrawals. The whole-chain queue and the raw validator cosignature bytes are not part of this API |
 | `delegator_history` | Nothing. No delegation event log is committed |
 | `delegator_summary` | [`account_state`](./info/account.md#account_state) with `detail: "overview"` — `staking.summary` |

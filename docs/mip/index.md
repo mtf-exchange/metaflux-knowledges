@@ -1,7 +1,7 @@
 # MIP — Market Improvement Proposals
 
 :::info
-**Status.** MIP-1 implemented and callable · MIP-2 in progress (the vault backstop is live) · MIP-3 implemented, **deploy actions not released** · MIP-4 planned (V2) · MIP-5 (Earn) live and paying zero · MIP-6 deferred (V3).
+**Status.** MIP-1 implemented and callable · MIP-2 in progress (the vault backstop is live) · MIP-3 **live and in use** · MIP-4 planned (V2) · MIP-5 (Earn) live and paying zero · MIP-6 deferred (V3).
 :::
 
 MetaFlux follows a numbered improvement-proposal model (analogous to the improvement-proposal schemes used by established on-chain perp protocols) for protocol-level changes that affect listed markets, native liquidity, or core fee mechanisms.

@@ -121,19 +121,10 @@ confirm the tier the ledger actually stored. **Do not read the receipt status as
 proof the delegation landed.**
 :::
 
-:::warning
-**The tier is NOT LIVE on the chain yet.** This page leads the deployed binary.
-The live node still decodes three words and ignores anything after them, so a
-four-word call today delegates at tier `0` — silently, with no error. That row
-then earns no revenue share, and the chain refuses a later top-up at a different
-tier, so recovering costs an undelegate plus the whole unbonding window. Send
-three words until the release lands.
-:::
-
-**Send exactly three words or at least four.** After the swap, a params section
-between 97 and 127 bytes is refused as `params section truncated` — that is a
-four-word call whose declared length is short. Bytes past the fourth word stay
-ignored, as with every other action.
+**Send exactly three words or at least four.** The fourth word selects the lock
+tier. A params section between 97 and 127 bytes is refused as `params section
+truncated` — that is a four-word call whose declared length is short. Bytes past
+the fourth word stay ignored, as with every other action.
 
 `encodeTokenDelegate` in the reference `Encoders` helper still emits three words
 and keeps its pinned byte vector, so it stays a tier-`0` encoder. A separate
