@@ -8,6 +8,14 @@ description: The POST /info read endpoint — query types, envelope, and convent
 **Status.** **stable** shape. Query types are added over time; the envelope is committed.
 :::
 
+
+:::info
+**One name for the account: `address`.** Every account-scoped query takes it.
+Four queries shipped with `user` instead — `broker_state`, `referral_state`,
+`spot_margin_state` and `user_interest`. Those still accept `user`, and their
+replies carry the account under both names. Send `address` in new code.
+:::
+
 ## TL;DR {#tldr}
 
 Single endpoint, multi-type. Dispatches on the request body's `type` field. Read-only — never mutates state, never requires a signature.
@@ -251,10 +259,10 @@ type for its request fields and response schema.
 | **[Position history](./info/position-history.md)**<br/>closed position lifecycles | [`user_position_history`](./info/position-history.md#user_position_history) · [`user_position_history_by_time`](./info/position-history.md#user_position_history_by_time) · [`identities`](./info/position-history.md#identities) |
 | **[Options](./info/options.md)**<br/>the series registry and an account's open legs | [`option_series`](./info/options.md#option_series) · [`option_state`](./info/options.md#option_state) |
 | **[Vaults & staking](./info/vaults-staking.md)**<br/>vault TVL and share price, delegation state | [`vault_state`](./info/vaults-staking.md#vault_state) · [`staking_state`](./info/vaults-staking.md#staking_state) |
-| **[Fees & credit](./info/fees-credit.md)**<br/>the fee card, referral and broker credit | [`fee_schedule`](./info/fees-credit.md#fee_schedule) · [`referral_state`](./info/fees-credit.md#referral_state) · [`builder_state`](./info/fees-credit.md#builder_state) |
+| **[Fees & credit](./info/fees-credit.md)**<br/>the fee card, referral and broker credit | [`fee_schedule`](./info/fees-credit.md#fee_schedule) · [`referral_state`](./info/fees-credit.md#referral_state) · [`broker_state`](./info/fees-credit.md#broker_state) |
 | **[Governance](./info/governance.md)**<br/>proposals, votes and the parameter set | [`validator_votes`](./info/governance.md#validator_votes) · [`gov_state`](./info/governance.md#gov_state) · [`gov_proposals`](./info/governance.md#gov_proposals) · [`gov_history`](./info/governance.md#gov_history) |
 | **[Chain activity](./info/chain.md)**<br/>recent blocks, and one action's outcome | [`recent_blocks`](./info/chain.md#recent_blocks) · [`recent_transactions`](./info/chain.md#recent_transactions) |
-| **[Node snapshots](./info/node.md)**<br/>peers, sync state and node-scoped figures | [`exchange_status`](./info/node.md#exchange_status) · [`user_twaps`](./info/node.md#user_twaps) · [`vault_summaries`](./info/node.md#vault_summaries) · [`user_rate_limit`](./info/node.md#user_rate_limit) · [`approved_builders`](./info/node.md#approved_builders) · [`validator_l1_votes`](./info/node.md#validator_l1_votes) · [`validator_summaries`](./info/node.md#validator_summaries) · [`gossip_root_ips`](./info/node.md#gossip_root_ips) |
+| **[Node snapshots](./info/node.md)**<br/>peers, sync state and node-scoped figures | [`exchange_status`](./info/node.md#exchange_status) · [`user_twaps`](./info/node.md#user_twaps) · [`vault_summaries`](./info/node.md#vault_summaries) · [`user_rate_limit`](./info/node.md#user_rate_limit) · [`approved_brokers`](./info/node.md#approved_brokers) · [`validator_l1_votes`](./info/node.md#validator_l1_votes) · [`validator_summaries`](./info/node.md#validator_summaries) · [`gossip_root_ips`](./info/node.md#gossip_root_ips) |
 
 ## Removed reads {#retired-reads}
 
@@ -295,7 +303,7 @@ Read the value as prose for a human, not as a type you can post back.
 | `leading_vaults` | [`vault_summaries`](./info/node.md#vault_summaries) — filter the rows on `leader` |
 | `margin_summary` | [`account_state`](./info/account.md#account_state) with `detail: "margin"` |
 | `market_info` | [`markets`](./info/perpetuals.md#markets) with `coin`, plus [`markets_meta`](./info/perpetuals.md#markets_meta) with `coin` |
-| `max_builder_fee` | [`approved_builders`](./info/node.md#approved_builders) — look the builder up in the list |
+| `max_builder_fee` | [`approved_brokers`](./info/node.md#approved_brokers) — look the builder up in the list |
 | `max_market_order_ntls`, `perps_at_open_interest_cap` | [`markets_meta`](./info/perpetuals.md#markets_meta) — `max_market_order_ntl` is the served headroom, one row per market. `null` = uncapped, `"0"` = at the cap. Do not rebuild it from `open_interest` and `oi_cap`: an uncapped row OMITS `oi_cap`, so that arithmetic reads uncapped as zero headroom |
 | `node_info` | Nothing on this API. Per-node identity is not consensus state, so two honest nodes answer differently. The chain id is fixed per network — see [networks](../../networks.md#summary) |
 | `oracle_sources` | Nothing. The per-market bitmask it served is not read by the price aggregator. The static source facts are prose — see [oracle prices](../../concepts/oracle-prices.md#source-table) |

@@ -187,7 +187,7 @@ array rather than getting a query type of its own.
 [`spot_margin_state`](../info/spot.md#spot_margin_state), not the account-history reads.
 
 ```json
-{ "type": "user_interest", "user": "0x<addr>" }
+{ "type": "user_interest", "address": "0x<addr>" }
 ```
 
 **Response**

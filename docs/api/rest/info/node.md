@@ -220,7 +220,7 @@ budget — track your own spend against [rate limits](../../rate-limits.md).
 
 An address with no record reads as all zeros.
 
-### All approved builder-fee grants {#approved_builders}
+### All approved broker-fee grants {#approved_brokers}
 
 Every builder-fee grant an account has approved, and the bps ceiling on each.
 Required: `address` (0x hex). To check one `(address, builder)` pair, look the
@@ -228,7 +228,7 @@ builder up in this list — an address that is absent is not approved, which is
 the same answer as a `"0"` ceiling.
 
 ```json
-{ "type": "approved_builders", "address": "0x<addr>" }
+{ "type": "approved_brokers", "address": "0x<addr>" }
 ```
 
 **Response**
@@ -236,7 +236,7 @@ the same answer as a `"0"` ceiling.
 ```json
 {
   "data": {
-    "type": "approved_builders",
+    "type": "approved_brokers",
     "address": "0x<addr>",
     "builders": [
       { "builder": "0x<builder_a>", "max_fee_bps": "25" },

@@ -56,8 +56,7 @@ The trader signs one action:
 recognized broker who charges nothing, which is different from not being approved
 at all.
 
-Read a trader's approvals with the `approved_builders` query, or one specific
-grant on `approved_builders`.
+Read a trader's approvals with the `approved_brokers` query.
 
 :::warning
 **The action type is `approve_broker_fee`. Some older `builder` names stay, on
@@ -69,13 +68,17 @@ keeps the exact JSON that the trader submitted, and every node reads those block
 again when it replays the chain. An accepted action name is therefore never
 withdrawn.
 
-**These names do not move.** Committed data fixes each one:
+**Committed data fixes these two names, so they do not move:**
 
 | Name | Where you meet it |
 |------|-------------------|
 | `builder` | the parameter of `approve_broker_fee`, and the broker block on an order |
-| `approved_builders` | every grant this account approved, and the bps ceiling on each |
-| `approved_builders` | the enumerated-grant query |
+| `approve_builder_fee` | the accepted alias of the action name |
+
+**The READ names did move, because no committed block fixes them.** A query type
+is chosen at read time. `broker_state` and `approved_brokers` are the names to
+use. `broker_state` and `approved_brokers` still answer, and the reply echoes
+back the name you sent.
 
 **The EIP-712 type string still reads `ApproveBuilderFee`.** You send
 `approve_broker_fee`, but you sign
@@ -150,7 +153,7 @@ Fees accrue to a running balance. Claim it with:
 rule [`approve_broker_fee`](#approval) follows.
 
 **Read the balance before you claim it. The action reports no amount.** Query
-[`builder_state`](../api/rest/info/fees-credit.md#builder_state) with your address. That
+[`broker_state`](../api/rest/info/fees-credit.md#broker_state) with your address. That
 read keeps the `builder` spelling and is the only way to show a claimable
 figure. After the claim the balance is `0`, so a read afterwards cannot tell you
 what moved.

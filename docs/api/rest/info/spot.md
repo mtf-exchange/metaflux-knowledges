@@ -166,7 +166,7 @@ Every spot-margin position held by one account.
 **Request**
 
 ```json
-{ "type": "spot_margin_state", "user": "0x<addr>" }
+{ "type": "spot_margin_state", "address": "0x<addr>" }
 ```
 
 | Field | Type | Required | Meaning |
@@ -305,7 +305,7 @@ So build an "Interest" view on this read, not on
 **Request**
 
 ```json
-{ "type": "user_interest", "user": "0x<addr>" }
+{ "type": "user_interest", "address": "0x<addr>" }
 ```
 
 | Field | Type | Required | Meaning |

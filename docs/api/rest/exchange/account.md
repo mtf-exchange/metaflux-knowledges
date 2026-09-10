@@ -147,10 +147,10 @@ cross-collateral. No parameters.
 `claim_builder_rewards` still decodes and always will, for the same reason
 [`approve_broker_fee`](#approve_builder_fee) keeps its second name. The read
 beside it keeps the `builder` spelling and is
-[`builder_state`](../info/fees-credit.md#builder_state).
+[`broker_state`](../info/fees-credit.md#broker_state).
 
 **The action reports no amount.** Read the balance first with
-[`builder_state`](../info/fees-credit.md#builder_state).
+[`broker_state`](../info/fees-credit.md#broker_state).
 
 **An agent wallet cannot claim for its owner.** The action is sender-authorized
 and carries no `owner` field, so it always acts on the recovered signer's own

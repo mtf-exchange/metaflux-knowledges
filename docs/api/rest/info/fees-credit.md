@@ -66,7 +66,7 @@ series into an empty array.
 - **There is no builder-rebate field on this read, and there is no protocol rebate to a broker.**
   A broker is paid the `builder.fee` it sets on each order, and that rate is capped by the
   ceiling the trader granted it — read the ceiling from
-  [`approved_builders`](./node.md#approved_builders) `max_fee_bps`. The broker fee is charged ON TOP of
+  [`approved_brokers`](./node.md#approved_brokers) `max_fee_bps`. The broker fee is charged ON TOP of
   the schedule above, so no field here changes when a broker is paid. See
   [broker codes](../../../concepts/broker-codes.md#claiming).
 
@@ -193,7 +193,7 @@ One account's claimable referral credit, and the referrer it is bound to.
 **Request**
 
 ```json
-{ "type": "referral_state", "user": "0x<addr>" }
+{ "type": "referral_state", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required | Meaning |
@@ -241,14 +241,14 @@ One account's claimable referral credit, and the referrer it is bound to.
   accumulate here. See
   [in-kind fees](../../../concepts/fees.md#referrer-credit).
 
-### Accrued broker credit for one account {#builder_state}
+### Accrued broker credit for one account {#broker_state}
 
 One broker's claimable broker-code fee credit.
 
 **Request**
 
 ```json
-{ "type": "builder_state", "user": "0x<addr>" }
+{ "type": "broker_state", "address": "0x<addr>" }
 ```
 
 | Arg | Type | Required | Meaning |
@@ -260,7 +260,7 @@ One broker's claimable broker-code fee credit.
 ```json
 {
   "data": {
-    "type": "builder_state",
+    "type": "broker_state",
     "user":              "0x00000000000000000000000000000000000000aa",
     "claimable_rewards": "308.9"
   }
@@ -277,11 +277,11 @@ One broker's claimable broker-code fee credit.
 - **Read the credit here before you claim it. The claim action reports no
   amount.** [`claim_builder_rewards`](../../../concepts/broker-codes.md#claiming)
   drains the whole balance and answers with no figure.
-- **The read keeps the `builder` spelling.** The wire type is `builder_state`.
-  There is no `broker_state` read.
+- **`builder_state` is the old name and still answers.** Send `broker_state`.
+  The reply echoes back whichever name you sent.
 - **A broker credit and a referral credit are separate balances with separate
   claims.** One fill can pay both. Reading one tells you nothing about the
   other. See [broker credit is not referrer credit](../../../concepts/fees.md#referrer-credit).
 - **This is a credit balance, not a fee rate.** The rate a broker charges is the
   `builder.fee` on each order, capped by its
-  [`approved_builders`](./node.md#approved_builders) grant.
+  [`approved_brokers`](./node.md#approved_brokers) grant.
