@@ -552,7 +552,7 @@ and integrators read the first one as encouragement:
 
 **Read the code, not the message.** `ACTION_UNSUPPORTED` is the contract. The
 text behind it differs by tag, and there are at least three of them:
-`governance actions are operator-injected only (gov-admin lane)`,
+`governance actions are not accepted on this surface`,
 `unsupported action: unsupported native action variant: <tag>`, and
 `action does not support typed signing`. Match on the code; a substring match on
 any one of those sentences fails for most of the table.
@@ -584,6 +584,7 @@ list, or in [`gov_history`](./info/governance.md), knows what it is.
 | `approve_upgrade` | Validator, ⅔ stake | Schedules or cancels the coordinated halt at which every validator swaps binaries |
 | `c_validator` | The validator itself | Maintains its own record: commission, active flag, self-jail, unjail, deregister. Not a vote; one signed action applies. A commission **raise** waits out a notice period; a cut applies at once |
 | `vote_app_hash` | The validator node itself | The checkpoint state-hash vote every validator node emits on its own after each checkpoint. No person casts it |
+| `gov_action` | A validator, on its own node only | Carries one signed governance or validator action. The node accepts it only from its own machine, so a public caller gets `AUTH_UNAUTHORIZED`, not `ACTION_UNSUPPORTED` |
 
 Two more tags in this set, `set_metaliquidity_set` and `gov_adjust_spot_value`,
 keep their payloads and signing types below, because their `value` hashing rule
