@@ -96,6 +96,68 @@ Perpetuals and [options](./options.md) do **not** share a margin account. An
 option is fully collateralized on its own lane: it holds no margin, takes no mark
 price, and cannot be liquidated.
 
+## Delisting a perp market {#delisting}
+
+> ⚠️ **NOT LIVE YET.** The settlement below ships with the next node release.
+> Until then, a delist cancels resting orders and makes the market reduce-only.
+> Open positions stay open, and `markets` never sends the `settled` key.
+
+Governance delists a perp market by a two-thirds-stake validator vote. The
+vote ends the market in ONE block, in this order:
+
+1. It cancels every resting order, parked trigger, TWAP parent and pending
+   batch-auction order on the market.
+2. It closes every open position on the market.
+3. It marks the market permanently closed.
+
+No block lies between these steps. No order can fill, and no liquidation can
+run, between the cancel and the close.
+
+**The settlement price.** The vote can name one price, and every position then
+closes at it, cut to 8 decimals. The oracle band does not apply to that price.
+When the vote names no price, every position closes at the market's **risk
+mark**: the mark price, clamped to the oracle band. The liquidation engine judges
+health at this mark. It is not the raw `mark_px`, so the two can differ when the
+mark sits outside the band. When the risk mark is stale or absent, the vote must
+name a price.
+
+**A settlement is a ledger entry, not a trade.** It does not touch the order
+book, so it has no slippage. It charges no fee. It writes no fill, so no
+`user_fills` row appears. Each closed leg writes one
+[`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) record with
+`kind: "liquidation"` and `cause: "delist_settlement"`, and its `mark_px` is the
+settlement price. A hedge account gets one record per leg.
+
+**Where the PnL goes.** A cross leg moves its PnL into the account balance. An
+isolated leg returns its whole margin bucket plus the PnL. A loss larger than the
+bucket is paid from the insurance fund, then the treasury queue. A cross loss the
+account cannot pay follows two rules:
+
+- An account that still holds a cross position on another market keeps the
+  negative balance. The liquidation engine collects it by closing those other
+  positions.
+- An account with no other cross position has its deficit covered by
+  [the deficit waterfall](../concepts/tiered-liquidation.md#t4--the-deficit-waterfall),
+  the same way a liquidation deficit is covered.
+
+**After the settlement, the market never reopens.**
+
+- Every order on it is refused, reduce-only orders included:
+  `market settled — trading closed`.
+- A vote to relist it is refused.
+- Its [`markets`](../api/rest/info/perpetuals.md#markets) row stays, with
+  `halted: true`, `settled: true`, and the `settled_px` it closed at.
+- A later listing of the same underlying is a new market. It gets a new asset id
+  and a new `coin`, and it inherits no position, order or funding state.
+
+**A pause is not a delist.** To stop trading without closing positions,
+governance sets the market's `open` and `close` flags instead. A paused market
+keeps its positions and trades again when the flags clear. See
+[funding on a paused market](../concepts/funding-rates.md#paused-market).
+
+**This settlement covers perp markets only.** A spot pair delist closes no
+spot-margin position on that pair.
+
 ## See also {#see-also}
 
 - [Contract specifications](../concepts/contract-specifications.md) — per-contract spec (margin, mark, funding, increments, limits) + how to read each field live

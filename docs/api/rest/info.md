@@ -164,7 +164,7 @@ kinds:
 | `deposit` | A MetaBridge inbound credit, a system spot credit, or an EVM→Core credit | `chain` on a bridge credit |
 | `withdraw` | A withdrawal to an EVM chain | |
 | `transfer` | An account, sub-account or spot transfer, and a VAULT deposit or withdrawal | `counterparty` when the move has one |
-| `liquidation` | A forced-close settlement | `market`, `mark_px` |
+| `liquidation` | A forced-close settlement, or a delist settlement | `market`, `mark_px` |
 | `staking_deposit` | MTF moves from spot into the staking free pool | |
 | `staking_withdraw` | MTF returns from the free pool to spot | |
 | `delegate` | MTF moves from the free pool to a validator | |
@@ -178,6 +178,11 @@ A vault movement is a `transfer`, not a kind of its own. It carries no
 `market` on a `liquidation` row is the perp market ID as a NUMBER, not a
 symbol. It is the one market reference on this read that is not resolved for
 you. Map it with [`markets_meta`](./info/perpetuals.md#markets_meta).
+
+A forced close and a [delist settlement](../../products/perpetuals.md#delisting)
+write the same `liquidation` row, and this read carries no `cause` to tell them
+apart. Read the cause from [`ledger_updates`](../ws/subscriptions.md#ledger_updates).
+**NOT LIVE YET:** a live node settles no position at a delist.
 
 `delegate` and `undelegate` do not change what the account holds in total. They
 move MTF between what it can withdraw and what it cannot, and that is a

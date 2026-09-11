@@ -631,11 +631,19 @@ A peer transfer emits two records. Their `delta` values net to zero.
 
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
-| `kind` | string | — | Coarse class: `"transfer"`, `"withdraw"`, `"deposit"` |
+| `kind` | string | — | Coarse class, such as `"transfer"`, `"withdraw"`, `"deposit"` or `"liquidation"`. Treat an unknown value as data |
 | `delta` | decimal string | whole tokens | Signed balance change. `−` outflow, `+` inflow. At most 8 decimal places |
 | `coin` | uint32 | id | **Token asset id.** `0` is USDC |
 | `time` | uint64 | ms | Timestamp. Equals `block_time` |
 | `counterparty` | string \| absent | — | The other party's `0x` address on a peer transfer. Absent on a single-sided move |
+| `market` | uint32 \| absent | id | **Market asset id** the position closed on. `"liquidation"` only |
+| `mark_px` | decimal string \| absent | whole USDC | Price the leg closed at. `"liquidation"` only. Absent when the market had no usable mark |
+
+A `liquidation` record is a forced close or a
+[delist settlement](../products/perpetuals.md#delisting). It has no `cause`
+field, so the two look the same here. The WS
+[`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) feed carries the
+cause. **NOT LIVE YET:** a live node settles no position at a delist.
 
 The event order inside `events` is deterministic on replay, so the index of an
 event within its block is a stable per-block discriminator.
@@ -648,10 +656,9 @@ different. Resolve `node_ledger.coin` against the token registry and
 :::
 
 :::warning
-**This stream is not a complete balance history.** Two money movements have no
-owning action and are therefore not recorded here: inbound bridge deposits
-credited by validator quorum, and liquidation settlements. Do not reconstruct an
-account balance from `node_ledger` alone.
+**This stream is not a complete balance history.** Fills, fees and funding are
+not recorded here. Do not reconstruct an account balance from `node_ledger`
+alone.
 :::
 
 ## `node_gov` {#node_gov}

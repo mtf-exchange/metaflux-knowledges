@@ -137,6 +137,25 @@ A skipped sample is folded as 0, so the premium-index EMA **decays toward 0** an
 **This is why you can see a large mark↔oracle gap with funding ≈ 0.** If a market's oracle feed is broken or distrusted, funding is gated off and decays to 0 — even while the [mark](./mark-prices.md#mark-vs-oracle--why-they-diverge) (which is built from the book and external perps) sits far from the last good oracle. A wide gap with ~0 funding is the protocol *declining to charge funding off a bad oracle*, not a funding bug.
 :::
 
+## A paused or closed market {#paused-market}
+
+> ⚠️ **NOT LIVE YET.** The rule below ships with the next node release. A live
+> node settles funding on every market, whatever its flags.
+
+Governance can stop trading on a market in steps. Funding follows one rule:
+**funding settles only while a holder can close the position.**
+
+| Market state | How a caller reads it | Funding |
+|---|---|---|
+| Closing disabled | `close: false` on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), whatever the other flags say | **Stops.** No payment settles |
+| Reduce-only | `open: false` with `close: true`, or `halted: true` on [`markets`](../api/rest/info/perpetuals.md#markets) | **Continues.** A holder can close the position to stop paying |
+| Settled | `settled: true` on `markets` | None. No position is open. See [Delisting a perp market](../products/perpetuals.md#delisting) |
+
+While closing is disabled, the period boundary still advances, so no funding
+builds up for the paused span. When closing is allowed again, the next boundary
+charges one period, not the paused span. The liquidation engine also counts no
+funding for the paused span.
+
 ## Worked example {#worked-example}
 
 Market: BTC perp on an 8 h funding period, current state (oracle plane in whole USDC):

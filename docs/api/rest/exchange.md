@@ -863,12 +863,12 @@ is prose and it can change.
 | `ORDER_ZERO_SIZE` | Size is zero or negative | Send a positive size |
 | `ORDER_BELOW_MIN_NOTIONAL` | Price × size is under the market minimum | Increase the size |
 | `MARGIN_INSUFFICIENT` | The account cannot fund the requirement. Carries `details` | `details.limit` is free collateral, `details.actual` is what is needed |
-| `MARKET_INACTIVE` | The market is disabled, closed or reduce-only | Send a closing order, or wait |
+| `MARKET_INACTIVE` | The market is disabled, closed or reduce-only. A perp that a delist halted or settled, or that governance paused, answers `PRECONDITION_FAILED` instead | Send a closing order, or wait |
 | `MARKET_OI_CAP` | Open interest is at the market cap | Nothing in the request is wrong. Wait, or trade elsewhere |
 | `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer or sell | Check the free balance; a held balance is not spendable |
 | `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |
 
-Three `PRECONDITION_FAILED` cases are worth naming, because the fix is not
+Four `PRECONDITION_FAILED` cases are worth naming, because the fix is not
 obvious from the sentence:
 
 - **`trail_px: 0`** on a `trigger` block. Presence of the key selects the
@@ -877,6 +877,11 @@ obvious from the sentence:
 - **A trailing leg on the take-profit side.** The ratchet follows a winning
   position, so only the stop-loss may trail. Put `trail_px` on the protective
   leg.
+- **`market settled — trading closed`.** A delist closed this market for good,
+  and every order on it is refused, reduce-only included. A retry never
+  succeeds. Test `settled` on [`markets`](./info/perpetuals.md#markets) rather
+  than the message. See [Delisting a perp market](../../products/perpetuals.md#delisting).
+  **NOT LIVE YET:** a live node never sends it.
 - **`this node is not on the exchange-serving allowlist`.** Nothing in your
   request is wrong, and the message carries no address. The node you reached
   does not serve `POST /exchange` writes. Treat it as a **routing** failure:

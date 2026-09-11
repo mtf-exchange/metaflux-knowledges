@@ -123,12 +123,21 @@ Response (truncated to one entry per list):
 | `perp[*].day_ntl_vlm` | Decimal string | 24h notional volume |
 | `perp[*].prev_day_px` | Decimal string \| null | Price 24h ago; `null` if unknown |
 | `perp[*].change_24h` | Decimal string \| null | 24h price change (fraction, signed); `null` when no prior px |
-| `perp[*].halted` | bool | Market halted |
+| `perp[*].halted` | bool | `true` = a governance delist stopped the market. An order that opens or extends a position is refused: `market delisted — only reduce-only / closing orders allowed`. A settled market also reads `true` |
+| `perp[*].settled` | bool \| absent | `true` = the market is **permanently closed**. A delist closed every position on it, and every order is refused, reduce-only included: `market settled — trading closed`. The key is **ABSENT** on every other market, never `false`. See [Delisting a perp market](../../../products/perpetuals.md#delisting) |
+| `perp[*].settled_px` | Decimal string \| absent | Whole-USDC price every position closed at: the price the delist vote named, cut to 8 decimals, or the risk mark when the vote named none. **ABSENT when no position was open at the delist**, and on every market that is not settled |
 | `spot.pairs` | array | Spot pair registry (same rows as [the spot registry](./spot.md#spot_meta) `pairs`, plus live `mark_px` / `mid_px` / `day_ntl_vlm`) |
 | `spot.tokens` | array | Spot token registry (same rows as [the spot registry](./spot.md#spot_meta) `tokens`) |
 
+> ⚠️ **NOT LIVE YET.** `settled` and `settled_px` ship with the next node
+> release. A live node never sends either key, and a delisted market stays halted
+> with its positions open.
+
 **Rules**
 
+- **Test `settled` before `halted`.** A settled market reads `halted: true` too,
+  but only a halted market that is NOT settled accepts a closing order. A settled
+  market never trades again, and no vote reopens it.
 - `coin` narrows the SAME rows; it does not change the shape. The response is
   still `{perp: [...], spot: {...}}`, with the arrays cut to the matching row. A
   client that wants one market pays one round trip and parses one shape.
@@ -236,7 +245,7 @@ Response (perp truncated to one entry; the `spot` section is identical to
 | `perp[*].init_margin_ratio` | bps string | Base initial-margin ratio, decimal bps |
 | `perp[*].margin_tiers` | array | Notional-banded leverage ladder; each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
-| `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden |
+| `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden. **A delist does not change them:** a halted or settled market can still read `true`. Read `halted` and `settled` on [`markets`](#markets) |
 | `perp[*].oi_cap` | Decimal string | Governance open-interest cap, in the market's size units; **OMITTED** entirely when the market is uncapped (never a fabricated `"0"`) |
 | `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. See below |
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
@@ -251,7 +260,8 @@ Response (perp truncated to one entry; the `spot` section is identical to
 - Each `perp` row is the **static** half of a market, joined to its dynamic
   [`markets`](#markets) row on `(coin, kind)`. None of the per-commit dynamic
   fields (`mark_px`, `oracle_px`, `mid_px`, `impact_pxs`, `premium`, `funding`,
-  `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`) appear
+  `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`, `settled`,
+  `settled_px`) appear
   here.
 - **`max_market_order_ntl` is the one exception, and it MOVES.** It is derived
   from live open interest, so it changes on every fill. Do not cache it with the

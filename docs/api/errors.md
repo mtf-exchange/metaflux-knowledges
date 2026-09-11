@@ -143,7 +143,7 @@ same address. Correct the signing input first.
 | `code` | HTTP | `details` | Cause and caller action |
 |--------|------|-----------|-------------------------|
 | `MARKET_NOT_FOUND` | 404 | — | The `coin` symbol or asset index names no market. Read the market list and use a symbol from it |
-| `MARKET_INACTIVE` | 400 | — | The market exists but does not accept this order: trading is disabled, the pair is closed, or the market is reduce-only. Only a closing order is admitted while a market is reduce-only |
+| `MARKET_INACTIVE` | 400 | — | The market exists but does not accept this order: trading is disabled, the pair is closed, or the market is reduce-only. Only a closing order is admitted while a market is reduce-only. A perp that a delist halted or settled, or that governance paused, answers `PRECONDITION_FAILED` instead |
 | `MARKET_OI_CAP` | 400 | — | Open interest is at the market cap. Nothing about your request is wrong. Wait, or trade another market |
 
 ### `ASSET_*` — spot balance {#asset}
