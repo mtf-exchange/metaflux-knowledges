@@ -1,7 +1,14 @@
 # Bridge
 
+:::danger
+**NOT LIVE on the current testnet.** The current testnet chain started on 2026-09-01, and the
+bridge is not brought up on it yet. The contracts below are deployed, but no validator watches
+them. A deposit sent today stays in custody and is NOT credited to an account. A withdrawal cannot
+be relayed. Do not deposit or withdraw until this notice is gone.
+:::
+
 :::info
-**Status.** The custody bridge is **live on Base Sepolia and Arbitrum Sepolia** (testnet,
+**Status.** The custody bridge is **deployed on Base Sepolia and Arbitrum Sepolia** (testnet,
 `Bridge` [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.basescan.org/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A)).
 **Base and Arbitrum are the supported chains.** Both directions —
 deposit and withdrawal — are verified end-to-end on Base Sepolia: a real deposit
