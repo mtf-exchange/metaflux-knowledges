@@ -115,7 +115,7 @@ the single documented exception on `UNKNOWN_TYPE`.
 | `ORDER_INVALID_SIZE` | 400 | ✅ | The size is off the lot grid. Round to a multiple of `details.limit` and resend |
 | `ORDER_BELOW_MIN_NOTIONAL` | 400 | — | Price × size is under the market minimum. Increase the size |
 | `ORDER_SELF_TRADE` | 400 | — | Self-trade prevention cancelled the order rather than let it match your own resting order. Move the price, or change `stp_mode` |
-| `ORDER_DUPLICATE_CLOID` | 400 | — | The `cloid` is already in use on this account. Use a fresh one. **Do not** treat this as a failure to place — check whether the first submission rested |
+| `ORDER_DUPLICATE_CLOID` | 400 | — | The `cloid` is already in use on this account, or two legs of one action share it. Use a fresh one. **Do not** treat this as a failure to place — check whether the first submission rested. An attempt the COMMIT refused gives its `cloid` back, so a re-signed retry may reuse that handle (**not live yet**) |
 
 ### `MARGIN_*` — collateral {#margin}
 
@@ -161,6 +161,18 @@ same address. Correct the signing input first.
 The bucket refills at 20 weight per second. An `/info` read costs 1 weight, so
 it is affordable again after 50 ms; an `/exchange` write costs 5 weight, so
 250 ms. See [rate limits](./rate-limits.md).
+
+### `NONCE_REPLAYED` {#nonce_replayed}
+
+| `code` | HTTP | `details` | Cause and caller action |
+|--------|------|-----------|-------------------------|
+| `NONCE_REPLAYED` | 200 | — | The block builder dropped the action: this account already used the nonce, or it sits more than 64 below the newest one. Nothing committed and the nonce is not consumed. **Do not retry at the same nonce** — re-sign at a higher one. **Not live yet:** a live node drops the replay in silence, and the caller waits out the order window |
+
+**The `200` is not a mistake.** This is a commit verdict, not an admission
+refusal, and every commit verdict rides a `200`. On an order action the same
+object arrives as `statuses[0].error`. See
+[a replayed nonce](./rest/exchange.md#nonce-replayed) for the 64-wide window and
+how a wrong clock walks an account out of it.
 
 ### Request-shape codes {#request-shape}
 

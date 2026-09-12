@@ -57,7 +57,7 @@ Returns an account's resting orders, across every perp book and every spot book.
 | `orders[*].px` | Decimal string | Resting price, whole units, tick-snapped |
 | `orders[*].sz` | Decimal string | Remaining size, whole units |
 | `orders[*].orig_sz` | Decimal string \| null | **Always `null`.** This read keeps no request size. `sz` is the size still resting |
-| `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none |
+| `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none. A parked TP/SL row carries it too (**not live yet:** a live node reads `null` on every parked row) |
 | `orders[*].tif` | string | Lowercase time-in-force (`"gtc"` / `"ioc"` / `"alo"`), or the literal `"trigger"` on a parked TP/SL row |
 | `orders[*].reduce_only` | bool | **A row-kind label, not the order's flag.** `false` on every book row, `true` on every parked TP/SL row. See the rule below |
 | `orders[*].trigger` | object \| null | Trigger detail when the row is, or carries, a trigger; `null` otherwise |
@@ -337,6 +337,22 @@ the write completed — the fill ring is keyed by `oid` and carried no cloid, so
 filled order stopped answering by `cloid`. The node now carries the cloid into
 its read-side rings.
 
+**A parked leg resolves by `cloid` from committed state**, not from a node-local
+index, so it keeps resolving after a node restart. Two parked legs that share a
+`cloid` resolve the LOWEST `oid`. **Not live yet:** it ships with the next node
+release. A live node resolves a parked leg by `cloid` only while its index
+survives.
+
+:::info
+**One term for one state: `parked`.** A trigger leg held off the book is
+**parked** on [`open_orders`](#open_orders), on the
+[`/exchange` status union](../exchange.md#statuses-parked), on the
+[`order_updates`](../../ws/subscriptions.md#order_updates) feed and in the node's
+streams. `order_status` answers the legacy token `triggered` for the same state.
+That one endpoint is the only place the older token appears, and it does not
+change.
+:::
+
 **Response**
 
 The `data.status` field discriminates which shape follows.
@@ -378,11 +394,15 @@ The `data.status` field discriminates which shape follows.
       "limit_px":      "65000",
       "sz":            "700",
       "registered_at": 1700000000000,
-      "fired":         false
+      "fired":         false,
+      "cloid":         "0x000000000000000000000000cafef00d"
     }
   }
 }
 ```
+
+`cloid` is the leg's client order id, or `null` when the submitted order set
+none. **Not live yet:** the key ships with the next node release.
 
 A **ladder** leg adds `group`, and a **trailing** leg adds `trail_px`. Both
 keys follow the same absence rule as on [`open_orders`](#open_orders) — the
@@ -490,6 +510,21 @@ terminal window holds right now. **Read it before you trust an `unknown`:** a
 `0` says the window is empty — the node restarted — so the `unknown` carries no
 information about your order at all.
 
+**Two orders stopped answering `unknown`.** A cancelled SPOT order answers
+`canceled`. A spot order or a scale rung that neither rests nor matches answers
+`rejected`, with `reason: "Order could not immediately match against any resting
+orders."` Both answered `unknown` before, because neither wrote a fill the ring
+could serve. **Not live yet:** both answers ship with the next node release.
+
+**What still answers `unknown`, by design.** The old `oid` of a
+[`modify`](../exchange/orders.md#modify) — ask by `cloid`, or by the new `oid` —
+and any order cancelled through [`batch_cancel`](../exchange/orders.md#batch_cancel),
+[`cancel_all_orders`](../exchange/orders.md#cancel_all_orders),
+[`cancel_scale`](../exchange/orders.md#cancel_scale) or
+[`cancel_chase`](../exchange/orders.md#cancel_chase). Each of those carries ONE
+verdict for the whole action, so the node will not claim a per-order outcome it
+cannot prove.
+
 The terminal states above come from a **node-local retention window**, not from
 committed state. A node restart empties that window, so after a restart the node
 answers `unknown` for orders it would have named before. For the archive answer,
@@ -500,7 +535,7 @@ contract `historical_orders` already carries.
 |-------|------|---------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "canceled" \| "cancel_rejected" \| "rejected" \| "unknown"` | Resolved lifecycle state. These seven tokens are the whole set |
 | `order` | object | Present on `"resting"` — `oid` (decimal-digit string), `coin` (market symbol or spot pair name), `side` (`"B"` = bid / `"A"` = ask), `px` / `sz` (decimal strings), `inserted_at`, `cloid` (hex \| null) |
-| `trigger` | object | Present on `"triggered"` — `oid` (decimal-digit string), `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
+| `trigger` | object | Present on `"triggered"` — `oid` (decimal-digit string), `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool), `cloid` (hex \| `null`; **not live yet**). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
 | `fills` | array | Present on `"filled"` — EVERY matching leg, oldest first, each the shape of one [`user_fills`](#user_fills) record |
 | `total_filled_sz` | Decimal string | Present on `"filled"` — the sum of `fills[*].sz` |
 | `outcome` | object | Present on `"canceled"` / `"cancel_rejected"` / `"rejected"` — exactly five fields: `oid` (decimal-digit string \| `null`; `null` when the node holds no id for the record — always on `rejected`, and on a `cancel_rejected` for a `cloid` that never mapped to an order), `coin` (market symbol or spot pair name), `side` (`"B"` / `"A"` \| `null`; `null` on both cancel outcomes — a cancel names the order, not its side), `time` (uint64, consensus ms of the transition), `reason` (string \| `null`; `null` on a successful cancel — **branch on `status`, never on this string**). No `sz`, no `filled_sz`, no `cloid` — see [above](#order_status) |

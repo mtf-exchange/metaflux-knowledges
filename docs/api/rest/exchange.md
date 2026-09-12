@@ -456,7 +456,7 @@ refuse every other market. See [options](../../products/options.md).
 | [`claim_rewards`](./exchange/staking.md#claim_rewards) | Claim staking rewards | master only |
 | [`link_staking_user`](./exchange/staking.md#link_staking_user) | Alias a staking target | master only |
 | [`user_set_abstraction`](./exchange/account.md#user_set_abstraction) | Self-scope abstraction config | master only |
-| [`agent_set_abstraction`](./exchange/account.md#agent_set_abstraction) | Agent-scope abstraction config | master only |
+| [`agent_set_abstraction`](./exchange/account.md#agent_set_abstraction) | **Not available** — every call is refused | master only |
 | [`priority_bid`](./exchange/utility.md#priority_bid) | Pay a priority fee for block-front placement | master only |
 
 ### Encrypted orders {#encrypted-orders}
@@ -674,8 +674,8 @@ JavaScript client cannot lose digits — see
 [Ids and wire shapes](../../changelog/ids-and-wire-shapes.md#id-strings). The `oid` you
 put inside a SIGNED cancel or modify payload stays a `uint64` number: the typed
 digest binds `uint64 oid` and is consensus-frozen. A
-`batch_order` / `scale_order` resolves to **one entry per placed leg or rung**; a
-single order to one entry.
+`batch_order` / `scale_order` resolves to **one entry per leg or rung**, a
+parked trigger leg included; a single order to one entry.
 
 ```json
 { "data": { "statuses": [ { "resting": { "oid": "12345", "cloid": "0x..." } } ] } }
@@ -691,6 +691,7 @@ object naming the leg's outcome:
 { "filled":  { "oid": "12345", "total_sz": "100000000", "avg_px": "10050000000" } }  // matched
 { "error":   { "code": "MARGIN_INSUFFICIENT", "message": "..." } }     // this leg was rejected
 { "noop":    { "reason": "position already flat, nothing to reduce" } } // accepted, and it changed nothing
+{ "parked":  { "oid": "12345", "cloid": "0x..." } }                     // trigger leg accepted, and held off the book
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
 
@@ -714,6 +715,28 @@ same rule that says match an `error` on `code` and never on `message`.
 
 A `noop` entry carries **no `oid`**: no order was created, so no id was
 assigned. Do not read one out of it and do not cancel against one.
+
+#### `parked` — accepted, and held off the book {#statuses-parked}
+
+A TP/SL or stop leg is **parked**. It holds a real `oid` and it is an open
+order, but it never rests on the book. It carries no depth, so
+[`l2_book`](./info/perpetuals.md#l2_book) does not show it. The chain fires the
+leg when the mark crosses its trigger price.
+
+**A `parked` entry is accepted. Do not retry it.** Cancel it by its `oid` with
+[`cancel_order`](./exchange/orders.md#cancel_order), or by its `cloid` with
+[`cancel_by_cloid`](./exchange/orders.md#cancel_by_cloid). Both reach a parked leg.
+
+**The rule callers get wrong:** a `position_tpsl` group places no book order at
+all, so `parked` entries are its WHOLE answer. That group used to answer an
+empty `statuses` array, and a mixed `normal_tpsl` batch answered fewer entries
+than it sent legs.
+
+**Not live yet:** `parked` ships with the next node release. A live node leaves
+every parked leg out of `statuses`, so the array is shorter than the request.
+`parked` is the approved term across this reference — on
+[`order_status`](./info/orders-fills.md#order_status) alone the same state answers
+the legacy token `triggered`.
 
 **A failed leg carries the SAME error object as the envelope** — the same
 `code`, the same prose `message`, and the same optional `details`. There is one
@@ -821,9 +844,8 @@ when the wait expired.
 
 There is no separate verdict read. The wait is about fifty blocks, so the answer
 is in this response. If you get a `202`, RE-READ the state the action was meant
-to change; re-submitting the same nonce is replay-safe but usually silent,
-because the block builder drops a committed replay before any verdict is
-produced.
+to change. Re-submitting the same nonce is replay-safe, and the block builder
+answers the replay with [`NONCE_REPLAYED`](#nonce-replayed).
 :::
 
 **The most common silent rejection is a position-mode mismatch.** A hedge account
@@ -907,10 +929,40 @@ obvious from the sentence:
 bytes **before** parsing the typed action. So a request with both a bad
 signature and an unknown action type answers `401 AUTH_BAD_SIGNATURE`, not a
 `400`. Anti-replay (nonce uniqueness) is enforced in **committed state** (a
-64-wide per-account sliding window), not at admission — a reused nonce is
-admitted at the HTTP edge and dropped at commit, so there is no synchronous
-nonce rejection here.
+64-wide per-account sliding window), not at admission. A reused nonce is
+admitted at the HTTP edge and refused by the block builder, which answers
+[`NONCE_REPLAYED`](#nonce-replayed) at `200` — never a `401`.
 :::
+
+### A replayed nonce {#nonce-replayed}
+
+An action whose nonce the committed window already holds never reaches a block.
+The block builder drops it and answers the waiting caller:
+
+```json
+{
+  "error": {
+    "code":    "NONCE_REPLAYED",
+    "message": "nonce replayed: this account used this nonce, or it sits more than 64 below the newest"
+  }
+}
+```
+
+The status is `200`, because this is a commit verdict and not an admission
+refusal. On an order action the same object arrives as `statuses[0].error`.
+**Nothing committed, and the nonce is not consumed. Do not retry at the same
+nonce** — re-sign at a higher one.
+
+**Why an honest nonce can be refused.** The window is 64 wide, and it is
+anchored on the HIGHEST nonce the account has ever committed. One action signed
+far in the future — a wrong clock — moves that anchor forward. Every later
+`Date.now()` nonce then sits more than 64 below the anchor. The chain refuses
+each one until the wall clock passes the anchor. Recover by signing above the
+anchor.
+
+**Not live yet:** the verdict ships with the next node release. A live node
+drops the replay with no answer at all, so the caller waits out the order window
+and the gateway then answers a `502`.
 
 ### `429 Too Many Requests` — rate-limited {#429-too-many-requests--rate-limited}
 

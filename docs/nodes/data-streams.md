@@ -463,7 +463,7 @@ One record per order-status transition, keyed by the order owner.
 | `market` | uint32 | id | Canonical asset id |
 | `oid` | uint64 | id | Order id. **`0` on an `error` or `noop` record** — the order never got an id |
 | `cloid` | string \| absent | — | Client order id, `0x` plus 32 hex digits. **Absent on a maker execution record even when the order carried one** |
-| `status` | string | — | Exactly one of `"resting"`, `"filled"`, `"error"`, `"noop"`. One `filled` record per (block, maker `oid`) — see [maker execution records](#maker-execution-records) |
+| `status` | string | — | Exactly one of `"resting"`, `"filled"`, `"error"`, `"noop"`, `"parked"`. A `"parked"` record is an accepted trigger leg held off the book: it carries a real `oid`, and `sz` is the whole leg because it has never matched (**not live yet:** the token ships with the next node release). One `filled` record per (block, maker `oid`) — see [maker execution records](#maker-execution-records) |
 | `side` | string | — | `"B"` buy, `"A"` sell |
 | `limit_px` | i128 string | raw price | Limit price of the order. Always present |
 | `sz` | u128 string | raw size | On `filled`, the **filled** size. On `resting`, `error` and `noop`, the request size |

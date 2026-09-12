@@ -8,7 +8,7 @@ How to retry safely without double-spending nonces or duplicating orders.
 
 ## TL;DR {#tldr}
 
-- Every action has a `nonce`. Reusing one returns `400 nonce_must_increase`.
+- Every action has a `nonce`. Reusing one returns `NONCE_REPLAYED` at HTTP `200`.
 - Set a unique `cloid` on every `Order` / `ModifyOrder`; the server rejects duplicate `cloid` on the same account, so retry is safe.
 - For non-order actions, the **state machine** is naturally idempotent (cancel of a non-existent order is harmless; transfer is enforced by balance check).
 - The network error model splits into three classes — admission rejection, commit-time error, network drop — each with a different retry rule.
@@ -34,7 +34,7 @@ flowchart TD
 | Outcome | Nonce consumed? | Safe to retry? |
 |---------|:---------------:|:--------------:|
 | `202 admitted` | YES | NO — duplicate effect |
-| `400 nonce_must_increase` | NO (already past it) | NO — submit at a higher nonce |
+| `200 NONCE_REPLAYED` | NO (already past it) | NO — re-sign at a higher nonce |
 | `400 action: <parse error>` / other parse errors | NO | YES — fix and resubmit at same nonce |
 | `401 signer_*` | NO | NO until the signing issue is fixed; the nonce is unconsumed |
 | `422 reduce_only_violation` and other admit-time logical errors | NO | YES once the logical issue is fixed |
@@ -43,6 +43,16 @@ flowchart TD
 | Network drop (no response) | UNKNOWN | RECONCILE — see [reconcile after drop](#reconcile-after-network-drop) below |
 
 The rule: **a request gets a server response → the nonce decision is made**. A network drop is the only ambiguous case.
+
+:::warning
+**There is no `nonce_must_increase` and no `nonce_too_small`.** Neither string
+exists on this API, and neither answer is a `400`. A replayed nonce answers
+[`NONCE_REPLAYED`](../api/errors.md#nonce_replayed) at HTTP `200`, because the
+refusal comes from the block builder and not from admission. **Not live yet:**
+a live node drops the replay in silence, so the caller waits out the order
+window and the gateway answers a `502`. Branch on the code, never on a `502`
+body.
+:::
 
 ## Strategy: cloid {#strategy-cloid}
 
@@ -154,7 +164,7 @@ sequenceDiagram
     C->>S: T=0 attempt 1: POST /exchange Order { cloid: X }
     Note over C,S: T=2s (no response — network drop)
     C->>S: T=2s attempt 2: POST /exchange Order { cloid: X } (same params, NEW nonce)
-    S-->>C: T=2.1s response: error nonce_too_small → original was admitted! the new nonce is needed but the order itself is already in place.
+    S-->>C: T=2.1s response: NONCE_REPLAYED on the OLD nonce - the original was admitted, and the order is already in place
     S-->>C: OR response: resting/oid=N → original never landed — this one did
     S-->>C: OR response: error duplicate cloid → original landed too — we're already dedup'd
     C->>S: T=2.2s query openOrders by cloid: confirm presence
@@ -166,9 +176,9 @@ The cloid + the server-side checks make the retry safe even when the network is 
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `nonce_must_increase` on every request | Local clock skew (using `Date.now()`) | Sync clock; or use a monotonic counter |
+| `NONCE_REPLAYED` on every request | Local clock skew (using `Date.now()`), or one past action signed far in the future | Sync the clock, or use a monotonic counter. The window anchors on the HIGHEST nonce ever committed, so sign above that anchor |
 | Two scripts collide on nonce | Sharing the same account | Use a shared nonce service, or one script per account |
-| `nonce_too_small` after a reconnect | Local nonce counter reset to pre-drop value | Persist last-submitted nonce across restarts |
+| `NONCE_REPLAYED` after a reconnect | Local nonce counter reset to pre-drop value | Persist last-submitted nonce across restarts |
 
 ## Complement: action expiry {#complement-action-expiry}
 

@@ -38,6 +38,14 @@ The frame protocol mirrors HL's; the **channel names are MTF-native snake_case**
 
 and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: true`), then live change-driven `{"channel":...,"data":...}` pushes (`is_snapshot: false`). A push lands only when that channel's state actually changed since the last commit; an unchanged channel emits nothing. `coin` is **required** for the per-market channels (`l2_book`, `bbo`); see [Coin parameter](./index.md#coin-parameter) for how it is canonicalized (numeric asset id or symbol → asset-id key).
 
+**A subscribe answers ONE snapshot frame.** Some subscribes used to answer two
+`is_snapshot: true` frames — the gateway's own body and the node's — and the two
+could disagree. The gateway now forwards the node's snapshot, and sends a body of
+its own only when the node sends nothing inside the wait window.
+[`open_orders`](#open_orders) is the one documented exception: every frame on that
+channel is a full snapshot and carries `is_snapshot: true`. **Not live yet:** the
+single-frame rule ships with the next gateway release.
+
 ## Channels at a glance {#channels-at-a-glance}
 
 | Channel | key | Source |
@@ -170,7 +178,8 @@ Initial snapshot and every push share this shape:
 - `levels` is `[bids, asks]`. Bids are best (highest) first; asks are best (lowest) first.
 - Each level is `{ px, sz, n }`: `px` / `sz` are raw fixed-point magnitudes as decimal **strings** (per-asset tick scaling is applied downstream in the gateway), `n` is the number of resting orders at that price.
 - Each side is capped at **20 aggregated levels**.
-- `time` is the book's `last_trade_ms` (consensus-derived); `0` until the book has traded.
+- `time` on a PUSH is the book's `last_trade_ms` (consensus-derived); `0` until the book has traded.
+- **On the on-subscribe SNAPSHOT frame, `time` is the moment the gateway served the frame**, never below the node's own book time. The body is the current book; the stamp says "as of now", so a staleness guard does not refuse a warm book. Read `time` on a snapshot frame as serve time, not as the last trade. The same holds on [`bbo`](#bbo).
 
 Each push is a **full snapshot of the top 20 levels**, not a partial diff. The frame envelope carries an `is_snapshot` boolean — `true` on the initial on-subscribe snapshot, `false` on the subsequent change-driven pushes — but the **body is the full top-20 book either way**, so the field is informational: keep replacing your local book on each frame and you stay correct.
 
@@ -213,7 +222,7 @@ Top-of-book best bid / offer for one market. A thinner `l2_book`. **Requires `co
 ```
 
 - `bbo` is `[best_bid, best_ask]`. Each entry is a `{ px, sz, n }` level, or `null` when that side is empty.
-- `time` is `last_trade_ms`, same as `l2_book`.
+- `time` is `last_trade_ms`, same as [`l2_book`](#l2_book) — including the snapshot-frame serve stamp.
 
 Frequency: change-driven — a frame is sent only when the top-of-book actually changed since the last commit; an unchanged book emits nothing this commit.
 
@@ -403,7 +412,8 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
   "status": "open", "filled_sz": null, "avg_px": null, "reason": null, "time": 1735689600123 } ] }
 ```
 
-- `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`) / `noop` (+`reason`, null `oid`).
+- `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`) / `noop` (+`reason`, null `oid`) / `parked`.
+- **`parked` is an ACCEPTED trigger leg held off the book.** It carries a real `oid`, `order.sz` is the whole leg, and `filled_sz`, `avg_px` and `reason` are all `null`. The leg never rests, so [`l2_book`](#l2_book) does not show it; the chain fires it when the mark crosses. See [`parked`](../rest/exchange.md#statuses-parked). **Not live yet:** the token ships with the next node release.
 - **`noop` is a SUCCESS, not a rejection** — a `reduce_only` order with nothing left to reduce. It placed nothing and it must not be retried; `rejected` is the one to act on. Branch on `status`, never on `reason`. See [`noop`](../rest/exchange.md#statuses-noop).
 - `order.oid` is a **decimal-digit string**, or `null` on a rejected placement.
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
@@ -517,6 +527,20 @@ max-trade-size ceiling for one account on one market. Requires **both** `user`
 (0x) and `coin`. The initial snapshot is the live context (zeroed-config
 defaults when the account has no position), not an empty array; a push
 re-emits it only when that context changes.
+
+**The channel serves a REGISTERED PERP market.** A spot pair, an unknown coin,
+or a coin that names no perp is refused with
+`{"channel":"error","data":{"error":"market not found"}}`, and no subscription is
+created. That is the same refusal the
+[REST read](../rest/info/perpetuals.md#active_asset_data) answers as `404`. An
+unparseable `user` is refused as ``invalid `user` address``. There is no zeroed
+fallback snapshot. **Not live yet:** both refusals ship with the next node
+release, and a live node answers a zeroed snapshot that blanks your own `address`
+and `coin`.
+
+`coin` takes the market symbol here, and the numeric asset id is also accepted,
+because the channel routes on the asset id. The REST read takes the symbol only.
+Either spelling must still name a real perp.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "active_asset_data", "user": "0x<address>", "coin": "BTC" } }

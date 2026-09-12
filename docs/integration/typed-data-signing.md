@@ -215,7 +215,7 @@ Notes on specific fields:
 | `claim_rewards` | `MetaFluxTransaction:ClaimRewards(string metafluxChain,address validator,uint64 nonce)` |
 | `link_staking_user` | `MetaFluxTransaction:LinkStakingUser(string metafluxChain,address target,uint64 nonce)` |
 | `create_vault` | `MetaFluxTransaction:CreateVault(string metafluxChain,string name,uint64 lockPeriodSecs,uint8 kind,uint64 nonce)` |
-| `vault_modify` | `MetaFluxTransaction:VaultModify(string metafluxChain,uint64 vaultId,string newName,uint64 nonce)` |
+| `vault_modify` | `MetaFluxTransaction:VaultModify(string metafluxChain,uint64 vaultId,string newName,bool hasNewLockPeriodSecs,uint64 newLockPeriodSecs,bool hasNewManagementFeeBps,uint16 newManagementFeeBps,bool hasNewPaused,bool newPaused,uint64 nonce)` |
 | `spot_margin_close` | `MetaFluxTransaction:SpotMarginClose(string metafluxChain,uint32 pair,uint64 limitPx,uint64 nonce)` |
 | `noop` | `MetaFluxTransaction:Noop(string metafluxChain,uint64 nonce)` |
 | `claim_referral_rewards` | `MetaFluxTransaction:ClaimReferralRewards(string metafluxChain,uint64 nonce)` |
@@ -242,6 +242,17 @@ Notes on specific fields:
   carries that expiry. A caller that leaves the field out of the struct signs a
   four-field digest the chain never computes, so the recovered signer is a
   stranger and the action is refused.
+- `vault_modify`: **the digest binds every field the action applies.** Each
+  optional field signs as two words — a presence `bool`, then the value. Set the
+  flag to `true` only when the wire payload carries that key. Sign the value as
+  `0` or `false` when it does not. An absent key and a key sent as `0` are
+  DIFFERENT digests, so one signature covers exactly one wire form. `newName`
+  signs as `""` when the payload sends no name; the chain refuses an empty name,
+  so `""` can only mean unchanged. This string replaces a four-field
+  `VaultModify`, and a signature made with that older string is refused.
+  **Not live yet:** the new string ships with the next node release. A live node
+  still binds `newName` alone, so sign the four-field form until the release
+  lands. See [the action](../api/rest/exchange/vaults.md#vault_modify).
 - `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the
   envelope nonce are the only signed fields, because neither action carries
   params. Both drain the WHOLE accrued credit and neither reports the amount, so

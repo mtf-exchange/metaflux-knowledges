@@ -80,6 +80,20 @@ unchanged).
 | `new_management_fee_bps` | uint16 \| null | New management fee bps (capped at 2000 = 20%) |
 | `new_paused` | bool \| null | New paused flag |
 
+**The signature covers every field here.** The EIP-712 digest binds
+`new_lock_period_secs`, `new_management_fee_bps` and `new_paused` as well as
+`new_name`. Each optional field signs as a presence flag plus a value, so one
+signature covers exactly one field set. Add or remove a key after you sign and
+the chain refuses the action. See
+[typed-data signing](../../../integration/typed-data-signing.md#account-staking--vault)
+for the type string.
+
+**Not live yet:** the new digest ships with the next node release. A live node
+binds `new_name` alone, so a relay can add a fee change or a pause to a
+signature the leader gave for a rename. Sign the four-field form until the
+release lands, then re-sign with the new one — an old signature stops verifying
+at the swap.
+
 ---
 
 ### Deposit into a vault as a follower {#vault_distribute}

@@ -35,6 +35,11 @@ it acts for.
 
 There is no separate margin-mode action: isolation is the `is_isolated` flag here.
 
+**`asset` must name a listed perp market.** An id no DEX hosts is refused with
+`PRECONDITION_FAILED` and the message `no perp market for asset`. **Not live
+yet:** the check ships with the next node release. A live node writes a
+permanent leverage row for a market that does not exist.
+
 ---
 
 ### Adjust isolated margin by a delta {#update_isolated_margin}
@@ -58,11 +63,24 @@ Apply a signed margin delta to an isolated position (`+` adds, `−` withdraws).
 
 ---
 
-### Add margin to a strict-isolated position {#top_up_isolated_only_margin}
+### Add margin to an isolated position {#top_up_isolated_only_margin}
 
-Add margin to a strict-isolated position. Top-up direction only (positive amount).
+Add margin to an isolated position. Add direction only (positive amount).
 **Sender-authorized by default**; an approved agent may add margin **as** an `owner`
 it acts for.
+
+:::info
+**Correction: this action is not strict-isolated only.** This page said it was,
+and the chain has always accepted a PLAIN isolated position as well. The code is
+right and the earlier rule was wrong; nothing changed on the chain.
+
+The action requires an open **isolated** position on `asset` — margin mode
+isolated or strict-isolated. A cross position is refused with
+`PRECONDITION_FAILED` and the message `no isolated position`. On a
+strict-isolated position this is the only margin action available, because
+[`update_isolated_margin`](#update_isolated_margin) refuses a withdrawal there.
+On a plain isolated position it is the add-only half of that action.
+:::
 
 ```json
 {

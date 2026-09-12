@@ -197,6 +197,7 @@ const sidebars = {
       label: 'Changelog',
       link: {type: 'doc', id: 'changelog/index'},
       items: [
+        'changelog/next-release',
         'changelog/migrations',
         'changelog/ids-and-wire-shapes',
         'changelog/block-13350001',

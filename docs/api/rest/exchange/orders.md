@@ -57,7 +57,29 @@ approved agent). To place many orders under one signature, use
 | `builder` | object \| null | — | Optional [broker fee](../../../concepts/broker-codes.md), charged on top of the taker fee: `{ "fee": <bps u16>, "user": <0x-hex address> }`. The field keeps the `builder` name |
 | `position_side` | enum \| null | `"long"` / `"short"` | **[Hedge mode](../../../concepts/hedge-mode.md) only.** Target leg for the order. **Omit on a one-way account** (the default) and **send it on a hedge account** — a one-way account that sends it, or a hedge account that omits it, is rejected. `reduce_only` is evaluated against the named leg only. See [hedge mode](#position_side-hedge-mode) below |
 
-**Idempotency**: a duplicate `cloid` on the same account is rejected at admission with `ORDER_DUPLICATE_CLOID`. Use `cloid` as your client-side dedup key.
+**Idempotency**: a `cloid` names exactly one order. A `cloid` already in use on
+this account is refused at admission with `ORDER_DUPLICATE_CLOID`. Use `cloid` as
+your client-side dedup key.
+
+**The check runs PER LEG.** [`batch_order`](#batch_order) checks every leg that
+carries a `cloid`, and [`scale_order`](#scale_order) checks its ladder handle.
+Two legs of ONE action that share a `cloid` refuse the WHOLE action, with the
+message `duplicate cloid within one action`. The action is one signature on one
+nonce, so no leg is admitted.
+
+**Why the rule exists.** [`cancel_by_cloid`](#cancel_by_cloid) and
+[`order_status`](../info/orders-fills.md#order_status) by `cloid` both resolve the
+LOWEST `oid` that carries the handle. One `cloid` on two orders makes both
+unreachable by construction.
+
+**An attempt the COMMIT refused gives its `cloid` back**, so a re-signed retry
+may reuse the handle. The dedup set is admission-local and bounded, so a very old
+`cloid` may be admitted again. Committed-nonce uniqueness, not this set, is the
+hard replay guard.
+
+**Not live yet:** the per-leg check, the within-action refusal and the release of
+a refused `cloid` all ship with the next node release. A live node checks the
+single-order handle only, and it keeps the handle of an order the commit refused.
 
 **Common errors**: `px` not tick-aligned, `size` below market minimum, `reduce_only` would grow position, `stp` rejected via STP, account in T1+ liquidation tier.
 
@@ -69,6 +91,7 @@ approved agent). To place many orders under one signature, use
 {"filled":  {"oid": "12345", "total_sz": "100000000", "avg_px": "10050000000"}}
 {"error":   {"code": "ORDER_INVALID_PRICE", "message": "..."}}      // this entry was rejected
 {"noop":    {"reason": "..."}}                                      // accepted, nothing to do — DO NOT RETRY
+{"parked":  {"oid": "12345", "cloid": "0x..."}}                     // trigger leg accepted, and held off the book
 {"pending": {"action_hash": "0x...", "nonce": 1735689600001}}       // admitted, no commit in the wait window
 ```
 
@@ -338,8 +361,10 @@ it does not authorize anything. Set the account you act for at `params.owner`.
 :::
 
 Returns an array of per-leg statuses (same union as `submit_order`) — **one entry
-per placed leg**, in input order, each echoing its own `cloid`. A batch carries
-at most **1000** orders; an empty `orders` array is rejected with
+per leg**, in input order, each echoing its own `cloid`. A parked TP/SL leg gets
+its own [`parked`](../exchange.md#statuses-parked) entry (**not live yet:** a live
+node leaves it out, so the array is shorter than the request). A batch carries at
+most **1000** orders; an empty `orders` array is rejected with
 `INVALID_REQUEST`.
 
 :::danger
@@ -905,10 +930,12 @@ from [`open_orders`](../info/orders-fills.md#open_orders) filtered by the shared
 
 **Seams to know:**
 
-- **A shared `cloid` is a group, not a unique id.** If you later place a single
-  order that reuses the ladder's `cloid`, that order **joins** the group and a
-  later [`cancel_scale`](#cancel_scale) cancels it too. Use a fresh handle per
-  ladder — the SDKs tag ladder handles with a `0x5c` prefix.
+- **The ladder handle is reserved.** Every rung carries the one `cloid` you
+  supply. A later single order that reuses it is refused at admission with
+  `ORDER_DUPLICATE_CLOID`. Use a fresh handle per ladder — the SDKs tag ladder
+  handles with a `0x5c` prefix. **Not live yet:** the reservation ships with the
+  next node release. On a live node that reused order **joins** the group
+  instead, and a later [`cancel_scale`](#cancel_scale) cancels it too.
 - **A reduce-only ladder does not clamp per rung.** A resting order carries no
   reduce-only flag, so a reduce-only ladder whose `total_size` is larger than your
   net position over-rests: once the position closes, the extra rungs can open the

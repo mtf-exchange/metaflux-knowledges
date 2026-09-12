@@ -489,7 +489,7 @@ Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol |
-| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring |
+| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring. It caps the ANSWER, with the ring and the archive already merged, and the trim drops the OLDEST rows. **Not live yet:** a live gateway applies the cap to each source on its own, so a ranged ask can return up to twice the number you asked for |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive); filters on trade `time`. Absent ⇒ open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent ⇒ open upper bound |
 
@@ -652,21 +652,32 @@ for something that does not exist" is an error, "nothing happened there" is data
 |-------|------|-------------|
 | `coverage.start` | uint64 \| null | Open time of the oldest bar in THIS answer. **`null` when `candles` is empty** |
 | `coverage.end` | uint64 \| null | Open time of the newest bar in THIS answer. **`null` when `candles` is empty** |
-| `coverage.reaches_newest` | bool | `true` = the answer runs to the newest bar the store holds. `false` = **newer bars exist that this answer does not include** |
+| `coverage.reaches_newest` | bool | `true` = the answer runs to the newest bar the store holds. `false` = **newer bars exist that this answer does not include**. It is proved against the newest bar the store holds, NEVER against the `end_time` you asked for, so a page that fully answers a past window still reads `false`. That is what makes "page until `reaches_newest`" stop at the live edge and not at your own window. **Not live yet:** a live gateway also counts your `end_time` as proof, so a windowed ask reads `true` on its first page |
 | `t` | uint64 | Bar **open** timestamp (ms, bucket-aligned) |
-| `T` | uint64 | Bar **close** timestamp (ms) |
+| `T` | uint64 | Bar **close** timestamp (ms): always `t + interval − 1`, on every bar from every source. **Not live yet:** an archive-served bar stamps `t + interval`, so the convention changes at the join seam until the next gateway release |
 | `s` | string | Market symbol |
 | `i` | string | Interval bucket token |
 | `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **whole-unit decimal** string (e.g. `"78778.1"`) — the same plane [`markets`](#markets) reports `mark_px` in |
-| `v` | Decimal string | Base-asset volume. `"0"` on a `mark` / `oracle` bar — a price bar folds no trades. Real volume on a `trade` bar. **May be ABSENT** — see below |
-| `q` | Decimal string | Quote volume. `"0"` on a `mark` / `oracle` bar. Real quote volume on a `trade` bar folded from live prints. **May be ABSENT** — see below |
-| `n` | uint64 | Count. On a `mark` / `oracle` bar it is a **sample count**, not a trade count, and it is `0` on a carry-forward bar. On a `trade` bar it is a real **trade count**. **May be ABSENT** — see below |
+| `v` | Decimal string | Base-asset volume of the TRADE bucket at this bar's open, joined at read time. A `mark` or `oracle` bar carries the SAME volume its `trade` bar carries. **May be ABSENT** — see below |
+| `q` | Decimal string | Quote volume of that same trade bucket. **May be ABSENT** — see below |
+| `n` | uint64 | The **trade count** of that bucket. It is not a sample count, on any series. **May be ABSENT** — see below |
 | `f` | bool | Forward-filled flag. `true` = the bar carries the previous close forward and folded no new input; `false` = a real folded bar |
 
 **`coverage` reports the span of THIS answer.** It tells you whether the series
 is cut. Read `reaches_newest: false` as "keep paging forward", never as "the
-market stopped". `coverage.start` and `coverage.end` are both `null` when
+market stopped". With no folded coverage for a coin the gateway can prove
+nothing, so the flag stays `false`: it reads short rather than current, and a
+stale chart never passes as live. `coverage.start` and `coverage.end` are both `null` when
 `candles` is empty.
+
+#### Why a price bar carries trade volume {#candle_snapshot-volume-join}
+
+**Correction.** This page said `v` and `q` read `"0"` on a `mark` or `oracle`
+bar, and that `n` was a sample count there. Neither is true, and neither has
+been. The serving layer folds the price series for charting and JOINS the trade
+bucket of the same open, so the histogram under a mark chart is real traded
+volume. A bar with no proven trade coverage omits all three keys instead — see
+below. The `trade` series carries its own volume, from the same bucket.
 
 #### `v`, `q` and `n` can be ABSENT, and absent is not `"0"` {#candle_snapshot-volume}
 

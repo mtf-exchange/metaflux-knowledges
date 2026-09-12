@@ -527,8 +527,32 @@ Rejections, all `Precondition` unless noted:
 
 ### Set another user's abstraction config {#agent_set_abstraction}
 
-Agent-scope abstraction config: an agent signs to update another user's config.
-The core handler enforces the agent-approval check against `user` at dispatch.
+:::danger
+**`agent_set_abstraction` is not available, and it never worked.** This page
+described a working action. That was wrong: the handler accepted the call and
+wrote nothing, so the config it named never changed. The correction is the whole
+rule — there is no version of this action that sets a config.
+
+Every call is now refused with `PRECONDITION_FAILED` and the message
+`agentSetAbstraction is not available; the account owner must sign
+userSetAbstraction`. The refusal does not depend on the sender, the target
+account, the `kind`, or on the sender being an approved agent of `params.user`.
+
+**Why.** An approved agent holds trading authority only — place, cancel, modify,
+and tune position risk on the owner's own account. The abstraction mode is not a
+trading setting. Leaving `standard` mode moves the account's spot wallet into its
+perp wallet, and a reservation refuses the owner's own later orders. Both are
+owner-only, so the owner signs
+[`user_set_abstraction`](#user_set_abstraction) from the master key.
+
+The action stays on the wire and keeps its type and its EIP-712 type string. It
+never succeeds.
+
+**Not live yet:** the refusal ships with the next node release. A live node
+answers a `202` and commits nothing.
+:::
+
+The request shape below is what the action still accepts on the wire.
 
 ```json
 {
