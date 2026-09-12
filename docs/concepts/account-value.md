@@ -37,15 +37,15 @@ serves it as `total_margin_used` at the top level. The full read serves it as
 
 | Field | Read | What it is |
 |---|---|---|
-| `account_value` | both | Everything the account is worth right now, unrealized profit included |
+| `account_value` | both | Everything the account is worth right now, unrealized profit included. **Split `standard` account:** the perp wallet only; the spot wallet is the USDC row of `spot.balances` |
 | `total_raw_usd` | both | **Settled cash equity.** Realized USDC only — it does NOT count unrealized PnL. This is the `settled cash` term both formulas below start from |
-| `withdrawable` | both | Cash you can take out. **Clamped at zero** |
+| `withdrawable` | both | Cash you can take out. **Clamped at zero**. **Split `standard` account:** the perp wallet only |
 | `total_margin_used` / `perp.init_margin` | both, under two names | Margin currently committed to open CROSS positions |
 | `perp.total_ntl_pos` | full read only | Mark notional of the account's CROSS positions, summed. Isolated legs are NOT in it |
 | `cross_maintenance_margin_used` | `detail: "margin"` only | Margin below which the CROSS account is liquidated. **The scope is cross, and the name says so on purpose** — see the caution below |
 | `health` | both | `account_value - cross_maintenance_margin_used`. The cushion above liquidation |
 | `tier` | both | The liquidation band the engine has you in |
-| `abstraction` | both | `"unified"` (default), `"standard"` (per-product reservations) or `"portfolio"` (portfolio margin enrolled) |
+| `abstraction` | both | `"unified"` (default), `"standard"` (two USDC wallets — see [account modes](./account-modes.md#standard)) or `"portfolio"` (portfolio margin enrolled) |
 | `health_deferred` | both, when true | The risk engine cannot price a leg. See below |
 
 :::caution
@@ -261,6 +261,16 @@ market:
 side-aware and never negative. It is `withdrawable × leverage` on the increasing
 side; the reducing side may additionally close what is already open. This is the
 right field behind an order ticket's "available" line.
+
+A split `standard` account gets the same formula over its perp wallet, with no
+reservation cap. A `standard` account that entered before the split is also
+capped by its `perp` reservation.
+
+:::caution Not live yet
+The uncapped pair ships with the next node release after 0.9.7. Until then, a
+live node caps it by the `perp` reservation on a split account too, so a split
+account with no `perp` reservation reads `["0", "0"]`.
+:::
 
 Because it is derived from `withdrawable`, it carries the same unrealized-loss
 term: an open loss shrinks what the ticket offers on the increasing side, and an

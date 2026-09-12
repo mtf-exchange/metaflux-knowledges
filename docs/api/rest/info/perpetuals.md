@@ -968,6 +968,16 @@ closing the open position releases its margin. They are still an estimate agains
 a moving mark: both fall when the mark moves against the caller, and neither is a
 guarantee that the order is admitted.
 
+On a split `standard` account that free collateral is the perp wallet's, with no
+reservation cap. On a `standard` account that entered before the split, the
+`perp` reservation also caps both figures.
+
+:::caution Not live yet
+The uncapped read ships with the next node release after 0.9.7. Until then, a
+live node caps both figures by the `perp` reservation on a split account too, so
+a split account with no `perp` reservation reads `["0", "0"]`.
+:::
+
 ### `margin_table` — removed {#margin_table--removed}
 
 :::warning

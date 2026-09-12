@@ -150,7 +150,7 @@ same address. Correct the signing input first.
 
 | `code` | HTTP | `details` | Cause and caller action |
 |--------|------|-----------|-------------------------|
-| `ASSET_INSUFFICIENT_BALANCE` | 400 | — | The spot balance cannot fund the transfer, withdrawal or sell. Check the free balance — a held balance is not spendable |
+| `ASSET_INSUFFICIENT_BALANCE` | 400 | — | The spot balance cannot fund the transfer, withdrawal or spot order. Check the free balance — a held balance is not spendable. **Not live yet** for a spot order: a live node accepts an unfunded spot order as a no-op |
 
 ### `RATE_LIMITED` {#rate_limited}
 

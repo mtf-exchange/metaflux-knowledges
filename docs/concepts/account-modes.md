@@ -21,18 +21,19 @@ independent axes: a `standard` account can hold isolated positions, and a
 The three modes do not sit on one dial. They move **three separate properties**,
 and each mode moves a different subset:
 
-| | What counts as collateral | How margin is computed | How the budget is divided |
+| | What counts as collateral | How margin is computed | Where the USDC is held |
 |---|---|---|---|
-| **`unified`** | USDC only | Sum of each position's requirement | Not divided — one pool |
-| **`standard`** | USDC only | Sum of each position's requirement | **Per-product caps** |
-| **`portfolio`** | USDC **plus eligible spot tokens**, at a governance haircut | **Scenario (SPAN) sweep over the whole account** | Not divided — one pool |
+| **`unified`** | USDC only | Sum of each position's requirement | One balance |
+| **`standard`** | USDC only | Sum of each position's requirement | **Two wallets: perp and spot** |
+| **`portfolio`** | USDC **plus eligible spot tokens**, at a governance haircut | **Scenario (SPAN) sweep over the whole account** | One balance |
 
-`unified` is the origin: no division, USDC only, per-position sum. `standard`
+`unified` is the origin: one balance, USDC only, per-position sum. `standard`
 changes ONLY the third column. `portfolio` changes ONLY the first two.
 
-**Nothing here changes the ledger.** All three modes spend from the SAME single
-USDC balance. There is no second wallet in any of them, and there is no transfer
-between products — see [what standard is not](#standard-is-not-two-wallets).
+**Only `standard` changes the ledger.** `unified` and `portfolio` fund every
+product from ONE USDC balance. A `standard` account holds a perp wallet and a
+spot wallet, and USDC crosses between them only by an explicit transfer — see
+[`standard` is two wallets](#standard-is-two-wallets).
 
 ## `unified` {#unified}
 
@@ -45,8 +46,67 @@ counting on. `withdrawable` is what is left after every open requirement.
 
 ## `standard` {#standard}
 
-The same single USDC balance, plus a **spending cap per product**. The caps are
-called reservations and there are three:
+Two USDC wallets, and an explicit transfer between them. An account that enters
+`standard` at or above block 5,710,001 (node 0.9.7) gets the two wallets. An
+account that was already in `standard` below that height keeps one balance — see
+[before the split](#before-the-split).
+
+`account_state` reports the posture as `split`: `true` for two wallets, `false`
+for one balance.
+
+### `standard` is two wallets {#standard-is-two-wallets}
+
+| Wallet | What it funds | Where to read it |
+|---|---|---|
+| **Perp wallet** | Perp orders and positions, option orders and escrow, withdrawals. Liquidation judges this wallet alone | `account_value` and `withdrawable` on `account_state` |
+| **Spot wallet** | Spot orders and fills | The USDC row (`signing_id 100`) of `spot.balances` |
+
+The full list of which action reads which wallet is in
+[the standard-mode split](./usdc.md#standard-split).
+
+The spot wallet starts empty.
+[`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer) is the
+only way USDC crosses:
+
+- **Perp → spot** moves free collateral only. USDC that margins an open position
+  stays in the perp wallet.
+- **Spot → perp** moves USDC that no resting spot order holds.
+
+**A perp loss cannot reach the spot wallet.** A split account's perp bankruptcy
+is absorbed by the insurance fund and ADL, never by its spot USDC. For full
+isolation, with its own address and its own liquidation, use a
+[sub-account](./sub-accounts.md).
+
+**Each wallet funds its own orders, with no cap.** A perp or option order is
+admitted against the perp wallet's free collateral. A spot order is admitted
+against the spot wallet. A spot order the spot wallet cannot fund is refused with
+`insufficient spot balance`. A split account has no reservations and no spot
+margin.
+
+:::caution Not live yet
+Uncapped admission, the refusal of an unfunded spot order and the refusal of every
+reservation ship with the next node release after 0.9.7. Until then, a live node:
+
+- caps the perp and option orders of a split account by its `perp` and `option`
+  reservations, so a split account with no `perp` reservation opens no perp
+  position;
+- accepts a spot order the spot wallet cannot fund as a no-op, and answers
+  `filled` with `total_sz: "0"`.
+
+To trade perps on a live node, first set a `perp` reservation with
+[`user_set_abstraction`](../api/rest/exchange/account.md#user_set_abstraction) `kind: 1`.
+:::
+
+**Reading the two wallets.** `account_value` and `withdrawable` are the perp
+wallet. The USDC row of `spot.balances` is the spot wallet. Its `total` includes
+the USDC that resting spot bids hold, so `total − hold` is what a new spot order
+may spend. The account total is `account_value` plus that row's `total`.
+
+### Before the split {#before-the-split}
+
+An account that entered `standard` below block 5,710,001 reads `split: false`. It
+keeps ONE USDC balance and a **spending cap per product**. The caps are called
+reservations, and there are three:
 
 | Scope | Covers |
 |---|---|
@@ -57,9 +117,8 @@ called reservations and there are three:
 Set each one with `user_set_abstraction` kinds 1–3. Read them back on
 [`account_state.reservations`](../api/rest/info/account.md#account-state-reservations).
 
-**The mode is fail-closed.** An unset reservation is zero, and zero admits
-nothing. A fresh `standard` account can place NO order until it allocates. That
-is the point of the mode, not a defect.
+**The caps are fail-closed.** An unset reservation is zero, and zero admits
+nothing.
 
 **A reservation binds admission only.** No liquidation, ADL, settlement, funding
 or seizure path reads it, and neither does any cash path — withdraw, transfer,
@@ -69,18 +128,9 @@ vault or Earn. So a reservation:
 - cannot make the account harder to liquidate;
 - **cannot stop a loss in one product from consuming another product's USDC.**
 
-That last line is the one to read twice.
-
-### `standard` is NOT two wallets {#standard-is-not-two-wallets}
-
-A reservation is a cap on what you may OPEN, not a wall around money you hold. If
-perps lose, the loss comes out of the one balance, and the USDC your `spot`
-reservation names goes with it. The reservation is unchanged; the pool behind it
-is smaller.
-
-If you want money that a position in another product genuinely cannot reach,
-**use a sub-account**. A sub-account is a separate address with its own balance
-and its own liquidation, and it needs no mode at all.
+A reservation is a cap on what you may OPEN, not a wall around money you hold. To
+get two wallets, switch to `unified` and back to `standard`. Both changes need a
+flat account.
 
 ## `portfolio` {#portfolio}
 
@@ -135,13 +185,18 @@ any of these exists: a perp position, a resting perp order, a parked trigger, a
 live TWAP, a resting spot order, a spot TWAP, a spot-margin position, an option
 position, or an open RFQ quote. The rejection names what it found.
 
-Returning to `unified` clears every reservation.
+**Entering `standard`** splits the USDC: all of it stays in the perp wallet, and
+the spot wallet starts empty. Entry is refused while the perp wallet is below
+zero.
+
+**Returning to `unified`** folds the spot wallet back into the one balance and
+clears every reservation. It is refused while the spot wallet is below zero.
 
 ## Which mode do you want {#which-mode}
 
 | You want | Use |
 |---|---|
 | The simplest thing; everything shares one balance | `unified` |
-| A ceiling on what one product can commit, so a mistake in one place cannot spend the whole account | `standard` |
-| Money that another product's loss genuinely cannot reach | **A sub-account**, in any mode |
+| Spot USDC that a perp loss cannot reach, moved between wallets by hand | `standard` |
+| Full isolation, with its own address and its own liquidation | **A sub-account**, in any mode |
 | Spot holdings to back perp positions, and offsetting risk to net off | `portfolio` |

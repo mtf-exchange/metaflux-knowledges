@@ -866,7 +866,7 @@ is prose and it can change.
 | `MARGIN_INSUFFICIENT` | The account cannot fund the requirement. Carries `details` | `details.limit` is free collateral, `details.actual` is what is needed |
 | `MARKET_INACTIVE` | The market is disabled, closed or reduce-only. A perp that a delist halted or settled, or that governance paused, answers `PRECONDITION_FAILED` instead | Send a closing order, or wait |
 | `MARKET_OI_CAP` | Open interest is at the market cap | Nothing in the request is wrong. Wait, or trade elsewhere |
-| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer or sell | Check the free balance; a held balance is not spendable |
+| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer, withdrawal or spot order. **Not live yet** for a spot order: a live node accepts an unfunded spot order as a no-op | Check the free balance; a held balance is not spendable |
 | `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |
 
 Four `PRECONDITION_FAILED` cases are worth naming, because the fix is not

@@ -139,21 +139,44 @@ From the swap, an account that **enters** `standard` mode holds **two** USDC
 wallets:
 
 - The **perp wallet** is the collateral account. Perp margin, funding, liquidation,
-  ADL, Earn, vaults and bridge withdrawals read and write this one.
+  ADL, vaults and bridge withdrawals read and write this one.
 - The **spot wallet** is spot token `100`. Spot orders, spot fills, spot fees,
-  `send_asset` of USDC and Core→EVM transfers read and write this one.
+  `send_asset` of USDC, Core→EVM transfers and **Earn** read and write this one. An
+  Earn deposit the spot wallet cannot fund is refused `PRECONDITION_FAILED` with
+  the message `insufficient balance`, not `ASSET_INSUFFICIENT_BALANCE`.
 - [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer) is the
   **only** lane that crosses. It moves one amount from one wallet to the other.
 
-Three rules follow, and each is deliberate:
+Four rules follow, and each is deliberate:
 
 1. **A perp loss cannot reach the spot wallet.** A split account's perp bankruptcy
    is absorbed by the insurance fund and ADL, never by its spot USDC.
-2. **A split account is refused spot margin and a spot reservation.** Spot has its
-   own wallet, so there is nothing to reserve against.
-3. **Only entry splits.** An account already in `standard` at the swap keeps one
+2. **A split account has no reservations.** It is refused spot margin
+   (`spot margin is not available in standard mode`) and every reservation
+   (`a split standard account has no reservations`).
+3. **Each wallet funds its own orders, with no cap.** Perp and option orders are
+   admitted against the perp wallet's free collateral. Spot orders are admitted
+   against the spot wallet. A spot order the spot wallet cannot fund is refused:
+   `insufficient spot balance`.
+4. **Only entry splits.** An account already in `standard` at the swap keeps one
    balance until it leaves the mode and enters again. Leaving folds the spot
    wallet back into the pool.
+
+:::caution Not live yet
+Two parts of the rules above ship with the next node release after 0.9.7: the
+refusal of every reservation in rule 2, and the whole of rule 3. The spot-margin
+refusal in rule 2 is live now. Until the release, a live node refuses only a
+nonzero `spot` reservation on a split account
+(`spot has its own wallet in standard mode; no spot reservation`). It still caps
+perp and option orders by the `perp` and `option` reservations, and it accepts an
+unfunded spot order as a no-op.
+:::
+
+**Reading the two wallets.** `account_value` and `withdrawable` on
+[`account_state`](../api/rest/info/account.md#account_state) are the perp wallet.
+The USDC row of `spot.balances` is the spot wallet, and `total − hold` is what a
+new spot order may spend. Add `account_value` and that row's `total` for the
+account total.
 
 ## Moving USDC {#moving-usdc}
 
@@ -231,9 +254,9 @@ use.
 
 | Field | What it is | The rule behind it |
 |-------|-----------|--------------------|
-| `account_value` | Mark-aware **equity**: settled USDC plus unrealised perp PnL, unrealised funding and spot-margin unrealised PnL | This is the figure the liquidation engine judges you on |
-| `spot.balances[0]` (`name: "USDC"`, `signing_id: 100`) | `total` = **settled** USDC plus escrow; `hold` = USDC escrowed behind resting spot bids | `total` deliberately **excludes unrealised PnL**, so it never moves with the mark. `total − hold` is **not** spendable: `hold` is spot escrow only and never holds perp margin, so the subtraction leaves the margin in. Use `withdrawable` |
-| `withdrawable` | What a new order, send, withdrawal or Earn deposit may consume | The [budget above](#which-balance), **clamped at zero** |
+| `account_value` | Mark-aware **equity**: settled USDC plus unrealised perp PnL, unrealised funding and spot-margin unrealised PnL | This is the figure the liquidation engine judges you on. **Split `standard` account:** the perp wallet only |
+| `spot.balances[0]` (`name: "USDC"`, `signing_id: 100`) | `total` = **settled** USDC plus escrow; `hold` = USDC escrowed behind resting spot bids | `total` deliberately **excludes unrealised PnL**, so it never moves with the mark. `total − hold` is **not** spendable: `hold` is spot escrow only and never holds perp margin, so the subtraction leaves the margin in. Use `withdrawable`. **Split `standard` account:** the row is the spot wallet alone, so `total − hold` is what a spot order may spend — see [the standard-mode split](#standard-split) |
+| `withdrawable` | What a new order, send, withdrawal or Earn deposit may consume | The [budget above](#which-balance), **clamped at zero**. **Split `standard` account:** a USDC send and a spot order read the **spot wallet** (`insufficient spot balance`), and so does an Earn deposit (`insufficient balance`). `withdrawable` bounds perp and option orders and withdrawals only — see [the standard-mode split](#standard-split) |
 
 **Why two numbers.** `account_value` and `spot.balances[0].total` both look like "my
 USDC" and differ by unrealised PnL. Use `account_value` for equity and risk; use

@@ -440,8 +440,8 @@ action id stays permanently reserved and is never reused.
 
 ### Set the account's margin mode and per-product reservations {#user_set_abstraction}
 
-Chooses the margin mode, and — in `standard` mode — how much USDC each product may
-encumber.
+Chooses the account mode, and — on a pooled `standard` account — how much USDC
+each product may encumber.
 
 ```json
 {
@@ -452,15 +452,18 @@ encumber.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `kind` | uint8 | `0` sets the mode; `1` perp, `2` spot, `3` option reservation. Any other value is rejected. |
+| `kind` | uint8 | `0` sets the mode; `1` perp, `2` spot, `3` option reservation. Any other value is rejected. Kinds 1–3 apply to a pooled `standard` account only. |
 | `value` | decimal (string or number) | For `kind: 0`, `0` = unified or `1` = standard. For a reservation, whole USDC; `0` removes it. |
 
-**Modes.** `unified` is the default and the behaviour every account has today:
-one collateral pool, any product may draw on all of it. `standard` splits that
-pool by product — collateral one product has committed is not available to
-another.
+**Modes.** `unified` is the default: one USDC balance, and any product may draw
+on all of it. `standard` holds two USDC wallets, a perp wallet and a spot wallet,
+and only [`usd_class_transfer`](./transfers.md#usd_class_transfer) moves USDC
+between them. A `standard` account that entered below block 5,710,001 is
+**pooled** (`split: false` on `account_state`): it keeps one balance, and
+reservations divide it by product.
 
-**A reservation is a CEILING ON ENCUMBRANCE, not on spending.** This is the rule
+**A reservation is a CEILING ON ENCUMBRANCE, not on spending.** Reservations
+exist on a pooled account only. This is the rule
 callers get wrong, so read it before you set one. A reservation caps how much
 USDC a product may have COMMITTED at one time — perp margin, an option writer's
 escrow, a spot-margin borrow. It does not cap what a product may SPEND. An option
@@ -469,24 +472,38 @@ account and something else arrives, so they are bounded by your balance, never b
 a reservation. Only the escrow the option WRITER posts is bounded by the option
 reservation.
 
-**Entering `standard` with no reservations admits nothing.** Every product's
-ceiling starts at zero, so a new standard-mode account can open no position until
-it allocates. That is deliberate and fail-closed.
+**A pooled account admits nothing its reservations do not cover.** An unset
+reservation is zero, and zero admits nothing. That is deliberate and fail-closed.
+
+**A split account has no reservations.** Its perp and option orders are admitted
+against the perp wallet's free collateral, and its spot orders against the spot
+wallet, with no cap. Kinds 1–3 on a split account are refused, whatever the
+value.
+
+:::caution Not live yet
+Uncapped admission and the refusal of kinds 1–3 on a split account ship with the
+next node release after 0.9.7. Until then, a live node refuses only a nonzero
+`kind: 2` on a split account. It caps the perp and option orders of a split
+account by the `perp` and `option` reservations, so a split account with no
+`perp` reservation opens no perp position.
+:::
 
 **A mode change needs a FLAT account.** Every perp leg, spot order, spot-margin
 position, option position, live TWAP, parked trigger and open RFQ must be gone.
 The rejection names the first surface it found. A RESERVATION change needs no
 flat account — but lowering one below what is already committed does not release
-anything, it only stops further commitment. Lowering a reservation is always
-allowed, even when your equity has fallen below the total already reserved.
+anything, it only stops further commitment. On a pooled account, lowering a
+reservation is always allowed, even when your equity has fallen below the total
+already reserved.
 
 **`standard` and `portfolio` are mutually exclusive.** Each refuses the other, in
 both directions.
 
 **The USDC split.** From node 0.9.7 (block 5,710,001), an account that
-ENTERS `standard` also splits its USDC: perp collateral stays in the perp wallet,
-spot USDC moves to its own wallet, and only
-[`usd_class_transfer`](./transfers.md#usd_class_transfer) crosses. An account
+ENTERS `standard` also splits its USDC: all of it stays in the perp wallet, the
+spot wallet starts empty, and only
+[`usd_class_transfer`](./transfers.md#usd_class_transfer) crosses. Entry is refused
+while the perp wallet is below zero. An account
 already in `standard` at the swap is NOT split until it leaves and re-enters.
 Leaving folds the spot wallet back into the pool, and is refused while that
 wallet is below zero. See [the standard-mode split](../../../concepts/usdc.md#standard-split).
@@ -502,7 +519,8 @@ Rejections, all `Precondition` unless noted:
 | `reservations exceed account value` | an INCREASE whose new total exceeds account value |
 | `cannot change abstraction while enrolled in portfolio margin` | PM enrolled |
 | `cannot change abstraction with <surface>` | the account is not flat |
-| `spot has its own wallet in standard mode; no spot reservation` | `kind: 2` on a split `standard` account |
+| `a split standard account has no reservations` | `kind` 1, 2 or 3, any value, on a split `standard` account. **Not live yet:** a live node refuses only a nonzero `kind: 2`, with `spot has its own wallet in standard mode; no spot reservation` |
+| `perp wallet is negative; cannot enter standard mode` | `kind: 0, value: 1` while the perp wallet is below zero |
 | `spot wallet is negative; cannot leave standard mode` | `kind: 0, value: 0` while the split account's spot wallet is below zero |
 
 ---

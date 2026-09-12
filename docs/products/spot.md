@@ -85,11 +85,21 @@ You can never rest or fill more than you can fund. At admission the order size i
   by level against your quote balance — there is no single price to divide by,
 - an **ask**, priced or market, is clamped by the base you actually own.
 
-An order that is entirely unaffordable is an **accepted no-op** — nothing fills,
-nothing rests, no order id is burned. A partially-affordable order trades/rests
-the affordable portion. Because the clamp runs **before** matching, every
-resulting fill and every escrow reservation is funded; there is no post-match
-fill drop.
+An order that is entirely unaffordable is **refused** with
+`insufficient spot balance` — nothing fills, nothing rests, no order id is burned.
+The refusal is about money, not liquidity: a funded order that finds no
+counterparty still answers `filled` with `total_sz: "0"`. One exception stays an
+accepted no-op: a market buy that holds quote, when the pair carries no
+**foreign ask** (an ask from another account). A foreign ask your quote cannot
+buy one lot of is a refusal, not a no-op. A partially-affordable order trades/rests the
+affordable portion. Because the clamp runs **before** matching, every resulting
+fill and every escrow reservation is funded; there is no post-match fill drop.
+
+:::caution Not live yet
+The refusal ships with the next node release after 0.9.7. Until then, a live node
+accepts an entirely unaffordable order as a no-op and answers `filled` with
+`total_sz: "0"`.
+:::
 
 ## Matching, fills, and fees {#matching-fills-and-fees}
 
@@ -214,7 +224,8 @@ pay the counterparty on fill, or come back to your spendable balance on cancel.
 
 **Q: Why did my large buy only partially fill / rest?**
 A: Affordability clamping. The order size is reduced to what your quote balance
-funds at the limit price. An entirely unaffordable order is an accepted no-op.
+funds at the limit price. An entirely unaffordable order is refused
+(`insufficient spot balance`). **Not live yet:** a live node accepts it as a no-op.
 
 **Q: Can I place a spot market order?**
 A: Yes — send `limit_px = 0` with `tif: "ioc"`. `gtc` / `alo` require a positive

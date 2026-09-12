@@ -74,7 +74,7 @@ Its EIP-712 [typed-data](../exchange.md#signing) primary type is
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `ntl` | decimal string | `> 0` | Amount in the **whole-USDC** plane |
-| `to_perp` | bool | | `true` = spot to perp (post collateral); refused when the spot wallet is short (`insufficient spot balance`). `false` = perp to spot, gated on **free collateral**: refused when the perp wallet cannot spare the amount (`insufficient free collateral`) |
+| `to_perp` | bool | | `true` = spot to perp (post collateral); refused when the spot wallet is short (`insufficient spot balance`; **not live yet:** a live node says `insufficient spot USDC balance`). Only USDC that no resting spot order holds can move. `false` = perp to spot, gated on **free collateral**: refused when the perp wallet cannot spare the amount (`insufficient free collateral for class transfer`) |
 
 :::info
 Accepted only by a `standard` account that **entered** the mode at or after the

@@ -62,8 +62,19 @@ balances are conserved exactly.
 a priced buy (`limit_px > 0`) by `quote_balance ÷ limit_px`; a sell by the base
 you own. A market buy (`limit_px = 0`) has no single price to divide by, so it
 is clamped by walking the resting asks level by level against your quote
-balance. An entirely unaffordable order is an accepted no-op (no fill, nothing
-rests).
+balance. An order your balance cannot fund at all is refused with
+`insufficient spot balance`, and no order id is burned. The refusal is about
+money, not liquidity: a funded order that finds no counterparty still answers
+`filled` with `total_sz: "0"`. One exception stays an accepted no-op: a market
+buy that holds quote, when the pair carries no **foreign ask** (an ask from
+another account). A foreign ask your quote cannot buy one lot of is a refusal,
+not a no-op.
+
+:::caution Not live yet
+The refusal ships with the next node release after 0.9.7. Until then, a live node
+accepts an entirely unaffordable order as a no-op and answers `filled` with
+`total_sz: "0"`.
+:::
 
 **Fees & settlement.** A fill swaps base for quote at the **maker's** resting
 price. The taker fee is taken from the leg the taker receives; the maker fee from

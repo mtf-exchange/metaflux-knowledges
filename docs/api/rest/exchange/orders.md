@@ -930,6 +930,12 @@ inactive`). A scale keeps no parent, so rungs already resting are cancelled and
 refunded like any other resting order. See
 [A halted spot pair PAUSES](../../../concepts/order-types.md#synth-on-spot-halt).
 
+:::caution Not live yet
+With the next node release after 0.9.7, a rung the spot wallet cannot fund is refused
+in that rung's own status (`insufficient spot balance`) and the earlier rungs stay.
+Until then a live node accepts the unfunded rung as a no-op.
+:::
+
 ---
 
 ### Cancel a scale ladder {#cancel_scale}
@@ -1071,6 +1077,7 @@ running on the remaining size.
 - Under the caps: at most **5** active chases per account (`chase_cap`) and a global active-chase cap (`chase global cap reached`).
 - The book is deep enough to peg against (`chase book too thin`) and the initial target does not cross the book (`chase target would cross the book`).
 - The initial leg rests (`chase leg did not rest`).
+- On a spot pair, your balance funds the initial leg, else `insufficient spot balance`. **Not live yet:** the refusal ships with the next node release after 0.9.7. Until then an unfunded spot leg answers `chase leg did not rest`.
 
 **Response.** A `chase_order` is an order-type action, so it returns the per-order
 `statuses` array. The success entry is a single-key `chase` object:
