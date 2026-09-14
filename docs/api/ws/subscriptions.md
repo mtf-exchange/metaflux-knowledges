@@ -518,6 +518,9 @@ Field rules for the two new kinds:
 - **One vote closes BOTH legs.** Live from node 0.9.7: one vote closes each leg the account holds, and a hedge account gets **two** `liquidation` records per vote, one per leg. An older node closed only the long leg, so a hedge account kept its short. The vote's `max_size` caps each leg on its own. The action's outcome summary reads `forceClosePosition partial (quorum met): residual stays open` when any leg keeps size; it read `accepted` before. The vote payload does not change.
 - `liquidation.mark_px` is the whole-USDC mark the slice was priced from; the key is ABSENT when the market had no usable mark at the slice.
 - ADL and backstop takeovers settle outside the measured slice and emit no `liquidation` record.
+  **They are not silent, though.** An ADL haircut writes its own `adl_haircut` ledger row, so read
+  that value rather than concluding the deleverage left no record. A Core credit that arrives from
+  the EVM side writes `evm_to_core_credit` the same way. Both reach this channel.
 - **Treat an unknown `kind` as data, not an error.** Show the `amount` and the `time`, and label the cause from the `kind` string. That rule keeps a client working across every later addition too.
 
 ### Trading context for one account and market {#active_asset_data}

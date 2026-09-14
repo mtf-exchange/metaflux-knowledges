@@ -330,7 +330,14 @@ position.
 
 The node pegs the leg one tick inside the touch — a buy chase one tick above the
 best bid, a sell chase one tick below the best ask — and re-prices it at most once
-per `interval_blocks` committed blocks. Each reprice cancels the old leg and places
+per `interval_blocks` committed blocks.
+
+**That touch is not the raw book.** It skips every resting order the engine would
+refuse to fill for you: your own orders, and any order in your
+[self-trade-prevention group](#stp-groups). So a chase pegs to the best price it
+can actually trade against, which may sit behind the best price you see in
+`l2_book`. Without that rule a chase would track its own group's quote and walk
+the price against itself. Each reprice cancels the old leg and places
 a new leg at the fresh price under the **same re-stamped `cloid`**, so correlate the
 leg across reprices by `cloid`, not by its `oid`.
 

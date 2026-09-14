@@ -100,7 +100,7 @@ by `limit_px`, open for maker quotes until `expiry_ms`.
 | `size` | uint64 | `> 0` | Requested size, on the series' `10^sz_decimals` plane (widened to `u128`) |
 | `limit_px` | uint64 \| null | — | Optional taker limit price, 1e8 plane; `null` / omitted = none |
 | `expiry_ms` | uint64 | — | Session expiry timestamp (consensus ms) |
-| `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
+| `stp_group` | uint64 \| null | — | **IGNORED.** The chain resolves your self-trade group from committed state; a value sent here has no effect. The field stays on the wire because it is inside the signed digest, so keep signing exactly what you sign today. See [self-trade prevention](../../../concepts/order-types.md#stp-groups) |
 
 Typed-data primary type (`owner` absent / present):
 
@@ -163,7 +163,7 @@ maker will fill, valid until `valid_until_ms`.
 | `price` | uint64 | `> 0` | Quoted **premium per whole unit**, 1e8 plane (widened to `i128`) |
 | `max_size` | uint64 | `> 0` | Maximum size the maker will fill, on the series' `10^sz_decimals` plane (widened to `u128`) |
 | `valid_until_ms` | uint64 | — | Quote validity deadline (consensus ms) |
-| `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
+| `stp_group` | uint64 \| null | — | **IGNORED.** The chain resolves your self-trade group from committed state; a value sent here has no effect. The field stays on the wire because it is inside the signed digest, so keep signing exactly what you sign today. See [self-trade prevention](../../../concepts/order-types.md#stp-groups) |
 
 Typed-data primary type (`owner` absent / present):
 

@@ -139,14 +139,11 @@ Updates are **change-driven**: after each commit the node publishes a frame for 
 
 ### `post` (request/response over WS) {#post-requestresponse-over-ws}
 
-:::warning
-**Not available on the public endpoint yet.** `post` is implemented on the validator's own WebSocket,
-but the public endpoint is served by the gateway, and the gateway does not carry `post` today. A
-`post` frame sent to the public endpoint gets no response.
+The gateway carries `post`, so the public endpoint answers it. You can place and cancel orders over
+the socket instead of opening a separate [`POST /exchange`](../rest/exchange.md) request per action.
 
-Until that lands, place and cancel orders over [`POST /exchange`](../rest/exchange.md) and take your
-market data from the subscription channels on this page. Track it as the WS write lane.
-:::
+A rejected `post` answers with `error`, carrying the same `{code, message}` object the REST envelope
+uses. It does **not** answer `accepted: false`.
 
 A `post` lets you issue a one-shot request/response call over the same socket instead of opening a REST connection. The `request` body is the same `{type, payload}` envelope the REST routes accept and is dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature verification on actions included. The shapes below are what the validator serves, and what the gateway will serve when the lane opens.
 
