@@ -215,9 +215,28 @@ reads. A revoke removes it. A revoke is accepted even for a key that is not in
 the Metaliquidity set, so a leader can always withdraw authority from a key that
 governance has since dropped.
 
+**One operator per vault, one vault per operator.** A grant is rejected with
+`vault already has a metaliquidity operator` when the vault already holds a
+different operator, and with `operator already runs another metaliquidity vault`
+when the key is registered on another Metaliquidity vault. Re-granting the
+**same** operator is always accepted, so a leader can extend an expiry without a
+revoke first. Revoke to move a key.
+
+The binding is one-to-one because it decides one
+[self-trade-prevention group](../../../concepts/order-types.md#stp-groups): from
+the grant, the vault and the operator count as one party, and the book refuses a
+match between them. The `stp_mode` on those orders is forced to
+`"cancel_oldest"`.
+
+**Governance removal withdraws the authority.** When a vote drops the operator
+from the Metaliquidity set, the chain also removes the agent approval this action
+wrote. The key stops signing as the vault at that moment — the leader does not
+have to revoke it.
+
 **Gating.** Rejected if the vault does not exist, if it is not a Metaliquidity
 vault, if the signer is not the vault leader, if `operator` is the zero address,
-or — on a grant only — if `operator` is not in the Metaliquidity set.
+or — on a grant only — if `operator` is not in the Metaliquidity set, if the
+vault already has a different operator, or if the key runs another vault.
 
 **Signing.** `expires_at_ms` is **always** part of the digest. Omitting it signs
 as `0`; encode `expiresAtMs = 0` in the typed struct when you leave it out. See

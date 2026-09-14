@@ -92,6 +92,31 @@ STP runs at the match step, so it applies across side, price, and time. STP
 groups orders by the account that owns them. Orders an agent places for a master
 count as that master's orders.
 
+### Accounts that share one group {#stp-groups}
+
+Two separate accounts can count as one party:
+
+| The pair | When they share a group |
+|---|---|
+| A master and its sub-account | The sub was created with `shared_stp_group: true`. See [sub-accounts](./sub-accounts.md). |
+| A Metaliquidity vault and its operator | Always, from the moment the vault's leader registers the operator with [`register_metaliquidity_operator`](../api/rest/exchange/vaults.md#register_metaliquidity_operator). |
+
+The operator quotes for the vault and can also trade its own account. Those are
+two addresses, so the book would otherwise match one against the other. The
+shared group refuses that match.
+
+On an order from either side of a Metaliquidity pair the node **forces**
+`stp_mode` to `"cancel_oldest"`. The value you sign is ignored on those orders.
+The resting order is retired and your taker keeps walking the book, so a
+protective close still fills against other makers.
+
+A sub-account of a Metaliquidity operator shares the operator's group.
+`shared_stp_group` does not switch that off — it applies to a master's own
+orders, not to this pair.
+
+Approving an operator as your agent with `approve_agent` does **not** put you in
+its group. Only the vault's own registration does.
+
 ## Triggers {#triggers}
 
 A **trigger order** is a reduce-only protective leg that parks off the book and
