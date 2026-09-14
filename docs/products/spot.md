@@ -85,13 +85,24 @@ You can never rest or fill more than you can fund. At admission the order size i
   by level against your quote balance — there is no single price to divide by,
 - an **ask**, priced or market, is clamped by the base you actually own.
 
+**The market-bid walk counts only asks the engine will actually fill.** It skips
+your own asks and every ask in your
+[self-trade-prevention group](../concepts/order-types.md#stp-groups) — a shared
+sub-account, or the other side of a Metaliquidity vault/operator pair. The engine
+refuses to fill those, so counting them would price your budget against
+liquidity you cannot buy, and the order would then walk deeper than the budget
+allows.
+
 An order that is entirely unaffordable is **refused** with
 `insufficient spot balance` — nothing fills, nothing rests, no order id is burned.
 The refusal is about money, not liquidity: a funded order that finds no
 counterparty still answers `filled` with `total_sz: "0"`. One exception stays an
-accepted no-op: a market buy that holds quote, when the pair carries no
-**foreign ask** (an ask from another account). A foreign ask your quote cannot
-buy one lot of is a refusal, not a no-op. A partially-affordable order trades/rests the
+accepted no-op: a market buy that holds quote, when the pair carries no ask the
+engine would fill for you — every ask is your own or a group peer. You have the
+money, so this is not a balance error. That no-op burns no order id and emits no
+STP cancellations, so the peers' orders stay on the book and their escrow stays
+reserved. An ask the engine WOULD fill, that your quote cannot buy one lot of, is
+a refusal, not a no-op. A partially-affordable order trades/rests the
 affordable portion. Because the clamp runs **before** matching, every resulting
 fill and every escrow reservation is funded; there is no post-match fill drop.
 
