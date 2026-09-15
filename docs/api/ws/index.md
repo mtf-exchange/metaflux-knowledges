@@ -139,13 +139,13 @@ Updates are **change-driven**: after each commit the node publishes a frame for 
 
 ### `post` (request/response over WS) {#post-requestresponse-over-ws}
 
-The gateway carries `post`, so the public endpoint answers it. You can place and cancel orders over
-the socket instead of opening a separate [`POST /exchange`](../rest/exchange.md) request per action.
+A `post` is a one-shot request/response call over the same socket, instead of a separate
+[`POST /exchange`](../rest/exchange.md) connection per action. **The gateway carries it, so the
+public endpoint answers it today** — you can place and cancel orders over the socket.
 
-A rejected `post` answers with `error`, carrying the same `{code, message}` object the REST envelope
-uses. It does **not** answer `accepted: false`.
-
-A `post` lets you issue a one-shot request/response call over the same socket instead of opening a REST connection. The `request` body is the same `{type, payload}` envelope the REST routes accept and is dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature verification on actions included. The shapes below are what the validator serves, and what the gateway will serve when the lane opens.
+The `request` body is the same `{type, payload}` envelope the REST routes accept, and it is
+dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature
+verification on actions included. The validator and the gateway serve the same shapes.
 
 Request:
 
@@ -177,7 +177,11 @@ Response (correlate on `id`):
 { "channel": "post", "data": { "id": 42, "response": { "type": "error", "payload": "<message>" } } }
 ```
 
-A failed-but-well-formed action (e.g. bad signature) comes back as a normal `action` response with `payload.accepted: false` and an `error` string, not an `error`-type response.
+A well-formed action the node REFUSES is **not** an `error`-type response. It comes back as a normal
+`action` response, and its `payload` is the REST
+[rejection envelope](../rest/exchange.md#rejection-envelope) — `{"error": {"code": …, "message": …}}`.
+A bad signature reads `AUTH_BAD_SIGNATURE` there. There is **no** `accepted` field, on this lane or
+on REST: the presence of `error` is the refusal.
 
 ## WebSocket compression (zstd) {#websocket-compression-zstd}
 

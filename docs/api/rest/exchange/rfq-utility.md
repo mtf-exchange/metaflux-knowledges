@@ -317,7 +317,7 @@ clears at the batch's uniform price on the next settle boundary.
 | `side` | enum | `"Bid"` / `"Ask"` | Order side |
 | `size` | uint64 | `> 0` | Order size, fixed-point size plane (widened to `u128`) |
 | `price` | uint64 | `> 0` | Order price, 1e8 plane (widened to `i128`) |
-| `stp_group` | uint64 \| null | — | Optional self-trade-prevention group |
+| `stp_group` | uint64 \| null | — | **IGNORED.** A value sent here has no effect. Self-trade prevention that asks the restrained party to describe itself restrains nobody, so a caller-declared group is never trusted — the chain resolves your self-trade group from committed state at the moment the order parks, and stores that. The field stays on the wire because it is inside the signed digest, so keep signing exactly what you sign today. `fba_batch_state` does **not** echo it back. The batch auction DOES apply self-trade prevention: see [self-trade prevention in a batch](../../../concepts/fba.md#fba-stp). See [self-trade prevention](../../../concepts/order-types.md#stp-groups) |
 
 Typed-data primary type:
 

@@ -212,7 +212,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
     "ask_count":   6,
     "bid_size":    "10",
     "ask_size":    "9",
-    "orders":      [ /* {oid, owner, side, price, sz, stp_group, submitted_at} */ ],
+    "orders":      [ /* {oid, owner, side, price, sz, submitted_at} */ ],
     "indicative":  { "clearing_px": "100.5", "matched_size": "8" }
   }
 }
@@ -221,6 +221,38 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 Prices and sizes are **human decimal strings**, tick- and lot-normalized — this is a read, not the raw order-submission plane. `next_settle` is **derived** as `last_settle + period_ms`. The `indicative` block is the volume-maximising uniform price + matched size the **next** batch *would* clear given the current window — computed read-only, not yet settled — and is `null` when there is no cross (one-sided or empty window). This is what p\* would be if the batch closed now, useful for traders deciding whether to add to the batch.
 
 Timestamp keys carry no `_ms` suffix; only a key naming a DURATION keeps it, which is why `period_ms` does and `last_settle` does not. Full rows on the `fba_batch_state` read above.
+
+Orders carry no `stp_group`. The chain resolves a self-trade group from committed
+state, so publishing it would tell every reader which vault an address operates.
+
+`indicative` is computed on the window **after** self-trade prevention, the same
+filter the auction runs, so the price you read is the price settlement uses.
+`orders` is the raw parked window and is **not** filtered: a later arrival can
+still change which orders the filter drops.
+
+## Self-trade prevention {#fba-stp}
+
+A batch auction applies self-trade prevention before it clears.
+
+Two parked orders are one party when they share an account, or when they share a
+self-trade group. The chain resolves the group; the `stp_group` you send is
+ignored. A metaliquidity vault and the operator that runs it are one party.
+
+The rule is `CancelNewest`, applied across the whole window. If two orders of one
+party sit on opposite sides and they **cross** — the bid price is at or above the
+ask price — the NEWER order is dropped from that batch. The older order stays. A
+dropped order drops nothing after it.
+
+Two quotes that do not cross both stay. A party can quote a bid at 99 and an ask
+at 101 in the same batch, because no clearing price fills both.
+
+A dropped order is not cancelled and it is not held: it leaves the batch with
+every other unfilled order, and nothing carries to the next window.
+
+The party is judged on BOTH the group stored when the order parked and the group
+committed state resolves at settlement. That is deliberate: a binding created
+inside the window is caught by the resolved value, and a binding REVOKED inside
+the window is caught by the stored one. Neither direction opens a self-cross.
 
 ## See also {#see-also}
 

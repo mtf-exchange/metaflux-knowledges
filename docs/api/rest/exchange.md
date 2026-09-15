@@ -876,19 +876,18 @@ rejection.
 Match on `code`. The `message` column shows a representative sentence only — it
 is prose and it can change.
 
+**This is the WHOLE admission taxonomy.** Admission checks the request shape, the
+signature, the agent approval, the nonce and the `cloid` — nothing else. So a
+`400` carries one of the four codes below, or one of the
+[`AUTH_*` codes](#401-unauthorized--signature--authorization-failed). Every
+order-body, collateral and market rule runs at COMMIT and answers a
+[`200`](#commit-time-codes) instead.
+
 | `error.code` | Cause | Remediation |
 |--------------|-------|-------------|
 | `INVALID_REQUEST` | A field is missing, mis-sized or unparseable — a signature that is not 130 hex chars, an `owner` that is not 40 hex chars, an `action` that fails to parse, an empty `orders` / `cancels` array, a number above `2^128 - 1` | Fix the field the `message` names. Do not retry the same bytes |
 | `ACTION_UNSUPPORTED` | The action variant is recognised but not bridged on `/exchange`, or a field selects a behaviour with no core equivalent — `tif: "aon"`, `stp_mode: "reject"`, a `stop_loss` / `take_profit` with no `trigger` block | See the [non-bridged table](./exchange/transfers.md#non-bridged-actions) and use a supported value |
 | `ORDER_DUPLICATE_CLOID` | `submit_order` reused a client order id on the same account | Use a fresh `cloid`. Check first whether the earlier submission rested |
-| `ORDER_INVALID_PRICE` | `px` is off the tick grid. Carries `details` | Round to a multiple of `details.limit` |
-| `ORDER_INVALID_SIZE` | `size` is off the lot grid. Carries `details` | Round to a multiple of `details.limit` |
-| `ORDER_ZERO_SIZE` | Size is zero or negative | Send a positive size |
-| `ORDER_BELOW_MIN_NOTIONAL` | Price × size is under the market minimum | Increase the size |
-| `MARGIN_INSUFFICIENT` | The account cannot fund the requirement. Carries `details` | `details.limit` is free collateral, `details.actual` is what is needed |
-| `MARKET_INACTIVE` | The market is disabled, closed or reduce-only. A perp that a delist halted or settled, or that governance paused, answers `PRECONDITION_FAILED` instead | Send a closing order, or wait |
-| `MARKET_OI_CAP` | Open interest is at the market cap | Nothing in the request is wrong. Wait, or trade elsewhere |
-| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer, withdrawal or spot order. **Not live yet** for a spot order: a live node accepts an unfunded spot order as a no-op | Check the free balance; a held balance is not spendable |
 | `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |
 
 Four `PRECONDITION_FAILED` cases are worth naming, because the fix is not
@@ -915,6 +914,44 @@ obvious from the sentence:
   so handle this on every write rather than only at startup. The public endpoint
   is `api.testnet.mtf.exchange`; an aggregator you run yourself can point at a
   node that does not serve writes.
+
+### Commit-time codes — carried by a `200`, never a `400` {#commit-time-codes}
+
+The codes below name an order-body, collateral or market rule. **None of them is
+an admission rejection.** The rule needs block-execution context — the live book,
+the account after the fills that landed first, the market's open interest at that
+moment — so the chain cannot answer it at admission. The verdict comes back on a
+**`200`**, and where you read it depends on the action class:
+
+| Action class | Where the code appears |
+|---|---|
+| **Order-type** — [`submit_order`](./exchange/orders.md#submit_order), [`batch_order`](./exchange/orders.md#batch_order), [`spot_order`](./exchange/spot.md#spot_order), [`scale_order`](./exchange/orders.md#scale_order), [`chase_order`](./exchange/orders.md#chase_order) | `200 OK`, in that leg's `error` entry inside [`statuses`](#per-order-statuses). The envelope itself is a **success** — walk the array |
+| **Every other action** | `200 OK` whose whole body is the [rejection envelope](#rejection-envelope). A `202` means the wait expired, not that the action failed |
+
+| `error.code` | Cause | Remediation |
+|--------------|-------|-------------|
+| `ORDER_INVALID_PRICE` | `px` is off the tick grid. Carries `details` | Round to a multiple of `details.limit` |
+| `ORDER_INVALID_SIZE` | `size` is off the lot grid. Carries `details` | Round to a multiple of `details.limit` |
+| `ORDER_ZERO_SIZE` | Size is zero or negative | Send a positive size |
+| `ORDER_BELOW_MIN_NOTIONAL` | Price × size is under the market minimum | Increase the size |
+| `ORDER_SELF_TRADE` | The two sides of an [`rfq_accept`](./exchange/rfq-utility.md#rfq_accept) are one party. **This is the RFQ lane only** — on the order book, [self-trade prevention](../../concepts/order-types.md#stp-groups) CANCELS an order and never mints this code | Quote or accept from an account outside the taker's STP group |
+| `MARGIN_INSUFFICIENT` | The account cannot fund the requirement. Carries `details` | `details.limit` is free collateral, `details.actual` is what is needed |
+| `MARKET_INACTIVE` | The market is disabled, closed or reduce-only. A perp that a delist halted or settled, or that governance paused, answers `PRECONDITION_FAILED` instead | Send a closing order, or wait |
+| `MARKET_OI_CAP` | Open interest is at the market cap | Nothing in the request is wrong. Wait, or trade elsewhere |
+| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer, withdrawal or spot order. **Not live yet** for a spot order: a live node accepts an unfunded spot order as a no-op | Check the free balance; a held balance is not spendable |
+
+`PRECONDITION_FAILED` reaches you from **both** points: admission mints it for
+the shape rules above, and the commit mints it for every state rule that has no
+code of its own. Read the status to tell them apart — a `400` refused the
+request, a `200` refused the effect.
+
+:::danger
+**Do not treat any code in this table as "the request was malformed".** The
+request was well formed, it was admitted, and it burned its nonce. Resending the
+identical bytes never re-runs the action — see
+[a replayed nonce](#nonce-replayed). Fix the cause, then re-sign with a fresh
+nonce.
+:::
 
 ### `401 Unauthorized` — signature / authorization failed {#401-unauthorized--signature--authorization-failed}
 

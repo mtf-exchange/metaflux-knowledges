@@ -105,6 +105,12 @@ plus `message` when it is not.
 Codes are namespaced by prefix. One code always answers with one status, with
 the single documented exception on `UNKNOWN_TYPE`.
 
+**The `HTTP` column is the status the code carries when ADMISSION mints it.** On
+`/exchange` most `ORDER_*`, `MARGIN_*`, `MARKET_*` and `ASSET_*` rules run at
+commit instead, and a commit verdict rides back on a `200` — see
+[commit-time codes](./rest/exchange.md#commit-time-codes) for which codes those
+are and where to read them.
+
 ### `ORDER_*` — the order body {#order}
 
 | `code` | HTTP | `details` | Cause and caller action |
@@ -114,7 +120,7 @@ the single documented exception on `UNKNOWN_TYPE`.
 | `ORDER_INVALID_PRICE` | 400 | ✅ | The price is off the tick grid. Round to a multiple of `details.limit` and resend |
 | `ORDER_INVALID_SIZE` | 400 | ✅ | The size is off the lot grid. Round to a multiple of `details.limit` and resend |
 | `ORDER_BELOW_MIN_NOTIONAL` | 400 | — | Price × size is under the market minimum. Increase the size |
-| `ORDER_SELF_TRADE` | 400 | — | Self-trade prevention cancelled the order rather than let it match your own resting order. Move the price, or change `stp_mode` |
+| `ORDER_SELF_TRADE` | 400 | — | The two sides of an [`rfq_accept`](./rest/exchange/rfq-utility.md#rfq_accept) are one party. **RFQ lane only** — on the order book, [self-trade prevention](../concepts/order-types.md#stp-groups) CANCELS an order and never mints this code. Quote or accept from an account outside the taker's STP group |
 | `ORDER_DUPLICATE_CLOID` | 400 | — | The `cloid` is already in use on this account, or two legs of one action share it. Use a fresh one. **Do not** treat this as a failure to place — check whether the first submission rested. An attempt the COMMIT refused gives its `cloid` back, so a re-signed retry may reuse that handle (**not live yet**) |
 
 ### `MARGIN_*` — collateral {#margin}
