@@ -249,6 +249,23 @@ governance listing vote gives that market a precision. Several live perps read
 `step_size` by orders of magnitude. A client that cached `sz_decimals` then sizes
 every order on that market wrong. Re-read it from `markets_meta` rather than
 storing it.
+
+**What a raise does, and what it does not do.** The vote can only RAISE a
+precision; a decrease is refused. It multiplies every stored lot count on that
+market by `10^Δ` — positions, resting orders, triggers, TWAP parents, open
+interest and the OI cap. So **no real quantity moves**: your position is the same
+number of coins, at the same entry price, with the same PnL and the same margin.
+Only the integer that expresses it gets bigger, because each lot got smaller.
+
+**An order signed before the raise executes `10^Δ` SMALLER.** An order carries a
+raw lot count, and you encode that from `sz_decimals`. A raise does not reach an
+order that is already signed and in flight. On a raise from `0` to `5`, an order
+that meant 2 whole coins lands as 2 lots = `0.00002` coins. The direction is
+always smaller, so you cannot overspend — but a market maker that does not
+re-read keeps quoting `10^Δ` thin.
+
+**Re-read `markets_meta` when a listing vote enacts.** That is the only thing you
+have to do.
 :::
 
 ## Order & position limits {#order--position-limits}

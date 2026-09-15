@@ -233,12 +233,27 @@ for the same split on the API surface.
 | Plane | On the wire | Convert to human units |
 |-------|-------------|------------------------|
 | **Raw price** (1e8 fixed-point) | Integer string, e.g. `"6250000000000"` | Divide by `100000000` → `62500.00` USDC |
-| **Raw size** (lots) | Integer string, e.g. `"50000"` | Divide by `10^sz_decimals` of that market → `0.5` whole units |
+| **Raw size** (lots) | Integer string, e.g. `"50000"` | Divide by the row's own `sz_decimals` → `0.5` whole units |
 | **Whole units** | Decimal string, e.g. `"-25.5"` | Already human. Parse as an arbitrary-precision decimal, never as a float |
 
-`sz_decimals` is the market's size precision. Read it from the `/info` `markets`
-read. It is at most `6`. See
+`sz_decimals` is the market's size precision. It is at most `6`. See
 [contract specifications](../concepts/contract-specifications.md).
+
+:::warning
+**Divide by the plane the ROW states, never by the market's current precision.**
+
+`node_fills`, `node_trades` and `node_order_statuses` each carry a `sz_decimals`
+field. It is the plane that row was written on.
+
+A market's precision can rise by a governance vote. The vote multiplies every
+stored lot count, so the real quantities do not move — but a row written before
+the vote keeps the smaller lot count AND the older plane. A reader that divides
+every row by the market's current precision reports each of those older rows
+`10^Δ` too small.
+
+Rows written before this field shipped carry no `sz_decimals`. Fall back to the
+market's current precision for those only.
+:::
 
 Which plane a stream uses:
 
@@ -347,6 +362,7 @@ One fill record, taker leg:
 | `market` | uint32 | id | Canonical asset id of the market. The same numeric key the API accepts as `coin` |
 | `px` | u128 string | raw price | Execution price |
 | `sz` | u128 string | raw size | Executed size, always positive |
+| `sz_decimals` | uint8 | — | The size plane `sz` and `startPosition` ride. Divide by `10^sz_decimals`. This is the plane the print was MATCHED on, which is not always the market's current one |
 | `side` | string | — | Side of **this** party: `"B"` buy, `"A"` sell |
 | `oid` | uint64 | id | This party's order id |
 | `cloid` | string \| absent | — | Client order id, `0x` plus 32 hex digits. Present on the taker leg only, and only when the order carried one |
@@ -414,6 +430,7 @@ The public trade tape. One record per match, not per party. This stream carries
 | `market` | uint32 | id | Canonical asset id |
 | `px` | u128 string | raw price | Print price |
 | `sz` | u128 string | raw size | Print size |
+| `sz_decimals` | uint8 | — | The size plane `sz` rides — see [`node_fills`](#node_fills) |
 | `side` | string | — | **Aggressor** side: `"B"` the taker bought, `"A"` the taker sold |
 | `tid` | uint64 | id | Print id. Matches the `tid` on both `node_fills` records of this print |
 | `taker_oid` | uint64 | id | Aggressing order id |
@@ -468,6 +485,7 @@ One record per order-status transition, keyed by the order owner.
 | `limit_px` | i128 string | raw price | Limit price of the order. Always present |
 | `sz` | u128 string | raw size | On `filled`, the **filled** size. On `resting`, `error` and `noop`, the request size |
 | `orig_sz` | u128 string | raw size | Request size at placement. **`"0"` on a maker execution record** |
+| `sz_decimals` | uint8 | — | The size plane `sz`, `orig_sz` and `total_sz` ride — see [`node_fills`](#node_fills) |
 | `tif` | string \| absent | — | Time in force: `"Gtc"`, `"Ioc"`, `"Alo"`. **Absent on a maker execution record** |
 | `reduce_only` | bool | — | Reduce-only flag of the order. **`false` on a maker execution record, whatever the order carried** |
 | `avg_px` | i128 string \| absent | raw price | Average fill price. Present on `filled` only |
