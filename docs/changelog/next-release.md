@@ -1,5 +1,5 @@
 ---
-description: What moves on the public wire at the next release — a new vault_modify signing type, a parked per-order status, a replayed-nonce verdict, per-leg cloid dedup, two order_status answers that stop reading unknown, and refusals that replace three silent accepts.
+description: What moves on the public wire at the next release — every raw-size row states its own size plane, a new vault_modify signing type, a parked per-order status, a replayed-nonce verdict, per-leg cloid dedup, two order_status answers that stop reading unknown, and refusals that replace three silent accepts.
 ---
 
 # Next release — not live yet
@@ -15,6 +15,41 @@ client, not to explain what you see today.
 `{"type":"account_state","address":"0x…"}` carries the live `height` if you need
 to check where the chain is.
 :::
+
+## Every raw-size row states its own size plane {#size-plane}
+
+`node_fills`, `node_trades` and `node_order_statuses` each gain a `sz_decimals`
+field. It is the plane THAT ROW was written on, and it is what you divide the
+row's raw size by.
+
+Archive candles gain the same field, and the `candle` read normalizes a bar by
+the plane the bar states rather than by the market's current one.
+
+**Why it matters, and why it is not cosmetic.** A market's size precision can
+RISE by a governance vote. The vote multiplies every stored lot count, so no
+real quantity moves — but a row written before the vote keeps the smaller lot
+count. A reader that divides every row by the market's CURRENT precision reports
+each of those older rows `10^Δ` too small. That error is silent: the numbers
+stay well-formed and understate.
+
+**Before the swap** these fields are absent. A row with no `sz_decimals` means
+"not recorded" — fall back to the market's current precision, which is exact
+only while no raise has happened since that row was written. No raise has
+enacted yet, so the fallback is exact today.
+
+**Checklist**
+
+1. Read `sz_decimals` per ROW; treat an absent value as the market's current
+   precision, and only that.
+2. Stop caching a market's precision across a read. It is per-row now.
+3. A perp's precision NEVER comes from a spot token, even where the names match.
+   Read it from the market.
+
+Two ceilings also change unit, with no change to their stored values:
+`per_market_limits.max_oi` and `max_oi_per_second` are documented as WHOLE UNITS
+of the base asset, not raw lots. They are one pair of numbers for every perp, and
+a lot means a different real quantity on each market, so a shared lot count could
+not state one real limit.
 
 ## Breaking: `vault_modify` signs a new type {#vault_modify}
 

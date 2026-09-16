@@ -242,6 +242,11 @@ for the same split on the API surface.
 :::warning
 **Divide by the plane the ROW states, never by the market's current precision.**
 
+**NOT LIVE YET.** The `sz_decimals` field ships with the next node release — see
+[next release](../changelog/next-release.md#size-plane). A node running today
+writes none of these rows with it, so every row reads as "not recorded" and the
+fallback below is the whole rule until the swap.
+
 `node_fills`, `node_trades` and `node_order_statuses` each carry a `sz_decimals`
 field. It is the plane that row was written on.
 
