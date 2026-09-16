@@ -1,5 +1,5 @@
 ---
-description: What moves on the public wire at the next release — every raw-size row states its own size plane, a new vault_modify signing type, a parked per-order status, a replayed-nonce verdict, per-leg cloid dedup, two order_status answers that stop reading unknown, and refusals that replace three silent accepts.
+description: What moves on the public wire at the next release — every raw-size row states its own size plane, four relocated reads, stricter faucet rules, a new vault_modify signing type, a parked per-order status, a replayed-nonce verdict, per-leg cloid dedup, two order_status answers that stop reading unknown, and refusals that replace three silent accepts.
 ---
 
 # Next release — not live yet
@@ -50,6 +50,36 @@ Two ceilings also change unit, with no change to their stored values:
 of the base asset, not raw lots. They are one pair of numbers for every perp, and
 a lot means a different real quantity on each market, so a shared lot count could
 not state one real limit.
+
+## Four relocated reads answer 410 instead of 400 {#relocated-reads}
+
+`spot_meta`, `all_mids`, `active_asset_ctx` and `user_events` answer a bare `400`
+`UNKNOWN_TYPE` today, even though this reference names a replacement for each. They
+join the `410` set and carry `details.use`, naming the read to call instead.
+
+Nothing that works today stops working: a `400` and a `410` both mean "do not call
+this name". Branch on `error.code` rather than on the status, and a client is correct
+on both sides of the swap.
+
+## The faucet gives one claim per address, ever, and one grant per IP per day {#faucet-rules}
+
+Two rules change together.
+
+**Once ever becomes a claim COUNT, not a value cap.** The committed row accumulates
+toward 3000 USDC / 10 MTF today, so it bounds a lifetime VALUE: an address that asked
+for less kept the remainder and could come back. After the swap the row records that
+the address has claimed. **Asking for less than the full grant spends the slot**, and
+the handler answers `429` before it queues rather than after.
+
+**The per-IP window goes from one MINUTE to one DAY** (86400 s, configurable). It is
+node-local and resets on restart, before and after — a speed bump, not an anti-sybil
+control.
+
+**Checklist**
+
+1. Ask for the FULL grant. There is no second call for the remainder.
+2. Treat `429 address already funded` as final for that address.
+3. Expect one grant per source IP per day, not per minute.
 
 ## Breaking: `vault_modify` signs a new type {#vault_modify}
 
