@@ -245,8 +245,8 @@ can move any of them, so confirm the current value through
 | `max_leverage` | Highest leverage a deployed market may set. Protocol cap is 50 |
 | `max_taker_fee_dbps` | Highest taker fee, in **deci-bps**. Default `500`, i.e. 50 bps |
 | `mip3_fee_ceiling_bps` | Governance fee ceiling, in **bps** |
-| `max_oi` | Highest open interest the market may carry |
-| `max_oi_per_second` | Highest open-interest increase admitted per one-second window |
+| `max_oi` | Highest open interest a market may carry, in **whole units** of the base asset |
+| `max_oi_per_second` | Highest open-interest increase admitted per one-second window, in **whole units** of the base asset |
 | `mip3_max_deploys_per_epoch` | New registrations allowed per **deploy epoch** — a fixed window of 100,000 committed rounds, about 3 hours at the current cadence. Not the staking epoch. `0` means uncapped |
 
 :::warning
@@ -258,6 +258,11 @@ closes the whole lane. Never read a `0` cap as "deployment is closed".
 
 `mip3_fee_ceiling_bps` and `mip3_max_deploys_per_epoch` **both bind admission today**.
 :::
+
+**Unit trap.** `max_oi` and `max_oi_per_second` are in whole units, not in lots.
+Both are single values that apply to every market, and a lot means a different real
+quantity on each one, so a shared lot count could not state a single real limit. The
+chain converts each value into a market's own size plane before it applies it.
 
 **Unit trap.** `mip3_fee_ceiling_bps` is in basis points; the fee fields on the
 wire are in **deci-bps**, tenths of a basis point. The two differ by a factor of

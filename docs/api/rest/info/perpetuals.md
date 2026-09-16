@@ -1059,10 +1059,21 @@ No parameters.
 | `limits.auction_duration_blocks` | uint64 | Gas-auction window length, in blocks |
 | `limits.deployer_fee_cap_bps` | string | Ceiling on the per-market deployer fee share, a decimal string of whole basis points |
 | `limits.dutch_start_multiplier` | Decimal string | Dutch-auction start-price multiplier over the minimum bid |
-| `limits.per_market_limits.max_oi` | u128 string | Per-market open-interest cap, size base units |
+| `limits.per_market_limits.max_oi` | u128 string | Open-interest cap, in **whole units** of the base asset |
 | `limits.per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |
 | `limits.per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](./fees-credit.md#fee_schedule)) |
-| `limits.per_market_limits.max_oi_per_second` | u128 string | Per-market open-interest growth-rate cap, size base units per second |
+| `limits.per_market_limits.max_oi_per_second` | u128 string | Open-interest growth-rate cap, in **whole units** of the base asset per second |
+
+**`per_market_limits` is GLOBAL, and it is in whole units.** The name says
+per-market; the values are one pair of numbers that applies to every perp. That is
+why they are not order sizes. An order size is an integer count of lots, and one lot
+is a different real quantity on each market, because each market sets its own
+`sz_decimals`. One shared lot count would therefore mean a thousand times more real
+size on a market with three size decimals than on one with none. These two limits are
+stated in whole units instead, and the chain converts each one into a market's own
+size plane at the point it applies it. Read `sz_decimals` from
+[`meta`](./perpetuals.md) to convert a position or an order size; do not apply it to
+these two fields.
 
 **`name` is the join key; `index` is not.** `clearinghouse_state` keys its
 position buckets by `name`, so `name` is the one field that joins an account's
