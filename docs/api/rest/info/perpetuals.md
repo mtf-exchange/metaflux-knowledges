@@ -681,9 +681,15 @@ below. The `trade` series carries its own volume, from the same bucket.
 
 #### `v`, `q` and `n` can be ABSENT, and absent is not `"0"` {#candle_snapshot-volume}
 
-A bar folded from the live price and trade streams carries all three keys. A bar
-served from durable history may **omit** them, because the durable store holds
-no volume for that bucket.
+A bar folded from the live price and trade streams carries all three keys.
+
+For a **`trade`** bar, durable history carries its own volume, so `v`, `q` and
+`n` are served for the whole range the durable store covers — not only for the
+recent window the live fold holds. Deep history and volume come together.
+
+For a **`mark`** or **`oracle`** bar, the volume is JOINED from the trade bucket
+of the same open. A durable bar outside that join **omits** all three keys,
+because nothing measured that bucket.
 
 **The two answers mean opposite things:**
 
