@@ -1,15 +1,25 @@
 # Bridge
 
 :::danger
-**NOT LIVE on the current testnet.** The current testnet chain started on 2026-09-01, and the
-bridge is not brought up on it yet. The contracts below are deployed, but no validator watches
-them. A deposit sent today stays in custody and is NOT credited to an account. A withdrawal cannot
-be relayed. Do not deposit or withdraw until this notice is gone.
+**BRING-UP IS NOT COMPLETE. Do not deposit or withdraw until this notice is gone.**
+
+The current testnet chain started on 2026-09-01. Bring-up on it is part done, so the state
+differs per chain:
+
+- **Base Sepolia** has a new contract, and the chain is configured for it. **Withdrawals are
+  halted**, so value that goes in cannot come out yet.
+- **Arbitrum Sepolia has no contract on this chain.** Nothing is deployed for it.
+- **Every address published before 2026-09-17 is PAUSED and holds nothing.** A transfer to one
+  of those cannot be credited and cannot be recovered.
+
+Read the address from the table below for each deposit. Do not cache it, and do not reuse an
+address from an older integration or an older copy of this page.
 :::
 
 :::info
-**Status.** The custody bridge is **deployed on Base Sepolia and Arbitrum Sepolia** (testnet,
-`Bridge` [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.basescan.org/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A)).
+**Status.** The custody bridge is **deployed on Base Sepolia** (testnet,
+`Bridge` [`0x655ab51b607cb0ef94af69525e3c98e28a8af6ad`](https://sepolia.basescan.org/address/0x655ab51b607cb0ef94af69525e3c98e28a8af6ad)).
+Arbitrum Sepolia has no contract on the current chain.
 **Base and Arbitrum are the supported chains.** Both directions —
 deposit and withdrawal — are verified end-to-end on Base Sepolia: a real deposit
 (watcher → cosign → auto-registered cosigner → ⅔-quorum credit) and a full
@@ -140,23 +150,26 @@ Base (two-phase: request → claim):
 
 | Network | Contract | Address |
 |---------|----------|---------|
-| Base **Sepolia** | `Bridge` | [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.basescan.org/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A) |
-| Arbitrum **Sepolia** | `Bridge` | [`0x10f1A0F6153B8B77a355098E5F19C659A9a0965A`](https://sepolia.arbiscan.io/address/0x10f1A0F6153B8B77a355098E5F19C659A9a0965A) |
+| Base **Sepolia** | `Bridge` | [`0x655ab51b607cb0ef94af69525e3c98e28a8af6ad`](https://sepolia.basescan.org/address/0x655ab51b607cb0ef94af69525e3c98e28a8af6ad) |
+| Arbitrum **Sepolia** | — | none on the current chain |
 | Base / Arbitrum mainnet | — | (pre-audit) |
 
-:::danger Use only the addresses above
-The bridge was redeployed on 2026-08-16. The previous contract at
-`0xA6c914Cd59F8B3A8551B5f24b047d78542063a00` is RETIRED on both chains and can
-no longer pay out: its validator set cannot be changed, so it recognises none of
-the current validators and every withdrawal reverts.
+:::danger Use only the address above
+Two earlier contracts are RETIRED. Neither can pay out, and **USDC sent to either
+is unrecoverable**:
 
-**USDC sent to the old address is unrecoverable.** Read the address from this
-page for each deposit. Do not cache it, and do not reuse an address from an
-older integration.
+| Retired address | Retired on | State |
+|---|---|---|
+| `0x10f1A0F6153B8B77a355098E5F19C659A9a0965A` | 2026-09-17 | paused on both chains, custody drained to zero |
+| `0xA6c914Cd59F8B3A8551B5f24b047d78542063a00` | 2026-08-16 | validator set cannot be changed, so every withdrawal reverts |
 
-The two chains share one address because the deploy account created both
-contracts as its first transaction on each chain. Treat that as a coincidence of
-this deployment, not a rule.
+Read the address from this page for each deposit. Do not cache it, and do not
+reuse an address from an older integration.
+
+Each retired pair shared one address across the two chains because the deploy
+account created both contracts as its first transaction on each chain. Treat that
+as a coincidence of those deployments, not a rule. The current Base contract has
+no counterpart.
 :::
 
 Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
