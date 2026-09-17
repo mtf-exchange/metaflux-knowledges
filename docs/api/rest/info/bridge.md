@@ -145,7 +145,7 @@ it with `message_id`.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `address` | string | yes | The withdrawing account. |
-| `chain` | number | no | Restrict `entries` to `1` or `2`. |
+| `chain` | number | no | Restrict `entries` to `1` or `2`. Any other value is a `400` (**not live yet** — see Errors below). |
 
 **Response**
 
@@ -207,11 +207,12 @@ it with `message_id`.
 
 **Errors**
 
-- **A `chain` outside `1` / `2` is not rejected.** It answers `200` with an
-  empty `entries` list, the same body an account with no pending withdrawal
-  gets. Only `1` (Base) and `2` (Arbitrum) carry withdrawals, so an empty list
-  on any other value tells you nothing about the account. Send a chain the
-  bridge serves.
+- **A `chain` outside `1` / `2` is a `400`** that names both accepted values.
+  Only `1` (Base) and `2` (Arbitrum) carry withdrawals. **Not live yet:** it
+  ships with the next indexer release. A live indexer answers `200` with an
+  empty `entries` list instead — the same body an account with no pending
+  withdrawal gets — so until then an empty list on a bad `chain` tells you
+  nothing about the account.
 - Archive unreachable → `503`. This read never answers an empty `entries` list
   for that case — "no archive" and "no withdrawal in flight" are different
   facts, and only one of them is about your money.
