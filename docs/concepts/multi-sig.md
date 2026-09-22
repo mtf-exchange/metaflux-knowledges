@@ -49,6 +49,22 @@ Signed by the **current** master key (single-sig, the last solo signature this a
 | `len(signers)` | `[2, 16]` |
 | `signers[*]` | distinct addresses |
 
+:::warning
+**Two of these become ENFORCED at the next node release. Today the chain accepts
+what this table forbids, and one of those accounts cannot be recovered.**
+
+`len(signers)` above 16, and a roster with a REPEATED address, are both accepted
+today. The repeat is the dangerous one: `threshold` is checked against the raw
+array length while the quorum counts DISTINCT signers, so a `[A, A]` roster at
+`threshold: 2` converts and can then never reach quorum — and a converted
+account is refused every single-sig path, including the one that would re-key
+it. **The account is permanently unusable.**
+
+Build to this table now. After the release both become `INVALID_PARAMS`
+(`at most 16 signers`, `signers must be distinct`) and the conversion is
+refused instead of bricking the account.
+:::
+
 After commit:
 - The account's `is_multisig: true` and `multisig_set: { threshold, signers }` are stored.
 - Subsequent direct (non-wrapped) actions signed by anyone (including the old master key) are rejected with `PRECONDITION_FAILED`.
@@ -81,7 +97,7 @@ envelope. The wrapper carries **four** params:
 |-------|---------|
 | `user` | The multi-sig account whose state the inner action mutates. |
 | `inner_action_blob` | `0x`-hex of the **canonical JSON bytes** of the inner action (e.g. a `submit_order`). These exact bytes are what each signer signs and what the server hashes — they are never re-serialized. |
-| `signatures` | A **flat array** of `0x`-hex 65-byte roster signatures over the inner digest (see below). There is no per-entry `signer` field — the signer is recovered from each signature. |
+| `signatures` | A **flat array** of `0x`-hex 65-byte roster signatures over the inner digest (see below). There is no per-entry `signer` field — the signer is recovered from each signature. **At most 16 entries from the next node release** — one recovery runs per entry, and a roster can hold no more than that, so extra entries can never raise the count that matters. Above 16 the action is refused with `INVALID_PARAMS` (`at most 16 signatures`). Not enforced yet. |
 | `nonce` | The wrapper nonce. It is **also** the nonce each signer folds into the inner digest, and it is the value that advances `user`'s nonce window. Set the outer envelope `nonce` to this same value. |
 
 The wrapper is a normal EIP-712-signed `/exchange` envelope: the **submitter**
