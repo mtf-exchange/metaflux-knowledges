@@ -1,16 +1,43 @@
 ---
-description: What moves on the public wire at the next release — every raw-size row states its own size plane, four relocated reads, stricter faucet rules, a new vault_modify signing type, a parked per-order status, a replayed-nonce verdict, per-leg cloid dedup, two order_status answers that stop reading unknown, and refusals that replace three silent accepts.
+description: Wire rules that were staged for a future release and are now live on node 0.9.11 — every raw-size row states its own size plane, four relocated reads answer 410, a new vault_modify signing type that refuses the old one, a parked per-order status, a replayed-nonce verdict, two order_status answers that stop reading unknown, and refusals that replace three silent accepts. Four rows remain unverified.
 ---
 
 # Next release — not live yet
 
-:::warning
-**Nothing on this page is live. The height is not pinned yet.**
+:::danger
+**CORRECTED 2026-09-22 — most of this page IS live. Do not read it as a
+preview.**
 
-Every rule here ships with the next node release after 0.9.7, and the gateway
-rows ship with the gateway of the same release. Until the swap, a live chain
-answers the OLD behaviour named beside each row. Read this page to prepare a
-client, not to explain what you see today.
+This page said "nothing here is live" and named node 0.9.7 as the release to
+wait for. The live release is **0.9.11**, and these rules are verified live on
+it:
+
+- **[Every raw-size row states its own size plane](#size-plane)** — `sz_decimals`
+  is present on written rows today.
+- **[Four relocated reads answer 410](#relocated-reads)** — `spot_meta`,
+  `all_mids`, `active_asset_ctx` and `user_events` each answer `410` with
+  `details.use` today, not `400`.
+- **[Breaking: `vault_modify` signs a new type](#vault_modify)** — the longer
+  EIP-712 type string is the one in force. **A client still signing the shorter
+  type is refused.** This is the row that cost the most to leave mislabelled.
+- **[`statuses` gains `parked`](#parked)**
+- **[A replayed nonce gets a verdict](#nonce-replayed)** — `NONCE_REPLAYED` is
+  answered today.
+- **[`order_status` stops answering `unknown` twice](#order_status)**
+- **[Three silent accepts become refusals](#refusals)** — all three refuse today.
+
+The remaining rows — [the leg `error` level](#leg-error), [per-leg `cloid`
+dedup](#cloid), [the faucet rules](#faucet-rules) and [the read-side and
+WebSocket rows](#read-side) — are NOT yet re-verified either way. Treat them as
+unconfirmed rather than as either state.
+
+**Each row still names the OLD behaviour beside it.** Where a row says "a live
+node does X", read that as the behaviour BEFORE the boundary, not as what you
+will see now.
+
+This page is still in the wrong place: an activated rule belongs in a
+`block-<height>` activation notice, and the last one on record is for a much
+older release. That split is outstanding.
 
 `{"type":"account_state","address":"0x…"}` carries the live `height` if you need
 to check where the chain is.
