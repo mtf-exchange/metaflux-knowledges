@@ -1,43 +1,53 @@
 ---
-description: Wire rules that were staged for a future release and are now live on node 0.9.11 — every raw-size row states its own size plane, four relocated reads answer 410, a new vault_modify signing type that refuses the old one, a parked per-order status, a replayed-nonce verdict, two order_status answers that stop reading unknown, and refusals that replace three silent accepts. Four rows remain unverified.
+description: Wire rules that were staged for a future release and are LIVE on node 0.9.11 — every raw-size row states its own size plane, four relocated reads answer 410, a vault_modify signing type that refuses the old one, a parked per-order status, a replayed-nonce verdict, a faucet slot spent by a partial claim, per-leg cloid dedup, and refusals that replace three silent accepts. One row, the rejected-leg error level, is not settled.
 ---
 
-# Next release — not live yet
+# Staged wire rules — LIVE on node 0.9.11
 
 :::danger
-**CORRECTED 2026-09-22 — most of this page IS live. Do not read it as a
-preview.**
+**CORRECTED 2026-09-22 — this page is LIVE, not a preview. Every rule below is
+in force on node 0.9.11 except one.**
 
-This page said "nothing here is live" and named node 0.9.7 as the release to
-wait for. The live release is **0.9.11**, and these rules are verified live on
-it:
+The page said "nothing here is live" and named 0.9.7 as the release to wait for.
+It was wrong for the whole page, and it was wrong in the direction that costs a
+client the most: the [`vault_modify`](#vault_modify) row is labelled Breaking and
+changes a SIGNING type, so anyone who believed the banner kept signing the
+shorter type and had **every such call refused**.
 
-- **[Every raw-size row states its own size plane](#size-plane)** — `sz_decimals`
-  is present on written rows today.
-- **[Four relocated reads answer 410](#relocated-reads)** — `spot_meta`,
-  `all_mids`, `active_asset_ctx` and `user_events` each answer `410` with
-  `details.use` today, not `400`.
-- **[Breaking: `vault_modify` signs a new type](#vault_modify)** — the longer
-  EIP-712 type string is the one in force. **A client still signing the shorter
-  type is refused.** This is the row that cost the most to leave mislabelled.
-- **[`statuses` gains `parked`](#parked)**
-- **[A replayed nonce gets a verdict](#nonce-replayed)** — `NONCE_REPLAYED` is
-  answered today.
-- **[`order_status` stops answering `unknown` twice](#order_status)**
-- **[Three silent accepts become refusals](#refusals)** — all three refuse today.
+Verified live by CALLING the endpoint:
 
-The remaining rows — [the leg `error` level](#leg-error), [per-leg `cloid`
-dedup](#cloid), [the faucet rules](#faucet-rules) and [the read-side and
-WebSocket rows](#read-side) — are NOT yet re-verified either way. Treat them as
-unconfirmed rather than as either state.
+- [Every raw-size row states its own size plane](#size-plane) — `sz_decimals` is
+  present on written rows.
+- [Four relocated reads answer 410](#relocated-reads) — `spot_meta`, `all_mids`,
+  `active_asset_ctx` and `user_events` each answer `410` with `details.use`.
+- [`trades`](#read-side) — `limit` caps the answer, on a ranged ask too, and
+  `last_trade` is the newest print in THAT answer.
+
+Verified live in the shipped release:
+
+- [Breaking: `vault_modify` signs a new type](#vault_modify)
+- [`statuses` gains `parked`](#parked)
+- [A replayed nonce gets a verdict](#nonce-replayed)
+- [`order_status` stops answering `unknown` twice](#order_status)
+- [Three silent accepts become refusals](#refusals) — all three
+- [The faucet gives one claim per address, ever](#faucet-rules) — a partial
+  claim forfeits the rest, and the per-IP interval is enforced
+- [`cloid` dedup runs per leg](#cloid)
+- The remaining [read-side and WebSocket rows](#read-side)
+
+**One row is NOT settled either way:** [a rejected leg's `error`
+level](#leg-error). Settling it needs a signed action whose leg is refused, and
+that was not run. Treat that one row as unconfirmed.
 
 **Each row still names the OLD behaviour beside it.** Where a row says "a live
-node does X", read that as the behaviour BEFORE the boundary, not as what you
-will see now.
+node does X", that is the behaviour BEFORE the boundary — history, not the
+present.
 
-This page is still in the wrong place: an activated rule belongs in a
-`block-<height>` activation notice, and the last one on record is for a much
-older release. That split is outstanding.
+This page is also in the wrong PLACE. An activated rule belongs in a
+`block-<height>` activation notice, and these rules shipped across several
+releases whose individual activation heights are not recoverable from here, so
+no faithful per-height split could be written. That split is outstanding; naming
+one wrong height would be worse than naming none.
 
 `{"type":"account_state","address":"0x…"}` carries the live `height` if you need
 to check where the chain is.
