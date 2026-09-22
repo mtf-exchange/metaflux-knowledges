@@ -44,10 +44,11 @@ node does X", that is the behaviour BEFORE the boundary — history, not the
 present.
 
 This page is also in the wrong PLACE. An activated rule belongs in a
-`block-<height>` activation notice, and these rules shipped across several
-releases whose individual activation heights are not recoverable from here, so
-no faithful per-height split could be written. That split is outstanding; naming
-one wrong height would be worse than naming none.
+`block-<height>` activation notice. There are exactly two boundaries missing —
+**block 11,550,001** and **block 13,020,001** — and the split is outstanding
+because each rule still has to be attributed to the boundary that introduced it.
+Knowing a rule is in the RUNNING release does not say which release added it, so
+that attribution has to be done per rule before any page is written.
 
 `{"type":"account_state","address":"0x…"}` carries the live `height` if you need
 to check where the chain is.
