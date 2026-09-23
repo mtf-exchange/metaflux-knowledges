@@ -660,6 +660,9 @@ The payload inside `data` depends on the action class:
 - **All other actions** → the admission payload: `200 OK` when the commit is
   observed inside the wait window, `202 Accepted` when it is not. Treat both as
   admitted, and read `committed`.
+- **[`batch_cancel`](./exchange/orders.md#batch_cancel-reply)** → the admission
+  payload plus a `statuses` array, one `canceled` or `error` entry per leg
+  (**not live yet**).
 - **Any admission-time rejection** → the `error` envelope, at the status its
   code maps to.
 
@@ -692,6 +695,7 @@ object naming the leg's outcome:
 { "error":   { "code": "MARGIN_INSUFFICIENT", "message": "..." } }     // this leg was rejected
 { "noop":    { "reason": "position already flat, nothing to reduce" } } // accepted, and it changed nothing
 { "parked":  { "oid": "12345", "cloid": "0x..." } }                     // trigger leg accepted, and held off the book
+{ "canceled": { "oid": "12345" } }                                      // batch_cancel leg removed its order (not live yet)
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
 

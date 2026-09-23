@@ -1,12 +1,14 @@
 ---
-description: One rule that waits for the next node release — a 1 MiB cap on the signed action bytes — plus two wire rows that are not verified on the running chain and two corrections to this reference.
+description: Two changes that wait for the next node release — a 1 MiB cap on the signed action bytes, and a per-leg reply for batch_cancel — plus two wire rows that are not verified on the running chain and two corrections to this reference.
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**One section waits for the next node release:**
-[the action byte cap](#action-byte-cap). A live node does not apply it yet.
+**Two sections wait for the next node release:**
+[the action byte cap](#action-byte-cap) and
+[the per-leg `batch_cancel` reply](#batch-cancel-legs). A live node does not
+apply either yet.
 
 Every other rule this page staged for the releases after 0.9.7 is live, and each
 one moved to [block 11,550,001](./block-11550001.md). The node rules turned on at
@@ -45,6 +47,25 @@ cap, made mostly of non-ASCII text, can be too large for one block.
 
 **What to do.** Send compact JSON. Both client SDKs already do. Nothing else
 moves: the 2 MiB body cap and every signing rule stay the same.
+
+## A `batch_cancel` answers for each leg {#batch-cancel-legs}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`batch_cancel`](../api/rest/exchange/orders.md#batch_cancel-reply) `200` reply | The admission fields only | The admission fields, plus `statuses`: one `canceled` or `error` entry per leg, in request order |
+| [`order_updates`](../api/ws/subscriptions.md#order_updates) | No record for any `batch_cancel` leg | One `status: "canceled"` record per leg that removed its order. A refused leg pushes nothing |
+
+**Why.** The legs run one by one, and a refused leg does not refuse the batch.
+So a live node answers `committed: true` when a leg names an order that is
+already gone, and the caller cannot tell that leg from one that removed its
+order. A leg that names the old oid of a modified order is the common case.
+
+**What to do.** Read `statuses[i]` for leg `i`. Match an `error` entry on
+`code`. Nothing else moves: the request shape, the signed digest and the
+admission fields stay the same, so a caller that ignores `statuses` keeps
+working.
 
 ## A rejected leg's `error` loses a level {#leg-error}
 

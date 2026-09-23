@@ -516,12 +516,17 @@ could serve.
 
 **What still answers `unknown`, by design.** The old `oid` of a
 [`modify`](../exchange/orders.md#modify) — ask by `cloid`, or by the new `oid` —
-and any order cancelled through [`batch_cancel`](../exchange/orders.md#batch_cancel),
+and any order cancelled through
 [`cancel_all_orders`](../exchange/orders.md#cancel_all_orders),
 [`cancel_scale`](../exchange/orders.md#cancel_scale) or
 [`cancel_chase`](../exchange/orders.md#cancel_chase). Each of those carries ONE
 verdict for the whole action, so the node will not claim a per-order outcome it
 cannot prove.
+
+An order cancelled through [`batch_cancel`](../exchange/orders.md#batch_cancel)
+also answers `unknown` here. Read its outcome from the `batch_cancel` reply or
+from [`order_updates`](../../ws/subscriptions.md#order_updates) instead: each
+leg reports its own result there (**not live yet**).
 
 The terminal states above come from a **node-local retention window**, not from
 committed state. A node restart empties that window, so after a restart the node

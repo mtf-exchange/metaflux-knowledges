@@ -417,6 +417,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 - `order.oid` is a **decimal-digit string**, or `null` on a rejected placement.
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
 - `limit_px` / `sz` / `orig_sz` / `avg_px` are **human decimal strings** — price tick-snapped in whole USDC, size on the market's `sz_decimals` plane, never raw 1e8; `time` is consensus-ms; unknown fields are `null`.
+- **`batch_cancel` pushes one `canceled` record per leg that removed its order (not live yet).** A refused leg pushes nothing, because it changed nothing; its reason is in the [`batch_cancel` reply](../rest/exchange/orders.md#batch_cancel-reply). A live node pushes no record for any `batch_cancel` leg.
 - **Not** emitted today: `modify` / `batchModify` / `scheduleCancel` / `cancelAllOrders` / TWAP transitions and engine-initiated (BOLE T0) cancels — the dispatch observation for those is an opaque ok/err with no per-order payload.
 
 ### Per-account resting order snapshot {#open_orders}

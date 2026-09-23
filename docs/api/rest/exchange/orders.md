@@ -488,7 +488,52 @@ required by the schema but the server **ignores** it — set the account you act
 for at `params.owner`.
 :::
 
-Same per-entry response shape as `cancel_order`.
+#### The `batch_cancel` reply {#batch_cancel-reply}
+
+:::caution
+**NOT LIVE YET.** The `statuses` array and the `order_updates` records below
+ship with the next node release. A live node answers only the admission
+fields. It does not tell you which legs removed an order, and it pushes no
+`order_updates` record for a `batch_cancel` leg.
+:::
+
+A committed `batch_cancel` answers `200` with the admission fields every
+non-order action carries: `accepted`, `committed`, `nonce`, `action_hash` and
+`mempool_depth`. It also carries a `statuses` array with one entry per
+`cancels[*]` entry, in request order:
+
+```json
+{ "data": {
+  "accepted": true, "committed": true, "nonce": 1735689600001,
+  "action_hash": "0x...", "mempool_depth": 0,
+  "statuses": [
+    { "canceled": { "oid": "10" } },
+    { "error": { "code": "ORDER_NOT_FOUND", "message": "precondition failed: order not found" } }
+  ] } }
+```
+
+| Entry | Meaning | What to do |
+|-------|---------|------------|
+| `canceled` | The leg removed its order. `oid` is a decimal-digit string | Nothing. The order is gone |
+| `error` | The leg was refused and changed nothing. It is the same `{code, message, details?}` object as a [per-order `error`](../exchange.md#per-order-statuses) | Match on `code`. `ORDER_NOT_FOUND` means the order is already gone, or the oid is wrong |
+
+**Why each leg has its own entry.** The legs run one by one, and a refused leg
+does not refuse the batch. So `committed: true` says only that the action
+committed. It does not say that every order is gone. Read `statuses` for that.
+
+**A leg aimed at a modified order answers `ORDER_NOT_FOUND`.** A
+[`modify`](#modify) gives the order a NEW oid. A leg that names the old oid finds
+no order.
+
+Each `canceled` leg also pushes one [`order_updates`](../../ws/subscriptions.md#order_updates)
+record with `status: "canceled"`. A refused leg pushes nothing, because it
+changed nothing. Its reason is in this reply.
+
+The fields `accepted`, `committed`, `nonce`, `action_hash` and `mempool_depth`
+keep their meaning, so a caller that reads only them keeps working. When the
+wait window expires before the commit, the reply is `202` with
+`committed: false` and no `statuses`. Read
+[`open_orders`](../info/orders-fills.md#open_orders) to learn which orders are gone.
 
 ---
 
