@@ -36,9 +36,9 @@ it acts for.
 There is no separate margin-mode action: isolation is the `is_isolated` flag here.
 
 **`asset` must name a listed perp market.** An id no DEX hosts is refused with
-`PRECONDITION_FAILED` and the message `no perp market for asset`. **Not live
-yet:** the check ships with the next node release. A live node writes a
-permanent leverage row for a market that does not exist.
+`MARKET_NOT_FOUND` and the message `no perp market for asset`. Before
+[block 11,550,001](../../../changelog/block-11550001.md#refusals) the chain
+wrote a permanent leverage row for a market that does not exist.
 
 ---
 

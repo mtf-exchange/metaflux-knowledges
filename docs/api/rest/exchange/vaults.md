@@ -88,11 +88,10 @@ the chain refuses the action. See
 [typed-data signing](../../../integration/typed-data-signing.md#account-staking--vault)
 for the type string.
 
-**Not live yet:** the new digest ships with the next node release. A live node
-binds `new_name` alone, so a relay can add a fee change or a pause to a
-signature the leader gave for a rename. Sign the four-field form until the
-release lands, then re-sign with the new one — an old signature stops verifying
-at the swap.
+**Why.** Before [block 11,550,001](../../../changelog/block-11550001.md#vault_modify)
+the digest bound `new_name` alone, so a relay could add a fee change or a pause
+to a signature the leader gave for a rename. A signature over that older form no
+longer verifies.
 
 ---
 

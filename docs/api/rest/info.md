@@ -225,8 +225,7 @@ answers with an empty body. It answers `UNKNOWN_TYPE`, in one of two forms:
 | What you sent | Status | Body |
 |---|---|---|
 | `spot_clearinghouse_state`, `oracle_sources`, `sub_accounts`, and every other name in [removed reads](#retired-reads) that is not in the row below | `400` | `{"error":{"code":"UNKNOWN_TYPE","message":"unknown info type: <name>"}}` — no `details` |
-| `account_overview`, `action_outcome`, `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`, `pm_summary` | `410` | the same `code`, plus `details.use` naming the read to call instead |
-| `spot_meta`, `all_mids`, `active_asset_ctx`, `user_events` | `400` today, `410` at the next node release | **Not live yet.** These four answer a bare `400` on the running chain even though this reference names a replacement for each. They move to `410` with `details.use` at the next release — see [next release](../../changelog/next-release.md#relocated-reads) |
+| `account_overview`, `action_outcome`, `active_asset_ctx`, `all_mids`, `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`, `pm_summary`, `spot_meta`, `user_events` | `410` | the same `code`, plus `details.use` naming the read to call instead. Four of these names — `spot_meta`, `all_mids`, `active_asset_ctx` and `user_events` — answered a bare `400` before gateway 0.9.8; see [relocated reads](../../changelog/block-11550001.md#relocated-reads) |
 
 So a `200` carrying an empty array IS an answer about a real account. A client
 that shows "no balances" after calling `spot_clearinghouse_state` swallowed a
@@ -280,16 +279,14 @@ a wrong choice is silent. For the release a removal landed in, see
 The status splits the two kinds of removal:
 
 - **`400`** — the name never named a read on this API, or its answer is gone.
-- **`410`** — the name was public and its answer MOVED. Ten names get this
-  today: `account_overview`, `action_outcome`, `bridge_chain_configs`,
-  `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`,
-  `gov_history`, `gov_proposals`, `gov_state` and `pm_summary`. The error
-  carries `details.use`, naming the read to call instead, so a client can
-  follow the move without reading this table.
-  **Four more join them at the next node release** — `spot_meta`, `all_mids`,
-  `active_asset_ctx` and `user_events` answer a bare `400` until then, which is
-  wrong for a name this reference gives a replacement for. Branch on the status
-  AND on `error.code`, never on the status alone.
+- **`410`** — the name was public and its answer MOVED. Fourteen names get
+  this: `account_overview`, `action_outcome`, `active_asset_ctx`, `all_mids`,
+  `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`,
+  `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`,
+  `pm_summary`, `spot_meta` and `user_events`. The error carries
+  `details.use`, naming the read to call instead, so a client can follow the
+  move without reading this table. Branch on the status AND on `error.code`,
+  never on the status alone.
 
 **`details.use` does not always name another `/info` type.** `action_outcome`
 and `encode_action` both answer `"use": "/exchange"`, which is an ENDPOINT.

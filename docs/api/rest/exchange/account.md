@@ -180,7 +180,7 @@ Register a multi-sig roster on the account. It takes effect at that commit.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `signers` | array of hex addresses | The multi-sig signer set |
+| `signers` | array of hex addresses | The multi-sig signer set: at most 16, all distinct. A longer list is refused with `at most 16 signers`, and a repeated address with `signers must be distinct`. A repeat would let `threshold` exceed the distinct count the quorum reads, and the account could then never act — see [multi-sig](../../../concepts/multi-sig.md#conversion) |
 | `threshold` | uint32 | M-of-N threshold: at least `1`, and no more than the number of `signers`. The one exception is the disable form below, which pairs an empty `signers` with `threshold: 0` |
 
 :::warning Only the roster can change the roster
@@ -240,11 +240,14 @@ Its EIP-712 [typed-data](../exchange.md#signing) primary type is
 There is no `signers` field on the wire. A declared list would not add authority:
 the roster membership is what counts, and it is recovered, not declared.
 
-**The two nonces are checked against two different accounts.** `params.nonce`
-advances `user`'s window inside the handler. The envelope's own top-level `nonce`
-advances the **submitter's** window before dispatch. Setting them equal is the
-convention, and it is what the [worked flow](../../../concepts/multi-sig.md) shows,
-but the chain does not compare them.
+**Only `params.nonce` moves a window.** It advances `user`'s window inside the
+handler, after the roster quorum verifies. The envelope's own top-level `nonce`
+advances no window, so the submitter's window does not move. Setting the two
+equal is the convention, and it is what the
+[worked flow](../../../concepts/multi-sig.md) shows, but the chain does not
+compare them. **Why:** anyone may submit the envelope, and the roster quorum is
+its only authority, so it moves only the window of the account it acts for. The
+rule is in force since [block 16,450,001](../../../changelog/block-16450001.md#multi-sig-nonce).
 
 **The rules, written as rejections.**
 
@@ -252,6 +255,7 @@ but the chain does not compare them.
 |----------|--------|
 | `user` has no registered roster, or a zero threshold | **Rejected** — `user not multi-sig` / `multi-sig threshold zero` |
 | An empty `inner_action_blob` | **Rejected**, `InvalidParams` — `empty inner_action_blob` |
+| More than 16 entries in `signatures` | **Rejected**, `PRECONDITION_FAILED` — `at most 16 signatures`. A roster holds at most 16 signers, so extra entries never raise the count |
 | A signature of the wrong length, or from a non-roster key | **Silently skipped.** One malformed entry must not block an otherwise valid quorum, so it is not an error — it does not count |
 | Fewer than `threshold` **distinct** roster signers recovered | **Rejected**, `AUTH_UNAUTHORIZED` |
 | A stale or replayed `params.nonce` | **Rejected** — `stale or replayed multi-sig nonce` |
@@ -546,10 +550,8 @@ owner-only, so the owner signs
 [`user_set_abstraction`](#user_set_abstraction) from the master key.
 
 The action stays on the wire and keeps its type and its EIP-712 type string. It
-never succeeds.
-
-**Not live yet:** the refusal ships with the next node release. A live node
-answers a `202` and commits nothing.
+never succeeds. The refusal is in force since
+[block 11,550,001](../../../changelog/block-11550001.md#refusals).
 :::
 
 The request shape below is what the action still accepts on the wire.

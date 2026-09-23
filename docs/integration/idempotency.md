@@ -48,10 +48,8 @@ The rule: **a request gets a server response → the nonce decision is made**. A
 **There is no `nonce_must_increase` and no `nonce_too_small`.** Neither string
 exists on this API, and neither answer is a `400`. A replayed nonce answers
 [`NONCE_REPLAYED`](../api/errors.md#nonce_replayed) at HTTP `200`, because the
-refusal comes from the block builder and not from admission. **Not live yet:**
-a live node drops the replay in silence, so the caller waits out the order
-window and the gateway answers a `502`. Branch on the code, never on a `502`
-body.
+refusal comes from the block builder and not from admission. Branch on the
+code, never on a `502` body.
 :::
 
 ## Strategy: cloid {#strategy-cloid}

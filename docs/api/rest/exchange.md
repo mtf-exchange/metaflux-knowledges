@@ -732,8 +732,6 @@ all, so `parked` entries are its WHOLE answer. That group used to answer an
 empty `statuses` array, and a mixed `normal_tpsl` batch answered fewer entries
 than it sent legs.
 
-**Not live yet:** `parked` ships with the next node release. A live node leaves
-every parked leg out of `statuses`, so the array is shorter than the request.
 `parked` is the approved term across this reference — on
 [`order_status`](./info/orders-fills.md#order_status) alone the same state answers
 the legacy token `triggered`.
@@ -996,10 +994,6 @@ far in the future — a wrong clock — moves that anchor forward. Every later
 `Date.now()` nonce then sits more than 64 below the anchor. The chain refuses
 each one until the wall clock passes the anchor. Recover by signing above the
 anchor.
-
-**Not live yet:** the verdict ships with the next node release. A live node
-drops the replay with no answer at all, so the caller waits out the order window
-and the gateway then answers a `502`.
 
 ### `429 Too Many Requests` — rate-limited {#429-too-many-requests--rate-limited}
 

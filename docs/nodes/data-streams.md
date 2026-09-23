@@ -242,11 +242,6 @@ for the same split on the API surface.
 :::warning
 **Divide by the plane the ROW states, never by the market's current precision.**
 
-**NOT LIVE YET.** The `sz_decimals` field ships with the next node release — see
-[next release](../changelog/next-release.md#size-plane). A node running today
-writes none of these rows with it, so every row reads as "not recorded" and the
-fallback below is the whole rule until the swap.
-
 `node_fills`, `node_trades` and `node_order_statuses` each carry a `sz_decimals`
 field. It is the plane that row was written on.
 
@@ -256,8 +251,8 @@ the vote keeps the smaller lot count AND the older plane. A reader that divides
 every row by the market's current precision reports each of those older rows
 `10^Δ` too small.
 
-Rows written before this field shipped carry no `sz_decimals`. Fall back to the
-market's current precision for those only.
+Rows written before [block 11,550,001](../changelog/block-11550001.md#size-plane)
+carry no `sz_decimals`. Fall back to the market's current precision for those only.
 :::
 
 Which plane a stream uses:
@@ -485,7 +480,7 @@ One record per order-status transition, keyed by the order owner.
 | `market` | uint32 | id | Canonical asset id |
 | `oid` | uint64 | id | Order id. **`0` on an `error` or `noop` record** — the order never got an id |
 | `cloid` | string \| absent | — | Client order id, `0x` plus 32 hex digits. **Absent on a maker execution record even when the order carried one** |
-| `status` | string | — | Exactly one of `"resting"`, `"filled"`, `"error"`, `"noop"`, `"parked"`. A `"parked"` record is an accepted trigger leg held off the book: it carries a real `oid`, and `sz` is the whole leg because it has never matched (**not live yet:** the token ships with the next node release). One `filled` record per (block, maker `oid`) — see [maker execution records](#maker-execution-records) |
+| `status` | string | — | Exactly one of `"resting"`, `"filled"`, `"error"`, `"noop"`, `"parked"`. A `"parked"` record is an accepted trigger leg held off the book: it carries a real `oid`, and `sz` is the whole leg because it has never matched. One `filled` record per (block, maker `oid`) — see [maker execution records](#maker-execution-records) |
 | `side` | string | — | `"B"` buy, `"A"` sell |
 | `limit_px` | i128 string | raw price | Limit price of the order. Always present |
 | `sz` | u128 string | raw size | On `filled`, the **filled** size. On `resting`, `error` and `noop`, the request size |

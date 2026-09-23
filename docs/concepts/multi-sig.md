@@ -46,23 +46,23 @@ Signed by the **current** master key (single-sig, the last solo signature this a
 | Constraint | Value |
 |------------|-------|
 | `threshold` | `[1, len(signers)]` |
-| `len(signers)` | `[2, 16]` |
+| `len(signers)` | `[1, 16]` |
 | `signers[*]` | distinct addresses |
 
+The chain refuses a roster of more than 16 signers with `at most 16 signers`,
+and a roster that repeats an address with `signers must be distinct`. Both
+answer `PRECONDITION_FAILED`, and both are in force since
+[block 16,450,001](../changelog/block-16450001.md).
+
+**Why the signers must be distinct.** The quorum counts DISTINCT signers, but
+`threshold` is checked against the array length. So a `[A, A]` roster at
+`threshold: 2` could never reach quorum. A converted account refuses every
+single-sig path, including the re-key that would repair it, so that account
+could never act again. The refusal stops such a roster before it commits.
+
 :::warning
-**Two of these become ENFORCED at the next node release. Today the chain accepts
-what this table forbids, and one of those accounts cannot be recovered.**
-
-`len(signers)` above 16, and a roster with a REPEATED address, are both accepted
-today. The repeat is the dangerous one: `threshold` is checked against the raw
-array length while the quorum counts DISTINCT signers, so a `[A, A]` roster at
-`threshold: 2` converts and can then never reach quorum — and a converted
-account is refused every single-sig path, including the one that would re-key
-it. **The account is permanently unusable.**
-
-Build to this table now. After the release both become `INVALID_PARAMS`
-(`at most 16 signers`, `signers must be distinct`) and the conversion is
-refused instead of bricking the account.
+**A roster that committed before block 16,450,001 is not repaired.** If its
+distinct addresses number fewer than its `threshold`, that account cannot act.
 :::
 
 After commit:
@@ -97,8 +97,8 @@ envelope. The wrapper carries **four** params:
 |-------|---------|
 | `user` | The multi-sig account whose state the inner action mutates. |
 | `inner_action_blob` | `0x`-hex of the **canonical JSON bytes** of the inner action (e.g. a `submit_order`). These exact bytes are what each signer signs and what the server hashes — they are never re-serialized. |
-| `signatures` | A **flat array** of `0x`-hex 65-byte roster signatures over the inner digest (see below). There is no per-entry `signer` field — the signer is recovered from each signature. **At most 16 entries from the next node release** — one recovery runs per entry, and a roster can hold no more than that, so extra entries can never raise the count that matters. Above 16 the action is refused with `INVALID_PARAMS` (`at most 16 signatures`). Not enforced yet. |
-| `nonce` | The wrapper nonce. It is **also** the nonce each signer folds into the inner digest, and it is the value that advances `user`'s nonce window. Set the outer envelope `nonce` to this same value. |
+| `signatures` | A **flat array** of `0x`-hex 65-byte roster signatures over the inner digest (see below). There is no per-entry `signer` field — the signer is recovered from each signature. **At most 16 entries.** Above 16 the action is refused with `PRECONDITION_FAILED` (`at most 16 signatures`). One recovery runs per entry on every validator, and a roster holds at most 16 signers, so extra entries can never raise the count that matters. |
+| `nonce` | The wrapper nonce. It is **also** the nonce each signer folds into the inner digest, and it is the only value that advances a nonce window: `user`'s. Set the outer envelope `nonce` to this same value. The outer `nonce` advances no window, so the posting account's window does not move. |
 
 The wrapper is a normal EIP-712-signed `/exchange` envelope: the **submitter**
 signs the outer `multi_sig` action with their own key. The submitter can be **any
@@ -118,8 +118,9 @@ Server checks:
 4. If all checks pass, the inner action is dispatched as if `user` had signed it
    directly, and `user`'s nonce advances to the wrapper `nonce`.
 
-A failed check answers `AUTH_UNAUTHORIZED`, whose `message` names which one:
-threshold not met, duplicate signer, or signer not in set.
+A failed quorum check answers `AUTH_UNAUTHORIZED` with the flat message
+`unauthorized`. It does not say which check failed. Re-derive the inner digest
+and the recovered addresses on your own side to find out.
 
 ### Signing the inner action {#signing-the-inner-action}
 
@@ -252,7 +253,7 @@ Until the SDK lands, integrators implement their own coordinator. The on-chain s
 
 - **Lost keys**: M-of-N tolerates up to `N - M` losses. Plan key custody to spread the loss surface (different jurisdictions, different HSMs, different humans).
 - **Compromised key**: M-of-N tolerates up to `M - 1` compromises before funds can be moved. Detect early — but NOT from the order feeds. An inner order inside a multi-sig envelope used to produce no [`order_updates`](../api/ws/subscriptions.md#order_updates) message, no [`fills`](../api/ws/subscriptions.md#fills) message and no [`historical_orders`](../api/rest/info/account-history.md#historical_orders) record, leaving a watcher blind to exactly the action it looks for. **Node 0.9.5 records it** — see [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills). Against an older node, or for defence in depth, Watch [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) and diff [`account_state`](../api/rest/info/account.md#account_state) and [`open_orders`](../api/rest/info/orders-fills.md#open_orders) instead.
-- **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other is refused with `INVALID_REQUEST`. Coordinator should assign nonces.
+- **Nonce collisions**: the multi-sig's nonce is per-account, monotonic, same as single-sig. Two parallel signing efforts that pick the same nonce: only one commits; the other is refused with `PRECONDITION_FAILED` (`stale or replayed multi-sig nonce`). Coordinator should assign nonces.
 - **Signature expiry**: roster signatures over the inner blob don't expire on their own — a signature collected today is valid until the bundle is submitted. Some integrators add their own off-chain TTL. (The optional [action `expiresAfter`](../integration/typed-data-signing.md#action-expiry-expiresafter) applies to the **outer** `/exchange` envelope, not to the inner roster signatures.)
 
 </details>

@@ -250,10 +250,10 @@ governance listing vote gives that market a precision. Several live perps read
 every order on that market wrong. Re-read it from `markets_meta` rather than
 storing it.
 
-**NO RAISE HAS ENACTED YET, and the vote that performs one ships with the next
-node release** — see [next release](../changelog/next-release.md#size-plane).
-The rules below are what a raise WILL do. They are written now because an
-integrator has to encode sizes correctly before the first one, not after.
+**The vote that performs a raise is live since
+[block 11,550,001](../changelog/block-11550001.md#size-plane).** It rides the
+governance listing vote. Encode sizes to the rules below before a raise enacts on
+a market you trade, not after.
 
 **What a raise does, and what it does not do.** The vote can only RAISE a
 precision; a decrease is refused. It multiplies every stored lot count on that

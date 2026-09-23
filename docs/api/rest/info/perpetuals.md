@@ -489,7 +489,7 @@ Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol |
-| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring. It caps the ANSWER, with the ring and the archive already merged, and the trim drops the OLDEST rows. **Not live yet:** a live gateway applies the cap to each source on its own, so a ranged ask can return up to twice the number you asked for |
+| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring. It caps the ANSWER, with the ring and the archive already merged, and the trim drops the OLDEST rows |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive); filters on trade `time`. Absent ⇒ open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent ⇒ open upper bound |
 
@@ -652,9 +652,9 @@ for something that does not exist" is an error, "nothing happened there" is data
 |-------|------|-------------|
 | `coverage.start` | uint64 \| null | Open time of the oldest bar in THIS answer. **`null` when `candles` is empty** |
 | `coverage.end` | uint64 \| null | Open time of the newest bar in THIS answer. **`null` when `candles` is empty** |
-| `coverage.reaches_newest` | bool | `true` = the answer runs to the newest bar the store holds. `false` = **newer bars exist that this answer does not include**. It is proved against the newest bar the store holds, NEVER against the `end_time` you asked for, so a page that fully answers a past window still reads `false`. That is what makes "page until `reaches_newest`" stop at the live edge and not at your own window. **Not live yet:** a live gateway also counts your `end_time` as proof, so a windowed ask reads `true` on its first page |
+| `coverage.reaches_newest` | bool | `true` = the answer runs to the newest bar the store holds. `false` = **newer bars exist that this answer does not include**. It is proved against the newest bar the store holds, NEVER against the `end_time` you asked for, so a page that fully answers a past window still reads `false`. That is what makes "page until `reaches_newest`" stop at the live edge and not at your own window |
 | `t` | uint64 | Bar **open** timestamp (ms, bucket-aligned) |
-| `T` | uint64 | Bar **close** timestamp (ms): always `t + interval − 1`, on every bar from every source. **Not live yet:** an archive-served bar stamps `t + interval`, so the convention changes at the join seam until the next gateway release |
+| `T` | uint64 | Bar **close** timestamp (ms): always `t + interval − 1`, on every bar from every source |
 | `s` | string | Market symbol |
 | `i` | string | Interval bucket token |
 | `o` / `c` / `h` / `l` | Decimal string | **O**pen / **c**lose / **h**igh / **l**ow price, **whole-unit decimal** string (e.g. `"78778.1"`) — the same plane [`markets`](#markets) reports `mark_px` in |

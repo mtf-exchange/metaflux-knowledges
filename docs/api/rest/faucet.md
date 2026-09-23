@@ -113,8 +113,8 @@ applies it, and either can be refused there** — see
 | 400 | `{"error":"invalid address: <detail>"}` | `address` not valid `0x`-hex (e.g. wrong length) |
 | 400 | `{"error":"zero address not allowed"}` | Recipient is the zero address |
 | 400 | `{"error":"amount must be positive"}` | Explicit `amount` of `0` |
-| 429 | `{"error":"address already funded"}` | This address claimed before (**once-ever**). The faucet node answers this from a set it holds in memory, so a restart clears it — see [Limits](#limits) |
-| 429 | `{"error":"rate limit: this IP requested too recently"}` | Source IP claimed inside the per-IP window: one grant per minute today, one per DAY at the next release — see [Limits](#limits) |
+| 429 | `{"error":"address already funded"}` | This address claimed before (**once-ever**). The faucet reads the committed claim record before it queues, so the refusal holds across a node restart — see [Limits](#limits) |
+| 429 | `{"error":"rate limit: this IP requested too recently"}` | Source IP claimed inside the per-IP window. The window is a node setting — see [Limits](#limits) |
 | 403 | `{"error":"faucet disabled on this network"}` | Defensive guard (should be unreachable — mainnet never mounts the route) |
 | 503 | `{"error":"faucet reserve is empty; ask an operator to refill it"}` | The reserve cannot pay this grant. The node checks it before it queues, so the claim is refused, not silently dropped — see [the reserve](#reserve) |
 | 503 | `{"error":"faucet backlog full; retry shortly"}` | Injection queue saturated (transient backpressure; retry) |
@@ -192,36 +192,27 @@ nothing.
 
 ## Limits {#limits}
 
-:::warning
-**The two rules below CHANGE at the next node release.** Today's behaviour is
-described first in each item, then the incoming one. See
-[next release](../../changelog/next-release.md#faucet-rules).
-:::
-
 - **Once ever per address.** A second claim for the same address returns `429
   address already funded`, even from another IP, even much later.
 
-  **Today** that refusal comes from a set the faucet node holds in memory, and the
-  set resets when the node restarts. The binding limit is the committed row, and
-  that row accumulates toward a value CAP of 3000 USDC / 10 MTF — so it bounds a
-  lifetime VALUE, not a claim COUNT, and an address that asked for less keeps the
-  remainder and can claim again.
-
-  **At the next release** the committed row is a once-ever CLAIM record. The
-  handler reads it before it queues and answers `429` synchronously. Asking for
-  less than the full grant spends the slot: there is no remainder to come back
-  for. The in-memory set survives only to close the window between the queue and
-  the commit inside one block.
+  The committed row is a once-ever CLAIM record. The handler reads it before it
+  queues and answers `429` at once. Asking for less than the full grant spends
+  the slot: there is no remainder to come back for. A set in the faucet node's
+  memory closes the window between the queue and the commit inside one block.
+  The rule is in force since
+  [block 11,550,001](../../changelog/block-11550001.md#faucet-rules). Before
+  that height the committed row was a VALUE cap, so an address that asked for
+  less could come back for the rest.
 
   A `400` or `429` refusal records nothing. A `503` is different: the node has
   already marked the address and advanced the IP window by the time the queue
   refuses it, so that node refuses the address until it restarts. No committed row
   is written, so the address can claim again after that restart.
 - **Per-IP window.** Distinct addresses behind one IP inside the window get
-  `429 rate limit`. **Today the window is one minute. At the next release it is
-  one DAY** (86400 s, configurable).
+  `429 rate limit`. The window is a node setting. **The testnet faucet runs one
+  MINUTE.** The default for a node that sets no value is one day (86400 s).
 
-  **The window is a speed bump, not an anti-sybil control**, before and after. It
+  **The window is a speed bump, not an anti-sybil control.** It
   lives in the faucet node's memory, it is not chain-wide, and it resets when that
   node restarts. What bounds the give-away is the committed per-address rule and
   the reserve balance.

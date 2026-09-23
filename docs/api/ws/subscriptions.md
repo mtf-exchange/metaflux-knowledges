@@ -43,8 +43,7 @@ and receive an ack (`subscriptionResponse`), an initial snapshot (`is_snapshot: 
 could disagree. The gateway now forwards the node's snapshot, and sends a body of
 its own only when the node sends nothing inside the wait window.
 [`open_orders`](#open_orders) is the one documented exception: every frame on that
-channel is a full snapshot and carries `is_snapshot: true`. **Not live yet:** the
-single-frame rule ships with the next gateway release.
+channel is a full snapshot and carries `is_snapshot: true`.
 
 ## Channels at a glance {#channels-at-a-glance}
 
@@ -413,7 +412,7 @@ Per-account order lifecycle. Requires `user` (the 0x address). Each push is an a
 ```
 
 - `status` ∈ `open` (resting; `order.sz` is the post-commit book remainder, `order.orig_sz` the size the order was placed with) / `filled` / `canceled` / `rejected` (+`reason`, null `oid`) / `cancel_rejected` (+`reason`) / `noop` (+`reason`, null `oid`) / `parked`.
-- **`parked` is an ACCEPTED trigger leg held off the book.** It carries a real `oid`, `order.sz` is the whole leg, and `filled_sz`, `avg_px` and `reason` are all `null`. The leg never rests, so [`l2_book`](#l2_book) does not show it; the chain fires it when the mark crosses. See [`parked`](../rest/exchange.md#statuses-parked). **Not live yet:** the token ships with the next node release.
+- **`parked` is an ACCEPTED trigger leg held off the book.** It carries a real `oid`, `order.sz` is the whole leg, and `filled_sz`, `avg_px` and `reason` are all `null`. The leg never rests, so [`l2_book`](#l2_book) does not show it; the chain fires it when the mark crosses. See [`parked`](../rest/exchange.md#statuses-parked).
 - **`noop` is a SUCCESS, not a rejection** — a `reduce_only` order with nothing left to reduce. It placed nothing and it must not be retried; `rejected` is the one to act on. Branch on `status`, never on `reason`. See [`noop`](../rest/exchange.md#statuses-noop).
 - `order.oid` is a **decimal-digit string**, or `null` on a rejected placement.
 - On a **`filled`** record, `order.sz` = the **FILLED** size and `order.orig_sz` = the **original** order size (so `sz / orig_sz` is the fill fraction); a taker also carries cumulative `filled_sz` + `avg_px`, while a maker leg reports the per-match `filled_sz` with `status` still `open` while any size rests.
@@ -537,9 +536,7 @@ or a coin that names no perp is refused with
 created. That is the same refusal the
 [REST read](../rest/info/perpetuals.md#active_asset_data) answers as `404`. An
 unparseable `user` is refused as ``invalid `user` address``. There is no zeroed
-fallback snapshot. **Not live yet:** both refusals ship with the next node
-release, and a live node answers a zeroed snapshot that blanks your own `address`
-and `coin`.
+fallback snapshot.
 
 `coin` takes the market symbol here, and the numeric asset id is also accepted,
 because the channel routes on the asset id. The REST read takes the symbol only.

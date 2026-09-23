@@ -249,10 +249,9 @@ Notes on specific fields:
   DIFFERENT digests, so one signature covers exactly one wire form. `newName`
   signs as `""` when the payload sends no name; the chain refuses an empty name,
   so `""` can only mean unchanged. This string replaces a four-field
-  `VaultModify`, and a signature made with that older string is refused.
-  **Not live yet:** the new string ships with the next node release. A live node
-  still binds `newName` alone, so sign the four-field form until the release
-  lands. See [the action](../api/rest/exchange/vaults.md#vault_modify).
+  `VaultModify`, and a signature made with that older string is refused since
+  [block 11,550,001](../changelog/block-11550001.md#vault_modify). See
+  [the action](../api/rest/exchange/vaults.md#vault_modify).
 - `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the
   envelope nonce are the only signed fields, because neither action carries
   params. Both drain the WHOLE accrued credit and neither reports the amount, so

@@ -121,7 +121,7 @@ are and where to read them.
 | `ORDER_INVALID_SIZE` | 400 | ✅ | The size is off the lot grid. Round to a multiple of `details.limit` and resend |
 | `ORDER_BELOW_MIN_NOTIONAL` | 400 | — | Price × size is under the market minimum. Increase the size |
 | `ORDER_SELF_TRADE` | 400 | — | The two sides of an [`rfq_accept`](./rest/exchange/rfq-utility.md#rfq_accept) are one party. **RFQ lane only** — on the order book, [self-trade prevention](../concepts/order-types.md#stp-groups) CANCELS an order and never mints this code. Quote or accept from an account outside the taker's STP group |
-| `ORDER_DUPLICATE_CLOID` | 400 | — | The `cloid` is already in use on this account, or two legs of one action share it. Use a fresh one. **Do not** treat this as a failure to place — check whether the first submission rested. An attempt the COMMIT refused gives its `cloid` back, so a re-signed retry may reuse that handle (**not live yet**) |
+| `ORDER_DUPLICATE_CLOID` | 400 | — | The `cloid` is already in use on this account, or two legs of one action share it. Use a fresh one. **Do not** treat this as a failure to place — check whether the first submission rested. An attempt the COMMIT refused gives its `cloid` back, so a re-signed retry may reuse that handle |
 
 ### `MARGIN_*` — collateral {#margin}
 
@@ -172,7 +172,7 @@ it is affordable again after 50 ms; an `/exchange` write costs 5 weight, so
 
 | `code` | HTTP | `details` | Cause and caller action |
 |--------|------|-----------|-------------------------|
-| `NONCE_REPLAYED` | 200 | — | The block builder dropped the action: this account already used the nonce, or it sits more than 64 below the newest one. Nothing committed and the nonce is not consumed. **Do not retry at the same nonce** — re-sign at a higher one. **Not live yet:** a live node drops the replay in silence, and the caller waits out the order window |
+| `NONCE_REPLAYED` | 200 | — | The block builder dropped the action: this account already used the nonce, or it sits more than 64 below the newest one. Nothing committed and the nonce is not consumed. **Do not retry at the same nonce** — re-sign at a higher one |
 
 **The `200` is not a mistake.** This is a commit verdict, not an admission
 refusal, and every commit verdict rides a `200`. On an order action the same

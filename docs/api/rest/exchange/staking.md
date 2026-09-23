@@ -35,12 +35,11 @@ the resulting balances via [`/info`](../info.md).
 balance`, MTF spot asset not configured on this chain.
 
 **`amount` must sit on the token's wei grid.** An amount finer than the token's
-declared `wei_decimals` is refused with `INVALID_REQUEST` and the message
+declared `wei_decimals` is refused with `PRECONDITION_FAILED` and the message
 `amount is finer than the token's wei_decimals`. MTF declares 8 `wei_decimals`,
 so `"0.00000001"` is accepted and `"0.000000001"` is refused. Trailing zeros do
-not count: `"1.000000000"` is on an 8-decimal grid. **Not live yet:** the check
-ships with the next node release. A live node commits a sub-wei amount and
-leaves dust no ledger row can render. The same rule applies to
+not count: `"1.000000000"` is on an 8-decimal grid. The check exists because a
+sub-wei amount leaves dust that no ledger row can render. The same rule applies to
 [`c_withdraw`](#c_withdraw).
 
 ---

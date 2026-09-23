@@ -57,7 +57,7 @@ Returns an account's resting orders, across every perp book and every spot book.
 | `orders[*].px` | Decimal string | Resting price, whole units, tick-snapped |
 | `orders[*].sz` | Decimal string | Remaining size, whole units |
 | `orders[*].orig_sz` | Decimal string \| null | **Always `null`.** This read keeps no request size. `sz` is the size still resting |
-| `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none. A parked TP/SL row carries it too (**not live yet:** a live node reads `null` on every parked row) |
+| `orders[*].cloid` | hex string \| null | Client order id the order was placed with (`0x` + 32 hex chars); `null` when the order set none. A parked TP/SL row carries it too |
 | `orders[*].tif` | string | Lowercase time-in-force (`"gtc"` / `"ioc"` / `"alo"`), or the literal `"trigger"` on a parked TP/SL row |
 | `orders[*].reduce_only` | bool | **A row-kind label, not the order's flag.** `false` on every book row, `true` on every parked TP/SL row. See the rule below |
 | `orders[*].trigger` | object \| null | Trigger detail when the row is, or carries, a trigger; `null` otherwise |
@@ -339,9 +339,7 @@ its read-side rings.
 
 **A parked leg resolves by `cloid` from committed state**, not from a node-local
 index, so it keeps resolving after a node restart. Two parked legs that share a
-`cloid` resolve the LOWEST `oid`. **Not live yet:** it ships with the next node
-release. A live node resolves a parked leg by `cloid` only while its index
-survives.
+`cloid` resolve the LOWEST `oid`.
 
 :::info
 **One term for one state: `parked`.** A trigger leg held off the book is
@@ -402,7 +400,7 @@ The `data.status` field discriminates which shape follows.
 ```
 
 `cloid` is the leg's client order id, or `null` when the submitted order set
-none. **Not live yet:** the key ships with the next node release.
+none.
 
 A **ladder** leg adds `group`, and a **trailing** leg adds `trail_px`. Both
 keys follow the same absence rule as on [`open_orders`](#open_orders) — the
@@ -514,7 +512,7 @@ information about your order at all.
 `canceled`. A spot order or a scale rung that neither rests nor matches answers
 `rejected`, with `reason: "Order could not immediately match against any resting
 orders."` Both answered `unknown` before, because neither wrote a fill the ring
-could serve. **Not live yet:** both answers ship with the next node release.
+could serve.
 
 **What still answers `unknown`, by design.** The old `oid` of a
 [`modify`](../exchange/orders.md#modify) — ask by `cloid`, or by the new `oid` —
@@ -535,7 +533,7 @@ contract `historical_orders` already carries.
 |-------|------|---------|
 | `status` | `"resting" \| "triggered" \| "filled" \| "canceled" \| "cancel_rejected" \| "rejected" \| "unknown"` | Resolved lifecycle state. These seven tokens are the whole set |
 | `order` | object | Present on `"resting"` — `oid` (decimal-digit string), `coin` (market symbol or spot pair name), `side` (`"B"` = bid / `"A"` = ask), `px` / `sz` (decimal strings), `inserted_at`, `cloid` (hex \| null) |
-| `trigger` | object | Present on `"triggered"` — `oid` (decimal-digit string), `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool), `cloid` (hex \| `null`; **not live yet**). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
+| `trigger` | object | Present on `"triggered"` — `oid` (decimal-digit string), `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool), `cloid` (hex \| `null`). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
 | `fills` | array | Present on `"filled"` — EVERY matching leg, oldest first, each the shape of one [`user_fills`](#user_fills) record |
 | `total_filled_sz` | Decimal string | Present on `"filled"` — the sum of `fills[*].sz` |
 | `outcome` | object | Present on `"canceled"` / `"cancel_rejected"` / `"rejected"` — exactly five fields: `oid` (decimal-digit string \| `null`; `null` when the node holds no id for the record — always on `rejected`, and on a `cancel_rejected` for a `cloid` that never mapped to an order), `coin` (market symbol or spot pair name), `side` (`"B"` / `"A"` \| `null`; `null` on both cancel outcomes — a cancel names the order, not its side), `time` (uint64, consensus ms of the transition), `reason` (string \| `null`; `null` on a successful cancel — **branch on `status`, never on this string**). No `sz`, no `filled_sz`, no `cloid` — see [above](#order_status) |

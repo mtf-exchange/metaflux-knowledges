@@ -77,10 +77,6 @@ may reuse the handle. The dedup set is admission-local and bounded, so a very ol
 `cloid` may be admitted again. Committed-nonce uniqueness, not this set, is the
 hard replay guard.
 
-**Not live yet:** the per-leg check, the within-action refusal and the release of
-a refused `cloid` all ship with the next node release. A live node checks the
-single-order handle only, and it keeps the handle of an order the commit refused.
-
 **Common errors**: `px` not tick-aligned, `size` below market minimum, `reduce_only` would grow position, `stp` rejected via STP, account in T1+ liquidation tier.
 
 **Response status entries** (per order, in order — see the full union under
@@ -362,8 +358,7 @@ it does not authorize anything. Set the account you act for at `params.owner`.
 
 Returns an array of per-leg statuses (same union as `submit_order`) — **one entry
 per leg**, in input order, each echoing its own `cloid`. A parked TP/SL leg gets
-its own [`parked`](../exchange.md#statuses-parked) entry (**not live yet:** a live
-node leaves it out, so the array is shorter than the request). A batch carries at
+its own [`parked`](../exchange.md#statuses-parked) entry. A batch carries at
 most **1000** orders; an empty `orders` array is rejected with
 `INVALID_REQUEST`.
 
@@ -933,9 +928,7 @@ from [`open_orders`](../info/orders-fills.md#open_orders) filtered by the shared
 - **The ladder handle is reserved.** Every rung carries the one `cloid` you
   supply. A later single order that reuses it is refused at admission with
   `ORDER_DUPLICATE_CLOID`. Use a fresh handle per ladder — the SDKs tag ladder
-  handles with a `0x5c` prefix. **Not live yet:** the reservation ships with the
-  next node release. On a live node that reused order **joins** the group
-  instead, and a later [`cancel_scale`](#cancel_scale) cancels it too.
+  handles with a `0x5c` prefix.
 - **A reduce-only ladder does not clamp per rung.** A resting order carries no
   reduce-only flag, so a reduce-only ladder whose `total_size` is larger than your
   net position over-rests: once the position closes, the extra rungs can open the
