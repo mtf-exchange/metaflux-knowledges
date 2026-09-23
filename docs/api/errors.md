@@ -184,7 +184,7 @@ how a wrong clock walks an account out of it.
 
 | `code` | HTTP | `details` | Cause and caller action |
 |--------|------|-----------|-------------------------|
-| `INVALID_REQUEST` | 400 | sometimes | A field is missing, unparseable, or out of range. `message` names the field. Fix the body — a retry of the same bytes gets the same answer |
+| `INVALID_REQUEST` | 400 | sometimes | A field is missing, unparseable, or out of range, or an `/exchange` `action` is over 1 MiB (**not live yet**). `message` names the field. Fix the body — a retry of the same bytes gets the same answer. One case rides a `200`: the block builder drops an `action` that does not fit one block (**not live yet**) — see [the action byte cap](../changelog/next-release.md#action-byte-cap) |
 | `UNKNOWN_TYPE` | 400 / 410 | on 410 | The `/info` `type` names no read. See below |
 | `NOT_FOUND` | 404 | — | A named resource does not exist — a vault, a sub-account. Check the identifier. **An unknown ACCOUNT is not this**: an address never seen on-chain answers `200` with a zeroed record |
 | `ACTION_UNSUPPORTED` | 400 | — | The action decodes, but this build has no path for it. It is a system-only action, or a capability that is not open yet. Do not retry — see the [action catalog](./rest/exchange.md#action-catalog) |

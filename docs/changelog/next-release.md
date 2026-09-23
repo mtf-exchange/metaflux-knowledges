@@ -1,14 +1,17 @@
 ---
-description: Two wire rows that are not verified on the running chain — the rejected-leg error level and the size plane on archive candles — and two corrections to this reference. Nothing on this page waits for a node release.
+description: One rule that waits for the next node release — a 1 MiB cap on the signed action bytes — plus two wire rows that are not verified on the running chain and two corrections to this reference.
 ---
 
-# Unverified wire rows
+# Next release and unverified wire rows
 
 :::caution
-**Nothing on this page waits for a node release.** Every rule this page staged
-for the releases after 0.9.7 is live, and each one moved to
-[block 11,550,001](./block-11550001.md). The node rules turned on at that height.
-The gateway rows are on the same page, and they shipped with gateway 0.9.8.
+**One section waits for the next node release:**
+[the action byte cap](#action-byte-cap). A live node does not apply it yet.
+
+Every other rule this page staged for the releases after 0.9.7 is live, and each
+one moved to [block 11,550,001](./block-11550001.md). The node rules turned on at
+that height. The gateway rows are on the same page, and they shipped with gateway
+0.9.8.
 
 **What this page waits for is a MEASUREMENT.** Two rows below are in the shipped
 code, but nobody has yet read them on the running chain. Each row says what would
@@ -17,6 +20,31 @@ settle it. Until then, code to BOTH shapes it names.
 The page also keeps [two corrections](#corrections) to this reference. They are
 not chain changes.
 :::
+
+## The signed `action` is capped at 1 MiB {#action-byte-cap}
+
+**NOT LIVE YET.** This rule ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`/exchange`](../api/rest/exchange.md#request-envelope) with an `action` over 1,048,576 bytes | Accepted when the whole body is under 2 MiB | `400` `INVALID_REQUEST`, message `action is N bytes; the limit is 1048576 bytes` |
+| [`node_actions`](../nodes/data-streams.md#node_actions-rejections) `error_code` | No such code | `DROPPED_ACTION_TOO_LARGE`. Only a faulty proposer produces it |
+| `/exchange` with an `action` under the cap that does not fit one block | Accepted | Dropped before any block. The synchronous verdict is `200` `INVALID_REQUEST`, message `action too large: its stored form does not fit in one block` |
+
+**Why.** Every validator stores the exact `action` bytes in the block and checks
+the signature again at commit. The cap bounds the work that one action puts on
+every validator.
+
+**What counts.** The cap counts the `action` bytes as sent, whitespace included.
+A compact 1,000-leg `batch_order` is between a quarter and a half of the cap.
+
+**Why an action under the cap can still fail.** A block holds about 3 MiB. The
+node stores each action twice: the bytes as sent and the decoded action. A byte
+outside ASCII takes two bytes in that stored form. So only an action near the
+cap, made mostly of non-ASCII text, can be too large for one block.
+
+**What to do.** Send compact JSON. Both client SDKs already do. Nothing else
+moves: the 2 MiB body cap and every signing rule stay the same.
 
 ## A rejected leg's `error` loses a level {#leg-error}
 

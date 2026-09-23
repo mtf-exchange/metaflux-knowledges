@@ -1297,6 +1297,7 @@ refused it before it ran. It consumed no nonce and changed no state.
 | `DROPPED_PAYLOAD_KEYS_INACTIVE` | A `CoreEvmTransfer` carried payload keys that are not active yet |
 | `DROPPED_INVALID_SIGNATURE` | No authorized signature recovered from the action |
 | `DROPPED_NONCE_REPLAY` | This `(sender, nonce)` pair is already used |
+| `DROPPED_ACTION_TOO_LARGE` | The action's signed bytes exceed 1 MiB. Only a faulty proposer produces this row: admission refuses the same body with `INVALID_REQUEST`. **Not live yet** |
 
 **Any other code means the action dispatched and a state rule refused it.**
 Those codes are the same catalog `/exchange` answers with — read them in

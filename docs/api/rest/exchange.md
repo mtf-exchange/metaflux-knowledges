@@ -52,7 +52,7 @@ native `/exchange` is served directly at `http://localhost:8080`.
 |-------|------|----------|-------------|
 | `signature` | hex string, 65 bytes (130 hex chars; `0x` optional) | yes | secp256k1 ECDSA over the EIP-712 [typed-data digest](#signing) of the action's structured fields + `nonce`. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
 | `nonce` | uint64 | yes | Strictly-monotonic per actor. Conventionally `Date.now()`. Bound into the signed digest. See [idempotency](../../integration/idempotency.md). |
-| `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. |
+| `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. At most **1,048,576 bytes** as sent, whitespace included. The whole request body is capped at 2 MiB. The node refuses a larger `action` with `400` `INVALID_REQUEST`, before it parses the action or checks the signature. **Why:** every validator stores the exact `action` bytes in the block and checks the signature again at commit, so the cap bounds that work per action. Send compact JSON: a compact 1,000-leg `batch_order` is between a quarter and a half of the cap. An `action` under the cap can still fail to fit one block when most of it is non-ASCII text: the verdict is then `200` with `INVALID_REQUEST`. **NOT LIVE YET:** a live node applies only the 2 MiB body cap. |
 | `expires_after` | uint64 (ms) | no | **Optional** action expiry, in consensus milliseconds. Omit it or send `0` for the default (never expires) — that produces the exact same signed digest as before this field existed. A non-zero value is **signed into** the digest and the action is rejected once consensus time passes it. See [Optional action expiry](#optional-action-expiry-expiresafter). |
 
 :::info
@@ -883,7 +883,7 @@ order-body, collateral and market rule runs at COMMIT and answers a
 
 | `error.code` | Cause | Remediation |
 |--------------|-------|-------------|
-| `INVALID_REQUEST` | A field is missing, mis-sized or unparseable — a signature that is not 130 hex chars, an `owner` that is not 40 hex chars, an `action` that fails to parse, an empty `orders` / `cancels` array, a number above `2^128 - 1` | Fix the field the `message` names. Do not retry the same bytes |
+| `INVALID_REQUEST` | A field is missing, mis-sized or unparseable — a signature that is not 130 hex chars, an `owner` that is not 40 hex chars, an `action` that fails to parse, an empty `orders` / `cancels` array, a number above `2^128 - 1`, an `action` over 1 MiB (**not live yet**) | Fix the field the `message` names. Do not retry the same bytes |
 | `ACTION_UNSUPPORTED` | The action variant is recognised but not bridged on `/exchange`, or a field selects a behaviour with no core equivalent — `tif: "aon"`, `stp_mode: "reject"`, a `stop_loss` / `take_profit` with no `trigger` block | See the [non-bridged table](./exchange/transfers.md#non-bridged-actions) and use a supported value |
 | `ORDER_DUPLICATE_CLOID` | `submit_order` reused a client order id on the same account | Use a fresh `cloid`. Check first whether the earlier submission rested |
 | `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |

@@ -475,7 +475,7 @@ The commit loop dropped a committed action **before it dispatched**. The action 
 | `DROPPED_PAYLOAD_KEYS_INACTIVE` | A `core_evm_transfer` carries keys the unified lane has not armed. |
 | `DROPPED_NONCE_REPLAY` | The nonce is used, or below the per-sender replay window. |
 
-**A badly-signed action produces NO notice, by design.** The node emits this record only when the signature verified, so it knows who signed. Every other drop — an invalid signature, a malformed sender, an injected action from the wrong proposer — carries a sender the payload merely CLAIMED, and pushing it would let anyone post a failure into that account's feed. So the absence of a notice is not proof an action landed: a caller that must know either holds the [`/exchange`](../rest/exchange.md) request open for the synchronous verdict, or reads the account's state.
+**A badly-signed action produces NO notice, by design.** The node emits this record only when the signature verified, so it knows who signed. Every other drop — an invalid signature, a malformed sender, an injected action from the wrong proposer, an action over 1 MiB (`DROPPED_ACTION_TOO_LARGE`, **not live yet**) — carries a sender the payload merely CLAIMED, and pushing it would let anyone post a failure into that account's feed. So the absence of a notice is not proof an action landed: a caller that must know either holds the [`/exchange`](../rest/exchange.md) request open for the synchronous verdict, or reads the account's state.
 
 ### Per-account money movement history {#ledger_updates}
 
