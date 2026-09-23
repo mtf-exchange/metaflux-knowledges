@@ -182,7 +182,6 @@ you. Map it with [`markets_meta`](./info/perpetuals.md#markets_meta).
 A forced close and a [delist settlement](../../products/perpetuals.md#delisting)
 write the same `liquidation` row, and this read carries no `cause` to tell them
 apart. Read the cause from [`ledger_updates`](../ws/subscriptions.md#ledger_updates).
-**NOT LIVE YET:** a live node settles no position at a delist.
 
 `delegate` and `undelegate` do not change what the account holds in total. They
 move MTF between what it can withdraw and what it cannot, and that is a

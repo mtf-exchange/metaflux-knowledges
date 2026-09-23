@@ -886,7 +886,7 @@ order-body, collateral and market rule runs at COMMIT and answers a
 
 | `error.code` | Cause | Remediation |
 |--------------|-------|-------------|
-| `INVALID_REQUEST` | A field is missing, mis-sized or unparseable — a signature that is not 130 hex chars, an `owner` that is not 40 hex chars, an `action` that fails to parse, an empty `orders` / `cancels` array, a number above `2^128 - 1`, an `action` over 1 MiB (**not live yet**) | Fix the field the `message` names. Do not retry the same bytes |
+| `INVALID_REQUEST` | A field is missing, mis-sized or unparseable — a signature that is not 130 hex chars, an `owner` that is not 40 hex chars, an `action` that fails to parse, an empty `orders` / `cancels` array, a number above `2^128 - 1`, an `action` over 1 MiB | Fix the field the `message` names. Do not retry the same bytes |
 | `ACTION_UNSUPPORTED` | The action variant is recognised but not bridged on `/exchange`, or a field selects a behaviour with no core equivalent — `tif: "aon"`, `stp_mode: "reject"`, a `stop_loss` / `take_profit` with no `trigger` block | See the [non-bridged table](./exchange/transfers.md#non-bridged-actions) and use a supported value |
 | `ORDER_DUPLICATE_CLOID` | `submit_order` reused a client order id on the same account | Use a fresh `cloid`. Check first whether the earlier submission rested |
 | `PRECONDITION_FAILED` | A state rule refused the action and the rule has no code of its own — a trailing callback of `0`, a trailing leg on the wrong side, an owner-less action that is not sender-authorized | Read `message` for the reason. **Do not match on it** |
@@ -904,7 +904,6 @@ obvious from the sentence:
   and every order on it is refused, reduce-only included. A retry never
   succeeds. Test `settled` on [`markets`](./info/perpetuals.md#markets) rather
   than the message. See [Delisting a perp market](../../products/perpetuals.md#delisting).
-  **NOT LIVE YET:** a live node never sends it.
 - **`this node is not on the exchange-serving allowlist`.** Nothing in your
   request is wrong, and the message carries no address. The node you reached
   does not serve `POST /exchange` writes. Treat it as a **routing** failure:
@@ -939,7 +938,7 @@ moment — so the chain cannot answer it at admission. The verdict comes back on
 | `MARGIN_INSUFFICIENT` | The account cannot fund the requirement. Carries `details` | `details.limit` is free collateral, `details.actual` is what is needed |
 | `MARKET_INACTIVE` | The market is disabled, closed or reduce-only. A perp that a delist halted or settled, or that governance paused, answers `PRECONDITION_FAILED` instead | Send a closing order, or wait |
 | `MARKET_OI_CAP` | Open interest is at the market cap | Nothing in the request is wrong. Wait, or trade elsewhere |
-| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer, withdrawal or spot order. **Not live yet** for a spot order: a live node accepts an unfunded spot order as a no-op | Check the free balance; a held balance is not spendable |
+| `ASSET_INSUFFICIENT_BALANCE` | The spot balance cannot fund the transfer, withdrawal or spot order. A spot order that the balance cannot fund at all is refused with `insufficient spot balance`, and no order id is burned | Check the free balance; a held balance is not spendable |
 
 `PRECONDITION_FAILED` reaches you from **both** points: admission mints it for
 the shape rules above, and the commit mints it for every state rule that has no

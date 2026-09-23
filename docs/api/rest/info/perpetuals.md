@@ -129,10 +129,6 @@ Response (truncated to one entry per list):
 | `spot.pairs` | array | Spot pair registry (same rows as [the spot registry](./spot.md#spot_meta) `pairs`, plus live `mark_px` / `mid_px` / `day_ntl_vlm`) |
 | `spot.tokens` | array | Spot token registry (same rows as [the spot registry](./spot.md#spot_meta) `tokens`) |
 
-> ⚠️ **NOT LIVE YET.** `settled` and `settled_px` ship with the next node
-> release. A live node never sends either key, and a delisted market stays halted
-> with its positions open.
-
 **Rules**
 
 - **Test `settled` before `halted`.** A settled market reads `halted: true` too,
@@ -988,12 +984,6 @@ guarantee that the order is admitted.
 On a split `standard` account that free collateral is the perp wallet's, with no
 reservation cap. On a `standard` account that entered before the split, the
 `perp` reservation also caps both figures.
-
-:::caution Not live yet
-The uncapped read ships with the next node release after 0.9.7. Until then, a
-live node caps both figures by the `perp` reservation on a split account too, so
-a split account with no `perp` reservation reads `["0", "0"]`.
-:::
 
 ### `margin_table` — removed {#margin_table--removed}
 

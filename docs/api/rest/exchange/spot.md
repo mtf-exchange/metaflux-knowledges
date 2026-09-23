@@ -70,12 +70,6 @@ buy that holds quote, when the pair carries no **foreign ask** (an ask from
 another account). A foreign ask your quote cannot buy one lot of is a refusal,
 not a no-op.
 
-:::caution Not live yet
-The refusal ships with the next node release after 0.9.7. Until then, a live node
-accepts an entirely unaffordable order as a no-op and answers `filled` with
-`total_sz: "0"`.
-:::
-
 **Fees & settlement.** A fill swaps base for quote at the **maker's** resting
 price. The taker fee is taken from the leg the taker receives; the maker fee from
 the leg the maker receives. Fees accrue to the spot fee account.

@@ -98,9 +98,8 @@ price, and cannot be liquidated.
 
 ## Delisting a perp market {#delisting}
 
-> ⚠️ **NOT LIVE YET.** The settlement below ships with the next node release.
-> Until then, a delist cancels resting orders and makes the market reduce-only.
-> Open positions stay open, and `markets` never sends the `settled` key.
+The settlement below is live since node 0.9.10 — see
+[block 11,550,001](../changelog/block-11550001.md#no-height-pin).
 
 Governance delists a perp market by a two-thirds-stake validator vote. The
 vote ends the market in ONE block, in this order:

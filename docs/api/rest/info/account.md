@@ -227,8 +227,8 @@ three share are `address` and the `height` / `time` stamp. See
 | `health_deferred` | `true` \| absent | Present, and only ever `true`, when the risk engine cannot price a leg. **The risk numbers are then not a solvency statement** — see [account value](../../../concepts/account-value.md). Absent is the normal case; treat absent as `false` |
 | `tier` | enum **string** | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when no maintenance margin) — see [tiered liquidation](../../../concepts/tiered-liquidation.md). It is a STRING, never a number |
 | `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (two USDC wallets — see [account modes](../../../concepts/account-modes.md#standard)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
-| `reservations` | object \| **absent** | The per-product reservation ledger. Present **only when `abstraction` is `"standard"` and `split` is `false`** — see [`reservations`](#account-state-reservations) below. **Not live yet:** a live node also serves it when `split` is `true`. A 0.9.6 node omits it in every mode |
-| `split` | bool \| **absent** | Present **only when `abstraction` is `"standard"`**. `true` = the account holds two USDC wallets (it entered `standard` under the live split gate); `false` = one pooled balance, the posture of an account that entered before the arm. When `true`, `account_value` and `withdrawable` are the perp wallet, the USDC row of `spot.balances` is the spot wallet, and `reservations` is absent (**not live yet:** a live node still serves it). Read it before you interpret the USDC row — see [the standard-mode split](../../../concepts/usdc.md#standard-split). Served from node 0.9.7; an older node omits the key in every mode |
+| `reservations` | object \| **absent** | The per-product reservation ledger. Present **only when `abstraction` is `"standard"` and `split` is `false`** — see [`reservations`](#account-state-reservations) below. A 0.9.6 node omits it in every mode |
+| `split` | bool \| **absent** | Present **only when `abstraction` is `"standard"`**. `true` = the account holds two USDC wallets (it entered `standard` under the live split gate); `false` = one pooled balance, the posture of an account that entered before the arm. When `true`, `account_value` and `withdrawable` are the perp wallet, the USDC row of `spot.balances` is the spot wallet, and `reservations` is absent. Read it before you interpret the USDC row — see [the standard-mode split](../../../concepts/usdc.md#standard-split). Served from node 0.9.7; an older node omits the key in every mode |
 | `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled. **Account-scoped, so it is NOT under `perp`** — see the warning above |
 | `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs) — see [hedge mode](../../../concepts/hedge-mode.md) |
 | `height` | uint64 | Committed block height this snapshot reflects. A **bare integer**, not a Decimal string. Advances on **every** commit, even when nothing else in the record changed |
@@ -348,14 +348,6 @@ available(p) = max(0, min(reserved(p) − held(p),
 So a scope can read `"0"` while `reserved` still exceeds `held` — the other scopes
 have promised the rest of the pool away. **This is the figure that explains a
 margin rejection on an account that holds USDC.**
-
-:::caution Not live yet
-The field is absent on a split account from the next node release after 0.9.7.
-Until then, a live node serves it when `split` is `true`, with a changed `spot`
-row: `reserved` reads `"0"`, `held` is unchanged, and `available` is the spot
-wallet itself. The `perp` and `option` rows still cap admission on that node.
-See [the standard-mode split](../../../concepts/usdc.md#standard-split).
-:::
 
 The ledger binds ADMISSION only. No engine path (liquidation, ADL, settlement,
 funding) and no cash path (withdraw, transfer, vault, Earn) reads it, so a

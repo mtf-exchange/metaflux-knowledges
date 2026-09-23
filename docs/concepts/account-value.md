@@ -266,12 +266,6 @@ A split `standard` account gets the same formula over its perp wallet, with no
 reservation cap. A `standard` account that entered before the split is also
 capped by its `perp` reservation.
 
-:::caution Not live yet
-The uncapped pair ships with the next node release after 0.9.7. Until then, a
-live node caps it by the `perp` reservation on a split account too, so a split
-account with no `perp` reservation reads `["0", "0"]`.
-:::
-
 Because it is derived from `withdrawable`, it carries the same unrealized-loss
 term: an open loss shrinks what the ticket offers on the increasing side, and an
 open gain does not grow it.

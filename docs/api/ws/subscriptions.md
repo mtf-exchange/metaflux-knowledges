@@ -313,8 +313,8 @@ So the **snapshot is all rows** and a **delta is the changed rows only** — dem
 | `prev_day_px` | Decimal string \| null | Mark ~24h ago (whole-USDC); `null` when no 24h-ago sample |
 | `change_24h` | Decimal string \| null | Signed 24h change fraction (`"0.05"` = +5%); `null` when no prior px |
 | `halted` | bool | Whether the market is halted |
-| `settled` | bool \| absent | `true` on a permanently closed market; **ABSENT** on every other market. Same rule as the REST [`markets`](../rest/info/perpetuals.md#markets) row. **NOT LIVE YET:** a live node never sends it |
-| `settled_px` | Decimal string \| absent | Whole-USDC price every position closed at. Absent when no position was open at the delist. **NOT LIVE YET** |
+| `settled` | bool \| absent | `true` on a permanently closed market; **ABSENT** on every other market. Same rule as the REST [`markets`](../rest/info/perpetuals.md#markets) row |
+| `settled_px` | Decimal string \| absent | Whole-USDC price every position closed at. Absent when no position was open at the delist |
 
 Spot rows carry only the fields with a spot analogue — `coin`, `kind` (`"spot"`), `mark_px`, `mid_px` (omitted when one-sided), `day_ntl_vlm`, `prev_day_px`; the perp-only fields (`oracle_px` / `premium` / `funding` / `open_interest` / `change_24h` / `halted` / `settled` / `settled_px`) are absent.
 
@@ -476,7 +476,7 @@ The commit loop dropped a committed action **before it dispatched**. The action 
 | `DROPPED_PAYLOAD_KEYS_INACTIVE` | A `core_evm_transfer` carries keys the unified lane has not armed. |
 | `DROPPED_NONCE_REPLAY` | The nonce is used, or below the per-sender replay window. |
 
-**A badly-signed action produces NO notice, by design.** The node emits this record only when the signature verified, so it knows who signed. Every other drop — an invalid signature, a malformed sender, an injected action from the wrong proposer, an action over 1 MiB (`DROPPED_ACTION_TOO_LARGE`, **not live yet**) — carries a sender the payload merely CLAIMED, and pushing it would let anyone post a failure into that account's feed. So the absence of a notice is not proof an action landed: a caller that must know either holds the [`/exchange`](../rest/exchange.md) request open for the synchronous verdict, or reads the account's state.
+**A badly-signed action produces NO notice, by design.** The node emits this record only when the signature verified, so it knows who signed. Every other drop — an invalid signature, a malformed sender, an injected action from the wrong proposer, an action over 1 MiB (`DROPPED_ACTION_TOO_LARGE`) — carries a sender the payload merely CLAIMED, and pushing it would let anyone post a failure into that account's feed. So the absence of a notice is not proof an action landed: a caller that must know either holds the [`/exchange`](../rest/exchange.md) request open for the synchronous verdict, or reads the account's state.
 
 ### Per-account money movement history {#ledger_updates}
 
@@ -513,7 +513,7 @@ Field rules for the two new kinds:
 - `liquidation.amount` is **SIGNED** — negative on a loss. This is the one signed `amount` on the channel; every existing kind stays unsigned with direction read from `kind`.
 - `liquidation.coin` is the settlement token (USDC); `market` names the perp the forced close ran on.
 - `liquidation.cause` is `forced_close_partial` / `forced_close_full` / `forced_close_isolated` / `forced_close_governance`, the same values `user_fills` carries, or `delist_settlement`.
-- **`delist_settlement` is a delist, not a liquidation.** A delist closed the leg at the settlement price by ledger entry. It charges no fee and writes no fill, so `user_fills` never carries this value. `mark_px` is the settlement price. See [Delisting a perp market](../../products/perpetuals.md#delisting). **NOT LIVE YET:** a live node never sends this value.
+- **`delist_settlement` is a delist, not a liquidation.** A delist closed the leg at the settlement price by ledger entry. It charges no fee and writes no fill, so `user_fills` never carries this value. `mark_px` is the settlement price. See [Delisting a perp market](../../products/perpetuals.md#delisting).
 - **`forced_close_governance` is a forced close that is NOT a liquidation.** A validator-quorum `force_close_position` settles against the book like the ladder does, and it writes the same record — but it charges no liquidation fee and bumps no liquidation counter. Read the `cause` before you fold the record into a liquidation total.
 - **One vote closes BOTH legs.** Live from node 0.9.7: one vote closes each leg the account holds, and a hedge account gets **two** `liquidation` records per vote, one per leg. An older node closed only the long leg, so a hedge account kept its short. The vote's `max_size` caps each leg on its own. The action's outcome summary reads `forceClosePosition partial (quorum met): residual stays open` when any leg keeps size; it read `accepted` before. The vote payload does not change.
 - `liquidation.mark_px` is the whole-USDC mark the slice was priced from; the key is ABSENT when the market had no usable mark at the slice.

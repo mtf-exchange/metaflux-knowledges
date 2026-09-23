@@ -162,16 +162,6 @@ Four rules follow, and each is deliberate:
    balance until it leaves the mode and enters again. Leaving folds the spot
    wallet back into the pool.
 
-:::caution Not live yet
-Two parts of the rules above ship with the next node release after 0.9.7: the
-refusal of every reservation in rule 2, and the whole of rule 3. The spot-margin
-refusal in rule 2 is live now. Until the release, a live node refuses only a
-nonzero `spot` reservation on a split account
-(`spot has its own wallet in standard mode; no spot reservation`). It still caps
-perp and option orders by the `perp` and `option` reservations, and it accepts an
-unfunded spot order as a no-op.
-:::
-
 **Reading the two wallets.** `account_value` and `withdrawable` on
 [`account_state`](../api/rest/info/account.md#account_state) are the perp wallet.
 The USDC row of `spot.balances` is the spot wallet, and `total − hold` is what a

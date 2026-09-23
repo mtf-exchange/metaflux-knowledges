@@ -106,27 +106,16 @@ Returns one account's staking, delegation, and unbonding state.
 `n_active_validators` and `reward_source` sit at the top level. There is no
 `reward_pool` object.
 
-:::warning[`lock_months` and `reward_weight` are NOT LIVE YET]
-The two keys ship with the next node release. A live node serves a delegation row with exactly
-`validator`, `amount`, `since_ts` and `pending_rewards` — the example above shows the target shape,
-not today's. **Read both keys as optional**: absent on a live node, present after the release. A
-client that requires either key breaks against the chain you can reach today.
-
-Everything the rules below say about the two keys describes the released behaviour. The rule that
-does hold today is the one about `pending_rewards`: a flexible row accrues nothing, and the served
-read gives you no way to see why until these keys land.
-:::
-
 | Field | Type | Meaning |
 |-------|------|---------|
 | `address` | hex address | Resolved account address |
 | `total_staked` | Decimal string | This account's delegated stake only, whole-MTF — the sum of `delegations[*].amount`. It is `"0"` for an account that delegates nothing |
 | `delegations[*].validator` | hex address | Validator the stake is delegated to |
 | `delegations[*].amount` | Decimal string | Stake delegated to this validator, whole-MTF |
-| `delegations[*].lock_months` | uint8 | The row's lock tier in committed state: `0` flexible, or `1`, `6`, `24`. It tells a delegator what to change. Do not compute `reward_weight` from it. **NOT LIVE YET** — see the notice above |
-| `delegations[*].reward_weight` | Decimal string | This row's weight in its validator's reward split, on the same whole-MTF plane as `amount`. The row's share of a distribution is this weight over the sum of weights at that validator, before the validator's commission. It is a weight, not a payable amount. **It is not derivable from `lock_months`** — see the rules below. **NOT LIVE YET** — see the notice above |
+| `delegations[*].lock_months` | uint8 | The row's lock tier in committed state: `0` flexible, or `1`, `6`, `24`. It tells a delegator what to change. Do not compute `reward_weight` from it |
+| `delegations[*].reward_weight` | Decimal string | This row's weight in its validator's reward split, on the same whole-MTF plane as `amount`. The row's share of a distribution is this weight over the sum of weights at that validator, before the validator's commission. It is a weight, not a payable amount. **It is not derivable from `lock_months`** — see the rules below |
 | `delegations[*].since_ts` | uint64 | **Last reward-claim time, consensus ms — not the time the delegation began.** Committed state keeps the last-claim stamp only. Do not compute a delegation age from it |
-| `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards, whole-MTF. A row whose `reward_weight` is `"0"` never accrues here — see the rules below |
+| `delegations[*].pending_rewards` | Decimal string | Accrued, unclaimed rewards, whole-MTF. A row whose `reward_weight` is `"0"` gains nothing new here — see the rules below. It can still show a balance from earlier accrual. That balance does not grow |
 | `pending_unstakes[*].amount` | Decimal string | Stake in the unbonding window, whole-MTF |
 | `pending_unstakes[*].matures_at_ts` | uint64 | When that amount becomes withdrawable, consensus ms |
 | `total_stake` | Decimal string | Total staked MTF across the **whole chain**, whole-MTF — the denominator this account's delegated stake competes in. Chain-wide, not per-account |

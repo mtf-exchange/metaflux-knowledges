@@ -139,9 +139,6 @@ A skipped sample is folded as 0, so the premium-index EMA **decays toward 0** an
 
 ## A paused or closed market {#paused-market}
 
-> ⚠️ **NOT LIVE YET.** The rule below ships with the next node release. A live
-> node settles funding on every market, whatever its flags.
-
 Governance can stop trading on a market in steps. Funding follows one rule:
 **funding settles only while a holder can close the position.**
 

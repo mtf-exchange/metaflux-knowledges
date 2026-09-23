@@ -484,14 +484,6 @@ against the perp wallet's free collateral, and its spot orders against the spot
 wallet, with no cap. Kinds 1–3 on a split account are refused, whatever the
 value.
 
-:::caution Not live yet
-Uncapped admission and the refusal of kinds 1–3 on a split account ship with the
-next node release after 0.9.7. Until then, a live node refuses only a nonzero
-`kind: 2` on a split account. It caps the perp and option orders of a split
-account by the `perp` and `option` reservations, so a split account with no
-`perp` reservation opens no perp position.
-:::
-
 **A mode change needs a FLAT account.** Every perp leg, spot order, spot-margin
 position, option position, live TWAP, parked trigger and open RFQ must be gone.
 The rejection names the first surface it found. A RESERVATION change needs no
@@ -523,7 +515,7 @@ Rejections, all `Precondition` unless noted:
 | `reservations exceed account value` | an INCREASE whose new total exceeds account value |
 | `cannot change abstraction while enrolled in portfolio margin` | PM enrolled |
 | `cannot change abstraction with <surface>` | the account is not flat |
-| `a split standard account has no reservations` | `kind` 1, 2 or 3, any value, on a split `standard` account. **Not live yet:** a live node refuses only a nonzero `kind: 2`, with `spot has its own wallet in standard mode; no spot reservation` |
+| `a split standard account has no reservations` | `kind` 1, 2 or 3, any value, on a split `standard` account |
 | `perp wallet is negative; cannot enter standard mode` | `kind: 0, value: 1` while the perp wallet is below zero |
 | `spot wallet is negative; cannot leave standard mode` | `kind: 0, value: 0` while the split account's spot wallet is below zero |
 

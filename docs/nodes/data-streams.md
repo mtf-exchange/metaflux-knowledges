@@ -661,7 +661,7 @@ A `liquidation` record is a forced close or a
 [delist settlement](../products/perpetuals.md#delisting). It has no `cause`
 field, so the two look the same here. The WS
 [`ledger_updates`](../api/ws/subscriptions.md#ledger_updates) feed carries the
-cause. **NOT LIVE YET:** a live node settles no position at a delist.
+cause.
 
 The event order inside `events` is deterministic on replay, so the index of an
 event within its block is a stable per-block discriminator.

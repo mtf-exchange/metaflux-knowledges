@@ -83,20 +83,6 @@ against the spot wallet. A spot order the spot wallet cannot fund is refused wit
 `insufficient spot balance`. A split account has no reservations and no spot
 margin.
 
-:::caution Not live yet
-Uncapped admission, the refusal of an unfunded spot order and the refusal of every
-reservation ship with the next node release after 0.9.7. Until then, a live node:
-
-- caps the perp and option orders of a split account by its `perp` and `option`
-  reservations, so a split account with no `perp` reservation opens no perp
-  position;
-- accepts a spot order the spot wallet cannot fund as a no-op, and answers
-  `filled` with `total_sz: "0"`.
-
-To trade perps on a live node, first set a `perp` reservation with
-[`user_set_abstraction`](../api/rest/exchange/account.md#user_set_abstraction) `kind: 1`.
-:::
-
 **Reading the two wallets.** `account_value` and `withdrawable` are the perp
 wallet. The USDC row of `spot.balances` is the spot wallet. Its `total` includes
 the USDC that resting spot bids hold, so `total − hold` is what a new spot order

@@ -106,12 +106,6 @@ a refusal, not a no-op. A partially-affordable order trades/rests the
 affordable portion. Because the clamp runs **before** matching, every resulting
 fill and every escrow reservation is funded; there is no post-match fill drop.
 
-:::caution Not live yet
-The refusal ships with the next node release after 0.9.7. Until then, a live node
-accepts an entirely unaffordable order as a no-op and answers `filled` with
-`total_sz: "0"`.
-:::
-
 ## Matching, fills, and fees {#matching-fills-and-fees}
 
 Spot matching is the same price-time CLOB the rest of MetaFlux uses. A fill swaps
@@ -236,7 +230,7 @@ pay the counterparty on fill, or come back to your spendable balance on cancel.
 **Q: Why did my large buy only partially fill / rest?**
 A: Affordability clamping. The order size is reduced to what your quote balance
 funds at the limit price. An entirely unaffordable order is refused
-(`insufficient spot balance`). **Not live yet:** a live node accepts it as a no-op.
+(`insufficient spot balance`).
 
 **Q: Can I place a spot market order?**
 A: Yes — send `limit_px = 0` with `tif: "ioc"`. `gtc` / `alo` require a positive
