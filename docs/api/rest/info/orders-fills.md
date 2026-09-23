@@ -526,7 +526,7 @@ cannot prove.
 An order cancelled through [`batch_cancel`](../exchange/orders.md#batch_cancel)
 also answers `unknown` here. Read its outcome from the `batch_cancel` reply or
 from [`order_updates`](../../ws/subscriptions.md#order_updates) instead: each
-leg reports its own result there (**not live yet**).
+leg reports its own result there.
 
 The terminal states above come from a **node-local retention window**, not from
 committed state. A node restart empties that window, so after a restart the node

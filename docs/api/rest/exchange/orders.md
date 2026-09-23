@@ -490,13 +490,6 @@ for at `params.owner`.
 
 #### The `batch_cancel` reply {#batch_cancel-reply}
 
-:::caution
-**NOT LIVE YET.** The `statuses` array and the `order_updates` records below
-ship with the next node release. A live node answers only the admission
-fields. It does not tell you which legs removed an order, and it pushes no
-`order_updates` record for a `batch_cancel` leg.
-:::
-
 A committed `batch_cancel` answers `200` with the admission fields every
 non-order action carries: `accepted`, `committed`, `nonce`, `action_hash` and
 `mempool_depth`. It also carries a `statuses` array with one entry per

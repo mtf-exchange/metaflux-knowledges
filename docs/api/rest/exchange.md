@@ -52,7 +52,7 @@ native `/exchange` is served directly at `http://localhost:8080`.
 |-------|------|----------|-------------|
 | `signature` | hex string, 65 bytes (130 hex chars; `0x` optional) | yes | secp256k1 ECDSA over the EIP-712 [typed-data digest](#signing) of the action's structured fields + `nonce`. `r ‖ s ‖ v`. Both legacy `v ∈ {27, 28}` and EIP-2098 `v ∈ {0, 1}` accepted. |
 | `nonce` | uint64 | yes | Strictly-monotonic per actor. Conventionally `Date.now()`. Bound into the signed digest. See [idempotency](../../integration/idempotency.md). |
-| `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. At most **1,048,576 bytes** as sent, whitespace included. The whole request body is capped at 2 MiB. The node refuses a larger `action` with `400` `INVALID_REQUEST`, before it parses the action or checks the signature. **Why:** every validator stores the exact `action` bytes in the block and checks the signature again at commit, so the cap bounds that work per action. Send compact JSON: a compact 1,000-leg `batch_order` is between a quarter and a half of the cap. An `action` under the cap can still fail to fit one block when most of it is non-ASCII text: the verdict is then `200` with `INVALID_REQUEST`. **NOT LIVE YET:** a live node applies only the 2 MiB body cap. |
+| `action` | object | yes | A tagged variant: `{ "type": "<snake_case_tag>", ... }`. See [Action catalog](#action-catalog) below. At most **1,048,576 bytes** as sent, whitespace included. The whole request body is capped at 2 MiB. The node refuses a larger `action` with `400` `INVALID_REQUEST`, before it parses the action or checks the signature. **Why:** every validator stores the exact `action` bytes in the block and checks the signature again at commit, so the cap bounds that work per action. Send compact JSON: a compact 1,000-leg `batch_order` is between a quarter and a half of the cap. An `action` under the cap can still fail to fit one block when most of it is non-ASCII text: the verdict is then `200` with `INVALID_REQUEST`. The public endpoint refuses a body over 1 MiB with `413` and an HTML page, before the node sees it — see [block 17,113,494](../../changelog/block-17113494.md#action-byte-cap). |
 | `expires_after` | uint64 (ms) | no | **Optional** action expiry, in consensus milliseconds. Omit it or send `0` for the default (never expires) — that produces the exact same signed digest as before this field existed. A non-zero value is **signed into** the digest and the action is rejected once consensus time passes it. See [Optional action expiry](#optional-action-expiry-expiresafter). |
 
 :::info
@@ -661,8 +661,7 @@ The payload inside `data` depends on the action class:
   observed inside the wait window, `202 Accepted` when it is not. Treat both as
   admitted, and read `committed`.
 - **[`batch_cancel`](./exchange/orders.md#batch_cancel-reply)** → the admission
-  payload plus a `statuses` array, one `canceled` or `error` entry per leg
-  (**not live yet**).
+  payload plus a `statuses` array, one `canceled` or `error` entry per leg.
 - **Any admission-time rejection** → the `error` envelope, at the status its
   code maps to.
 
@@ -695,7 +694,7 @@ object naming the leg's outcome:
 { "error":   { "code": "MARGIN_INSUFFICIENT", "message": "..." } }     // this leg was rejected
 { "noop":    { "reason": "position already flat, nothing to reduce" } } // accepted, and it changed nothing
 { "parked":  { "oid": "12345", "cloid": "0x..." } }                     // trigger leg accepted, and held off the book
-{ "canceled": { "oid": "12345" } }                                      // batch_cancel leg removed its order (not live yet)
+{ "canceled": { "oid": "12345" } }                                      // batch_cancel leg removed its order
 { "pending": { "action_hash": "0x<keccak>", "nonce": 1735689600001 } }  // admitted but no commit seen in the wait window
 ```
 
