@@ -1,12 +1,13 @@
 ---
-description: One wire row that is not verified on the running chain, and two corrections to this reference. Nothing on this page waits for a node release.
+description: One change that waits for the next node release — order_status answers for a batch_cancel leg — one wire row that is not verified on the running chain, and two corrections to this reference.
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Nothing on this page waits for a node release.** The action byte cap and the
-per-leg `batch_cancel` reply went live at
+**One section waits for the next node release:**
+[`order_status` for a `batch_cancel` leg](#batch-cancel-status). The action byte
+cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
 Every other rule this page staged for the releases after 0.9.7 is live, and each
@@ -24,6 +25,21 @@ The rejected-leg `error` level is settled: a live `batch_cancel` reply read on
 The page also keeps [two corrections](#corrections) to this reference. They are
 not chain changes.
 :::
+
+## `order_status` answers for a `batch_cancel` leg {#batch-cancel-status}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`order_status`](../api/rest/info/orders-fills.md) for an order a `batch_cancel` leg removed | `unknown` | `canceled` |
+
+**Why.** A `batch_cancel` carries a verdict per leg, so the node can prove which
+legs removed an order. It records only those. A refused leg leaves the order's
+earlier terminal state untouched.
+
+**What to do.** Nothing. Until the release, read a leg's outcome from the
+`batch_cancel` reply or from `order_updates`.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

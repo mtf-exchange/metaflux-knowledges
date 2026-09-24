@@ -523,10 +523,16 @@ and any order cancelled through
 verdict for the whole action, so the node will not claim a per-order outcome it
 cannot prove.
 
-An order cancelled through [`batch_cancel`](../exchange/orders.md#batch_cancel)
-also answers `unknown` here. Read its outcome from the `batch_cancel` reply or
-from [`order_updates`](../../ws/subscriptions.md#order_updates) instead: each
-leg reports its own result there.
+An order that a [`batch_cancel`](../exchange/orders.md#batch_cancel) leg removed
+answers `canceled` here. Each leg carries its own verdict, so the node records
+only the legs that removed an order. A refused leg names an order that is
+already gone, and it leaves that order's earlier terminal state untouched.
+
+**Not live yet.** This ships with the next node release. Until then a
+batch-cancelled order answers `unknown` here: read its outcome from the
+`batch_cancel` reply or from
+[`order_updates`](../../ws/subscriptions.md#order_updates), where each leg
+reports its own result.
 
 The terminal states above come from a **node-local retention window**, not from
 committed state. A node restart empties that window, so after a restart the node
