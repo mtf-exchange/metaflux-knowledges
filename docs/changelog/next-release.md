@@ -1,12 +1,14 @@
 ---
-description: One change that waits for the next node release — order_status answers for a batch_cancel leg — one wire row that is not verified on the running chain, and two corrections to this reference.
+description: Three changes that wait for the next node release — order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, and mtfStatus for two transactions at one nonce — one wire row that is not verified on the running chain, and two corrections to this reference.
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**One section waits for the next node release:**
-[`order_status` for a `batch_cancel` leg](#batch-cancel-status). The action byte
+**Three sections wait for the next node release:**
+[`order_status` for a `batch_cancel` leg](#batch-cancel-status),
+[`contractAddress` on a deployment receipt](#contract-address) and
+[`mtfStatus` for two transactions at one nonce](#same-nonce-status). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -40,6 +42,39 @@ earlier terminal state untouched.
 
 **What to do.** Nothing. Until the release, read a leg's outcome from the
 `batch_cancel` reply or from `order_updates`.
+
+## `contractAddress` on a deployment receipt {#contract-address}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`eth_getTransactionReceipt`](../evm/index.md#contract-address) `contractAddress` for a successful deployment | `null` | the address of the deployed contract |
+
+**Why.** The node derives the address from the sender and the nonce when it
+stores the receipt of a successful deployment. A call, a failed deployment and
+a receipt stored before the release keep `null`. There is no backfill.
+
+**What to do.** Nothing. Until the release, and for an older receipt, compute
+the address locally from the sender and the nonce.
+
+## `mtfStatus` for two transactions at one nonce {#same-nonce-status}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+One EVM block can hold two transactions from one sender at the same nonce. When
+the node refuses the first before it runs (for example `insufficient_funds`),
+the nonce stays free, and the second transaction runs.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`mtfStatus`](../evm/index.md#mtf-status) and `status` of the second transaction | `bad_nonce`, `0x0` | what really happened to it, for example `success`, `0x1` |
+
+**Why.** The live node counts the refused transaction as if it used the nonce.
+
+**What to do.** Nothing. Until the release, a `bad_nonce` receipt next to a
+refused transaction at the same nonce can be wrong. Read the sender's nonce or
+the contract code to confirm.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

@@ -404,20 +404,33 @@ the old placeholder. Do not decide from `gas` or `type` alone — a
 placeholder's gas-used value can coincidentally match a real gas limit, and
 its `type` reads the same `0x0` a genuine legacy transaction also reports.
 
-##### `contractAddress` stays null {#contractaddress-stays-null}
+#### `contractAddress` on a deployment receipt {#contract-address}
 
-`contractAddress` on a receipt reads `null` for every transaction, deployment
-included, on both old and new rows. This is unrelated to the raw-bytes change
-above.
+**Not live yet.** This ships with the next node release. Until then a live
+node answers `null` for `contractAddress` on every receipt, deployment
+included.
 
-The field is carried, not missing: the receipt row reserves a slot for it, so
-a future release can fill it in with no wire-shape change. It is never
-populated today. revm reports the created address after a deployment runs,
-but the node drops that address before it reaches the stored receipt. Read a
-`null` here as "not implemented yet", not as a sign the deployment failed.
+From the next release, the node fills the field in for a successful
+deployment only:
 
-To learn a contract's address after a deployment, compute it locally from the
-sender and the nonce — ethers v6 and viem both do this without an RPC call.
+| Receipt | `contractAddress` |
+|---|---|
+| A deployment (`to` is `null`) with `status` `0x1` | the address of the deployed contract |
+| A deployment with `status` `0x0` | `null` |
+| A call (`to` is set) | `null` |
+| A system-lane call | `null` |
+| Any receipt the node stored before the release | `null` |
+
+**Why a failed deployment reads `null`.** A failed deployment creates no
+contract. So on MTF a non-null `contractAddress` always means the deployment
+succeeded. Some Ethereum clients fill the field for a failed deployment too. Do
+not expect that here.
+
+**Why an old receipt stays `null`.** The node writes the field when it stores
+the receipt. **There is no backfill**, so a receipt stored before the release
+keeps `null` permanently. For such a receipt, compute the address locally from
+the sender and the nonce. ethers v6 and viem both do this without an RPC call.
+The result is the same address the node reports for a new receipt.
 
 #### `mtfStatus` on a receipt {#mtf-status}
 
