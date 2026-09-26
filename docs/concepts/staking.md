@@ -314,6 +314,6 @@ A: No, and you cannot delegate one for this: every staking action (`c_deposit`, 
 A: No — there is no redelegate action. Once you undelegate, the stake serves the full unbonding window before it is free; only then can you delegate it elsewhere.
 
 **Q: Where do staking rewards come from?**
-A: Fee revenue is the ongoing source: validators receive the **20% validator share** of the [fee buyback](./fees.md) (70% buyback-and-lock / 20% validators / 10% treasury) and distribute it to their stakers minus commission. Early on, a finite treasury-funded bootstrap budget tops this up. The protocol **never mints new MTF** — total supply is fixed ([tokenomics](./tokenomics.md)).
+A: Fee revenue is the ongoing source: validators receive the **20% validator share** of the [fee buyback](./fees.md) (70% buyback-and-lock / 20% validators / 10% treasury) and distribute it to their stakers minus commission. Early on, a finite treasury-funded bootstrap budget tops this up. Rewards **never mint new MTF**, and mainnet total supply is fixed ([tokenomics](./tokenomics.md#total-supply)).
 
 </details>

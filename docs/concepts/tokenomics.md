@@ -9,8 +9,9 @@ description: The MTF token economic model — utility, fixed supply, allocation 
 fee-driven buyback) is built and live. The economic parameters below — total
 supply, allocation, vesting, fee split, and the staking multiplier curve — are
 final. Tier thresholds and the fee split are network parameters that governance
-can tune within the bounds stated in [Governance](#governance). **Total supply is
-fixed and cannot be changed by governance.**
+can tune within the bounds stated in [Governance](#governance). **On mainnet,
+total supply is fixed and governance cannot change it.** Testnet differs; see
+[Total supply](#total-supply).
 :::
 
 ## TL;DR {#tldr}
@@ -113,9 +114,18 @@ Details under [Value accrual](#value-accrual--flywheel) and on
 
 ### Total supply {#total-supply}
 
-**1,000,000,000 MTF, fixed.** There is no mint function in the protocol and
+**1,000,000,000 MTF, fixed.** On mainnet there is no mint function and
 governance has no supply lever. The only supply-changing operation is the buyback
 lock, which reduces circulating supply permanently.
+
+:::note Testnet is different
+On testnet, operators can mint MTF, burn MTF and adjust test balances by a
+validator vote. They use these votes to run the network, for example to fund
+validator stakes and the faucet reserve. So the testnet MTF supply is not the
+mainnet design: it reads **1,404,890,000** on 2026-09-26. Read the current value
+in `tokens[*].total_supply` on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta).
+These votes do not exist on mainnet.
+:::
 
 ### Genesis allocation {#genesis-allocation}
 
@@ -345,9 +355,11 @@ ecosystem, and treasury buckets within their caps.
 bucket release caps can be lowered but not raised; activation and unbonding
 floors cannot go below 24h.
 
-**Out of scope:** governance cannot mint MTF (there is no mint function), cannot
-alter total supply, cannot raise contributor unlock speed, cannot seize user
-balances or positions, and cannot alter past committed state.
+**Out of scope on mainnet:** governance cannot mint MTF (there is no mint
+function), cannot alter total supply, cannot raise contributor unlock speed,
+cannot seize or lower user balances or positions, and cannot alter past committed
+state. Testnet has operator votes that change supply and test balances; see
+[Total supply](#total-supply).
 
 Actions require a stake-weighted quorum; jailed validators are excluded from the
 tally.
@@ -367,10 +379,11 @@ tally.
 <summary>Show FAQ</summary>
 
 **Q: Is total supply final?**
-A: Yes. 1,000,000,000 MTF, fixed at genesis, no mint function.
+A: On mainnet, yes. 1,000,000,000 MTF, fixed at genesis, no mint function.
+The testnet supply is different; see [Total supply](#total-supply).
 
 **Q: Is MTF inflationary?**
-A: No. Nothing is minted after genesis. Staking yield comes from a finite
+A: Not on mainnet. Nothing is minted after genesis there. Staking yield comes from a finite
 bootstrap bucket and from fee revenue.
 
 **Q: What does the 20% revenue-share pay in?**

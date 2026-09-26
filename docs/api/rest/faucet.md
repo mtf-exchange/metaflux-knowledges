@@ -181,8 +181,9 @@ validator governance votes fund it, one per leg:
 | USDC cross-value | `GovAdjustSpotValue` | Sets the reserve's cross-account value |
 | MTF spot | `GovAdjustSpotBalance` | Sets the reserve's spot balance, and moves `total_supply` by the same delta |
 
-Both appear on [`governance_history`](./info/governance.md) under those `action`
-names once they land, so that read is how you confirm the reserve was funded.
+Both appear on [`validator_votes`](./info/governance.md#validator_votes) with
+those names in the `action` field once they land. Filter on `status: "enacted"`
+to confirm the reserve was funded.
 
 A claim the reserve cannot pay is refused, and nothing is credited. If you are
 integrating against a network whose faucet appears dead, this is the first thing

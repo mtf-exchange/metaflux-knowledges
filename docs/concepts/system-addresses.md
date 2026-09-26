@@ -51,7 +51,7 @@ This address is also the faucet's **reserve**: a claim TRANSFERS out of the bala
 
 ### Treasury — `0x7777…7777` {#treasury--0x77777777}
 
-The **protocol treasury**. It holds the treasury's share of collected fees and the MTF accumulated by the [buyback](./tokenomics.md#value-accrual--flywheel). It is also the single point through which **supply changes flow**: when governance changes total supply, MTF is minted into or burned from the treasury balance. Keyless; operated by the protocol under governance. See [Tokenomics](./tokenomics.md) for the economic model and [Fees](./fees.md) for where fees go.
+The **protocol treasury**. It holds the treasury's share of collected fees and the MTF accumulated by the [buyback](./tokenomics.md#value-accrual--flywheel). On testnet, an operator vote mints MTF into or burns MTF from the treasury balance. Mainnet has no such vote, and its total supply is fixed ([Total supply](./tokenomics.md#total-supply)). Keyless; operated by the protocol under governance. See [Tokenomics](./tokenomics.md) for the economic model and [Fees](./fees.md) for where fees go.
 
 ### Assistance fund — `0x8888…8888` {#assistance-fund--0xafafafaf}
 
@@ -75,7 +75,7 @@ trigger — only the buyback's own schedule does that. See
 
 The canonical EVM **burn sink**. It is keyless and, uniquely on this page, **provably unspendable**: the protocol rejects every attempted transfer whose source is the burn address, under any path. Nothing can ever move value out of it.
 
-The address is **reserved**. Supply is reduced by **decreasing the treasury balance** through a governance vote, not by sending tokens here. No burn path routes through this address.
+The address is **reserved**. No burn path routes through this address. On testnet, an operator vote reduces supply by **decreasing the treasury balance**, not by sending tokens here.
 
 ### Spot backstop — `0x0000…5b07` {#spot-backstop--0x00005b07}
 
@@ -93,7 +93,7 @@ So a balance at this address is not one product's residue. Read it as "collatera
 the protocol now holds and has not yet disposed of".
 
 It is NOT the treasury. The treasury also holds unissued MTF supply, and a
-supply-cut vote burns from that row — so collateral standing behind a settled
+testnet supply-cut vote burns from that row — so collateral standing behind a settled
 debt must not sit there.
 
 Keyless, and provably so: landing on this fixed image of eighteen zero bytes
@@ -111,7 +111,7 @@ address.
 
 Every address here is keyless, but they split into two kinds:
 
-- **Protocol-operated (system authority).** System, Oracle feeder, Faucet, Treasury, and Assistance fund. No key signs for them, but the **protocol** writes to or from them as part of its own operation (oracle publication, faucet credits on test networks, treasury supply changes, buyback execution). The legacy Spot fee sink was in this group and is now inert.
+- **Protocol-operated (system authority).** System, Oracle feeder, Faucet, Treasury, and Assistance fund. No key signs for them, but the **protocol** writes to or from them as part of its own operation (oracle publication, faucet credits on test networks, testnet treasury supply changes, buyback execution). The legacy Spot fee sink was in this group and is now inert.
 - **Never-spendable.** The Burn address. No key and no protocol path can ever move value out of it.
 
 The Null address is neither — it is a sentinel value, not an account anyone acts on.
@@ -125,7 +125,7 @@ The Null address is neither — it is a sentinel value, not an account anyone ac
 A: No. These are not derived from any public key; they are fixed constants. Recovering a key for one would require inverting keccak-256 onto a specific 20-byte target, which is infeasible. There is no key to find.
 
 **Q: Can I send tokens to the burn address to destroy them?**
-A: The burn address is reserved but not wired into the active supply path today — supply reductions happen by governance reducing the treasury balance, not by sending here. Treat the burn address as reserved.
+A: No. The burn address is reserved and no supply path uses it. Mainnet supply is fixed. On testnet, an operator vote reduces the treasury balance instead. Treat the burn address as reserved.
 
 **Q: The faucet gave me funds on testnet. Will it on mainnet?**
 A: No. The faucet only credits on test networks. On mainnet there is no faucet dispense.

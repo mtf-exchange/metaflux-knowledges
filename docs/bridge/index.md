@@ -7,7 +7,9 @@ The current testnet chain started on 2026-09-01. Bring-up on it is part done, so
 differs per chain:
 
 - **Base Sepolia** and **Arbitrum Sepolia** each have a new contract, and the chain is
-  configured for both. **Withdrawals are halted**, so value that goes in cannot come out yet.
+  configured for both. **Both contracts are paused** (`paused()` returns `true` on
+  2026-09-26), so a `deposit` call reverts. **Withdrawals are halted**, so value that goes
+  in cannot come out yet. Do not send a plain USDC transfer to either address.
 - **Every address published before 2026-09-17 is PAUSED and holds nothing.** A transfer to one
   of those cannot be credited and cannot be recovered.
 
@@ -85,14 +87,19 @@ contract wallet** credits THAT address — you do not control it on MetaFlux and
 the funds are **unrecoverable**. When in doubt, use `deposit(mtfDest, amount)`.
 :::
 
-**Encoding the MetaFlux destination (`mtfDest`).** `mtfDest` is your 20-byte
-MetaFlux (L1) address — the same address you sign and trade with.
+**Encoding the MetaFlux destination (`mtfDest`).** Both contracts expose
+`deposit(bytes32 mtfDest, uint128 amount)` (selector `0x56d2e1ea`). Call it after
+`USDC.approve(bridge, amount)`.
 
-- **Base / Arbitrum** — pass the 20-byte address directly:
-  `deposit(address mtfDest, uint256 amount)`, after `USDC.approve(bridge, amount)`.
+- `mtfDest` is a `bytes32`. The contract credits its **low 20 bytes**: your
+  MetaFlux (L1) address, the same address you sign and trade with. Left-pad the
+  address with 12 zero bytes: `bytes32(uint256(uint160(addr)))`. For
+  `0xAbC…123`, that is `0x000000000000000000000000abc…123`.
+- The contract rejects an `mtfDest` of zero, and one whose low 20 bytes are zero.
 
-`amount` is in USDC base units — **6 decimals** on every source chain (100 USDC =
-`100_000000`). The custody contract address for each chain is in the
+`amount` is a `uint128` in USDC base units — **6 decimals** on every source chain
+(100 USDC = `100_000000`). The `Deposit` event reports the amount the contract
+actually received. The custody contract address for each chain is in the
 [Deployments](#deployments) table below.
 
 **When the credit lands.** Only **finalized** source-chain deposits are attested
@@ -185,7 +192,7 @@ not for value-bearing use.
 
 | Method | Authorization | Purpose |
 |--------|---------------|---------|
-| `deposit(mtfDest, amount)` | anyone (depositor) | Pull USDC into custody, emit `Deposit` for validators to attest |
+| `deposit(bytes32 mtfDest, uint128 amount)` | anyone (depositor) | Pull USDC into custody, emit `Deposit` for validators to attest |
 | `withdraw(...)` / `batchWithdraw(reqs)` | anyone relaying a **HOT ⅔** co-signature set | Verify quorum + queue the withdrawal(s) into the dispute window |
 | `claim(mid)` / `batchClaim(mids)` | anyone | Release matured USDC after the dual time + block window (not pausable) |
 | `dispute(mid)` | any single **HOT** validator | Cancel a queued withdrawal inside its dispute window |
