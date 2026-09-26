@@ -143,7 +143,7 @@ validator ⅔ stake-weighted co-signing, no Circle CCTP dependency. Source chain
 | Chain | Status |
 |-------|--------|
 | Base | Deployed on Base Sepolia (`Bridge` [`0x655ab51b607cb0ef94af69525e3c98e28a8af6ad`](https://sepolia.basescan.org/address/0x655ab51b607cb0ef94af69525e3c98e28a8af6ad)); bring-up is not complete and withdrawals are halted; mainnet pre-audit |
-| Arbitrum | No contract on the current chain; mainnet pre-audit |
+| Arbitrum | Deployed on Arbitrum Sepolia (`Bridge` [`0x3f1f93c8ce4b7285f9923de9783f29625b84a9d2`](https://sepolia.arbiscan.io/address/0x3f1f93c8ce4b7285f9923de9783f29625b84a9d2)); bring-up is not complete and withdrawals are halted; mainnet pre-audit |
 
 See [bridge](./bridge/) for the deposit and withdraw flow and the deployment table.
 

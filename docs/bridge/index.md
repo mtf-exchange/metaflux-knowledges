@@ -6,9 +6,8 @@
 The current testnet chain started on 2026-09-01. Bring-up on it is part done, so the state
 differs per chain:
 
-- **Base Sepolia** has a new contract, and the chain is configured for it. **Withdrawals are
-  halted**, so value that goes in cannot come out yet.
-- **Arbitrum Sepolia has no contract on this chain.** Nothing is deployed for it.
+- **Base Sepolia** and **Arbitrum Sepolia** each have a new contract, and the chain is
+  configured for both. **Withdrawals are halted**, so value that goes in cannot come out yet.
 - **Every address published before 2026-09-17 is PAUSED and holds nothing.** A transfer to one
   of those cannot be credited and cannot be recovered.
 
@@ -18,8 +17,8 @@ address from an older integration or an older copy of this page.
 
 :::info
 **Status.** The custody bridge is **deployed on Base Sepolia** (testnet,
-`Bridge` [`0x655ab51b607cb0ef94af69525e3c98e28a8af6ad`](https://sepolia.basescan.org/address/0x655ab51b607cb0ef94af69525e3c98e28a8af6ad)).
-Arbitrum Sepolia has no contract on the current chain.
+`Bridge` [`0x655ab51b607cb0ef94af69525e3c98e28a8af6ad`](https://sepolia.basescan.org/address/0x655ab51b607cb0ef94af69525e3c98e28a8af6ad))
+and on **Arbitrum Sepolia** (`Bridge` [`0x3f1f93c8ce4b7285f9923de9783f29625b84a9d2`](https://sepolia.arbiscan.io/address/0x3f1f93c8ce4b7285f9923de9783f29625b84a9d2)).
 **Base and Arbitrum are the supported chains.** Both directions —
 deposit and withdrawal — are verified end-to-end on Base Sepolia: a real deposit
 (watcher → cosign → auto-registered cosigner → ⅔-quorum credit) and a full
@@ -151,10 +150,10 @@ Base (two-phase: request → claim):
 | Network | Contract | Address |
 |---------|----------|---------|
 | Base **Sepolia** | `Bridge` | [`0x655ab51b607cb0ef94af69525e3c98e28a8af6ad`](https://sepolia.basescan.org/address/0x655ab51b607cb0ef94af69525e3c98e28a8af6ad) |
-| Arbitrum **Sepolia** | — | none on the current chain |
+| Arbitrum **Sepolia** | `Bridge` | [`0x3f1f93c8ce4b7285f9923de9783f29625b84a9d2`](https://sepolia.arbiscan.io/address/0x3f1f93c8ce4b7285f9923de9783f29625b84a9d2) |
 | Base / Arbitrum mainnet | — | (pre-audit) |
 
-:::danger Use only the address above
+:::danger Use only the addresses above
 Two earlier contracts are RETIRED. Neither can pay out, and **USDC sent to either
 is unrecoverable**:
 
@@ -168,13 +167,13 @@ reuse an address from an older integration.
 
 Each retired pair shared one address across the two chains because the deploy
 account created both contracts as its first transaction on each chain. Treat that
-as a coincidence of those deployments, not a rule. The current Base contract has
-no counterpart.
+as a coincidence of those deployments, not a rule. The current contracts have a
+different address on each chain.
 :::
 
-Custodies Circle's Base Sepolia USDC (`0x036CbD…f3dCF7e`); **⅔ stake-weighted
-validator set, no admin** (all privileged ops are validator-cosigned), 300 s +
-150-block dual dispute window. Domain-separated + epoch-bound signatures.
+Custodies Circle's USDC: Base Sepolia `0x036CbD…f3dCF7e`, Arbitrum Sepolia
+`0x75faf1…46AA4d`. Both contracts: **⅔ stake-weighted validator set, no admin**
+(all privileged ops are validator-cosigned), 300 s + 150-block dual dispute window. Domain-separated + epoch-bound signatures.
 Contracts + deploy runbook live in the
 [`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts)
 repo; the L1-side co-signature / credit logic stays on the node. Pre-audit testnet —
