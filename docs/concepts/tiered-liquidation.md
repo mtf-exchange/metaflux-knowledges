@@ -439,6 +439,23 @@ genuine tail events):
 2. **ADL haircut** — an adaptive severity controller claws back up to the
    gains the netting counterparties **just realized** (never more than they
    received, and never unrealized paper PnL).
+
+   **Not live yet: live from the release after 2026-10-01.** The haircut then
+   reaches every gain realized on that market inside the episode. The episode
+   is the current 60-second window and the one before it, so a gain stays in
+   reach for 60 to 120 seconds. Any fill counts, taker or maker, forced closes
+   included. Netting at mark and a delisting settlement count too. Three
+   limits apply. The haircut takes only cash that is still in your cross
+   balance, so a gain that you moved out (a transfer, a spot trade, a
+   withdrawal) gives only what remains. The haircut never takes your account
+   below its maintenance margin, so it cannot start a new liquidation. The
+   total never exceeds the deficit, and a gain that paid once does not pay
+   again.
+
+   Why: before this change, only the netting counterparties' gains were in
+   reach. A trader who held both sides could sell the winning side to a third
+   account on the book before the pass. The gain was then out of reach, and
+   the insurance fund and the treasury reserve paid the whole deficit.
 3. **Insurance fund** — auto-absorbs the remainder (this is the pool the
    [liquidation fee](#how-a-forced-close-executes-the-price-floor) feeds).
 4. **Treasury reserve** — whatever is left queues for a multisig-authorized

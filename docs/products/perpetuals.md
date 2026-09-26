@@ -120,6 +120,45 @@ health at this mark. It is not the raw `mark_px`, so the two can differ when the
 mark sits outside the band. When the risk mark is stale or absent, the vote must
 name a price.
 
+**Not live yet.** The rules below ship with the first node release after
+2026-10-01. Until then, the paragraph above is the whole rule.
+
+The chain records the oracle price of every market once an hour, at the first
+oracle update after the hour. The **six-hour average** is the mean of the six
+newest hourly records that carry the market, rounded toward zero to 8 decimals.
+It is a mean of six samples, not a time-weighted price. The **maintenance
+band** is the risk mark plus or minus the market's smallest maintenance margin
+ratio (3% unless governance set another). A position at or above its
+maintenance margin at the risk mark keeps a non-negative balance at any price
+inside that band. The rules below apply while the market's oracle price is
+fresh, that is, while the risk mark exists:
+
+- When the vote names no price, every position closes at the six-hour average,
+  moved to the nearest edge of the maintenance band when it lies outside. A
+  market listed less than one hour ago has no hourly record, so it closes at
+  the risk mark.
+- A named price must sit within 20% of the six-hour average or inside the
+  maintenance band, edges included. The chain refuses a vote outside both
+  before it counts the vote:
+  `delist <coin>: settle_px <px> is outside 2000 bps of the <n>-slot TWAP <avg> and outside the maintenance band of the risk mark <mark>`.
+  Here `<n>` is the number of hourly records the average read. A market with
+  no open position accepts any named price.
+
+When the oracle price is stale, these rules do not apply. The vote must name a
+price, and that price has no band.
+
+Why: the validators who vote the price can also hold positions on the market.
+The 20% band keeps their price near recent history, and the average keeps one
+short price move from setting the settlement price. The maintenance band keeps
+a vote with no price from closing a position that the liquidation engine found
+solvent at a loss larger than its margin. That loss would become bad debt that
+other traders pay. After a real crash deeper than 20% inside six hours, a vote
+can still name a price inside the maintenance band. The limit is a speed bump,
+not a bound: the validators also supply the oracle price of an externally
+priced market, so a quorum that controls six hourly records controls the
+average. The six records and the 20% band are fixed values. To change either
+one takes a node release.
+
 **A settlement is a ledger entry, not a trade.** It does not touch the order
 book, so it has no slippage. It charges no fee. It writes no fill, so no
 `user_fills` row appears. Each closed leg writes one

@@ -77,6 +77,65 @@ the number is yours, and the deploy bond is slashable.
 That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. A [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px) push is refused with `mip3_deployer_oracle feature not active` on a chain where it is off, so a test push tells you the posture. See [MIP-3 — oracle](../mip/mip-3.md#oracle) for the operator rules.
 :::
 
+## Self-priced markets {#self-priced-markets}
+
+**Not live yet.** The rules in this section are live from the release after
+2026-10-01. Until then, the index is the mid of the best bid and the best ask
+over every resting order, whatever its age. The depth floor, the depth band and
+the move band already apply. The rest time and the smoothing do not.
+
+Some markets have no external venue to price from. MTF is one. Governance marks
+such a market **self-priced**. Its index price then comes from a MetaFlux book:
+the `<COIN>/USDC` spot pair when one exists, else the market's own perp book.
+
+One order can move the best bid or the best ask, so the index does not read the
+touch. At each oracle update it applies these rules in order:
+
+1. **Rest time.** An order counts only after it has rested for the rest time. A
+   quote that is placed and pulled inside the rest time does not count.
+2. **Depth.** Each side prices at the volume-weighted average price (VWAP) of
+   its rested orders. The walk starts at the best price and stops at the depth
+   floor, in notional. Only orders inside the depth band around the rested mid
+   count.
+3. **Mid.** The book price is the mid of the bid VWAP and the ask VWAP.
+4. **Smoothing.** The index closes 1/N of its gap to that mid, where N is the
+   smoothing value. A gap smaller than N × 0.00000001 closes in full, so the
+   index reaches the mid exactly.
+5. **Move band.** One update never moves the index further than the move band
+   from its previous value.
+
+| Rule | Current value |
+|---|---|
+| Rest time | 2 s |
+| Depth floor | 1,000 USDC per side |
+| Depth band | 500 bps (5 %) around the rested mid |
+| Smoothing | 8 updates |
+| Move band | 500 bps (5 %) per update |
+
+These are the values today. They can change.
+
+**Why a VWAP and not a minimum order size.** A small order at the touch moves
+the VWAP only by its share of the depth floor. To move the index, a trader must
+rest the full depth floor at the new price for the full rest time, where other
+traders can fill it.
+
+**Why smoothing.** The move band limits one update. Smoothing makes one update
+cover only part of the gap, so the book must hold a new price over several
+updates before the index reaches it. A real move still arrives, because the
+index converges on the book mid.
+
+### When the book gives no price {#self-priced-no-price}
+
+The index keeps its previous value when one side has no rested order, when the
+rested best bid is above the rested best ask, or when one side cannot fill the
+depth floor inside the depth band.
+
+A kept value is not a fresh price. After 60 s without a fresh price, the
+[`markets`](../api/rest/info/perpetuals.md#markets) read shows
+`px_stale: true` and the market is reduce-only. An order that opens or adds to a
+position is refused. An order that reduces a position is accepted. Liquidation
+and funding wait until a fresh price arrives.
+
 ## Reliability rules {#reliability-rules}
 
 The aggregator is built to degrade rather than lie. Per tick, in order:
@@ -91,6 +150,25 @@ A venue whose weight is set to 0 (e.g. delisted for that symbol) is never reques
 ## Publication {#publication}
 
 The composed `oracle_px` is published **once per block**, derived from the consensus block timestamp (never wall-clock), and signed by the oracle validators in the active set. Because the median, the staleness/outlier filters, and the timestamp are all consensus-derived, every honest validator computes a **byte-identical** oracle snapshot for the block.
+
+A price for one asset needs fresh submissions from validators that hold at least
+**half** of the active stake. With less, the asset keeps its previous price, and
+after 60 s liquidation and funding on that market wait for a fresh price. So one
+validator can never set a price alone. The cost is liveness: if validators that
+hold half of the stake stop submitting, every externally priced market holds its
+price. With the stakes read on 2026-09-26, two dark validators can be enough:
+the largest together with the second or the third largest holds more than half.
+The largest alone holds about one third, so one dark validator does not stall
+the oracle. A validator with more than half of the stake would. **Not live
+yet:** the half-stake rule is live from the release after 2026-10-01. Until then
+the floor is one third of the active stake.
+
+The 60 s count runs on the block clock. So it also runs when no asset gets a
+fresh price and the chain publishes no new oracle price at all. A self-priced
+market needs no validator stake, so it keeps its book price while some
+validators still submit. **Not live yet:** both rules are live from the release
+after 2026-10-01. Until then the count runs only while at least one asset gets a
+fresh price.
 
 ## Relationship to mark and funding {#relationship-to-mark-and-funding}
 
