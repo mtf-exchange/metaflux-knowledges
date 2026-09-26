@@ -42,8 +42,8 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Tick size** | per-market min price increment | `tick_size` |
 | **Size decimals / step** | per-market size precision + lot step | `sz_decimals`, `step_size` |
 | **Min order size** | per-market minimum order | `min_order` |
-| **Max order value** | OI-cap-derived size ceiling + margin gate (no fixed per-order $ cap) | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` |
-| **Open-interest cap** | per-market OI ceiling + per-second OI velocity limit | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` vs [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest` |
+| **Max order value** | margin gate + the market's remaining open-interest headroom (no fixed per-order $ cap) | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `max_market_order_ntl` |
+| **Open-interest cap** | the cap the chain enforces: the lower of the governance-set cap and the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity), plus a per-second OI velocity limit | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap`, `oi_cap_usd`, `oi_cap_bound` vs [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest` |
 | **Margin modes** | Cross / Isolated / Strict-Iso (Strict-Iso also imposable at **market** level) | `strict_isolated` |
 | **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info/account.md#account_state) `abstraction` |
 | **FBA eligible** | whether [frequent batch auction](../concepts/fba.md) is enabled | `fba_enabled` |
@@ -278,15 +278,33 @@ have to do.
 MetaFlux bounds risk by **open interest and the margin gate**, rather than a fixed
 per-order dollar cap:
 
-- **Max order value** — [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap`
-  returns the per-asset OI-cap-derived size ceiling (the matching layer converts to
-  notional at the live mark). An order's notional is additionally bounded by your
-  free collateral × `max_leverage` (the initial-margin gate).
-- **Open-interest cap** — each market carries an OI ceiling plus a per-second OI
-  **velocity** limit (an OI-increasing order is rejected once the 1-second window
-  hits the ceiling). [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest`
-  lists assets currently at/over their cap. `open_interest` on the market record is
-  true position OI (positions outstanding), not the book's resting depth.
+- **Max order value** — no fixed per-order cap exists. Your free collateral ×
+  `max_leverage` bounds an order (the initial-margin gate). The market's
+  remaining open-interest headroom,
+  [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta)
+  `max_market_order_ntl`, bounds the whole market. That value is a size, not a
+  notional.
+- **Open-interest cap** — `oi_cap` on
+  [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) is the cap the
+  chain enforces, in size units. It is the lower of the governance-set cap and
+  the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity). The chain
+  recomputes the capacity cap every block from the protocol's backstop capacity
+  and the market's worst loss per unit of notional. `oi_cap_usd` gives its
+  USDC value at the committed risk mark, and `oi_cap_bound` names the source.
+  At the cap, or when an order's new exposure would pass it, the chain refuses
+  an order that opens, extends or flips a position and is priced through the
+  committed mark. On a self-priced market it refuses every such order. A
+  passive order rests. The cap never closes a position.
+- **Open-interest velocity** — a separate per-second limit. An OI-increasing
+  order is rejected once the 1-second window reaches its ceiling.
+- `open_interest` on the [`markets`](../api/rest/info/perpetuals.md#markets)
+  record is true position OI (positions outstanding), not the book's resting
+  depth.
+
+**Not live yet.** The capacity cap ships with the node release after
+2026-10-01. From then, every perp market carries an open-interest cap. Until
+then, `oi_cap` is the governance-set cap only, no market has one, and every
+market is uncapped.
 
 ## Account & margin modes {#account--margin-modes}
 

@@ -144,8 +144,8 @@ Response (truncated to one entry per list):
   these same dynamic rows (a full snapshot on subscribe, then changed-row deltas).
 - The **static** per-market fields (`sz_decimals`, `tick_size`, `step_size`,
   `min_order`, `max_leverage`, `maint_margin_ratio`, `init_margin_ratio`,
-  `margin_tiers`, `strict_isolated`, `open` / `close`, `oi_cap`,
-  `mark_source`, `fba_enabled`, `signing_id`, `risk_override`) are **not** on this
+  `margin_tiers`, `strict_isolated`, `open` / `close`, `oi_cap`, `oi_cap_usd`,
+  `oi_cap_bound`, `mark_source`, `fba_enabled`, `signing_id`, `risk_override`) are **not** on this
   read — fetch them from [`markets_meta`](#markets_meta). For the spot pair / token field semantics
   see [the spot registry](./spot.md#spot_meta).
 
@@ -202,8 +202,10 @@ Response (perp truncated to one entry; the `spot` section is identical to
         "strict_isolated": false,
         "open":            true,
         "close":           true,
-        "oi_cap":          "1000000",
-        "max_market_order_ntl": "400000",
+        "oi_cap":          "31.25",
+        "oi_cap_usd":      "2500000",
+        "oi_cap_bound":    "capacity",
+        "max_market_order_ntl": "30.84",
         "mark_source":     "oracle_median",
         "fba_enabled":     false,
         "signing_id":      0,
@@ -242,8 +244,10 @@ Response (perp truncated to one entry; the `spot` section is identical to
 | `perp[*].margin_tiers` | array | Notional-banded leverage ladder; each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
 | `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden. **A delist does not change them:** a halted or settled market can still read `true`. Read `halted` and `settled` on [`markets`](#markets) |
-| `perp[*].oi_cap` | Decimal string | Governance open-interest cap, in the market's size units; **OMITTED** entirely when the market is uncapped (never a fabricated `"0"`) |
-| `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. See below |
+| `perp[*].oi_cap` | Decimal string | The open-interest cap the chain enforces, in the market's size units. It is the lower of the governance-set cap and the capacity cap. **OMITTED** only when neither exists (never a fabricated `"0"`). **Not live yet:** until the release after 2026-10-01 this is the governance-set cap only. See [the capacity cap](#oi-cap-capacity) |
+| `perp[*].oi_cap_usd` | Decimal string | USDC value of `oi_cap` at the committed risk mark: the mark clamped to the oracle band. **OMITTED** with `oi_cap`, and when the market has no mark. **Not live yet** |
+| `perp[*].oi_cap_bound` | `"voted"` \| `"capacity"` \| `"floor"` \| `"ceiling"` | Which source set `oi_cap`. `"voted"` = the governance-set cap. The other three are the capacity cap: the capacity result, the floor, or the ceiling. **OMITTED** with `oi_cap`. **Not live yet** |
+| `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. **Not live yet:** from the release after 2026-10-01, an order whose new exposure is larger than this headroom takes the [at-cap rules](#oi-cap-capacity). See below |
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].signing_id` | uint32 | **The number you put in the EIP-712 `market` field when you sign an order for this market.** It has no other meaning on the read plane — do not use it as a sort key, a join key, or a market identity. See below |
@@ -259,9 +263,11 @@ Response (perp truncated to one entry; the `spot` section is identical to
   `open_interest`, `day_ntl_vlm`, `prev_day_px`, `change_24h`, `halted`, `settled`,
   `settled_px`) appear
   here.
-- **`max_market_order_ntl` is the one exception, and it MOVES.** It is derived
-  from live open interest, so it changes on every fill. Do not cache it with the
-  rest of the row. See below.
+- **The open-interest fields MOVE.** `max_market_order_ntl` is derived from live
+  open interest, so it changes on every fill. From the release after 2026-10-01,
+  `oi_cap`, `oi_cap_usd` and `oi_cap_bound` follow the
+  [capacity cap](#oi-cap-capacity), which the chain recomputes every block. Do
+  not cache these fields with the rest of the row. See below.
 - For the spot pair / token field semantics see [the spot registry](./spot.md#spot_meta).
 
 #### `max_market_order_ntl` is served — do not reconstruct it {#max_market_order_ntl}
@@ -274,7 +280,10 @@ loses the two conventions the served field carries.
   produce it, because `oi_cap` is OMITTED from an uncapped row. A client that
   reads a missing `oi_cap` as `0` computes a negative headroom and blocks every
   order on a market that has no limit at all. This is the inverse mistake, and it
-  is the worse one.
+  is the worse one. From the release after 2026-10-01, every perp market has a
+  [capacity cap](#oi-cap-capacity), so `null` becomes rare. It stays only on a
+  market with no governance-set cap and no capacity cap: a market that has never
+  had a mark, or any market while governance has the capacity cap switched off.
 - **`"0"` means the market sits AT its cap.** The value is floored at `0` and
   never goes negative.
 - **The name says notional; the value is a SIZE.** It is in the same units as
@@ -287,6 +296,101 @@ loses the two conventions the served field carries.
 **`active_asset_data.max_trade_size` is the SAME number under another name.**
 Both fields are the one headroom figure. Read whichever response you already
 have; never expect the two to differ.
+
+#### How the capacity cap works {#oi-cap-capacity}
+
+:::caution
+**Not live yet.** The capacity cap ships with the node release after 2026-10-01.
+Until then, `oi_cap` is the governance-set cap only. No market has one, so every
+market is uncapped, and `oi_cap_usd` and `oi_cap_bound` are absent. See
+[the next release](../../../changelog/next-release.md#oi-cap-capacity).
+:::
+
+**Why the cap exists.** A liquidation can leave a deficit. This happens when the
+price moves past the maintenance margin before the close completes. The protocol
+pays the deficit from money it holds. The capacity cap limits open interest to
+what that money can cover. The chain recomputes the cap every block, from
+committed state only.
+
+**Capacity.** A market's capacity is the sum of these amounts, in whole USDC:
+
+| Amount | Counts when |
+|---|---|
+| The market's [insurance fund](../../../concepts/tiered-liquidation.md#t4--the-deficit-waterfall) | Always |
+| An equal share of the [Metaliquidity vault](../../../concepts/tiered-liquidation.md#mlp-first-bite) backstop: the room left under its equity-fraction bound, divided by the number of perp markets | The vault backstop is enabled, and the market is a core market |
+| The market's treasury reserve | The treasury reserve is configured |
+
+ADL does not count. It takes gains back from winners. It is not money the
+protocol holds.
+
+**Loss per unit of notional.** A position liquidates when its equity falls below
+its maintenance margin. The price can move further before the close completes.
+The loss per unit of notional is the largest such move, minus the smallest
+maintenance margin ratio that the market allows on any tier:
+
+- On an oracle-priced market, the move is two widths of the
+  [oracle band](../../../concepts/contract-specifications.md#mark-price) of the
+  risk mark. A trade on the book cannot push the risk mark past the band, but
+  the risk mark can go from one edge of the band to the other.
+- On a [deployed market](../../../mip/mip-3.md#oracle), the deployer's push can
+  move the index 10%. The move is two pushes, or two band widths if that is
+  larger.
+- On a [self-priced market](../../../concepts/oracle-prices.md#self-priced-markets),
+  the move is two index updates at the move band. One update takes the account
+  below maintenance. The chain allows one more update for the close.
+- The loss per unit is never less than 1%. This also applies when the move is
+  not larger than the maintenance ratio.
+
+**The formula.** Governance sets the share, the floor and the ceiling.
+
+```text
+target  = share × capacity ÷ loss per unit      whole USDC, toward zero
+usd cap = target, clamped to [floor, ceiling]
+oi_cap  = usd cap ÷ committed risk mark         size units, toward zero, at least one lot
+```
+
+If governance sets the floor above the ceiling, the ceiling applies.
+
+| `oi_cap_bound` | Meaning |
+|---|---|
+| `"capacity"` | The target lies between the floor and the ceiling |
+| `"floor"` | The target is below the floor. A market with little capacity shows this |
+| `"ceiling"` | The target is above the ceiling |
+| `"voted"` | The governance-set cap is not higher than the capacity cap, or it is the only cap |
+
+**How the cap moves.**
+
+- A lower cap applies in the same block.
+- A higher cap applies slowly. `oi_cap` grows by at most a governance-set
+  percentage per hour, counted from the last change of the cap. A fast rise in
+  capacity, or a fast fall of the mark, loosens the cap only at that rate.
+- When the mark is stale, the chain keeps the previous cap.
+- A governance-set cap only makes the cap tighter. The chain enforces the lower
+  of the two.
+- Governance can switch the capacity cap off. The governance-set cap then
+  applies alone.
+
+`oi_cap` is a size, so `oi_cap_usd` moves with the mark. After the mark falls,
+`oi_cap_usd` can read below the floor until `oi_cap` catches up.
+
+**At the cap.** The cap limits new exposure. It never closes a position.
+
+- A cap below the current open interest does not change any position, balance
+  or margin.
+- The chain checks an order that opens, extends or flips a position when open
+  interest is at or above the cap. It also checks such an order when its new
+  exposure would take open interest past the cap. The error is `MARKET_OI_CAP`.
+- On an oracle-priced market, the chain refuses a checked order that is priced
+  through the committed mark (a bid above it, an ask below it). A passive
+  checked order rests. The sweep below cancels it if the mark moves through it
+  while the market is at the cap.
+- On a self-priced market, the chain refuses every checked order.
+- An order that can only close its owner's position passes. The reduce-only
+  flag alone does not make an order pass.
+- At most once per second, on a market at or above its cap, the chain cancels
+  each resting order that is priced through the committed mark (a bid above it,
+  an ask below it). It keeps passive orders, and orders that can only close
+  their owner's position.
 
 #### `signing_id` is the write handle, and nothing else {#signing_id}
 
@@ -970,10 +1074,14 @@ Two values need care:
 - **`"0"` means AT THE CAP** — the market is full and an OI-increasing order is
   refused right now. A reducing order still works.
 
-The cap is read from the market's committed annotation only. There is **no
-fallback to a configured default**: a read surface must never advertise a ceiling
-the chain does not enforce, so an unannotated market reports `null` rather than
-borrowing a global number.
+The cap is the open-interest cap the chain enforces, the same number as
+[`markets_meta`](#markets_meta) `oi_cap`. There is **no fallback to a configured
+default**: a read surface must never advertise a ceiling the chain does not
+enforce, so a market with no cap reports `null` rather than borrowing a global
+number. **Not live yet:** from the release after 2026-10-01, every perp market
+has a [capacity cap](#oi-cap-capacity), so `max_trade_size` is a number on
+every market that has a mark. Until then, only a governance-set cap counts, and
+no market has one.
 
 `available_to_trade` and `max_trade_szs` are budgets from the caller's own free
 collateral, side-aware and never negative. The reducing side is larger because
