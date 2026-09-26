@@ -9,7 +9,7 @@ EIP-712 signing rules, the number planes and the response shape are on that
 page and apply to every action here.
 
 :::warning
-**Confirm the lane against the network you target.** The nine deploy actions and
+**Confirm the lane against the network you target.** The ten deploy actions and
 [`mip3_set_oracle_px`](#mip3_set_oracle_px) are built. What varies by network is
 whether the running build carries them and whether the governance off-switch
 `mip3_enabled` is open, so a call can still be refused. Build against these
@@ -17,8 +17,9 @@ shapes now; probe one call on your target network before you depend on it.
 
 [`perp_set_oracle`](#perp_set_oracle) is RETIRED: the node refuses it.
 [`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) has **shipped** — the
-node accepts it now. Every other wire shape and signing type on this page is
-unchanged.
+node accepts it now. [`perp_set_oi_cap`](#perp_set_oi_cap) is **not live yet**:
+it ships with the node release after 2026-10-01. Every other wire shape and
+signing type on this page is unchanged.
 :::
 
 Permissionless perp market deployment, plus the deployer price push the deployed
@@ -140,6 +141,71 @@ them is off by ten. Every fee is bounded by the governance ceilings
 | `asset` | uint32 | a market you deployed | Target market |
 | `min_order_size` | uint64 | `> 0` | Minimum size, in the market's size plane |
 
+### Set the open-interest cap {#perp_set_oi_cap}
+
+:::caution
+**Not live yet.** Ships with the node release after 2026-10-01. Until then, the
+live node answers `unknown variant` for `perp_set_oi_cap`, the same answer a
+made-up action gets. Build against this shape now. Send it after the release.
+:::
+
+You set the open-interest cap of your market. It is the cap the chain enforces
+on a deployer market. The
+[capacity cap](../info/perpetuals.md#oi-cap-capacity) never applies to a
+deployer market, so this action is the one way to change the cap.
+
+```json
+{ "type": "perp_set_oi_cap", "params": { "asset": 1000, "oi_cap_units": 250000 } }
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `asset` | uint32 | a market you deployed | Target market |
+| `oi_cap_units` | uint64 | `>= 0` | The cap, in **whole units** of the base asset. Not lots, not USD. `0` removes the cap |
+
+EIP-712 type string, frozen:
+
+```text
+MetaFluxTransaction:PerpSetOiCap(string metafluxChain,uint32 asset,uint64 oiCapUnits,uint64 nonce)
+```
+
+**Why whole units, not USD.** The chain counts open interest in size units. A
+USD cap must convert through the market's price, and on a deployer market you
+push that price. A lower push would then give a larger cap. A cap in whole
+units does not move with the price.
+
+**Why whole units, not lots.** The governance default
+[`max_oi`](../../../mip/mip-3.md#limits) is in whole units too, so one number
+means the same quantity in both places. The chain converts it to the market's
+size plane once, at the write. Your
+[price push](#mip3_set_oracle_px) never changes the cap after that.
+
+**The rules.**
+
+- `0` removes the cap. The market is uncapped, and
+  [`markets_meta`](../info/perpetuals.md#markets_meta) omits `oi_cap`.
+- A cap below the current open interest closes no position. It changes no
+  balance or margin. The chain then refuses an order that opens, extends or
+  flips a position, by the
+  [at-cap rules](../info/perpetuals.md#oi-cap-capacity) every capped market
+  uses. The at-cap sweep cancels resting orders priced through the mark, and it
+  keeps orders that can only close.
+- At activation, a market with no cap starts at the governance default
+  `max_oi`. A market that has a cap keeps it. So after you send `0`, a later
+  [deactivate and activate](#perp_activate_market) applies the default again.
+  Send `0` again after the activation to keep the market uncapped.
+- The market's deployer may call it, or a delegate holding
+  [bit 9](#perp_set_sub_deployers).
+
+**The rules, as rejections**, in the order the node checks them.
+
+| The call | Result |
+|----------|--------|
+| Governance has closed `mip3_enabled` | **Rejected**, `MIP-3 disabled by governance` |
+| `asset` is not a deployer market. A core market listed by governance is not one | **Rejected**, `target is not a MIP-3 deployer perp market` |
+| Sent by an address that is not the deployer and does not hold bit 9 | **Rejected**, `AUTH_UNAUTHORIZED` |
+| `oi_cap_units` is too large to state in the market's size plane | **Rejected**, `invalid parameters: oi_cap_units is too large for the market's size plane` |
+
 ### Activate and deactivate a market {#perp_activate_market}
 
 `perp_activate_market` opens the market for trading; `perp_deactivate_market`
@@ -196,7 +262,7 @@ so a delegate holding every bit still cannot grant or edit a delegation.
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | Target market |
 | `sub_deployer` | address | `0x`-hex | The delegate |
-| `add` | bool | | `true` grants all nine bits, `false` revokes |
+| `add` | bool | | `true` grants all ten bits, `false` revokes |
 
 **Lane 2 — `perp_set_sub_deployer_perms`.** New. It grants an exact mask.
 
@@ -211,7 +277,7 @@ so a delegate holding every bit still cannot grant or edit a delegation.
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | Target market |
 | `sub_deployer` | address | `0x`-hex | The delegate |
-| `permissions` | uint16 | `0`-`511` | Bit mask. `0` revokes |
+| `permissions` | uint16 | `0`-`1023` | Bit mask. `0` revokes. `1023` is every bit |
 
 | Bit | Value | Grants |
 |-----|-------|--------|
@@ -224,12 +290,13 @@ so a delegate holding every bit still cannot grant or edit a delegation.
 | 6 | 64 | `perp_deactivate_market` |
 | 7 | 128 | `perp_set_fba_mode` |
 | 8 | 256 | [`perp_register_asset`](#perp_register_asset) into this dex |
+| 9 | 512 | [`perp_set_oi_cap`](#perp_set_oi_cap). **Not live yet:** a live node refuses bit 9 until the release after 2026-10-01 |
 
 `33` is bit 0 plus bit 5: push the price and activate the market, nothing else.
 
 **Your existing delegates keep every power.** An address already in a committed
 delegate set reads as the full mask after the upgrade, as if you had granted all
-nine bits. An upgrade must not silently narrow what anyone can already do. To
+ten bits. An upgrade must not silently narrow what anyone can already do. To
 narrow such a delegate, send lane 2 with the mask you want to keep; the old
 all-powers grant is dropped in the same call.
 
@@ -237,7 +304,7 @@ all-powers grant is dropped in the same call.
 you want the delegate to end with. Sending only the bit you want removed grants
 that bit alone.
 
-**Bit 8 is checked against the dex, not against a market.** The other eight bits
+**Bit 8 is checked against the dex, not against a market.** The other nine bits
 are checked on the market named by `asset`. `perp_register_asset` has no market
 yet, so a sender that does not own the named dex may register into it if it holds
 bit 8 on at least one market of that dex. Three consequences:
@@ -253,7 +320,7 @@ bit 8 on at least one market of that dex. Three consequences:
 | The call | Result |
 |----------|--------|
 | Either lane sent by a sub-deployer | **Rejected**, `AUTH_UNAUTHORIZED`. Delegating needs the deployer's own authority, whatever bits the delegate holds. There is no bit for it, and there will not be one |
-| `permissions` with any bit above bit 8 set | **Rejected**, `InvalidParams`. Bits 9-15 are reserved for handlers added later |
+| `permissions` with any bit above bit 9 set | **Rejected**, `InvalidParams`. Bits 10-15 are reserved for handlers added later. **Not live yet:** until the release after 2026-10-01, bit 9 is refused too |
 | `permissions: 0` | **Accepted.** It revokes. The address is removed, not stored with an empty mask |
 | A handler called by a delegate that lacks that handler's bit | **Rejected**, `AUTH_UNAUTHORIZED` |
 | A second grant to the same address | **Accepted.** It replaces the mask |

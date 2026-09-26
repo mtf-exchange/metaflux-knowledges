@@ -395,12 +395,19 @@ delegates hold.
 | `perp_set_fee_tier` | `MetaFluxTransaction:PerpSetFeeTier(string metafluxChain,uint32 asset,uint32 takerFeeDbps,uint32 makerFeeDbps,uint32 deployerFeeBps,uint64 nonce)` |
 | `perp_set_maker_rebate` | `MetaFluxTransaction:PerpSetMakerRebate(string metafluxChain,uint32 asset,uint16 rebateBps,uint64 nonce)` |
 | `perp_set_min_size` | `MetaFluxTransaction:PerpSetMinSize(string metafluxChain,uint32 asset,uint64 minOrderSize,uint64 nonce)` |
+| `perp_set_oi_cap` | **NOT LIVE YET:** `MetaFluxTransaction:PerpSetOiCap(string metafluxChain,uint32 asset,uint64 oiCapUnits,uint64 nonce)` |
 | `perp_activate_market` | `MetaFluxTransaction:PerpActivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_deactivate_market` | `MetaFluxTransaction:PerpDeactivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
 | `perp_set_sub_deployer_perms` | `MetaFluxTransaction:PerpSetSubDeployerPerms(string metafluxChain,uint32 asset,address subDeployer,uint16 permissions,uint64 nonce)` |
 
-**Both rows are live.**
+**`PerpSetOiCap` is NOT live yet.** It ships with the node release after
+2026-10-01. Until then the live node answers `unknown variant` for
+`perp_set_oi_cap`. `oiCapUnits` is in whole units of the base asset, and `0`
+removes the cap. See
+[`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap).
+
+**Both rows below are live.**
 
 - **`PerpSetSubDeployerPerms` is new.** It grants a delegate an exact permission
   mask instead of every power. `permissions` is in the digest, so one signature

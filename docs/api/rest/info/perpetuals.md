@@ -244,9 +244,9 @@ Response (perp truncated to one entry; the `spot` section is identical to
 | `perp[*].margin_tiers` | array | Notional-banded leverage ladder; each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
 | `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden. **A delist does not change them:** a halted or settled market can still read `true`. Read `halted` and `settled` on [`markets`](#markets) |
-| `perp[*].oi_cap` | Decimal string | The open-interest cap the chain enforces, in the market's size units. It is the lower of the governance-set cap and the capacity cap. **OMITTED** only when neither exists (never a fabricated `"0"`). **Not live yet:** until the release after 2026-10-01 this is the governance-set cap only. See [the capacity cap](#oi-cap-capacity) |
+| `perp[*].oi_cap` | Decimal string | The open-interest cap the chain enforces, in the market's size units. On a native perp market it is the lower of the governance-set cap and the capacity cap. On a deployer market it is the deployer's cap: the value its deployer set with [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), or the governance default it started at. A deployer market has no capacity cap, because the protocol's backstop never takes its risk. **OMITTED** only when no cap exists (never a fabricated `"0"`). **Not live yet:** until the release after 2026-10-01 this is the governance-set cap only. See [the capacity cap](#oi-cap-capacity) |
 | `perp[*].oi_cap_usd` | Decimal string | USDC value of `oi_cap` at the committed risk mark: the mark clamped to the oracle band. **OMITTED** with `oi_cap`, and when the market has no mark. **Not live yet** |
-| `perp[*].oi_cap_bound` | `"voted"` \| `"capacity"` \| `"floor"` \| `"ceiling"` | Which source set `oi_cap`. `"voted"` = the governance-set cap. The other three are the capacity cap: the capacity result, the floor, or the ceiling. **OMITTED** with `oi_cap`. **Not live yet** |
+| `perp[*].oi_cap_bound` | `"voted"` \| `"capacity"` \| `"floor"` \| `"ceiling"` \| `"deployer"` | Which source set `oi_cap`. `"voted"` = the governance-set cap. `"capacity"`, `"floor"` and `"ceiling"` are the capacity cap: the capacity result, the floor, or the ceiling. `"deployer"` = a deployer market: the cap its deployer set, or the governance default it started at. A deployer market never reads another value. **OMITTED** with `oi_cap`. **Not live yet** |
 | `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. **Not live yet:** from the release after 2026-10-01, an order whose new exposure is larger than this headroom takes the [at-cap rules](#oi-cap-capacity). See below |
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
@@ -265,9 +265,11 @@ Response (perp truncated to one entry; the `spot` section is identical to
   here.
 - **The open-interest fields MOVE.** `max_market_order_ntl` is derived from live
   open interest, so it changes on every fill. From the release after 2026-10-01,
-  `oi_cap`, `oi_cap_usd` and `oi_cap_bound` follow the
-  [capacity cap](#oi-cap-capacity), which the chain recomputes every block. Do
-  not cache these fields with the rest of the row. See below.
+  `oi_cap`, `oi_cap_usd` and `oi_cap_bound` on a native perp market follow the
+  [capacity cap](#oi-cap-capacity), which the chain recomputes every block. On
+  a deployer market, `oi_cap` changes when its deployer sends
+  [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap). Do not cache
+  these fields with the rest of the row. See below.
 - For the spot pair / token field semantics see [the spot registry](./spot.md#spot_meta).
 
 #### `max_market_order_ntl` is served — do not reconstruct it {#max_market_order_ntl}
@@ -280,10 +282,12 @@ loses the two conventions the served field carries.
   produce it, because `oi_cap` is OMITTED from an uncapped row. A client that
   reads a missing `oi_cap` as `0` computes a negative headroom and blocks every
   order on a market that has no limit at all. This is the inverse mistake, and it
-  is the worse one. From the release after 2026-10-01, every perp market has a
-  [capacity cap](#oi-cap-capacity), so `null` becomes rare. It stays only on a
-  market with no governance-set cap and no capacity cap: a market that has never
-  had a mark, or any market while governance has the capacity cap switched off.
+  is the worse one. From the release after 2026-10-01, every native perp market
+  has a [capacity cap](#oi-cap-capacity), so `null` becomes rare there. On a
+  native market it stays only when there is no governance-set cap and no
+  capacity cap: a market that has never had a mark, or any market while
+  governance has the capacity cap switched off. A deployer market reads `null`
+  when it has no cap: its deployer sent `0`, or the governance default is `0`.
 - **`"0"` means the market sits AT its cap.** The value is floored at `0` and
   never goes negative.
 - **The name says notional; the value is a SIZE.** It is in the same units as
@@ -306,6 +310,15 @@ market is uncapped, and `oi_cap_usd` and `oi_cap_bound` are absent. See
 [the next release](../../../changelog/next-release.md#oi-cap-capacity).
 :::
 
+**Native perps only.** A deployer market has no capacity cap. Its deployer sets
+its cap with
+[`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), and
+`oi_cap_bound` reads `"deployer"`. The governance cap vote does not apply to a
+deployer market. The capacity cap measures what the
+protocol's backstops can pay. The Metaliquidity vault backstop never takes a
+deployer market's risk, so that measure does not apply to one. The rules under
+**At the cap** below apply to every capped market, a deployer market included.
+
 **Why the cap exists.** A liquidation can leave a deficit. This happens when the
 price moves past the maintenance margin before the close completes. The protocol
 pays the deficit from money it holds. The capacity cap limits open interest to
@@ -317,7 +330,7 @@ committed state only.
 | Amount | Counts when |
 |---|---|
 | The market's [insurance fund](../../../concepts/tiered-liquidation.md#t4--the-deficit-waterfall) | Always |
-| An equal share of the [Metaliquidity vault](../../../concepts/tiered-liquidation.md#mlp-first-bite) backstop: the room left under its equity-fraction bound, divided by the number of perp markets | The vault backstop is enabled, and the market is a core market |
+| An equal share of the [Metaliquidity vault](../../../concepts/tiered-liquidation.md#mlp-first-bite) backstop: the room left under its equity-fraction bound, divided by the number of native perp markets | The vault backstop is enabled |
 | The market's treasury reserve | The treasury reserve is configured |
 
 ADL does not count. It takes gains back from winners. It is not money the
@@ -332,9 +345,6 @@ maintenance margin ratio that the market allows on any tier:
   [oracle band](../../../concepts/contract-specifications.md#mark-price) of the
   risk mark. A trade on the book cannot push the risk mark past the band, but
   the risk mark can go from one edge of the band to the other.
-- On a [deployed market](../../../mip/mip-3.md#oracle), the deployer's push can
-  move the index 10%. The move is two pushes, or two band widths if that is
-  larger.
 - On a [self-priced market](../../../concepts/oracle-prices.md#self-priced-markets),
   the move is two index updates at the move band. One update takes the account
   below maintenance. The chain allows one more update for the close.
@@ -357,6 +367,7 @@ If governance sets the floor above the ceiling, the ceiling applies.
 | `"floor"` | The target is below the floor. A market with little capacity shows this |
 | `"ceiling"` | The target is above the ceiling |
 | `"voted"` | The governance-set cap is not higher than the capacity cap, or it is the only cap |
+| `"deployer"` | A deployer market. The cap is the one its deployer set, or the governance default it started at. The capacity cap does not apply |
 
 **How the cap moves.**
 
@@ -1078,9 +1089,10 @@ The cap is the open-interest cap the chain enforces, the same number as
 [`markets_meta`](#markets_meta) `oi_cap`. There is **no fallback to a configured
 default**: a read surface must never advertise a ceiling the chain does not
 enforce, so a market with no cap reports `null` rather than borrowing a global
-number. **Not live yet:** from the release after 2026-10-01, every perp market
-has a [capacity cap](#oi-cap-capacity), so `max_trade_size` is a number on
-every market that has a mark. Until then, only a governance-set cap counts, and
+number. **Not live yet:** from the release after 2026-10-01, every native perp
+market has a [capacity cap](#oi-cap-capacity), so `max_trade_size` is a number
+on every native market that has a mark. On a deployer market it follows the
+cap its deployer set. Until then, only a governance-set cap counts, and
 no market has one.
 
 `available_to_trade` and `max_trade_szs` are budgets from the caller's own free
@@ -1163,7 +1175,7 @@ No parameters.
 | `limits.auction_duration_blocks` | uint64 | Gas-auction window length, in blocks |
 | `limits.deployer_fee_cap_bps` | string | Ceiling on the per-market deployer fee share, a decimal string of whole basis points |
 | `limits.dutch_start_multiplier` | Decimal string | Dutch-auction start-price multiplier over the minimum bid |
-| `limits.per_market_limits.max_oi` | u128 string | Open-interest cap, in **whole units** of the base asset |
+| `limits.per_market_limits.max_oi` | u128 string | The open-interest cap a deployer market starts at when it activates with no cap, in **whole units** of the base asset. Its deployer can then change it with [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), so read the market's own cap from [`markets_meta`](#markets_meta) `oi_cap`. **Not live yet:** until the release after 2026-10-01 there is no such action, and this is the cap every deployer market carries |
 | `limits.per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |
 | `limits.per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](./fees-credit.md#fee_schedule)) |
 | `limits.per_market_limits.max_oi_per_second` | u128 string | Open-interest growth-rate cap, in **whole units** of the base asset per second |

@@ -23,6 +23,27 @@ A deliberate split keeps the consensus surface small:
   signs orders **on behalf of the vault account** and submits them through the
   normal signed-order path. No strategy logic is baked into consensus.
 
+## Scope {#scope}
+
+The vault trades core markets only. It never takes the risk of a
+[deployer market](./mip-3.md): a market a builder deployed, with an asset id at
+or above 1000.
+
+- **Orders.** The chain refuses a vault order that opens or extends a position
+  on a deployer market, or flips one. The error is `PRECONDITION_FAILED`, with
+  the message
+  `metaliquidity vault cannot open or extend a position on a MIP-3 market`. An
+  order that only closes a position passes. **Not live yet:** this rule ships
+  with the node release after 2026-10-01.
+- **Backstop.** The vault never absorbs a deployer market's liquidation. This
+  is live. See [Liquidation on a deployed market](./mip-3.md#liquidation).
+- **Strategy.** The reference market maker refuses to start when its list
+  names a deployer market.
+
+**Why.** A deployer market prices from its own deployer, and its deployer sets
+its open-interest cap. Neither is under protocol control. Liquidity providers
+did not deposit to carry that risk.
+
 ## For liquidity providers {#for-liquidity-providers}
 
 - **Deposit** USDC, permissionlessly, and receive vault shares priced at the

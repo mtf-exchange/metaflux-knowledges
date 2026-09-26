@@ -413,6 +413,10 @@ served on a public read, so treat both as governance values that can move.
 is refused at both entry points, whether or not it prices from its own deployer
 oracle. Its bad debt can never reach vault depositors; it is handled by that
 market's own backstop settings and then by the waterfall.
+The vault also never opens or extends a position on such a market, so its
+depositors carry no trading risk there either. **Not live yet:** that order
+rule ships with the node release after 2026-10-01. See
+[Metaliquidity scope](../mip/mip-2.md#scope).
 
 What this changes for you:
 

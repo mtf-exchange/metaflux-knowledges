@@ -1,15 +1,16 @@
 ---
-description: Four changes that wait for the next node release — order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, and an open-interest cap on every perp market — one wire row that is not verified on the running chain, and two corrections to this reference.
+description: "Five changes that wait for the next node release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, and a deployer-set cap on a deployer market. Also one wire row that is not verified on the running chain, and two corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Four sections wait for the next node release:**
+**Five sections wait for the next node release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
-[`mtfStatus` for two transactions at one nonce](#same-nonce-status) and
-[an open-interest cap on every perp market](#oi-cap-capacity). The action byte
+[`mtfStatus` for two transactions at one nonce](#same-nonce-status),
+[an open-interest cap on every native perp market](#oi-cap-capacity) and
+[a deployer sets its market's open-interest cap](#perp-set-oi-cap). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -77,22 +78,25 @@ the nonce stays free, and the second transaction runs.
 refused transaction at the same nonce can be wrong. Read the sender's nonce or
 the contract code to confirm.
 
-## An open-interest cap on every perp market {#oi-cap-capacity}
+## An open-interest cap on every native perp market {#oi-cap-capacity}
 
 **NOT LIVE YET.** This change ships with the next node release, after
 2026-10-01.
 
 | Surface | A live node | From the next release |
 |---|---|---|
-| [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` | present only on a market with a governance-set cap. No market has one, so every market is uncapped | present on every perp market: the lower of the governance-set cap and the capacity cap |
-| `markets_meta` `oi_cap_usd` and `oi_cap_bound` | absent | present with `oi_cap` |
-| `markets_meta` `max_market_order_ntl` and [`active_asset_data`](../api/rest/info/perpetuals.md#active_asset_data) `max_trade_size` | `null` on every market | a number on every market that has a mark |
+| [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap` | present only on a market with a governance-set cap. No market has one, so every market is uncapped | present on every native perp market: the lower of the governance-set cap and the capacity cap. On a deployer market, the cap its deployer set: see [below](#perp-set-oi-cap) |
+| `markets_meta` `oi_cap_usd` and `oi_cap_bound` | absent | present with `oi_cap`. `oi_cap_bound` reads `"deployer"` on a deployer market |
+| `markets_meta` `max_market_order_ntl` and [`active_asset_data`](../api/rest/info/perpetuals.md#active_asset_data) `max_trade_size` | `null` on every market | a number on every native perp market that has a mark, and on every deployer market that has a cap |
 
 **Why.** A liquidation can leave a deficit, and the protocol pays it from the
 insurance fund and its other backstops. With no cap, open interest has no bound
 against that money. The chain now derives a cap from what the backstops can
 pay, and it recomputes the cap every block. See
 [how the capacity cap works](../api/rest/info/perpetuals.md#oi-cap-capacity).
+The capacity cap covers native perp markets only. The Metaliquidity vault
+backstop never takes a deployer market's risk, so a deployer market gets its
+cap from its deployer instead.
 
 **What to do.**
 
@@ -107,6 +111,42 @@ pay, and it recomputes the cap every block. See
 - Do not cache `oi_cap`. It changes as the capacity and the mark change.
 
 The cap never closes a position.
+
+## A deployer sets its market's open-interest cap {#perp-set-oi-cap}
+
+**NOT LIVE YET.** This change ships with the next node release, after
+2026-10-01.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap) | `unknown variant` | accepted from the market's deployer, or from a delegate that holds bit 9 |
+| [`perp_set_sub_deployer_perms`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers) `permissions` with bit 9 set | refused: bits 9-15 are reserved | accepted. `1023` is every bit |
+| The mask of a delegate added with `perp_set_sub_deployers` | `511` | `1023` |
+| [`perp_activate_market`](../api/rest/exchange/deploy-perp.md#perp_activate_market) on a market that has a cap | sets the cap to the governance default `max_oi` | keeps the cap. Only a market with no cap starts at `max_oi` |
+| [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap_bound` on a deployer market | absent | `"deployer"` |
+| A Metaliquidity vault order that opens, extends or flips a position on a deployer market | accepted | refused, `PRECONDITION_FAILED`: `metaliquidity vault cannot open or extend a position on a MIP-3 market` |
+
+**Why.** A deployer market prices from its own deployer, and the protocol's
+backstops never take its risk. The capacity cap measures what those backstops
+can pay, so it does not fit a deployer market. The deployer owns the market's
+risk, so the deployer sets the cap. For the same reason, the Metaliquidity
+vault does not trade a deployer market. Its depositors did not deposit to carry
+a price the protocol does not control.
+
+**What to do.**
+
+- As a deployer, set your cap with `perp_set_oi_cap` after the release. The
+  cap is in whole units of the base asset, not lots and not USD. Until the
+  release, your market carries the governance default it started at.
+- Send `0` to remove the cap. Activation fills an empty cap with the governance
+  default, so send `0` again after you deactivate and activate the market.
+- To let a delegate set the cap, grant bit 9. A delegate added with
+  `perp_set_sub_deployers` holds every bit, bit 9 included.
+- Accept `"deployer"` as a value of `oi_cap_bound`.
+- A lower cap closes no position. It stops new exposure only, by the
+  [at-cap rules](../api/rest/info/perpetuals.md#oi-cap-capacity).
+- The reference market maker refuses to start when its list names a deployer
+  market. Remove such a market from the list.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

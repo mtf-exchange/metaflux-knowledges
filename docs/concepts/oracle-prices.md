@@ -211,7 +211,9 @@ address holding **some** authority on the market; `sub_deployer_perms` maps each
 one to its exact [permission mask](../mip/mip-3.md#delegation) as an integer.
 Read the mask, not the list, before you decide who can push a price: a delegate
 appears in `sub_deployers` whether it holds bit 0 or only the fee bits. A
-delegate granted before the release reads back as `511`, the full mask.
+delegate granted before the release reads back as the full mask: `511` on a
+live node, and `1023` from the node release after 2026-10-01, which adds bit 9
+for `perp_set_oi_cap`.
 
 ## Edge cases {#edge-cases}
 

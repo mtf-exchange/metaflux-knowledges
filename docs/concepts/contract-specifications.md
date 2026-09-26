@@ -43,7 +43,7 @@ from**. For the mechanics behind a field, follow the link in its row.
 | **Size decimals / step** | per-market size precision + lot step | `sz_decimals`, `step_size` |
 | **Min order size** | per-market minimum order | `min_order` |
 | **Max order value** | margin gate + the market's remaining open-interest headroom (no fixed per-order $ cap) | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `max_market_order_ntl` |
-| **Open-interest cap** | the cap the chain enforces: the lower of the governance-set cap and the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity), plus a per-second OI velocity limit | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap`, `oi_cap_usd`, `oi_cap_bound` vs [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest` |
+| **Open-interest cap** | the cap the chain enforces: on a native perp market, the lower of the governance-set cap and the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity); on a deployer market, the cap its deployer set with [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap). Plus a per-second OI velocity limit | [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `oi_cap`, `oi_cap_usd`, `oi_cap_bound` vs [`markets`](../api/rest/info/perpetuals.md#markets) `open_interest` |
 | **Margin modes** | Cross / Isolated / Strict-Iso (Strict-Iso also imposable at **market** level) | `strict_isolated` |
 | **Portfolio margin** | SPAN price×vol scenario grid, 100K USDC enroll floor, multi-collateral haircut | [`account_state`](../api/rest/info/account.md#account_state) `abstraction` |
 | **FBA eligible** | whether [frequent batch auction](../concepts/fba.md) is enabled | `fba_enabled` |
@@ -286,8 +286,11 @@ per-order dollar cap:
   notional.
 - **Open-interest cap** — `oi_cap` on
   [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) is the cap the
-  chain enforces, in size units. It is the lower of the governance-set cap and
-  the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity). The chain
+  chain enforces, in size units. On a native perp market it is the lower of the
+  governance-set cap and the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity). On a
+  deployer market it is the cap its deployer set with
+  [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap),
+  and the capacity cap does not apply. The chain
   recomputes the capacity cap every block from the protocol's backstop capacity
   and the market's worst loss per unit of notional. `oi_cap_usd` gives its
   USDC value at the committed risk mark, and `oi_cap_bound` names the source.
@@ -301,8 +304,9 @@ per-order dollar cap:
   record is true position OI (positions outstanding), not the book's resting
   depth.
 
-**Not live yet.** The capacity cap ships with the node release after
-2026-10-01. From then, every perp market carries an open-interest cap. Until
+**Not live yet.** The capacity cap and `perp_set_oi_cap` ship with the node
+release after 2026-10-01. From then, every native perp market carries an
+open-interest cap, and a deployer market carries the cap its deployer set. Until
 then, `oi_cap` is the governance-set cap only, no market has one, and every
 market is uncapped.
 

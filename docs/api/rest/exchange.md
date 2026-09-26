@@ -367,7 +367,7 @@ the allocated ids and the committed spec through
 
 ### Perp deployment (MIP-3) {#perp-deployment}
 
-Eleven **sender-authorized** actions let an account register a perp market in its
+Twelve **sender-authorized** actions let an account register a perp market in its
 own dex, configure it, open it, and price it. The signer *is* the deployer. After
 the first registration, only that market's deployer — or a
 [sub-deployer](./exchange/deploy-perp.md#perp_set_sub_deployers) holding the matching permission bit — may
@@ -386,6 +386,7 @@ listed by governance is not one, so this lane cannot reach it.
 | [`perp_set_fee_tier`](./exchange/deploy-perp.md#perp_set_fee_tier) | Set the taker, maker and deployer fees | deployer, or bit 2 | no |
 | [`perp_set_maker_rebate`](./exchange/deploy-perp.md#perp_set_maker_rebate) | Set the maker rebate | deployer, or bit 3 | no |
 | [`perp_set_min_size`](./exchange/deploy-perp.md#perp_set_min_size) | Set the minimum order size | deployer, or bit 4 | no |
+| [`perp_set_oi_cap`](./exchange/deploy-perp.md#perp_set_oi_cap) | Set the open-interest cap, in whole units. **Not live yet:** ships with the node release after 2026-10-01 | deployer, or bit 9 | no |
 | [`perp_activate_market`](./exchange/deploy-perp.md#perp_activate_market) | Open the market to trading | deployer, or bit 5 | no |
 | [`perp_deactivate_market`](./exchange/deploy-perp.md#perp_activate_market) | Close the market, and cancel every resting order and parked trigger on it | deployer, or bit 6 | no |
 | [`perp_set_sub_deployers`](./exchange/deploy-perp.md#perp_set_sub_deployers) | Grant a delegate every bit, or revoke it | deployer only | no |
