@@ -127,9 +127,16 @@ eligible** in these cases, whatever its weight:
 - The price perpetual is a deployer market, not a native perp market.
 - The price perpetual is [self-priced](./oracle-prices.md#self-priced-markets):
   its price comes from its own book.
+- The price perpetual is delisted or inactive.
 
 A named price perpetual that fails one of these checks makes the token
 ineligible. The chain does not fall back to the perpetual with the same symbol.
+
+Governance names a price perpetual only for a token that has no usable
+same-symbol perpetual. A vote that names another perpetual for such a token is
+refused. One unit of the token must equal one unit of the perpetual's
+underlying: the credit multiplies the token balance by the perpetual's price
+and applies no unit ratio.
 
 USDC is weight 1 and is never haircut.
 

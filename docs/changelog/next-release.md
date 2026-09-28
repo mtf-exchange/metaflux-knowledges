@@ -180,9 +180,10 @@ another market. See
 | A [disputed](../api/rest/info/bridge.md#disputed) withdrawal that reads `released` | no recovery lane | governance can re-issue it the same way |
 | [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) after a re-issue | — | a NEW entry: same `amount_units` and `dst_addr`, a higher `nonce`, `awaiting_cosignatures`. The old entry stays terminal |
 | [`markets_meta`](../api/rest/info/spot.md) `spot.tokens` | a spot token that governance registers is absent | the token appears, with its size and wei decimals |
-| A spot token as [portfolio-margin collateral](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) | never counts | counts when governance sets a collateral weight for that token and its price perpetual, native and not self-priced, gives its mark |
+| A spot token as [portfolio-margin collateral](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) | never counts | counts when governance sets a collateral weight for that token and its price perpetual, native, listed and not self-priced, gives its mark |
 | The perpetual that gives a collateral token its [mark](../concepts/portfolio-margin.md#pm-collateral-eligibility) | — | the perpetual governance names for the token or, when none is named, the perpetual with the same symbol. A token whose symbol differs from its perpetual, such as a bridged `gBTC` priced by `BTC`, needs the named mapping |
-| [`node_gov`](../nodes/data-streams.md#node_gov) `asset` on a `pm_collateral_haircut` vote | — | a spot token id, not a market id |
+| [`node_gov`](../nodes/data-streams.md#node_gov) `asset` on a `pm_collateral_haircut` or `pm_collateral_price_asset` vote | — | a spot token id, not a market id |
+| [`node_gov`](../nodes/data-streams.md#node_gov-vote-enacted) `changes[].field` on a `SetDynamicRiskParam` enactment | — | can be `pm_collateral_price_asset`, the perpetual that gives the token its mark |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on a re-issue vote | — | `bridge_reissue` |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on an `ArmFeatures` or SPAN shock-grid vote | `circle_promotion_attest` | `arm_features` or `pm_shock_grid` |
 
@@ -258,6 +259,7 @@ read the archive or the gateway's own 24-hour trade window instead.
 | [`markets`](../api/rest/info/perpetuals.md#markets) `time` | node release | New top-level field: the block time of the read |
 | `markets` `day_ntl_vlm` | gateway release | The gateway replaces `day_ntl_vlm` with the sum from its own window. It removes `day_ntl_vlm_lower_bound_from` only when its data covers the whole 24 hours. Otherwise the marker is the oldest instant its data covers |
 | [`markets`](../api/rest/info/spot.md#spot_meta) spot `prev_day_px` | gateway release | When the gateway data covers the whole 24 hours, the price of the first print in that window |
+| WebSocket [`markets`](../api/ws/subscriptions.md#markets) `day_ntl_vlm` and spot `prev_day_px` | gateway release | The same two rules on every snapshot and delta row. The window ends at the row's `time` |
 | [`trades`](../api/rest/info/perpetuals.md#trades-archive), un-ranged | gateway release | The ask also reaches the archive. The answer merges the node ring, the gateway window and the archive, with no duplicate `tid` |
 | `trades`, a row from the gateway window | gateway release | No `hash` key and no `block` key, the same as an archive row that has no block |
 | WS [`trades`](../api/ws/subscriptions.md#trades) on-subscribe snapshot | gateway release | When the node has no ring for the market, the gateway serves the snapshot from its own window |

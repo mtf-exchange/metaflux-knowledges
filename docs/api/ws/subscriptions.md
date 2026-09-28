@@ -321,10 +321,11 @@ So the **snapshot is all rows** and a **delta is the changed rows only** — dem
 | `halted` | bool | Whether the market is halted |
 | `settled` | bool \| absent | `true` on a permanently closed market; **ABSENT** on every other market. Same rule as the REST [`markets`](../rest/info/perpetuals.md#markets) row |
 | `settled_px` | Decimal string \| absent | Whole-USDC price every position closed at. Absent when no position was open at the delist |
+| `time` | uint64 | Consensus ms of the commit that pushed this row. The gateway's 24-hour window ends here |
 
-**The gateway does not fill `day_ntl_vlm` on this channel.** The rows come from the node. From the release that arms the fill-tape retirement, a node with no 24-hour window serves `"0"` with `day_ntl_vlm_lower_bound_from` at the block time. Read that as no data, and read the REST [`markets`](../rest/info/perpetuals.md#day-ntl-vlm-bound) row for the gateway's figure. **Not live yet:** see [the notice](../../changelog/next-release.md#tape-retirement-reads).
+**The gateway fills `day_ntl_vlm` on this channel** with the same rule as the REST [`markets`](../rest/info/perpetuals.md#day-ntl-vlm-bound) row, on the snapshot and on every delta. It anchors the 24-hour window on the row's `time`. It removes `day_ntl_vlm_lower_bound_from` only when its window covers the whole 24 hours. On a spot row it then also serves the price of the first print in the window as `prev_day_px`. A row that still carries the marker is a lower bound. A marker equal to `time` means no window: read `"0"` as no data. **Not live yet:** see [the notice](../../changelog/next-release.md#tape-retirement-reads).
 
-Spot rows carry only the fields with a spot analogue — `coin`, `kind` (`"spot"`), `mark_px`, `mid_px` (omitted when one-sided), `day_ntl_vlm`, `day_ntl_vlm_lower_bound_from` (when set), `prev_day_px`; the perp-only fields (`oracle_px` / `premium` / `funding` / `open_interest` / `change_24h` / `halted` / `settled` / `settled_px`) are absent.
+Spot rows carry only the fields with a spot analogue — `coin`, `kind` (`"spot"`), `mark_px`, `mid_px` (omitted when one-sided), `day_ntl_vlm`, `day_ntl_vlm_lower_bound_from` (when set), `prev_day_px`, `time`; the perp-only fields (`oracle_px` / `premium` / `funding` / `open_interest` / `change_24h` / `halted` / `settled` / `settled_px`) are absent.
 
 Frequency: change-driven — a delta frame lands only on commits where at least one market's row moved; a commit that changes nothing emits nothing.
 

@@ -741,7 +741,7 @@ Each event is one of two shapes. Read `type` to tell them apart.
 | `category` | string | — | The label of the round that holds the vote. See [the category table](#node_gov-categories) |
 | `sub_id` | uint64 | — | Offset of `round` from the base of its category. `0` on a fixed round. Under `"proposal"` it **equals `round`** |
 | `action` | string | — | Wire action name the vote targets, such as `"SetDynamicRiskParam"`. **This is the exact filter for a vote kind** |
-| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote. On a `SetDynamicRiskParam` vote that sets `pm_collateral_haircut`, it is a spot token id, not a market id, and `coin` is absent. Resolve the id against the token registry |
+| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote. On a `SetDynamicRiskParam` vote that sets `pm_collateral_haircut` or `pm_collateral_price_asset`, it is a spot token id, not a market id, and `coin` is absent. Resolve the id against the token registry |
 | `coin` | string \| absent | — | Market symbol for `asset`. Absent when the vote is global, or the market carries no listing spec |
 | `validator` | string | — | Casting validator's `0x` address, lowercase, 20 bytes |
 | `stake` | decimal string | whole stake units | **This validator's own** weight at the cast |
@@ -835,7 +835,7 @@ the vote kind.
 |-------|------|-------|---------|
 | `round` | uint64 | id | The round that reached quorum |
 | `action` | string | — | Wire action name. `"DirectAction"` when the block that enacts holds no `vote_cast` on this `round`. Then read `action` from the earlier `vote_cast` on the same `round` |
-| `asset` | uint32 \| absent | id | Market asset id. Absent on a chain-global change. A spot token id on a `pm_collateral_haircut` change, as on `vote_cast` |
+| `asset` | uint32 \| absent | id | Market asset id. Absent on a chain-global change. A spot token id on a `pm_collateral_haircut` or `pm_collateral_price_asset` change, as on `vote_cast` |
 | `coin` | string \| absent | — | Market symbol for `asset` |
 | `changes` | array | — | The fields the enactment moved, in a fixed order |
 | `agreeing_stake` | decimal string | whole stake units | Weight that agreed on the enacted payload |
@@ -852,6 +852,10 @@ One entry of `changes`:
 
 Values in `changes` stay strings. One enactment can move several fields of one
 struct, and those fields are not one numeric type.
+
+On a `SetDynamicRiskParam` enactment, `field: "pm_collateral_price_asset"` is
+the native perpetual id that gives the spot token its collateral mark. A vote
+that clears the haircut (weight `0`) clears it too, so `new` reads `null`.
 
 :::warning
 **Five traps on this stream.**
