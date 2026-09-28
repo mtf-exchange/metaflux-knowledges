@@ -1,5 +1,5 @@
 ---
-description: "The bounded history lanes: ledger updates, funding payments, TWAP history, and the archive-backed windows."
+description: "The bounded history lanes: funding payments, TWAP history, and the archive-backed windows."
 ---
 
 # Account history reads
@@ -10,7 +10,7 @@ to every query here.
 
 ## Account history query types {#account-history-query-types}
 
-Per-account history reads — funding payments, ledger updates, past orders,
+Per-account history reads — funding payments, past orders,
 TWAP slice fills, and staking rewards. Same `{type, data}` envelope and
 MTF-native conventions as the reads above (decimal-string money, `0x`-hex
 addresses, coin **symbols**). Every type here requires `address` (0x hex;
@@ -25,8 +25,8 @@ An empty array alone does not tell you which case you are in: an account with
 no matching history also reads `[]`, and a node-local retention window is empty
 right after a restart. Read the notice on the type itself.
 
-[`user_ledger_updates`](#user_ledger_updates) is empty for a different reason:
-its records live in the archive, not on the node. Read its own notice below.
+`user_ledger_updates` is removed. For balance ledger history, see its row in
+[removed reads](../info.md#retired-reads).
 
 **An honest-empty array is not the same as a hardcoded one.** A read that
 could only ever answer `[]` was deleted rather than documented — see
@@ -241,68 +241,6 @@ nothing. Read shares and their current value from
 
 **An account with no borrow answers an empty `borrows` and `owed: "0"`**, not an
 error. That is a fact about the account.
-
-### Balance ledger update history {#user_ledger_updates}
-
-> ⚠️ **This read answers `[]`.** The node keeps
-> no per-account ledger history for REST. The archive does retain the deltas,
-> but in the node stream's own record shape: a signed `delta` and a numeric
-> token id. The locked record shape below instead matches the
-> [`ledger_updates` WS record](../../ws/subscriptions.md#ledger_updates), which
-> carries an unsigned `amount` and a fine-grained `kind`. The gateway will not
-> route the archive's data through a shape it does not match. The read opens
-> when the archive stores the matching record shape.
-
-**Neither side can answer this read.** The node emits each balance delta
-once, on the [`ledger_updates` WS channel](../../ws/subscriptions.md#ledger_updates),
-and keeps nothing after. The archive keeps the deltas, in the different shape
-above. Use the WS channel for live movement; there is no REST history for it
-yet.
-
-**A deployment with no archive answers typed-empty**: `updates` is `[]`, never
-an error. So `[]` carries two meanings — "no archive here" and "no delta in
-this window" — and the reply does not tell them apart. For a live per-account
-feed, subscribe to the WS channel instead.
-
-**Request**
-
-```json
-{ "type": "user_ledger_updates", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
-```
-
-| Field | Type | Required | Meaning |
-|-------|------|----------|---------|
-| `address` | hex address | yes | Account address |
-| `start_time` / `end_time` | uint64 | no | Window, ms. Echoed back; `null` when omitted |
-
-**Response**
-
-```json
-{
-  "data": {
-    "type": "user_ledger_updates",
-    "address":    "0x<addr>",
-    "start_time": 1700000000000,
-    "end_time":   1700003600000,
-    "updates":    []
-  }
-}
-```
-
-| Field | Type | Meaning |
-|-------|------|---------|
-| `address` | hex address | Echoes the request address |
-| `start_time` | uint64 \| null | Echoes the request window start |
-| `end_time` | uint64 \| null | Echoes the request window end |
-| `updates` | array | Ledger-update records. Always `[]` today |
-
-Locked record shape: the
-[`ledger_updates` WS record](../../ws/subscriptions.md#ledger_updates) verbatim —
-`{kind, amount, time}` plus the kind-specific fields
-(`destination`, `token`, `asset`, `to_perp`, `via`). Every `amount` is a
-whole-token decimal string; no record carries raw base units. The underlying
-deltas, once retention lands, come from the archive's
-[`node_ledger`](../../../nodes/data-streams.md#node_ledger) stream.
 
 ### Past executed orders {#historical_orders}
 

@@ -52,7 +52,6 @@ strings. The field names do not change.
 | [`order_status`](../api/rest/info/orders-fills.md#order_status) | `order.oid`, `trigger.oid`, `fills[*].oid`, `fills[*].tid`, `outcome.oid` |
 | [`open_orders`](../api/rest/info/orders-fills.md#open_orders) | each row's `oid` |
 | [`historical_orders`](../api/rest/info/account-history.md#historical_orders) | `orders[*].oid` |
-| [`user_ledger_updates`](../api/rest/info/account-history.md#user_ledger_updates) | a trade row's `tid` |
 | The RFQ / FBA read | `oid` |
 | [`/exchange`](../api/rest/exchange.md) | EVERY id in the ACK union — `resting.oid`, `filled.oid`, `chase.chase_oid`, `chase.leg_oid` |
 | WS [`trades`](../api/ws/subscriptions.md#trades), [`fills`](../api/ws/subscriptions.md#fills), [`order_updates`](../api/ws/subscriptions.md#order_updates), [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) | `oid`, `tid` |

@@ -1,11 +1,11 @@
 ---
-description: "Nine changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, and the reads after the fill-tape retirement. Also one wire row that is not verified on the running chain, and five corrections to this reference."
+description: "Ten changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, the reads after the fill-tape retirement, and the removal of user_ledger_updates. Also one wire row that is not verified on the running chain, and five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Nine sections wait for the next node release, and one of them also waits for
+**Ten sections wait for the next node release, and two of them also wait for
 the next gateway release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
@@ -14,8 +14,9 @@ the next gateway release:**
 [a deployer sets its market's open-interest cap](#perp-set-oi-cap),
 [a deficit is charged to the market that produced it](#deficit-attribution),
 [a bridge re-issue lane and spot tokens as portfolio-margin collateral](#reissue-and-pm-collateral),
-[a `node_gov` label for every governance round](#node_gov-labels) and
-[the reads after the fill-tape retirement](#tape-retirement-reads). The action byte
+[a `node_gov` label for every governance round](#node_gov-labels),
+[the reads after the fill-tape retirement](#tape-retirement-reads) and
+[the removal of `user_ledger_updates`](#user-ledger-updates-removed). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -179,7 +180,8 @@ another market. See
 | A [disputed](../api/rest/info/bridge.md#disputed) withdrawal that reads `released` | no recovery lane | governance can re-issue it the same way |
 | [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) after a re-issue | — | a NEW entry: same `amount_units` and `dst_addr`, a higher `nonce`, `awaiting_cosignatures`. The old entry stays terminal |
 | [`markets_meta`](../api/rest/info/spot.md) `spot.tokens` | a spot token that governance registers is absent | the token appears, with its size and wei decimals |
-| A spot token as [portfolio-margin collateral](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) | never counts | counts when governance sets a collateral weight for that token and a same-symbol perpetual that is not self-priced gives its mark |
+| A spot token as [portfolio-margin collateral](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) | never counts | counts when governance sets a collateral weight for that token and its price perpetual, native and not self-priced, gives its mark |
+| The perpetual that gives a collateral token its [mark](../concepts/portfolio-margin.md#pm-collateral-eligibility) | — | the perpetual governance names for the token or, when none is named, the perpetual with the same symbol. A token whose symbol differs from its perpetual, such as a bridged `gBTC` priced by `BTC`, needs the named mapping |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `asset` on a `pm_collateral_haircut` vote | — | a spot token id, not a market id |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on a re-issue vote | — | `bridge_reissue` |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on an `ArmFeatures` or SPAN shock-grid vote | `circle_promotion_attest` | `arm_features` or `pm_shock_grid` |
@@ -190,9 +192,10 @@ recovery lane. A re-issue pays the original withdrawal once, on the destination
 chain. It never debits the user again and never credits the user on the
 exchange. Governance re-issues a withdrawal once.
 
-A spot token takes its mark from the exchange's own perpetual with the same
-symbol, so the collateral and a perpetual position on that symbol share one
-price in the scenario grid. A self-priced perpetual has no external price, so
+A spot token takes its mark from its price perpetual: the one governance names
+for the token or, when none is named, the perpetual with the same symbol. So the
+collateral and a position on that perpetual share one price in the scenario
+grid. A self-priced perpetual has no external price, so
 its token never counts.
 
 **What to do.**
@@ -214,13 +217,16 @@ its token never counts.
 |---|---|---|
 | [`node_gov`](../nodes/data-streams.md#node_gov-categories) `category` on a fixed-round vote with no label of its own, for example `DisableDex` | the label of the nearest labeled base below it, such as `oracle_weights` | the label of its own round, such as `disable_dex` |
 | `node_gov` `sub_id` on that vote | the distance from that lower base, such as `12000000` | `0` |
-| `node_gov` `category` on a round that more than one action shares | the label of a lower base | one label that joins the sharers with `+`, such as `delist_market+burn_treasury` |
+| `node_gov` `round` on a `Listing`, `MintTreasury`, `BurnTreasury` or `SetPopulationTarget` vote | a round that another action also uses: 13,000,000, 13,000,000, 14,000,000 and 15,000,000, in that order | a round of its own: 48,000,000, 49,000,000, 50,000,000 and 51,000,000, in that order |
 
 **Why.** A live node labels only eight bases. Thirty fixed rounds have no base
 of their own, so each one reads as a different vote kind. The new
 [category table](../nodes/data-streams.md#node_gov-categories) gives every round
-its own label. Three rounds are shared by more than one action, and a `+`
-label says so.
+its own label.
+
+Every round has one action. On a live node, three rounds are shared by more
+than one action. A validator has one vote slot per round, so its vote for one
+of those actions replaces its vote for the other.
 
 **What to do.**
 
@@ -228,7 +234,9 @@ label says so.
   exact filter.
 - Do not split a vote kind by `category` on a record written before the
   release. The old label on those records does not change.
-- Accept a `category` value that contains `+`.
+- A vote cast on a shared round in the 24 hours before the release does not
+  carry over for `Listing`, `MintTreasury`, `BurnTreasury` and
+  `SetPopulationTarget`. Cast it again after the release.
 
 ## Reads after the fill-tape retirement {#tape-retirement-reads}
 
@@ -272,6 +280,30 @@ them. A ring of 256 prints covers minutes on a busy market, so the gateway's
 - Keep reading `trades` rows with and without `hash`. A missing `hash` means
   "not recorded".
 - Expect no type change. No field changes its type, and no field is removed.
+
+## `user_ledger_updates` is removed {#user-ledger-updates-removed}
+
+**NOT LIVE YET.** This change ships with the next node release and the next
+gateway release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`POST /info`](../api/rest/info.md#retired-reads) `user_ledger_updates` | `200` with `updates: []` | `410` with `code: "UNKNOWN_TYPE"` and `details.use: "user_non_funding_ledger_updates"`. A node that you call directly answers `400` `UNKNOWN_TYPE` |
+
+**Why.** This read could only answer `[]`. The node keeps no per-account ledger
+history. The archive keeps every balance movement, in the stream's own record
+shape: a signed `delta` and a token `coin`.
+[`user_non_funding_ledger_updates`](../api/rest/info.md#archive-lane) serves
+those records. One question, one read.
+
+**What to do.**
+
+- Call `user_non_funding_ledger_updates` for the balance ledger history of an
+  account. It answers today.
+- Read `delta` as a signed change, not as an unsigned amount.
+- For live balance movement, keep the
+  [`ledger_updates` WS channel](../api/ws/subscriptions.md#ledger_updates). It
+  does not change.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

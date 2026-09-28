@@ -346,7 +346,8 @@ Hedged / correlated positions net inside the grid, so a balanced book margins at
 fraction of classical. **Multi-collateral PM** (preview): governance can make a
 non-USDC spot token count toward an enrolled account's PM value at
 `balance × mark × haircut` (a per-token weight in `(0, 1]`; the mark is the oracle
-price of the same-symbol perpetual), folded into the grid as a spot leg — letting a
+price of the perpetual governance names for the token, or of the same-symbol
+perpetual when none is named), folded into the grid as a spot leg — letting a
 portfolio post collateral beyond plain USDC. See
 [which tokens count](./portfolio-margin.md#pm-collateral-eligibility).
 

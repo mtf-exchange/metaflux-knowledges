@@ -115,13 +115,21 @@ that TOKEN. The weight is the `pm_collateral_haircut` value, in `(0, 1]`. A
 weight of `0.95` credits 95 % of the value, a 5 % haircut. The weight is set on
 the spot token id, never on a market id.
 
-The mark of the token is the oracle price of the exchange's own perpetual market
-with the same symbol. The BTC token takes its mark from the BTC perpetual. So a
-token is **never eligible** in these cases, whatever its weight:
+The mark of the token is the oracle price of its **price perpetual**: the
+perpetual market that governance names for the token or, when none is named,
+the perpetual with the same symbol. The BTC token takes its mark from the BTC
+perpetual. A token whose symbol differs from its perpetual, such as a bridged
+`gBTC` priced by `BTC`, needs the named mapping. So a token is **never
+eligible** in these cases, whatever its weight:
 
-- The token has no perpetual market with the same symbol.
-- That perpetual is [self-priced](./oracle-prices.md#self-priced-markets): its
-  price comes from its own book.
+- The token has no price perpetual: governance names none, and no perpetual has
+  the same symbol.
+- The price perpetual is a deployer market, not a native perp market.
+- The price perpetual is [self-priced](./oracle-prices.md#self-priced-markets):
+  its price comes from its own book.
+
+A named price perpetual that fails one of these checks makes the token
+ineligible. The chain does not fall back to the perpetual with the same symbol.
 
 USDC is weight 1 and is never haircut.
 
@@ -141,7 +149,7 @@ double-counted against its own mark). The weight discounts the credit only. The
 same price-shock sweep that margins your derivatives therefore also stresses the
 collateral: a token that crashes reduces *both* your collateral value and your
 scenario worst-case, as a real position would. A long collateral balance and a
-short perpetual position on the same symbol offset in the grid.
+short position on its price perpetual offset in the grid.
 
 **A stale oracle removes the credit.** When the oracle price of the perpetual is
 stale, or the oracle has not yet sourced one, the token credits nothing, and the protocol cannot seize it in a
@@ -154,10 +162,10 @@ position opened with borrowed USDC adds no credit.
 
 | Property | Behaviour |
 |----------|-----------|
-| Eligible set | The spot tokens with a positive collateral weight and a same-symbol perpetual that is not self-priced |
+| Eligible set | The spot tokens with a positive collateral weight and a price perpetual that is native and not self-priced |
 | Collateral weight | Per-token governance parameter `pm_collateral_haircut`; a higher weight credits more of the balance |
 | Clearing eligibility | Setting the weight to **zero** removes the token from the eligible set |
-| Mark | The oracle price of the same-symbol perpetual market |
+| Mark | The oracle price of the price perpetual: the one governance names for the token or, when none is named, the perpetual with the same symbol |
 | Inclusion | The full balance, folded into the SPAN grid as a long spot leg at mark (no double-count) |
 | Stale oracle | No credit and no seizure until the price is fresh |
 | Relation to lending | None — independent of the Earn / borrow-lend pool |

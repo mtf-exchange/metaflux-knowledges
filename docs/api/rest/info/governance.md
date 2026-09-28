@@ -54,7 +54,7 @@ with no arguments the read returns the most recent window it can serve.
 | `end_time` | uint64 | no | Window end (ms, inclusive). Same anchor time. Absent ⇒ open upper bound |
 | `limit` | uint32 | no | Rows returned. Default `500`, clamped to `1 … 5000` |
 | `coin` | string | no | Market symbol, e.g. `"BTC"`. Keeps only votes scoped to that market. A vote with no market scope is excluded |
-| `category` | string | no | Vote category, e.g. `"dynamic_risk"`, `"vote_global"`, `"gov_propose"`, `"treasury"`, `"metaliquidity"`, `"oracle_weights"`, `"funding_formula"`, `"spot_margin"` |
+| `category` | string | no | Vote category, e.g. `"dynamic_risk"`, `"vote_global"`, `"proposal"`, `"treasury_config"`, `"metaliquidity_set"`, `"oracle_weights"`, `"funding_formula"`, `"spot_margin_params"`. The full list is the [`node_gov` category table](../../../nodes/data-streams.md#node_gov-categories) |
 | `validator` | hex address | no | Keeps only rows this validator cast a vote in |
 | `status` | `"voting" \| "enacted" \| "expired"` | no | Keeps only rows in that lifecycle state |
 

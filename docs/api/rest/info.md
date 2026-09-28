@@ -224,7 +224,7 @@ answers with an empty body. It answers `UNKNOWN_TYPE`, in one of two forms:
 | What you sent | Status | Body |
 |---|---|---|
 | `spot_clearinghouse_state`, `oracle_sources`, `sub_accounts`, and every other name in [removed reads](#retired-reads) that is not in the row below | `400` | `{"error":{"code":"UNKNOWN_TYPE","message":"unknown info type: <name>"}}` — no `details` |
-| `account_overview`, `action_outcome`, `active_asset_ctx`, `all_mids`, `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`, `pm_summary`, `spot_meta`, `user_events` | `410` | the same `code`, plus `details.use` naming the read to call instead. Four of these names — `spot_meta`, `all_mids`, `active_asset_ctx` and `user_events` — answered a bare `400` before gateway 0.9.8; see [relocated reads](../../changelog/block-11550001.md#relocated-reads) |
+| `account_overview`, `action_outcome`, `active_asset_ctx`, `all_mids`, `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`, `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`, `pm_summary`, `spot_meta`, `user_events`, `user_ledger_updates` | `410` | the same `code`, plus `details.use` naming the read to call instead. Four of these names — `spot_meta`, `all_mids`, `active_asset_ctx` and `user_events` — answered a bare `400` before gateway 0.9.8; see [relocated reads](../../changelog/block-11550001.md#relocated-reads) |
 
 So a `200` carrying an empty array IS an answer about a real account. A client
 that shows "no balances" after calling `spot_clearinghouse_state` swallowed a
@@ -257,7 +257,7 @@ type for its request fields and response schema.
 |---|---|
 | **[Account state](./info/account.md)**<br/>collateral, margin health, positions, reservations | [`account_state`](./info/account.md#account_state) · [`clearinghouse_state`](./info/account.md#clearinghouse_state) |
 | **[Orders & fills](./info/orders-fills.md)**<br/>resting orders, fill history, one order's lifecycle | [`open_orders`](./info/orders-fills.md#open_orders) · [`user_fills`](./info/orders-fills.md#user_fills) · [`order_status`](./info/orders-fills.md#order_status) |
-| **[Account history](./info/account-history.md)**<br/>ledger updates, funding payments, TWAP history | [`user_funding`](./info/account-history.md#user_funding) · [`user_volume_history`](./info/account-history.md#user_volume_history) · [`user_interest`](./info/account-history.md#user_interest) · [`user_ledger_updates`](./info/account-history.md#user_ledger_updates) · [`historical_orders`](./info/account-history.md#historical_orders) · [`action_outcome`](./info/account-history.md#action_outcome) · [`user_twap_slice_fills`](./info/account-history.md#user_twap_slice_fills) · [`delegator_rewards`](./info/account-history.md#delegator_rewards) |
+| **[Account history](./info/account-history.md)**<br/>funding payments, past orders, TWAP history | [`user_funding`](./info/account-history.md#user_funding) · [`user_volume_history`](./info/account-history.md#user_volume_history) · [`user_interest`](./info/account-history.md#user_interest) · [`historical_orders`](./info/account-history.md#historical_orders) · [`action_outcome`](./info/account-history.md#action_outcome) · [`user_twap_slice_fills`](./info/account-history.md#user_twap_slice_fills) · [`delegator_rewards`](./info/account-history.md#delegator_rewards) |
 | **[Perpetual markets](./info/perpetuals.md)**<br/>market metadata, books, trades, candles, funding | [`markets`](./info/perpetuals.md#markets) · [`markets_meta`](./info/perpetuals.md#markets_meta) · [`l2_book`](./info/perpetuals.md#l2_book) · [`trades`](./info/perpetuals.md#trades) · [`candle_snapshot`](./info/perpetuals.md#candle_snapshot) · [`funding_history`](./info/perpetuals.md#funding_history) · [`mip3_active_bids`](./info/perpetuals.md#mip3_active_bids) · [`liquidatable`](./info/perpetuals.md#liquidatable) · [`active_asset_data`](./info/perpetuals.md#active_asset_data) · [`perp_dexs`](./info/perpetuals.md#perp_dexs) |
 | **[Spot, margin & Earn](./info/spot.md)**<br/>spot markets and balances, the margin lane, the lending pool | [`spot_meta`](./info/spot.md#spot_meta) · [`spot_margin_state`](./info/spot.md#spot_margin_state) · [`earn_state`](./info/spot.md#earn_state) · [`user_interest`](./info/spot.md#user_interest) · [`spot_deploy_auction`](./info/spot.md#spot_deploy_auction) |
 | **[Position history](./info/position-history.md)**<br/>closed position lifecycles | [`user_position_history`](./info/position-history.md#user_position_history) · [`user_position_history_by_time`](./info/position-history.md#user_position_history_by_time) · [`identities`](./info/position-history.md#identities) |
@@ -278,11 +278,11 @@ a wrong choice is silent. For the release a removal landed in, see
 The status splits the two kinds of removal:
 
 - **`400`** — the name never named a read on this API, or its answer is gone.
-- **`410`** — the name was public and its answer MOVED. Fourteen names get
+- **`410`** — the name was public and its answer MOVED. Fifteen names get
   this: `account_overview`, `action_outcome`, `active_asset_ctx`, `all_mids`,
   `bridge_chain_configs`, `bridge_user_outbox`, `encode_action`,
   `evm_contract_bindings`, `gov_history`, `gov_proposals`, `gov_state`,
-  `pm_summary`, `spot_meta` and `user_events`. The error carries
+  `pm_summary`, `spot_meta`, `user_events` and `user_ledger_updates`. The error carries
   `details.use`, naming the read to call instead, so a client can follow the
   move without reading this table. Branch on the status AND on `error.code`,
   never on the status alone.
@@ -325,6 +325,7 @@ Read the value as prose for a human, not as a type you can post back.
 | `token_info` | [`markets_meta`](./info/perpetuals.md#markets_meta) with `kind: "spot"` |
 | `user_fees` | [`fee_schedule`](./info/fees-credit.md#fee_schedule) with `address` — it resolves the effective maker / taker bps |
 | `user_fills_by_time` | [`user_fills`](./info/orders-fills.md#user_fills) with `start_time` / `end_time` |
+| `user_ledger_updates` | [`user_non_funding_ledger_updates`](#archive-lane). The node keeps no per-account ledger history. The archive keeps every balance movement in the stream's own record shape (a signed `delta`, a token `coin`), and that read serves it. One question, one read. **Not live yet:** until the next release, the name still answers `200` with `updates: []`. See [the notice](../../changelog/next-release.md#user-ledger-updates-removed) |
 | `user_role` | [`account_state`](./info/account.md#account_state) with `detail: "overview"` — `role` |
 | `user_to_multi_sig_signers` | [`account_state`](./info/account.md#account_state) with `detail: "overview"` — `multisig` |
 | `user_vault_equities` | [`account_state`](./info/account.md#account_state) with `detail: "overview"` — `vault.equities` |

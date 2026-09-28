@@ -759,14 +759,12 @@ Each vote kind collects its votes in a synthetic round. A **fixed** round is
 one round for the whole vote kind. A **band** starts at a base and adds an id to
 it, so one vote kind has one round per market, per chain or per pair.
 
-Three rules read this table:
+Two rules read this table:
 
 - **`sub_id` is `0` on a fixed round.** In a band it is the id added to the
   base.
 - **`action` is the exact filter for a vote kind.** `category` names the round,
   not the action.
-- **A `+` in a label means the round is shared.** More than one action casts
-  into that round. Split those votes by `action`.
 
 | `category` | `action` | Round base | `sub_id` |
 |---|---|---|---|
@@ -782,9 +780,9 @@ Three rules read this table:
 | `disabled_venues` | `SetDisabledVenues` | 9,000,000 | `0` |
 | `fee_schedule` | `SetFeeSchedule` | 11,000,000 | `0` |
 | `gov_adjust_spot_value` | `GovAdjustSpotValue` ¹ | 12,000,000 | `0` |
-| `locked_stake_allowlist+seed_market+mint_treasury` | `SetLockedStakeAllowlist`, `Listing`, `MintTreasury` ¹ | 13,000,000 | `0` |
-| `delist_market+burn_treasury` | `Delisting`, `BurnTreasury` ¹ | 14,000,000 | `0` |
-| `set_perp_max_oi+set_population_target` | `SetPerpMaxOpenInterest`, `SetPopulationTarget` ¹ | 15,000,000 | `0` |
+| `locked_stake_allowlist` | `SetLockedStakeAllowlist` | 13,000,000 | `0` |
+| `delist_market` | `Delisting` | 14,000,000 | `0` |
+| `set_perp_max_oi` | `SetPerpMaxOpenInterest` | 15,000,000 | `0` |
 | `set_spot_min_notional` | `SetSpotMinNotional` | 16,000,000 | `0` |
 | `mip3_set_global` | `SetGlobal` | 17,000,000 | `0` |
 | `register_spot` | `RegisterSpot` | 18,000,000 | `0` |
@@ -811,6 +809,10 @@ Three rules read this table:
 | `network_peer` | `SetNetworkPeer` | 45,000,000 | `0` |
 | `validator_allowlist` | `SetValidatorAllowlist` | 46,000,000 | `0` |
 | `gov_rotate_consensus_key` | `GovRotateConsensusKey` | 47,000,000 | `0` |
+| `seed_market` | `Listing` | 48,000,000 | `0` |
+| `mint_treasury` | `MintTreasury` ¹ | 49,000,000 | `0` |
+| `burn_treasury` | `BurnTreasury` ¹ | 50,000,000 | `0` |
+| `set_population_target` | `SetPopulationTarget` ¹ | 51,000,000 | `0` |
 | `spot_margin_params` | `SetSpotMarginParams` | 10,000,000,000 | spot pair id |
 
 ¹ Testnet only. These five actions change token supply or an account balance.
