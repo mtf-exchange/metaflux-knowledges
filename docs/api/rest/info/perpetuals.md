@@ -162,10 +162,15 @@ oldest instant the sum covers. The same rule holds on a spot pair row.
 See [the notice](../../../changelog/next-release.md#tape-retirement-reads).
 
 - **The gateway fills the figure from its own window.** The gateway keeps a
-  24-hour trade window for each market. When it holds a window for the market,
-  it serves the sum from that window in `day_ntl_vlm` and removes
+  24-hour trade window for each market. When its data covers the whole 24
+  hours, it serves the sum from that window in `day_ntl_vlm` and removes
   `day_ntl_vlm_lower_bound_from`. On a spot pair, it also serves the price of
   the first print in the window as `prev_day_px`.
+- **A gateway whose data starts later keeps the marker.** After a gateway
+  restart, its data can start inside the 24 hours. It then serves its sum as a
+  lower bound, with `day_ntl_vlm_lower_bound_from` at the oldest instant its
+  data covers. It leaves `prev_day_px` as the node sent it, because the first
+  print it holds is not a price from 24 hours ago.
 - **A marker at the time of the read means NO window.** From the release that
   arms the fill-tape retirement, the node keeps no trade ring. A node with no
   window serves `"0"` with `day_ntl_vlm_lower_bound_from` equal to `time`.

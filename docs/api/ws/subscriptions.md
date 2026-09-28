@@ -245,7 +245,7 @@ empty only if the market has never traded). Snapshot rows carry **`users: null`*
 
 From the release that arms the fill-tape retirement, the node keeps no trade
 ring, so its snapshot is empty. The gateway then serves the snapshot from its
-own 24-hour trade window, in the same row shape. **Not live yet:** this ships
+own 24-hour trade window, in the same row shape, `users: null` included. **Not live yet:** this ships
 with the next gateway release. See [the notice](../../changelog/next-release.md#tape-retirement-reads).
 
 ```json

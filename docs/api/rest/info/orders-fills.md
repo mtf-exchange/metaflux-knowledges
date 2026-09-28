@@ -459,7 +459,8 @@ filled order. The gateway then reads the legs from the archive fills of
 `address` for that `oid`, and serves `fills` and `total_filled_sz`. An
 answer that the node gives as `unknown` then reads `filled`. Without
 `address`, the answer carries no `fills`, and a filled order can answer
-`unknown`.
+`unknown`. The gateway reads the newest 5,000 archive fills of `address`. An
+order whose legs are all older than those can also answer `unknown`.
 
 **Not live yet:** the archive legs ship with the next gateway release. See
 [the notice](../../../changelog/next-release.md#tape-retirement-reads).

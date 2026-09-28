@@ -832,7 +832,7 @@ the vote kind.
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
 | `round` | uint64 | id | The round that reached quorum |
-| `action` | string | — | Wire action name |
+| `action` | string | — | Wire action name. `"DirectAction"` when the block that enacts holds no `vote_cast` on this `round`. Then read `action` from the earlier `vote_cast` on the same `round` |
 | `asset` | uint32 \| absent | id | Market asset id. Absent on a chain-global change. A spot token id on a `pm_collateral_haircut` change, as on `vote_cast` |
 | `coin` | string \| absent | — | Market symbol for `asset` |
 | `changes` | array | — | The fields the enactment moved, in a fixed order |

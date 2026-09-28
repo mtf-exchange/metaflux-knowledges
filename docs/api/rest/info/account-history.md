@@ -527,7 +527,9 @@ never run a TWAP". Read the coverage envelope to tell the two apart.
 **The gateway adds the archive.** It merges the node answer with the archive
 fills of the same `address` that carry a `twap_id`, with no fill twice. From
 the release that arms the fill-tape retirement, the node keeps no fill ring, so
-the archive supplies every slice. **Not live yet:** the merge ships with the
+the archive supplies the slices. The gateway reads the newest 5,000 archive
+fills of the `address`. A slice older than those is not in the answer.
+**Not live yet:** the merge ships with the
 next gateway release. See
 [the notice](../../../changelog/next-release.md#tape-retirement-reads).
 
@@ -550,7 +552,7 @@ No parameters beyond `address`, which is required (hex address).
 | Field | Type | Meaning |
 |-------|------|---------|
 | `address` | hex address | Echoes the request address |
-| `fills` | array | Slice-fill records, oldest first |
+| `fills` | array | Slice-fill records, newest first |
 | `fills[*].twap_id` | uint64 | The parent TWAP this slice belongs to. It stays a NUMBER — a small per-account counter, not a derived 64-bit value |
 | `fills[*].fill` | object | A full [`user_fills`](./orders-fills.md#user_fills) record for the slice, `oid` / `tid` decimal-digit strings included |
 

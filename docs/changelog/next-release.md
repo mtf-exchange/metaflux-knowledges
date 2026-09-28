@@ -248,8 +248,8 @@ read the archive or the gateway's own 24-hour trade window instead.
 |---|---|---|
 | [`markets`](../api/rest/info/perpetuals.md#day-ntl-vlm-bound) `day_ntl_vlm`, perp and spot | node release | From the release that arms the fill-tape retirement, a node that holds no 24-hour window for a market serves `"0"` with `day_ntl_vlm_lower_bound_from` equal to the new top-level `time` |
 | [`markets`](../api/rest/info/perpetuals.md#markets) `time` | node release | New top-level field: the block time of the read |
-| `markets` `day_ntl_vlm` | gateway release | When the gateway holds a 24-hour window for the market, it replaces `day_ntl_vlm` with the sum from that window and removes `day_ntl_vlm_lower_bound_from` |
-| [`markets`](../api/rest/info/spot.md#spot_meta) spot `prev_day_px` | gateway release | When the gateway holds a window, the price of the first print in that window |
+| `markets` `day_ntl_vlm` | gateway release | The gateway replaces `day_ntl_vlm` with the sum from its own window. It removes `day_ntl_vlm_lower_bound_from` only when its data covers the whole 24 hours. Otherwise the marker is the oldest instant its data covers |
+| [`markets`](../api/rest/info/spot.md#spot_meta) spot `prev_day_px` | gateway release | When the gateway data covers the whole 24 hours, the price of the first print in that window |
 | [`trades`](../api/rest/info/perpetuals.md#trades-archive), un-ranged | gateway release | The ask also reaches the archive. The answer merges the node ring, the gateway window and the archive, with no duplicate `tid` |
 | `trades`, a row from the gateway window | gateway release | No `hash` key and no `block` key, the same as an archive row that has no block |
 | WS [`trades`](../api/ws/subscriptions.md#trades) on-subscribe snapshot | gateway release | When the node has no ring for the market, the gateway serves the snapshot from its own window |
