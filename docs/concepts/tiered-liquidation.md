@@ -479,7 +479,10 @@ on several markets, so the chain first splits the deficit across markets:
 - Each market's share runs the four stages on that market alone.
 - The liquidation run is the set of forced closes, backstop netting and
   delisting settlement that ends with the account flat. A loss that a partial
-  close realized in an earlier block counts.
+  close realized in an earlier block counts while the account stays in the run.
+- The run also ends when the account is safe again, or at the
+  [yellow card](#why-a-yellow-card) with a cross balance of zero or more. A
+  loss from an earlier run does not count.
 - A [builder-deployed market](../mip/mip-3.md#liquidation) in the liquidation
   run takes the whole deficit. This rule does not change.
 - If the account realized no loss on any market, the whole deficit goes to the
