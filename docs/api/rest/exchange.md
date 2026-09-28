@@ -587,6 +587,15 @@ list, or in [`gov_history`](./info/governance.md), knows what it is.
 | `vote_app_hash` | The validator node itself | The checkpoint state-hash vote every validator node emits on its own after each checkpoint. No person casts it |
 | `gov_action` | A validator, on its own node only | Carries one signed governance or validator action. The node accepts it only from its own machine, so a public caller gets `AUTH_UNAUTHORIZED`, not `ACTION_UNSUPPORTED` |
 
+Some validator governance actions are not native tags at all. `/exchange` fails
+them at decode with `unknown variant`, like a misspelt name. One of them changes
+what a user reads, so it is listed here. The [node streams](../../nodes/data-streams.md#node_actions-types)
+name it `BridgeReissueWithdrawal`.
+
+| Action | Who | What it does |
+|-----------|-----|--------------|
+| `bridge_reissue_withdrawal` | Validator governance | **Not live yet: ships with the next node release.** Re-issues one stranded or disputed bridge withdrawal under the current deployment with a new nonce. Bounded to that withdrawal's amount; refused twice for the same withdrawal. See [re-issue](./info/bridge.md#reissue) |
+
 Two more tags in this set, `set_metaliquidity_set` and `gov_adjust_spot_value`,
 keep their payloads and signing types below, because their `value` hashing rule
 is the one operators get wrong. The types are **consensus-frozen**. They are not

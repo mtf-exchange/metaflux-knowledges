@@ -70,9 +70,9 @@ can submit it now.
 
 **This is the only status a rotation can break.** A deployment rotation retires
 the domain the multisig was signed under, so the entry moves to
-`stranded_on_retired_domain` and no releasable multisig ever appears again. You
-stay debited until a governance re-credit. A withdrawal below quorum is safe: it
-re-signs under the new domain by itself.
+`stranded_on_retired_domain` and no releasable multisig ever appears again. The
+withdrawal stays unpaid until governance [re-issues](#reissue) it. A withdrawal
+below quorum is safe: it re-signs under the new domain by itself.
 
 ### `stranded_on_retired_domain`
 
@@ -86,12 +86,12 @@ deployment. That refusal is what prevents a double release — but it also means
 **`stranded_on_retired_domain` is terminal, and it covers TWO states with
 opposite outcomes.** Waiting does not clear either, and no relay action can.
 
-1. The withdrawal was never paid. It needs a governance re-credit.
+1. The withdrawal was never paid. Governance can [re-issue](#reissue) it.
 2. The withdrawal was **already paid**, and its deployment was then rotated
    inside the retention window. The funds are on the destination chain already.
 
-**Confirm which one it is on the destination chain BEFORE any re-credit.** A
-re-credit against state 2 pays the same withdrawal twice.
+**Confirm which one it is on the destination chain BEFORE any re-issue.** A
+re-issue against state 2 pays the same withdrawal twice.
 
 Contact the operators; do not re-submit the withdrawal.
 :::
@@ -109,6 +109,46 @@ chain's release-retention window so that a destination-chain reorg can be
 re-relayed with the same authorization. It leaves the outbox when that window
 elapses. `released_at_ms` carries the
 release timestamp; it is `null` for every other status.
+
+## Re-issue of a withdrawal {#reissue}
+
+**Not live yet.** This lane ships with the next node release. Until then, a
+stranded withdrawal has no recovery lane. Contact the operators.
+
+Governance can re-issue a stranded withdrawal under the current deployment. The
+re-issue carries the original withdrawal's fields and a new nonce.
+
+After a re-issue, [`bridge_withdrawal_history`](#bridge_withdrawal_history)
+shows two entries for the withdrawal:
+
+- A NEW entry. It has the same `amount_units` and `dst_addr`, a higher `nonce`,
+  and the status `awaiting_cosignatures`. It then moves through the normal
+  lifecycle.
+- The stranded entry. Its status stays terminal.
+
+The new nonce gives the new entry a new `message_id`. Act on the new entry only.
+
+The re-issue moves no exchange balance:
+
+- The user is never debited twice. The original withdrawal carries the only
+  debit.
+- The user is never credited on the exchange. The funds go to `dst_addr` on the
+  destination chain.
+- Governance re-issues a withdrawal once. A second re-issue of the same
+  withdrawal is refused.
+
+### A disputed withdrawal {#disputed}
+
+A validator can dispute a withdrawal on the destination contract. The dispute
+makes that `message_id` permanently unpayable. The exchange can still read
+`released` for the entry, because the exchange records the release before the
+dispute stops the payment.
+
+The same governed re-issue restores a disputed withdrawal. A new entry with a
+new nonce appears, as for a stranded withdrawal.
+
+To learn whether a `released` withdrawal was paid, check that `dst_addr`
+received the amount on the destination chain.
 
 ## Conventions {#conventions}
 

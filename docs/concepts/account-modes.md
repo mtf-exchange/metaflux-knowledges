@@ -124,12 +124,16 @@ Portfolio margin, for accounts that qualify. Enrol with
 [`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin). Two
 things change:
 
-**Eligible spot tokens become collateral.** A token whose governance
-`pm_collateral_haircut` is positive is credited at `balance × mark × haircut`,
-and the FULL un-haircut exposure is folded into the scenario sweep as a long spot
-leg — so a crash in the collateral raises the requirement. USDC is weight 1 and
-is never haircut. In the other two modes, a non-USDC spot balance is worth
-nothing as collateral.
+**Eligible spot tokens become collateral.** **Not live yet:** this ships with
+the next node release. A spot token counts only when governance sets a positive
+collateral weight (`pm_collateral_haircut`) for that TOKEN. The credit is
+`balance × mark × weight`. The mark is the oracle price of the exchange's own
+perpetual market with the same symbol. A token with no such perpetual, or whose
+perpetual is self-priced, never counts. A stale oracle removes the credit. The
+FULL un-weighted balance is folded into the scenario sweep as a long spot leg —
+so a crash in the collateral raises the requirement. USDC is weight 1 and is
+never haircut. In the other two modes, a non-USDC spot balance is worth nothing
+as collateral. See [the full rules](./portfolio-margin.md#multi-collateral-cross-collateral-haircut).
 
 **Margin becomes a scenario sweep.** Instead of summing each position's
 requirement, the engine stresses the whole account and takes the worst outcome,

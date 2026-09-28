@@ -101,46 +101,72 @@ else:
 
 ## Multi-collateral (cross-collateral haircut) {#multi-collateral-cross-collateral-haircut}
 
-By default, portfolio margin is collateralised in **USDC** only. Governance can
-additionally make selected **non-USDC spot balances** count as portfolio-margin
-collateral, after a **haircut** that discounts them for price risk.
+**Not live yet.** The rules in this section ship with the next node release.
+Until then, no spot token counts as portfolio-margin collateral.
 
-When an asset is in the eligible set with a haircut `h` (e.g. `0.9` ⇒ a 10 %
-haircut), a spot balance of that asset contributes
+By default, portfolio margin is collateralised in **USDC** only. Governance can
+also make a selected **spot token** count as portfolio-margin collateral, after a
+**haircut** that discounts it for price risk.
+
+### Which tokens count {#pm-collateral-eligibility}
+
+A spot token counts only when governance sets a **collateral weight** `h` for
+that TOKEN. The weight is the `pm_collateral_haircut` value, in `(0, 1]`. A
+weight of `0.95` credits 95 % of the value, a 5 % haircut. The weight is set on
+the spot token id, never on a market id.
+
+The mark of the token is the oracle price of the exchange's own perpetual market
+with the same symbol. The BTC token takes its mark from the BTC perpetual. So a
+token is **never eligible** in these cases, whatever its weight:
+
+- The token has no perpetual market with the same symbol.
+- That perpetual is [self-priced](./oracle-prices.md#self-priced-markets): its
+  price comes from its own book.
+
+USDC is weight 1 and is never haircut.
+
+### The credit {#pm-collateral-credit}
+
+A spot balance of an eligible token contributes
 
 ```
 collateral_credit = balance × mark × h        # whole-USDC plane
 ```
 
-to the account's portfolio-margin value. The credited balance is then **folded into
-the SPAN scenario grid as a long spot leg** (entry price == current mark, so it is
-not double-counted against its own mark). The same price-shock sweep that margins
-your derivatives therefore also stresses the collateral: a haircut asset that
-crashes reduces *both* your collateral value and your scenario worst-case, exactly
-as a real position would.
+to the account's portfolio-margin value.
+
+The **full, un-weighted** balance also enters the SPAN scenario grid as a long
+spot leg of the same perpetual market (entry price == current mark, so it is not
+double-counted against its own mark). The weight discounts the credit only. The
+same price-shock sweep that margins your derivatives therefore also stresses the
+collateral: a token that crashes reduces *both* your collateral value and your
+scenario worst-case, as a real position would. A long collateral balance and a
+short perpetual position on the same symbol offset in the grid.
+
+**A stale oracle removes the credit.** When the oracle price of the perpetual is
+stale, the token credits nothing, and the protocol cannot seize it in a
+liquidation. The credit returns with a fresh price.
 
 This is **margin** collateral, not a loan — it is **decoupled** from the
-[Earn / borrow-lend](./earn.md) pool. Posting a non-USDC balance as PM collateral
-does not lend it out or earn yield; it only lets the risk engine recognise it when
-sizing your maintenance requirement.
+[Earn / borrow-lend](./earn.md) pool. Posting a spot balance as PM collateral does
+not lend it out or earn yield. Only a spot balance counts: a spot-margin
+position opened with borrowed USDC adds no credit.
 
 | Property | Behaviour |
 |----------|-----------|
-| Eligible set | Governed — only assets governance has approved count |
-| Haircut | Per-asset governance parameter; a higher haircut credits more of the balance |
-| Clearing eligibility | Setting the haircut to **zero** removes the asset from the eligible set |
-| Inclusion | Folded into the SPAN grid as a long spot leg at mark (no double-count) |
+| Eligible set | The spot tokens with a positive collateral weight and a same-symbol perpetual that is not self-priced |
+| Collateral weight | Per-token governance parameter `pm_collateral_haircut`; a higher weight credits more of the balance |
+| Clearing eligibility | Setting the weight to **zero** removes the token from the eligible set |
+| Mark | The oracle price of the same-symbol perpetual market |
+| Inclusion | The full balance, folded into the SPAN grid as a long spot leg at mark (no double-count) |
+| Stale oracle | No credit and no seizure until the price is fresh |
 | Relation to lending | None — independent of the Earn / borrow-lend pool |
 
-:::warning
-**Not yet enabled.** Multi-collateral PM is a **governance-gated** capability that
-activates at a network upgrade. Until the liquidation path that can **seize and
-sell non-USDC collateral** is in place, the eligible set stays empty and no asset
-carries a non-zero haircut — crediting collateral the protocol cannot yet liquidate
-would risk uncoverable bad debt. Treat this section as the **target model**; check
-the live (governed) eligible set before assuming any non-USDC asset counts toward
-PM.
-:::
+**The initial weights.** Once those spot tokens exist, the initial weights will
+be `0.95` for BTC and ETH, and `0.8` for SOL and BNB. A spot token that
+governance registers appears in
+[`markets_meta`](../api/rest/info/spot.md) under `spot.tokens`. Read that list
+before you assume a token exists.
 
 ## Enrollment {#enrollment}
 

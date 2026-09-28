@@ -344,9 +344,11 @@ grid** (full mechanics: [portfolio margin](../concepts/portfolio-margin.md)):
 
 Hedged / correlated positions net inside the grid, so a balanced book margins at a
 fraction of classical. **Multi-collateral PM** (preview): governance can make a
-non-USDC spot asset count toward an enrolled account's PM value at
-`balance × mark × haircut` (a per-asset haircut weight in `(0, 1]`), folded into the
-grid as a spot leg — letting a portfolio post collateral beyond plain USDC.
+non-USDC spot token count toward an enrolled account's PM value at
+`balance × mark × haircut` (a per-token weight in `(0, 1]`; the mark is the oracle
+price of the same-symbol perpetual), folded into the grid as a spot leg — letting a
+portfolio post collateral beyond plain USDC. See
+[which tokens count](./portfolio-margin.md#pm-collateral-eligibility).
 
 ## MTF vs HL {#mtf-vs-hyperliquid}
 

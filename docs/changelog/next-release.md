@@ -1,17 +1,18 @@
 ---
-description: "Six changes that wait for the next node release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, and a deficit charged to the markets that produced it. Also one wire row that is not verified on the running chain, and two corrections to this reference."
+description: "Seven changes that wait for the next node release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, and a bridge re-issue lane with spot tokens as portfolio-margin collateral. Also one wire row that is not verified on the running chain, and two corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Six sections wait for the next node release:**
+**Seven sections wait for the next node release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
 [`mtfStatus` for two transactions at one nonce](#same-nonce-status),
 [an open-interest cap on every native perp market](#oi-cap-capacity),
 [a deployer sets its market's open-interest cap](#perp-set-oi-cap) and
-[a deficit is charged to the market that produced it](#deficit-attribution). The action byte
+[a deficit is charged to the market that produced it](#deficit-attribution) and
+[a bridge re-issue lane and spot tokens as portfolio-margin collateral](#reissue-and-pm-collateral). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -164,6 +165,41 @@ another market. See
 [which market pays](../concepts/tiered-liquidation.md#which-market-pays).
 
 **What to do.** Nothing. No action or read changes.
+
+## A bridge re-issue lane and spot tokens as portfolio-margin collateral {#reissue-and-pm-collateral}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| A [`stranded_on_retired_domain`](../api/rest/info/bridge.md#stranded_on_retired_domain) withdrawal | no recovery lane | governance can [re-issue](../api/rest/info/bridge.md#reissue) it with a new nonce |
+| A [disputed](../api/rest/info/bridge.md#disputed) withdrawal that reads `released` | no recovery lane | governance can re-issue it the same way |
+| [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) after a re-issue | — | a NEW entry: same `amount_units` and `dst_addr`, a higher `nonce`, `awaiting_cosignatures`. The old entry stays terminal |
+| [`markets_meta`](../api/rest/info/spot.md) `spot.tokens` | a spot token that governance registers is absent | the token appears, with its size and wei decimals |
+| A spot token as [portfolio-margin collateral](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) | never counts | counts when governance sets a collateral weight for that token and a same-symbol perpetual that is not self-priced gives its mark |
+| [`node_gov`](../nodes/data-streams.md#node_gov) `asset` on a `pm_collateral_haircut` vote | — | a spot token id, not a market id |
+| [`node_gov`](../nodes/data-streams.md#node_gov) `category` on a re-issue vote | — | `bridge_reissue` |
+
+**Why.** A deployment rotation can strand a withdrawal, and a dispute on the
+destination contract can make one unpayable. Before this release, neither had a
+recovery lane. A re-issue pays the original withdrawal once, on the destination
+chain. It never debits the user again and never credits the user on the
+exchange. Governance re-issues a withdrawal once.
+
+A spot token takes its mark from the exchange's own perpetual with the same
+symbol, so the collateral and a perpetual position on that symbol share one
+price in the scenario grid. A self-priced perpetual has no external price, so
+its token never counts.
+
+**What to do.**
+
+- Before any re-issue, confirm on the destination chain that the old withdrawal
+  was not paid. See the [danger box](../api/rest/info/bridge.md#stranded_on_retired_domain).
+- After a re-issue, track the NEW entry. Its `message_id` is new.
+- Read the collateral weight per token, not per market. The initial weights will
+  be `0.95` for BTC and ETH and `0.8` for SOL and BNB, once those spot tokens
+  exist.
+- Expect no credit from a token while the oracle of its perpetual is stale.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

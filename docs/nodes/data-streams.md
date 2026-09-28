@@ -738,10 +738,10 @@ Each event is one of two shapes. Read `type` to tell them apart.
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
 | `round` | uint64 | id | Synthetic vote round this cast belongs to |
-| `category` | string | — | The round's vote family: `"dynamic_risk"`, `"vote_global"`, `"mb_configure_chain"`, `"oracle_weights"`, `"circle_promotion_attest"`, `"option_listing"`, `"option_auto_list"`, `"spot_margin_params"`, or `"proposal"` |
+| `category` | string | — | The round's vote family: `"dynamic_risk"`, `"vote_global"`, `"mb_configure_chain"`, `"oracle_weights"`, `"circle_promotion_attest"`, `"option_listing"`, `"option_auto_list"`, `"spot_margin_params"`, `"bridge_reissue"` (not live yet: ships with the next node release), or `"proposal"` |
 | `sub_id` | uint64 | — | Offset of `round` inside its category band. Under `"proposal"` it **equals `round`** |
 | `action` | string | — | Wire action name the vote targets, such as `"setDynamicRiskParam"` |
-| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote |
+| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote. On a `setDynamicRiskParam` vote that sets `pm_collateral_haircut`, it is a spot token id, not a market id, and `coin` is absent. Resolve the id against the token registry |
 | `coin` | string \| absent | — | Market symbol for `asset`. Absent when the vote is global, or the market carries no listing spec |
 | `validator` | string | — | Casting validator's `0x` address, lowercase, 20 bytes |
 | `stake` | decimal string | whole stake units | **This validator's own** weight at the cast |
@@ -756,7 +756,7 @@ Each event is one of two shapes. Read `type` to tell them apart.
 |-------|------|-------|---------|
 | `round` | uint64 | id | The round that reached quorum |
 | `action` | string | — | Wire action name |
-| `asset` | uint32 \| absent | id | Market asset id. Absent on a chain-global change |
+| `asset` | uint32 \| absent | id | Market asset id. Absent on a chain-global change. A spot token id on a `pm_collateral_haircut` change, as on `vote_cast` |
 | `coin` | string \| absent | — | Market symbol for `asset` |
 | `changes` | array | — | The fields the enactment moved, in a fixed order |
 | `agreeing_stake` | decimal string | whole stake units | Weight that agreed on the enacted payload |
@@ -1429,7 +1429,7 @@ appear on the tape and are not listed here.
 - **Staking** — `TokenDelegate`, `ClaimRewards`, `LinkStakingUser`, `RegisterValidator`, `ExtendLongTermStaking`, `StakingDeposit`, `StakingWithdraw`, `BorrowLend`
 - **Governance and validator** — `GovPropose`, `GovVote`, `VoteGlobal`, `CValidator`, `CSigner`, `ValidatorL1Vote`, `ValidatorL1Stream`, `VoteAppHash`, `ForceIncreaseEpoch`, `ApproveUpgrade`, `ArmFeatures`, `SubmitSlashingEvidence`, `SetDynamicRiskParam`, `SetOracleWeights`, `SetDisabledVenues`, `SetFundingFormula`, `SetFeeSchedule`, `SetPrimeAccount`, `SetPmShockGrid`, `SetPopulationTarget`, `SetSpotMarginParams`, `SetMarketTick`, `SetMarkMode`, `SetSpotMinNotional`, `SetPerpMaxOpenInterest`, `SetThresholdEpochKey`, `GovAdjustSpotValue`, `GovAdjustSpotBalance`, `MintTreasury`, `BurnTreasury`, `CreateEarnPool`, `ConfigTreasuryBackstop`, `TreasuryBackstopDraw`, `DisableDex`, `QuarantineUser`, `ReactivateUser`, `ForceClosePosition`, `RegisterSpot`, `Listing`, `Delisting`, `OptionListing`, `OptionAutoList`, `FbaConfigure`
 - **Market deployment** — `PerpDeploy`, `SpotDeploy`, `SetGlobal`, `SubmitGasAuctionBid`, `Mip3SetOraclePx`
-- **Bridge** — `BridgeAttest`, `BridgeWithdraw`, `BridgeEmergencyPause`, `BridgeConfigureChain`, `RegisterBridgeCosigner`, `BridgeWithdrawReleased`, `ValidatorSignWithdrawal`, `VoteEthFinalizedWithdrawal`, `VoteEthFinalizedValidatorSetUpdate`, `SignValidatorSetUpdate`, `ValidatorBridgePause`, `CirclePromotionSchedule`, `CirclePromotionCustodyAttest`, `CirclePromotionAdvance`, `CirclePromotionPruneCosig`
+- **Bridge** — `BridgeAttest`, `BridgeWithdraw`, `BridgeEmergencyPause`, `BridgeConfigureChain`, `BridgeReissueWithdrawal` (not live yet: ships with the next node release), `RegisterBridgeCosigner`, `BridgeWithdrawReleased`, `ValidatorSignWithdrawal`, `VoteEthFinalizedWithdrawal`, `VoteEthFinalizedValidatorSetUpdate`, `SignValidatorSetUpdate`, `ValidatorBridgePause`, `CirclePromotionSchedule`, `CirclePromotionCustodyAttest`, `CirclePromotionAdvance`, `CirclePromotionPruneCosig`
 - **EVM** — `EvmRawTx`, `EvmUserModify`, `FinalizeEvmContract`
 - **System** — `SystemBole`, `SystemSpotSend`, `CWithdraw`, `CUserModify`, `SystemUserModify`, `OracleSubmit`
 
