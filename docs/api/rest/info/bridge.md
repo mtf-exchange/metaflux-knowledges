@@ -124,7 +124,8 @@ shows two entries for the withdrawal:
 - A NEW entry. It has the same `amount_units` and `dst_addr`, a higher `nonce`,
   and the status `awaiting_cosignatures`. It then moves through the normal
   lifecycle.
-- The stranded entry. Its status stays terminal.
+- The stranded entry. It leaves the outbox, and its last status stays
+  `stranded_on_retired_domain`. No lane can release it after the re-issue.
 
 The new nonce gives the new entry a new `message_id`. Act on the new entry only.
 

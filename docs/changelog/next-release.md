@@ -179,6 +179,7 @@ another market. See
 | A spot token as [portfolio-margin collateral](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) | never counts | counts when governance sets a collateral weight for that token and a same-symbol perpetual that is not self-priced gives its mark |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `asset` on a `pm_collateral_haircut` vote | — | a spot token id, not a market id |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on a re-issue vote | — | `bridge_reissue` |
+| [`node_gov`](../nodes/data-streams.md#node_gov) `category` on an `ArmFeatures` or SPAN shock-grid vote | `circle_promotion_attest` | `arm_features` or `pm_shock_grid` |
 
 **Why.** A deployment rotation can strand a withdrawal, and a dispute on the
 destination contract can make one unpayable. Before this release, neither had a
@@ -199,7 +200,8 @@ its token never counts.
 - Read the collateral weight per token, not per market. The initial weights will
   be `0.95` for BTC and ETH and `0.8` for SOL and BNB, once those spot tokens
   exist.
-- Expect no credit from a token while the oracle of its perpetual is stale.
+- Expect no credit from a token while the oracle of its perpetual is stale, or
+  before the oracle has sourced a price for it.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

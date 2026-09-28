@@ -144,7 +144,7 @@ scenario worst-case, as a real position would. A long collateral balance and a
 short perpetual position on the same symbol offset in the grid.
 
 **A stale oracle removes the credit.** When the oracle price of the perpetual is
-stale, the token credits nothing, and the protocol cannot seize it in a
+stale, or the oracle has not yet sourced one, the token credits nothing, and the protocol cannot seize it in a
 liquidation. The credit returns with a fresh price.
 
 This is **margin** collateral, not a loan — it is **decoupled** from the

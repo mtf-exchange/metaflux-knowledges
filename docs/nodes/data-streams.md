@@ -738,7 +738,7 @@ Each event is one of two shapes. Read `type` to tell them apart.
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
 | `round` | uint64 | id | Synthetic vote round this cast belongs to |
-| `category` | string | — | The round's vote family: `"dynamic_risk"`, `"vote_global"`, `"mb_configure_chain"`, `"oracle_weights"`, `"circle_promotion_attest"`, `"option_listing"`, `"option_auto_list"`, `"spot_margin_params"`, `"bridge_reissue"` (not live yet: ships with the next node release), or `"proposal"` |
+| `category` | string | — | The round's vote family: `"dynamic_risk"`, `"vote_global"`, `"mb_configure_chain"`, `"oracle_weights"`, `"circle_promotion_attest"`, `"option_listing"`, `"option_auto_list"`, `"spot_margin_params"`, `"bridge_reissue"`, `"arm_features"`, `"pm_shock_grid"` (the last three not live yet: they ship with the next node release), or `"proposal"`. A fixed-round vote with no category of its own reads as the nearest band below it, so read `action` for the vote kind |
 | `sub_id` | uint64 | — | Offset of `round` inside its category band. Under `"proposal"` it **equals `round`** |
 | `action` | string | — | Wire action name the vote targets, such as `"setDynamicRiskParam"` |
 | `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote. On a `setDynamicRiskParam` vote that sets `pm_collateral_haircut`, it is a spot token id, not a market id, and `coin` is absent. Resolve the id against the token registry |
@@ -818,7 +818,7 @@ Four record kinds, told apart by `type`:
 | `admission` | The recorder's first sight of this `economic_id`. The only kind that carries `msg` |
 | `transition` | The derived half moved: co-signature count, status, or release time |
 | `rebind` | A deployment change re-derived this entry. Emitted for **every** open entry on that block |
-| `removed` | The entry left the outbox, through release or the retention prune. Terminal |
+| `removed` | The entry left the outbox, through release, the retention prune or a governed re-issue of a stranded withdrawal (not live yet: ships with the next node release). Terminal |
 
 A withdrawal is admitted:
 
@@ -916,8 +916,10 @@ marker gives a false rotation on every restart. Compare the rows to decide.
    `economic_id`. Never read an admission as an arrival.
 3. **`removed` is terminal, and its `status` is not always `"released"`.** It
    reads `"released"` when the release is confirmed. Otherwise it carries the
-   entry's last known status, because the entry left through the retention prune.
-   Either way the `economic_id` never returns.
+   entry's last known status: the entry left through the retention prune, or
+   (from the next node release) through a re-issue of a stranded withdrawal.
+   Either way the `economic_id` never returns. A re-issue replacement arrives as
+   a new `admission` with its own `economic_id`.
 4. **`status` is derived. Do not recompute it.** It folds the live deployment row
    through the node's own derivation.
    `"stranded_on_retired_domain"` is reachable only from that side: a consumer
