@@ -6,7 +6,7 @@
 
 ## TL;DR {#tldr}
 
-When a liquidation leaves bad debt, the protocol claws back from profitable counter-parties on the same instrument, pro-rata to their unrealised PnL. ADL runs **before** the insurance fund, and after the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) has taken what it can. MetaFlux's allocation uses an online-learning ranking that aims to minimise **excess haircut** (haircut beyond what the deficit requires).
+When a liquidation leaves bad debt, the protocol claws back from profitable counter-parties on the same instrument, pro-rata to their unrealised PnL. For a cross account with positions on several markets, [Which market pays](./tiered-liquidation.md#which-market-pays) defines which market takes the deficit. ADL runs **before** the insurance fund, and after the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) has taken what it can. MetaFlux's allocation uses an online-learning ranking that aims to minimise **excess haircut** (haircut beyond what the deficit requires).
 
 ## When ADL fires {#when-adl-fires}
 

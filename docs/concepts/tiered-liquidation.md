@@ -468,6 +468,33 @@ genuine tail events):
 The account's negative balance is then zeroed — the debt lives in the
 waterfall. See [ADL](./adl.md) for the controller math.
 
+### Which market pays {#which-market-pays}
+
+Each of the four stages keys on one market. A cross account can hold positions
+on several markets, so the chain first splits the deficit across markets:
+
+- The deficit goes to the markets where the account realized a loss in the
+  liquidation run, in proportion to that loss.
+- A market where the account lost nothing pays nothing.
+- Each market's share runs the four stages on that market alone.
+- The liquidation run is the set of forced closes, backstop netting and
+  delisting settlement that ends with the account flat. A loss that a partial
+  close realized in an earlier block counts.
+- A [builder-deployed market](../mip/mip-3.md#liquidation) in the liquidation
+  run takes the whole deficit. This rule does not change.
+- If the account realized no loss on any market, the whole deficit goes to the
+  highest asset id among the markets the liquidation touched.
+
+**Not live yet: live from the release after 2026-10-01.**
+
+Today the whole deficit goes to one market: the highest asset id among the
+markets the liquidation touched. So a loss on one market can draw the insurance
+fund of another market.
+
+Why it matters: the open-interest cap on a native market is sized from the
+insurance fund of that market. See
+[the capacity cap](../changelog/next-release.md#oi-cap-capacity).
+
 ## Two-point margin check {#two-point-margin-check}
 
 Liquidation eligibility is checked at **two points** during each block:

@@ -1,16 +1,17 @@
 ---
-description: "Five changes that wait for the next node release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, and a deployer-set cap on a deployer market. Also one wire row that is not verified on the running chain, and two corrections to this reference."
+description: "Six changes that wait for the next node release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, and a deficit charged to the markets that produced it. Also one wire row that is not verified on the running chain, and two corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Five sections wait for the next node release:**
+**Six sections wait for the next node release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
 [`mtfStatus` for two transactions at one nonce](#same-nonce-status),
-[an open-interest cap on every native perp market](#oi-cap-capacity) and
-[a deployer sets its market's open-interest cap](#perp-set-oi-cap). The action byte
+[an open-interest cap on every native perp market](#oi-cap-capacity),
+[a deployer sets its market's open-interest cap](#perp-set-oi-cap) and
+[a deficit is charged to the market that produced it](#deficit-attribution). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -147,6 +148,22 @@ a price the protocol does not control.
   [at-cap rules](../api/rest/info/perpetuals.md#oi-cap-capacity).
 - The reference market maker refuses to start when its list names a deployer
   market. Remove such a market from the list.
+
+## A deficit is charged to the market that produced it {#deficit-attribution}
+
+**NOT LIVE YET.** This change ships with the next node release, after
+2026-10-01.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| The insurance fund a cross account's deficit draws | the fund of one market: the highest asset id among the markets the liquidation touched | the fund of each market where the account realized a loss in the liquidation run, in proportion to that loss |
+
+**Why.** The open-interest cap on a native market is sized from the insurance
+fund of that market. A loss on one market must not drain the insurance fund of
+another market. See
+[which market pays](../concepts/tiered-liquidation.md#which-market-pays).
+
+**What to do.** Nothing. No action or read changes.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 
