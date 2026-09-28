@@ -114,8 +114,9 @@ answer, not as an error.
 | `pairs[*].registered_at` | uint64 | Block height at which the pair was registered. `0` on a genesis pair |
 | `pairs[*].mark_px` | Decimal string \| null | Last-trade price (whole USDC); **`null`** before the first trade |
 | `pairs[*].mid_px` | Decimal string \| null | Book mid, falls back to `mark_px`; **`null`** when neither exists |
-| `pairs[*].day_ntl_vlm` | Decimal string | 24h notional volume |
-| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; **`null`** if unknown. It reads `null` on a traded pair too, until 24 hours of history exist |
+| `pairs[*].day_ntl_vlm` | Decimal string | 24h notional volume, whole USDC. A LOWER BOUND when the row carries `day_ntl_vlm_lower_bound_from`. See [the rule](./perpetuals.md#day-ntl-vlm-bound) |
+| `pairs[*].day_ntl_vlm_lower_bound_from` | uint64 \| absent | Consensus ms. Present only when `day_ntl_vlm` does not cover the whole 24h window. **ABSENT when the figure is complete**, never `null`. Same rule as on a [perp row](./perpetuals.md#day-ntl-vlm-bound) |
+| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; **`null`** if unknown. It reads `null` on a traded pair too, until 24 hours of history exist. **Not live yet:** from the next gateway release, the gateway serves the price of the first print in its own 24-hour window when it holds one. See [the notice](../../../changelog/next-release.md#tape-retirement-reads) |
 | `pairs[*].circulating_supply` | Decimal string | Base token committed supply (whole units) |
 | `tokens[*].id` | uint32 | Spot token asset id |
 | `tokens[*].name` | string | Token name (e.g. `"USDC"`, `"MTF"`) |

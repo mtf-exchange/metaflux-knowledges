@@ -108,6 +108,7 @@ Response (truncated to one entry per list):
 
 | Field | Type | Meaning |
 |-------|------|-------------|
+| `time` | uint64 | The block time of the read (consensus ms). The gateway anchors its 24-hour window on it. **Not live yet:** the field ships with the next node release |
 | `perp[*].coin` | string | Market symbol, e.g. `"BTC"` (the join key) |
 | `perp[*].kind` | `"perp"` | Market kind (lowercase, join key) |
 | `perp[*].mark_px` | Decimal string | On-book mark, **human-decimal plane**, tick-snapped (oracle fallback; `"0"` if unset) |
@@ -120,7 +121,8 @@ Response (truncated to one entry per list):
 | `perp[*].funding.interval_ms` | uint64 | Per-asset funding cadence (1h = `3600000`) |
 | `perp[*].funding.next_payment_ts` | uint64 | Next aligned funding-settlement boundary (epoch-ms); `0` until the first sample |
 | `perp[*].open_interest` | Decimal string | Current open interest (size units) |
-| `perp[*].day_ntl_vlm` | Decimal string | 24h notional volume |
+| `perp[*].day_ntl_vlm` | Decimal string | 24h notional volume, whole USDC. A LOWER BOUND when the row carries `day_ntl_vlm_lower_bound_from`. See [below](#day-ntl-vlm-bound) |
+| `perp[*].day_ntl_vlm_lower_bound_from` | uint64 \| absent | Consensus ms. Present only when `day_ntl_vlm` does not cover the whole 24h window: the volume then covers `[day_ntl_vlm_lower_bound_from, now]`. **ABSENT when the figure is complete**, never `null` |
 | `perp[*].prev_day_px` | Decimal string \| null | Price 24h ago; `null` if unknown |
 | `perp[*].change_24h` | Decimal string \| null | 24h price change (fraction, signed); `null` when no prior px |
 | `perp[*].halted` | bool | `true` = a governance delist stopped the market. An order that opens or extends a position is refused: `market delisted — only reduce-only / closing orders allowed`. A settled market also reads `true` |
@@ -148,6 +150,30 @@ Response (truncated to one entry per list):
   `oi_cap_bound`, `mark_source`, `fba_enabled`, `signing_id`, `risk_override`) are **not** on this
   read — fetch them from [`markets_meta`](#markets_meta). For the spot pair / token field semantics
   see [the spot registry](./spot.md#spot_meta).
+
+#### `day_ntl_vlm` can be a lower bound {#day-ntl-vlm-bound}
+
+The node sums `day_ntl_vlm` from its own bounded trade ring. A busy market
+fills that ring in less than 24 hours. The node then cannot see the whole
+window, and it says so: the row carries `day_ntl_vlm_lower_bound_from`, the
+oldest instant the sum covers. The same rule holds on a spot pair row.
+
+**Not live yet:** the rules below ship with the next node and gateway releases.
+See [the notice](../../../changelog/next-release.md#tape-retirement-reads).
+
+- **The gateway fills the figure from its own window.** The gateway keeps a
+  24-hour trade window for each market. When it holds a window for the market,
+  it serves the sum from that window in `day_ntl_vlm` and removes
+  `day_ntl_vlm_lower_bound_from`. On a spot pair, it also serves the price of
+  the first print in the window as `prev_day_px`.
+- **A marker at the time of the read means NO window.** From the release that
+  arms the fill-tape retirement, the node keeps no trade ring. A node with no
+  window serves `"0"` with `day_ntl_vlm_lower_bound_from` equal to `time`.
+  When the gateway holds no window either, the row reaches you that way. Read that `"0"` as no data, never as a quiet market.
+- **A row that still carries the marker is a lower bound.** Show it as "at
+  least", or show no figure. Do not rank markets by it.
+
+No field changes its type.
 
 ### Get static metadata for all markets {#markets_meta}
 
@@ -641,31 +667,41 @@ Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
 | `trades[*].sz` | Decimal string | Filled size, **base units** (whole-unit) |
 | `trades[*].time` | uint64 | Trade timestamp (consensus ms) |
 | `trades[*].tid` | decimal-digit string | Deterministic trade id, shared by both legs of the print. It is a 64-bit hash-derived value and routinely exceeds 2⁵³, so it is a STRING: a JSON number loses its low digits in JavaScript, and a `user_fills` to `trades` join by `tid` then matches nothing, silently. Compare it as a string, or convert it with `BigInt` |
-| `trades[*].block` | uint64 | Committed block height the trade settled in (on-chain locator) |
+| `trades[*].block` | uint64 \| absent | Committed block height the trade settled in (on-chain locator). Absent on a row whose source did not record it. See [below](#trades-archive) |
 | `trades[*].hash` | hex string | Transaction hash of the originating signed order, `0x`-prefixed hex — lets a print be traced on-chain. **Empty string (`""`) when there is no signed taker action** behind the print (a system / begin-block print, or a maker leg whose submit hash is not carried) |
 
 **Rules**
 
 - An **un-ranged** ask returns records NEWEST-FIRST (the newest trade is
-  element 0). A **ranged** ask returns them oldest-first. The node ring is
-  bounded, so an un-ranged ask is a recent window, not all history. An unknown
-  / never-traded market returns `"trades": []` and `last_trade: 0`.
+  element 0). A **ranged** ask returns them oldest-first. An un-ranged ask is a
+  recent window, not all history. An unknown / never-traded market returns
+  `"trades": []` and `last_trade: 0`.
 
 #### Deep history, past the ring {#trades-archive}
 
-**A RANGED ask reaches the archive; an UN-RANGED ask does not.** That split is
-the rule, not a stage. A request that carries `start_time` or `end_time` asks
-for a window, and a window can reach past the node's bounded ring, so the
-archive answers it. A request with neither is the live ring's job and always
-answers from the ring.
+**Every ask reaches the archive.** The gateway merges three sources: the
+node's bounded ring, the gateway's own 24-hour trade window and the archive.
+No `tid` appears twice. A ranged ask reads the archive over its window. An
+un-ranged ask reads the newest prints of the archive, then trims the merged
+answer to `limit`.
 
-**Your parser does not change.** The gateway relabels the archive record to the
-shape above, so one parser reads both sources. Three fields read differently on
-an archive-served print:
+**Why.** From the release that arms the fill-tape retirement, the node keeps no
+trade ring. An un-ranged ask that read the ring alone would then answer
+`"trades": []` for a market that trades.
 
-| Field | On an archive-served print |
+**Not live yet:** the un-ranged half and the gateway window ship with the next
+gateway release. Until then, a ranged ask reaches the archive, and an un-ranged
+ask answers from the node's ring alone. See
+[the notice](../../../changelog/next-release.md#tape-retirement-reads).
+
+**Your parser does not change.** The gateway relabels an archive record and a
+gateway-window record to the shape above, so one parser reads every source.
+Three fields read differently on a print that the archive or the gateway
+window serves:
+
+| Field | On a print from the archive or the gateway window |
 |-------|----------------------------|
-| `hash` | **ABSENT — the key is omitted, and that is deliberate.** On a node print `""` is a real value: it says there was no signed taker action. The archive's trade table stores no trace hash at all, which is a different fact. Emitting `""` would report an unknown as a known. Treat a missing `hash` as "not recorded" and a `""` as "recorded, and there was none" |
+| `hash` | **ABSENT — the key is omitted, and that is deliberate.** On a node print `""` is a real value: it says there was no signed taker action. The archive's trade table and the gateway window store no trace hash at all, which is a different fact. Emitting `""` would report an unknown as a known. Treat a missing `hash` as "not recorded" and a `""` as "recorded, and there was none". A gateway-window row also has no `block` key |
 | `last_trade` | The newest print **in this answer**, not the market's all-time newest |
 | `time` at the live edge | The archive consumes the node stream on a poll interval (**default 5 s**), so the newest prints reach it late. A window that runs up to now can stop a few seconds short of the tape's true end. Re-ask, or read the live [`trades` WS channel](../../ws/subscriptions.md#trades) for a sub-block tape |
 

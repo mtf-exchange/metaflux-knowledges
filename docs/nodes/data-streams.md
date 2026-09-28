@@ -695,7 +695,7 @@ transient: a quorum drains it and a timeout prunes it.
       "round": 2000007,
       "category": "dynamic_risk",
       "sub_id": 7,
-      "action": "setDynamicRiskParam",
+      "action": "SetDynamicRiskParam",
       "asset": 0,
       "coin": "BTC",
       "validator": "0x3f2a9c4b8d1e5f60718293a4b5c6d7e8f9012345",
@@ -708,7 +708,7 @@ transient: a quorum drains it and a timeout prunes it.
     {
       "type": "vote_enacted",
       "round": 2000007,
-      "action": "setDynamicRiskParam",
+      "action": "SetDynamicRiskParam",
       "asset": 0,
       "coin": "BTC",
       "changes": [
@@ -738,10 +738,10 @@ Each event is one of two shapes. Read `type` to tell them apart.
 | Field | Type | Units | Meaning |
 |-------|------|-------|---------|
 | `round` | uint64 | id | Synthetic vote round this cast belongs to |
-| `category` | string | — | The round's vote family: `"dynamic_risk"`, `"vote_global"`, `"mb_configure_chain"`, `"oracle_weights"`, `"circle_promotion_attest"`, `"option_listing"`, `"option_auto_list"`, `"spot_margin_params"`, `"bridge_reissue"`, `"arm_features"`, `"pm_shock_grid"` (the last three not live yet: they ship with the next node release), or `"proposal"`. A fixed-round vote with no category of its own reads as the nearest band below it, so read `action` for the vote kind |
-| `sub_id` | uint64 | — | Offset of `round` inside its category band. Under `"proposal"` it **equals `round`** |
-| `action` | string | — | Wire action name the vote targets, such as `"setDynamicRiskParam"` |
-| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote. On a `setDynamicRiskParam` vote that sets `pm_collateral_haircut`, it is a spot token id, not a market id, and `coin` is absent. Resolve the id against the token registry |
+| `category` | string | — | The label of the round that holds the vote. See [the category table](#node_gov-categories) |
+| `sub_id` | uint64 | — | Offset of `round` from the base of its category. `0` on a fixed round. Under `"proposal"` it **equals `round`** |
+| `action` | string | — | Wire action name the vote targets, such as `"SetDynamicRiskParam"`. **This is the exact filter for a vote kind** |
+| `asset` | uint32 \| absent | id | Market asset id the vote targets. Absent on a chain-global vote. On a `SetDynamicRiskParam` vote that sets `pm_collateral_haircut`, it is a spot token id, not a market id, and `coin` is absent. Resolve the id against the token registry |
 | `coin` | string \| absent | — | Market symbol for `asset`. Absent when the vote is global, or the market carries no listing spec |
 | `validator` | string | — | Casting validator's `0x` address, lowercase, 20 bytes |
 | `stake` | decimal string | whole stake units | **This validator's own** weight at the cast |
@@ -749,6 +749,83 @@ Each event is one of two shapes. Read `type` to tell them apart.
 | `quorum_met` | bool | — | `true` when this cast carried the payload to two thirds of `total_stake` |
 | `payload` | string | — | Raw vote bytes, `0x`-hex, undecoded. Two validators agree when these bytes are identical. Decode it per `action` |
 | `time` | uint64 | ms | Cast timestamp. Equals `block_time` |
+
+#### Categories and rounds {#node_gov-categories}
+
+**NOT LIVE YET.** This table ships with the next node release. See
+[the notice](../changelog/next-release.md#node_gov-labels).
+
+Each vote kind collects its votes in a synthetic round. A **fixed** round is
+one round for the whole vote kind. A **band** starts at a base and adds an id to
+it, so one vote kind has one round per market, per chain or per pair.
+
+Three rules read this table:
+
+- **`sub_id` is `0` on a fixed round.** In a band it is the id added to the
+  base.
+- **`action` is the exact filter for a vote kind.** `category` names the round,
+  not the action.
+- **A `+` in a label means the round is shared.** More than one action casts
+  into that round. Split those votes by `action`.
+
+| `category` | `action` | Round base | `sub_id` |
+|---|---|---|---|
+| `proposal` | `GovPropose`, `GovVote` | below 1,000,000 | equals `round`: the proposal id |
+| `vote_global` | `VoteGlobal` | 1,000,000 | the global parameter kind |
+| `dynamic_risk` | `SetDynamicRiskParam` | 2,000,000 | market asset id |
+| `prime_account` | `SetPrimeAccount` | 3,000,000 | `0` |
+| `mb_configure_chain` | `BridgeConfigureChain` | 4,000,000 | bridge chain id |
+| `treasury_config` | `ConfigTreasuryBackstop` | 5,000,000 | `0` |
+| `metaliquidity_set` | `SetMetaliquiditySet` | 6,000,000 | `0` |
+| `oracle_weights` | `SetOracleWeights` | 7,000,000 | market asset id. `999999` for the default table |
+| `funding_formula` | `SetFundingFormula` | 8,000,000 | market asset id |
+| `disabled_venues` | `SetDisabledVenues` | 9,000,000 | `0` |
+| `fee_schedule` | `SetFeeSchedule` | 11,000,000 | `0` |
+| `gov_adjust_spot_value` | `GovAdjustSpotValue` ¹ | 12,000,000 | `0` |
+| `locked_stake_allowlist+seed_market+mint_treasury` | `SetLockedStakeAllowlist`, `Listing`, `MintTreasury` ¹ | 13,000,000 | `0` |
+| `delist_market+burn_treasury` | `Delisting`, `BurnTreasury` ¹ | 14,000,000 | `0` |
+| `set_perp_max_oi+set_population_target` | `SetPerpMaxOpenInterest`, `SetPopulationTarget` ¹ | 15,000,000 | `0` |
+| `set_spot_min_notional` | `SetSpotMinNotional` | 16,000,000 | `0` |
+| `mip3_set_global` | `SetGlobal` | 17,000,000 | `0` |
+| `register_spot` | `RegisterSpot` | 18,000,000 | `0` |
+| `disable_dex` | `DisableDex` | 19,000,000 | `0` |
+| `quarantine_user` | `QuarantineUser` | 20,000,000 | `0` |
+| `force_close` | `ForceClosePosition` | 21,000,000 | `0` |
+| `reactivate_user` | `ReactivateUser` | 22,000,000 | `0` |
+| `create_earn_pool` | `CreateEarnPool` | 23,000,000 | `0` |
+| `set_market_tick` | `SetMarketTick` | 24,000,000 | `0` |
+| `set_mark_mode` | `SetMarkMode` | 25,000,000 | `0` |
+| `circle_promotion_schedule` | none ² | 26,000,000 | `0` |
+| `circle_promotion_attest` | none ² | 27,000,000 | bridge chain id |
+| `circle_promotion_advance` | none ² | 28,000,000 | `0` |
+| `circle_promotion_prune` | none ² | 29,000,000 | `0` |
+| `gov_adjust_spot_balance` | `GovAdjustSpotBalance` ¹ | 30,000,000 | `0` |
+| `finalize_evm_contract` | `FinalizeEvmContract` | 31,000,000 | `0` |
+| `fba_configure` | `FbaConfigure` | 32,000,000 | `0` |
+| `bridge_reissue` | `BridgeReissueWithdrawal` | 33,000,000 | bridge chain id |
+| `pm_shock_grid` | `SetPmShockGrid` | 40,000,000 | `0` |
+| `arm_features` | `ArmFeatures` | 41,000,000 | `0` |
+| `option_listing` | `OptionListing` | 42,000,000 | `0` |
+| `option_auto_list` | `OptionAutoList` | 43,000,000 | `0` |
+| `exchange_serving_allowlist` | `SetExchangeServingAllowlist` | 44,000,000 | `0` |
+| `network_peer` | `SetNetworkPeer` | 45,000,000 | `0` |
+| `validator_allowlist` | `SetValidatorAllowlist` | 46,000,000 | `0` |
+| `gov_rotate_consensus_key` | `GovRotateConsensusKey` | 47,000,000 | `0` |
+| `spot_margin_params` | `SetSpotMarginParams` | 10,000,000,000 | spot pair id |
+
+¹ Testnet only. These five actions change token supply or an account balance.
+Mainnet refuses them. See [total supply](../concepts/tokenomics.md#total-supply).
+
+² The circle promotion votes write no `vote_cast` record. The label keeps the
+round from reading as the band below it.
+
+**A live node labels only eight bases:** `vote_global`, `dynamic_risk`,
+`mb_configure_chain`, `oracle_weights`, `circle_promotion_attest`,
+`option_listing`, `option_auto_list` and `spot_margin_params`. A round that is
+not one of them takes the label of the nearest labeled base below it. For
+example, a `DisableDex` vote on round 19,000,000 reads `oracle_weights` with
+`sub_id: 12000000`. Until the release, read `action`, never `category`, to find
+the vote kind.
 
 ### `vote_enacted` {#node_gov-vote-enacted}
 
@@ -790,8 +867,8 @@ struct, and those fields are not one numeric type.
    enactment that fires from another trigger has no such cast in its block, so
    both read `"0"`. Look up the earlier `vote_cast` with `quorum_met: true` on
    the same `round`.
-4. **`sub_id` changes meaning with `category`.** In a named category it is an
-   offset inside that category's round band. Under `"proposal"` the round is the
+4. **`sub_id` changes meaning with `category`.** In a band it is the id added
+   to the base. On a fixed round it is `0`. Under `"proposal"` the round is the
    proposal id itself, and `sub_id` repeats it.
 5. **`prior: null` does not mean "first ever value".** It means the read path
    could not resolve an effective prior at all. Never read `null` as zero, and

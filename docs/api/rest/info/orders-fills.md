@@ -326,6 +326,7 @@ Or by client order id:
 |-------|------|----------|---------|
 | `oid` | uint64 \| decimal-digit string | one of `oid` / `cloid` | Server order id. A number and a string are both accepted, so an `oid` read back off any response can be sent straight back |
 | `cloid` | hex string | one of `oid` / `cloid` | Client order id — `0x` + 32 hex chars |
+| `address` | hex address | no | The order's owner. The gateway reads the fill legs of a filled order from the archive with it. See [below](#order_status-archive-legs). **Not live yet:** the gateway reads it from the next gateway release. A node ignores it |
 
 Neither field present returns `400 INVALID_REQUEST`. A
 malformed `cloid` returns `400`. Resolution stops at the first hit, in this
@@ -437,7 +438,7 @@ carries neither:
   "data": {
     "type": "order_status",
     "status": "filled",
-    "fills": [ /* each leg, oldest first — same shape as a user_fills record */ ],
+    "fills": [ /* each leg, newest first — same shape as a user_fills record */ ],
     "total_filled_sz": "1.49"
   }
 }
@@ -449,6 +450,19 @@ mark it partial: measured live, order `32535358` filled `0.62` and then `0.87`,
 and the read answered `0.62` — wrong by 58%. Compare `total_filled_sz` with the
 order's own size to tell a full fill from a partial one. If you want one leg,
 read `fills[0]` and know that is what you chose.
+
+#### Fill legs from the archive {#order_status-archive-legs}
+
+**Send `address` with the order's owner.** From the release that arms the
+fill-tape retirement, the node keeps no fill ring, so it holds no legs for a
+filled order. The gateway then reads the legs from the archive fills of
+`address` for that `oid`, and serves `fills` and `total_filled_sz`. An
+answer that the node gives as `unknown` then reads `filled`. Without
+`address`, the answer carries no `fills`, and a filled order can answer
+`unknown`.
+
+**Not live yet:** the archive legs ship with the next gateway release. See
+[the notice](../../../changelog/next-release.md#tape-retirement-reads).
 
 `"canceled"` / `"cancel_rejected"` / `"rejected"` — the order reached a terminal
 state without filling. All three carry the same `outcome` object:
@@ -545,7 +559,7 @@ contract `historical_orders` already carries.
 | `status` | `"resting" \| "triggered" \| "filled" \| "canceled" \| "cancel_rejected" \| "rejected" \| "unknown"` | Resolved lifecycle state. These seven tokens are the whole set |
 | `order` | object | Present on `"resting"` — `oid` (decimal-digit string), `coin` (market symbol or spot pair name), `side` (`"B"` = bid / `"A"` = ask), `px` / `sz` (decimal strings), `inserted_at`, `cloid` (hex \| null) |
 | `trigger` | object | Present on `"triggered"` — `oid` (decimal-digit string), `coin`, `side` (`"B"` / `"A"`), `trigger_px` / `sz` (decimal strings), `trigger_above` (bool: fire when mark crosses above), `is_market` (bool: `true` = fires a market exit, `false` = rests a limit exit), `limit_px` (decimal string \| `null`: the resting price for a limit trigger, `null` for a market trigger), `registered_at`, `fired` (bool), `cloid` (hex \| `null`). **Ladder legs only:** `group` (uint64, the shared ladder handle). **Trailing legs only:** `trail_px` (decimal string, the callback; `trigger_px` is then the RATCHETED level). Both keys are absent on every other trigger — see [`open_orders`](#open_orders) |
-| `fills` | array | Present on `"filled"` — EVERY matching leg, oldest first, each the shape of one [`user_fills`](#user_fills) record |
+| `fills` | array | Present on `"filled"` — EVERY matching leg, newest first, each the shape of one [`user_fills`](#user_fills) record |
 | `total_filled_sz` | Decimal string | Present on `"filled"` — the sum of `fills[*].sz` |
 | `outcome` | object | Present on `"canceled"` / `"cancel_rejected"` / `"rejected"` — exactly five fields: `oid` (decimal-digit string \| `null`; `null` when the node holds no id for the record — always on `rejected`, and on a `cancel_rejected` for a `cloid` that never mapped to an order), `coin` (market symbol or spot pair name), `side` (`"B"` / `"A"` \| `null`; `null` on both cancel outcomes — a cancel names the order, not its side), `time` (uint64, consensus ms of the transition), `reason` (string \| `null`; `null` on a successful cancel — **branch on `status`, never on this string**). No `sz`, no `filled_sz`, no `cloid` — see [above](#order_status) |
 | `outcome_coverage` | uint | Present on `"unknown"` ONLY — how many orders the terminal window holds. `0` means the window is empty (a restart), so the `unknown` says nothing about your order |

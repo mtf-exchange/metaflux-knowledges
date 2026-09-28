@@ -1,18 +1,21 @@
 ---
-description: "Seven changes that wait for the next node release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, and a bridge re-issue lane with spot tokens as portfolio-margin collateral. Also one wire row that is not verified on the running chain, and two corrections to this reference."
+description: "Nine changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, and the reads after the fill-tape retirement. Also one wire row that is not verified on the running chain, and five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Seven sections wait for the next node release:**
+**Nine sections wait for the next node release, and one of them also waits for
+the next gateway release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
 [`mtfStatus` for two transactions at one nonce](#same-nonce-status),
 [an open-interest cap on every native perp market](#oi-cap-capacity),
-[a deployer sets its market's open-interest cap](#perp-set-oi-cap) and
-[a deficit is charged to the market that produced it](#deficit-attribution) and
-[a bridge re-issue lane and spot tokens as portfolio-margin collateral](#reissue-and-pm-collateral). The action byte
+[a deployer sets its market's open-interest cap](#perp-set-oi-cap),
+[a deficit is charged to the market that produced it](#deficit-attribution),
+[a bridge re-issue lane and spot tokens as portfolio-margin collateral](#reissue-and-pm-collateral),
+[a `node_gov` label for every governance round](#node_gov-labels) and
+[the reads after the fill-tape retirement](#tape-retirement-reads). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -28,7 +31,7 @@ it.
 The rejected-leg `error` level is settled: a live `batch_cancel` reply read on
 2026-09-23 carries `statuses[i].error` as the flat `{code, message}` object.
 
-The page also keeps [two corrections](#corrections) to this reference. They are
+The page also keeps [five corrections](#corrections) to this reference. They are
 not chain changes.
 :::
 
@@ -203,6 +206,73 @@ its token never counts.
 - Expect no credit from a token while the oracle of its perpetual is stale, or
   before the oracle has sourced a price for it.
 
+## `node_gov` labels every governance round {#node_gov-labels}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`node_gov`](../nodes/data-streams.md#node_gov-categories) `category` on a fixed-round vote with no label of its own, for example `DisableDex` | the label of the nearest labeled base below it, such as `oracle_weights` | the label of its own round, such as `disable_dex` |
+| `node_gov` `sub_id` on that vote | the distance from that lower base, such as `12000000` | `0` |
+| `node_gov` `category` on a round that more than one action shares | the label of a lower base | one label that joins the sharers with `+`, such as `delist_market+burn_treasury` |
+
+**Why.** A live node labels only eight bases. Thirty fixed rounds have no base
+of their own, so each one reads as a different vote kind. The new
+[category table](../nodes/data-streams.md#node_gov-categories) gives every round
+its own label. Three rounds are shared by more than one action, and a `+`
+label says so.
+
+**What to do.**
+
+- Filter a vote kind by `action`, before and after the release. `action` is the
+  exact filter.
+- Do not split a vote kind by `category` on a record written before the
+  release. The old label on those records does not change.
+- Accept a `category` value that contains `+`.
+
+## Reads after the fill-tape retirement {#tape-retirement-reads}
+
+**NOT LIVE YET.** Each row below names the release it ships with. The node rows
+ship with the next node release. The gateway rows ship with the next gateway
+release. Some rows only change what a caller sees from the release that arms
+the fill-tape retirement.
+
+The fill-tape retirement stops two committed rings on the node: the trade ring
+of each market and the fill ring of each account. The
+[`node_trades`](../nodes/data-streams.md#node_trades) and
+[`node_fills`](../nodes/data-streams.md#node_fills) streams do not change, so
+the archive keeps every print. The reads below stop reading the node rings, and
+read the archive or the gateway's own 24-hour trade window instead.
+
+| Surface | Ships with | The rule |
+|---|---|---|
+| [`markets`](../api/rest/info/perpetuals.md#day-ntl-vlm-bound) `day_ntl_vlm`, perp and spot | node release | From the release that arms the fill-tape retirement, a node that holds no 24-hour window for a market serves `"0"` with `day_ntl_vlm_lower_bound_from` equal to the new top-level `time` |
+| [`markets`](../api/rest/info/perpetuals.md#markets) `time` | node release | New top-level field: the block time of the read |
+| `markets` `day_ntl_vlm` | gateway release | When the gateway holds a 24-hour window for the market, it replaces `day_ntl_vlm` with the sum from that window and removes `day_ntl_vlm_lower_bound_from` |
+| [`markets`](../api/rest/info/spot.md#spot_meta) spot `prev_day_px` | gateway release | When the gateway holds a window, the price of the first print in that window |
+| [`trades`](../api/rest/info/perpetuals.md#trades-archive), un-ranged | gateway release | The ask also reaches the archive. The answer merges the node ring, the gateway window and the archive, with no duplicate `tid` |
+| `trades`, a row from the gateway window | gateway release | No `hash` key and no `block` key, the same as an archive row that has no block |
+| WS [`trades`](../api/ws/subscriptions.md#trades) on-subscribe snapshot | gateway release | When the node has no ring for the market, the gateway serves the snapshot from its own window |
+| [`user_twap_slice_fills`](../api/rest/info/account-history.md#user_twap_slice_fills) | gateway release | The answer merges the node answer with the archive fills of the same `address` that carry a `twap_id` |
+| [`order_status`](../api/rest/info/orders-fills.md#order_status-archive-legs) for a filled order | gateway release | The legs can come from the archive when the ask carries `address` |
+| WS [`l2_book`](../api/ws/subscriptions.md#l2_book) and [`bbo`](../api/ws/subscriptions.md#bbo) `time` on a spot pair | node release | From the release that arms the fill-tape retirement, the time of the newest print the serving node saw since it started. `0` until the first print |
+
+**Why.** The node rings are bounded, and they are part of the committed state.
+The archive and the gateway already hold the same prints, and they hold more of
+them. A ring of 256 prints covers minutes on a busy market, so the gateway's
+24-hour window is the fuller figure even before the retirement.
+
+**What to do.**
+
+- Read a `markets` row that still carries `day_ntl_vlm_lower_bound_from` as a
+  lower bound. A marker within seconds of the current time means the serving
+  layer held no window: `"0"` is then no data, never a quiet market.
+- Send `address` on `order_status`. Without it, the answer can carry no
+  `fills`, and a filled order can answer `unknown`.
+- Keep reading `trades` rows with and without `hash`. A missing `hash` means
+  "not recorded".
+- Expect no type change. No field changes its type, and no field is removed.
+
 ## Archive candles state their size plane {#archive-candle-plane}
 
 **Unverified on the running chain.**
@@ -227,12 +297,20 @@ store, and the backfill run.
 **Until then:** treat archive trade-bar volume from before a raise on that market
 as unconfirmed.
 
-## Two corrections to this reference {#corrections}
+## Five corrections to this reference {#corrections}
 
-Neither is a change to the chain. The reference was wrong and the code was right.
+None is a change to the chain. The reference was wrong and the code was right.
 
 - [`top_up_isolated_only_margin`](../api/rest/exchange/margin-risk.md#top_up_isolated_only_margin)
   accepts a PLAIN isolated position, not strict-isolated only.
 - [`candle_snapshot`](../api/rest/info/perpetuals.md#candle_snapshot-volume-join)
   serves real trade volume in `v`, `q` and `n` on a `mark` or `oracle` bar. They
   are not `"0"`, and `n` is not a sample count.
+- [`node_gov`](../nodes/data-streams.md#node_gov) `action` is the protocol
+  action name with a capital first letter, such as `"SetDynamicRiskParam"`. The
+  example showed `"setDynamicRiskParam"`.
+- WS [`l2_book`](../api/ws/subscriptions.md#l2_book) and `bbo` on a spot pair
+  carry the time of the newest print on the pair in `time`. The reference said
+  a spot book always reads `time: 0`.
+- [`order_status`](../api/rest/info/orders-fills.md#order_status) serves
+  `fills` newest first. The reference said oldest first.
