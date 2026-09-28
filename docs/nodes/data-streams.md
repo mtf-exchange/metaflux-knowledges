@@ -813,6 +813,7 @@ Two rules read this table:
 | `mint_treasury` | `MintTreasury` ¹ | 49,000,000 | `0` |
 | `burn_treasury` | `BurnTreasury` ¹ | 50,000,000 | `0` |
 | `set_population_target` | `SetPopulationTarget` ¹ | 51,000,000 | `0` |
+| `pm_collateral` | `SetDynamicRiskParam` with a `pm_collateral_*` field (not live yet) | 52,000,000 | spot token id |
 | `spot_margin_params` | `SetSpotMarginParams` | 10,000,000,000 | spot pair id |
 
 ¹ Testnet only. These five actions change token supply or an account balance.
