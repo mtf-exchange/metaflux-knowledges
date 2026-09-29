@@ -430,16 +430,21 @@ funds. The code minimum makes each referrer identity trade first, and the caps
 bound what one referee can collect.
 
 **A broker credit and a referrer credit can both apply to the same fill.** They
-pay out independently.
+accrue independently.
 
-**Where to read each balance.** They are two separate accumulators with two
-separate claims. Read the referrer balance with
-[`referral_state`](../api/rest/info/fees-credit.md#referral_state) and claim it with
-[`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards); read
-the broker balance with [`broker_state`](../api/rest/info/fees-credit.md#broker_state) and
-claim it with
-[`claim_broker_rewards`](../api/rest/exchange/account.md#claim_builder_rewards).
-Neither claim action reports an amount, so read the balance first.
+**Where to read each balance.** They are two separate accumulators with one
+claim. Read the referrer balance with
+[`referral_state`](../api/rest/info/fees-credit.md#referral_state) and the broker
+balance with [`broker_state`](../api/rest/info/fees-credit.md#broker_state).
+[`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards)
+and [`claim_broker_rewards`](../api/rest/exchange/account.md#claim_builder_rewards)
+do the same thing: each one drains both balances. The claim reply reports no
+amount, so read both balances first.
+
+:::caution
+**The combined claim is not live yet.** It ships with the next node release.
+Until then, each claim action drains only its own credit.
+:::
 
 ## Where fees go {#where-fees-go}
 

@@ -1324,7 +1324,7 @@ Three records, one applied and two rejected:
 | `status` | string | no | `"success"` or `"failure"`. Nothing else |
 | `error_code` | string \| null | yes | Why it failed. `null` on success. See [rejections](#node_actions-rejections) |
 | `payload` | object \| null | yes | The action body as submitted. `null` when the action carries no signed body. See [the payload rule](#node_actions-payload) |
-| `result` | object \| null | yes | What the action produced. `null` for every action that is not order-shaped. See [`result`](#node_actions-result) |
+| `result` | object \| null | yes | What the action produced. `null` for every action that is not order-shaped or a fee claim. See [`result`](#node_actions-result) |
 
 ### `action_index` is half the seek cursor {#node_actions-index}
 
@@ -1468,7 +1468,8 @@ Three rules go with it:
 ### `result` carries the order legs {#node_actions-result}
 
 `result` is `null` on every action that is not order-shaped, success included.
-An `Order`, a `BatchOrder` and a `ChaseOrder` fill it in:
+The one exception is a [fee claim](#node_actions-result-claim). An `Order`, a
+`BatchOrder` and a `ChaseOrder` fill it in:
 
 ```json
 { "statuses": [ /* one record per placed leg */ ] }
@@ -1488,6 +1489,32 @@ repeats `block_time`.
 
 **`result` is the only per-leg surface.** The record has no per-leg column of
 its own.
+
+#### A fee claim reports what it moved {#node_actions-result-claim}
+
+:::caution
+**Not live yet.** This result ships with the next node release. A live node
+writes `result: null` on a fee claim.
+:::
+
+A successful `ClaimReferralRewards` or `ClaimBuilderRewards` fills `result` in
+with what the claim moved into the sender's cross-collateral:
+
+```json
+{ "claimed": "12.5", "referral": "4.5", "broker": "8" }
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `claimed` | Decimal string | Total USDC moved. Always `referral` plus `broker` |
+| `referral` | Decimal string | The part drained from the referral credit |
+| `broker` | Decimal string | The part drained from the broker-code credit |
+
+**Both action types drain both credits,** so the three fields have the same
+meaning whichever claim name the sender used. A claim with nothing accrued
+reads `"0"` in all three. This row is the only place the claimed amount
+appears: the [`/exchange` reply](../api/rest/exchange/account.md#claim_referral_rewards)
+reports none, and the balance reads are `0` after the claim.
 
 ### `action_type` vocabulary {#node_actions-types}
 
@@ -1528,7 +1555,8 @@ appear on the tape and are not listed here.
 What this tape does **not** carry:
 
 - **No effects.** The record says what the action was and whether it landed, not
-  what it moved. Money is [`node_ledger`](#node_ledger), executions are
+  what it moved. A [fee claim](#node_actions-result-claim) is the one
+  exception. Money is [`node_ledger`](#node_ledger), executions are
   [`node_fills`](#node_fills), funding is [`node_funding`](#node_funding). Join
   on `block_number` and, where a hash exists, on `action_hash`.
 - **No signature bytes.** `signer` reports that a signature authorized the row.

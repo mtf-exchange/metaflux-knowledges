@@ -148,15 +148,31 @@ Fees accrue to a running balance. Claim it with:
 { "type": "claim_broker_rewards" }
 ```
 
+**One claim moves the broker credit and the referral credit together.**
+`claim_broker_rewards` and
+[`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards)
+do the same thing: each one drains both credits of the sender. An account that
+is a broker and a referrer claims once, not twice.
+
+:::caution
+**Not live yet.** The combined claim ships with the next node release. Until
+then, each action drains only its own credit. To claim both on a live node,
+send one action, read both balances, and send the other action if its balance
+is still above `0`.
+:::
+
 **Both names are accepted.** `claim_broker_rewards` is the name to send, and
 `claim_builder_rewards` still decodes and always will — the same second-name
 rule [`approve_broker_fee`](#approval) follows.
 
-**Read the balance before you claim it. The action reports no amount.** Query
-[`broker_state`](../api/rest/info/fees-credit.md#broker_state) with your address. That
-read keeps the `builder` spelling and is the only way to show a claimable
-figure. After the claim the balance is `0`, so a read afterwards cannot tell you
-what moved.
+**Read the balances before you claim them. The `/exchange` reply reports no
+amount.** Query [`broker_state`](../api/rest/info/fees-credit.md#broker_state)
+and [`referral_state`](../api/rest/info/fees-credit.md#referral_state) with your
+address. `broker_state` keeps the `builder` spelling. The claimable figure is
+the sum of the two `claimable_rewards` values. After the claim both balances
+are `0`, so a read afterwards cannot tell you what moved. The claim's
+[`node_actions`](../nodes/data-streams.md#node_actions-result) row carries the
+total and the two parts.
 
 The whole accrued balance moves into your spendable collateral and the entry is
 removed. The call is **idempotent**: claiming again with nothing accrued claims

@@ -274,7 +274,7 @@ node release. See [the changelog](../../../changelog/next-release.md#referral-pr
 | `referrer_stats.referee_count` | uint | Accounts bound to this account |
 | `referrer_stats.referred_fees` | Decimal string | USDC taker fees those referees paid while bound |
 | `referrer_stats.rewarded` | Decimal string | USDC share this account earned from them |
-| `referrer_stats.claimed` | Decimal string | USDC this account claimed with `claim_referral_rewards` |
+| `referrer_stats.claimed` | Decimal string | Referral credit this account claimed, in USDC. The broker part of a claim is not in it |
 | `code_requirement.enabled` | bool | `true` while referral codes are on |
 | `code_requirement.min_volume_30d` | Decimal string | The 30-day volume a code needs, whole USDC |
 | `code_requirement.volume_30d` | Decimal string | This account's pooled 30-day taker plus maker volume |
@@ -282,10 +282,15 @@ node release. See [the changelog](../../../changelog/next-release.md#referral-pr
 
 **Rules**
 
-- **Read the credit here before you claim it. The claim action reports no
+- **Read the credit here before you claim it. The claim reply reports no
   amount.** [`claim_referral_rewards`](../exchange/account.md#claim_referral_rewards)
-  drains the whole balance and answers with no figure, so this read is the only
-  way to show a claimable balance or to decide whether a claim is worth sending.
+  drains the whole balance and answers with no figure, so this read and
+  [`broker_state`](#broker_state) are the only way to show a claimable balance
+  or to decide whether a claim is worth sending.
+- **One claim drains this credit and the broker credit.** Show the sum of this
+  `claimable_rewards` and the `broker_state` one behind one claim button. This
+  is not live yet: until the next node release, each claim action drains only
+  its own credit.
 - **`claimable_rewards` of `"0"` is normal, not an error state.** Claiming with
   nothing accrued claims `0` and succeeds. Do not block the button on it.
 - **`referrer: null` means the account never bound one.** It does not mean the
@@ -492,14 +497,17 @@ One broker's claimable broker-code fee credit.
 
 **Rules**
 
-- **Read the credit here before you claim it. The claim action reports no
-  amount.** [`claim_builder_rewards`](../../../concepts/broker-codes.md#claiming)
+- **Read the credit here before you claim it. The claim reply reports no
+  amount.** [`claim_broker_rewards`](../../../concepts/broker-codes.md#claiming)
   drains the whole balance and answers with no figure.
 - **`builder_state` is the old name and still answers.** Send `broker_state`.
   The reply echoes back whichever name you sent.
-- **A broker credit and a referral credit are separate balances with separate
-  claims.** One fill can pay both. Reading one tells you nothing about the
-  other. See [broker credit is not referrer credit](../../../concepts/fees.md#referrer-credit).
+- **A broker credit and a referral credit are separate balances with one
+  claim.** One fill can pay both. Reading one tells you nothing about the
+  other, so read [`referral_state`](#referral_state) too. Either claim action
+  drains both balances. This is not live yet: until the next node release, each
+  claim action drains only its own credit. See
+  [broker credit is not referrer credit](../../../concepts/fees.md#referrer-credit).
 - **This is a credit balance, not a fee rate.** The rate a broker charges is the
   `builder.fee` on each order, capped by its
   [`approved_brokers`](./node.md#approved_brokers) grant.

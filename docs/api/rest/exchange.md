@@ -438,8 +438,8 @@ refuse every other market. See [options](../../products/options.md).
 | [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) | Bind to the referrer that holds a referral code. Not live yet | master only |
 | [`register_referral_code`](./exchange/account.md#register_referral_code) | Register the sender's referral code. Not live yet | master only |
 | [`approve_broker_fee`](./exchange/account.md#approve_builder_fee) | Approve a broker fee ceiling | master only |
-| [`claim_referral_rewards`](./exchange/account.md#claim_referral_rewards) | Claim accrued referral credit | master only |
-| [`claim_broker_rewards`](./exchange/account.md#claim_builder_rewards) | Claim accrued broker-code credit | master only |
+| [`claim_referral_rewards`](./exchange/account.md#claim_referral_rewards) | Claim accrued referral and broker-code credit. Draining both is not live yet | master only |
+| [`claim_broker_rewards`](./exchange/account.md#claim_builder_rewards) | The same claim as `claim_referral_rewards`. Draining both is not live yet | master only |
 | [`approve_builder_fee`](./exchange/account.md#approve_builder_fee) | The older spelling of `approve_broker_fee`. It still decodes and behaves identically | master only |
 | [`claim_builder_rewards`](./exchange/account.md#claim_builder_rewards) | The older spelling of `claim_broker_rewards`. It still decodes and behaves identically | master only |
 | [`create_sub_account`](./exchange/account.md#create_sub_account) | Open a sub-account under the master | master only |

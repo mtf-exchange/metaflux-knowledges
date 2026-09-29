@@ -1,11 +1,11 @@
 ---
-description: "Eleven changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, the reads after the fill-tape retirement, the removal of user_ledger_updates, and referral codes with a referee discount and caps. Also one wire row that is not verified on the running chain, and five corrections to this reference."
+description: "Twelve changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, the reads after the fill-tape retirement, the removal of user_ledger_updates, referral codes with a referee discount and caps, and one claim for the referral and broker credits. Also one wire row that is not verified on the running chain, and five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Eleven sections wait for the next node release, and two of them also wait for
+**Twelve sections wait for the next node release, and two of them also wait for
 the next gateway release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
@@ -16,8 +16,9 @@ the next gateway release:**
 [a bridge re-issue lane and spot tokens as portfolio-margin collateral](#reissue-and-pm-collateral),
 [a `node_gov` label for every governance round](#node_gov-labels),
 [the reads after the fill-tape retirement](#tape-retirement-reads),
-[the removal of `user_ledger_updates`](#user-ledger-updates-removed) and
-[referral codes, a referee discount and caps](#referral-program). The action byte
+[the removal of `user_ledger_updates`](#user-ledger-updates-removed),
+[referral codes, a referee discount and caps](#referral-program) and
+[one claim for the referral and broker credits](#combined-claim). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -366,6 +367,31 @@ not flow the referrer brought, so it pays no share. See
   and zero counters, and its caps count from the release.
 - `referral_referees` lists every referee, a referee bound before the release
   included. Its counters start at the release.
+
+## One claim for the referral and broker credits {#combined-claim}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards) | drains the referral credit only | drains the referral credit and the broker-code credit |
+| [`claim_broker_rewards`](../api/rest/exchange/account.md#claim_builder_rewards) and `claim_builder_rewards` | drain the broker-code credit only | drain the broker-code credit and the referral credit |
+| [`node_actions`](../nodes/data-streams.md#node_actions-result-claim) `result` of a `ClaimReferralRewards` or `ClaimBuilderRewards` row | `null` | `claimed`, `referral` and `broker`, in USDC |
+| [`referral_state`](../api/rest/info/fees-credit.md#referral_state) `referrer_stats.claimed` | — | grows by the referral part only, whichever action the sender used |
+
+**Why.** One fill can pay an account a referral credit and a broker credit. A
+trader who earns both wants one claim, not two. No action is added, no action
+is removed and no signing type changes. Both actions now do the same thing.
+
+**What to do.**
+
+- Show one claimable figure: the sum of `claimable_rewards` from
+  `referral_state` and from [`broker_state`](../api/rest/info/fees-credit.md#broker_state).
+- Send one claim action. Until the release, read both balances after the claim
+  commits, and send the other action if its balance is still above `0`. That
+  second claim is harmless after the release: it claims `0`.
+- The `/exchange` reply still reports no amount. Read the amount from the
+  claim's `node_actions` row.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

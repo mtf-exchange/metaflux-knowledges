@@ -237,16 +237,38 @@ stays `ApproveBuilderFee`, which no signature lets you change — see
 
 ### Claim accrued referral credit {#claim_referral_rewards}
 
-Drain the sender's whole accrued referral credit into spendable
-cross-collateral. No parameters.
+:::caution
+**One claim drains both credits from the next node release. Not live yet.**
+Until the release, `claim_referral_rewards` drains only the referral credit,
+and [`claim_broker_rewards`](#claim_builder_rewards) drains only the broker
+credit. To claim everything on a live node, send one, read both balances, and
+send the other if its balance is still above `0`. See
+[the changelog](../../../changelog/next-release.md#combined-claim).
+:::
+
+Drain the sender's whole accrued referral credit AND its whole accrued
+broker-code credit into spendable cross-collateral. No parameters.
 
 ```json
 { "type": "claim_referral_rewards", "params": {} }
 ```
 
-**The action reports no amount.** Read the balance first with
-[`referral_state`](../info/fees-credit.md#referral_state). After the claim, the credit is `0`
-and the read no longer tells you what moved.
+**Either claim action claims both credits.** `claim_referral_rewards` and
+[`claim_broker_rewards`](#claim_builder_rewards) do the same thing. One fill
+can pay an account both credits, and a trader wants one button, not two. Send
+either one. A second claim right after the first claims `0`.
+
+**The response reports no amount.** The `/exchange` reply is the admission
+payload. Read the two balances first, with
+[`referral_state`](../info/fees-credit.md#referral_state) and
+[`broker_state`](../info/fees-credit.md#broker_state). After the claim, both
+credits are `0`, and the reads no longer tell you what moved. The
+[`node_actions`](../../../nodes/data-streams.md#node_actions-result) row of the
+claim carries the total and the two parts.
+
+**Only the referral part counts as claimed referral credit.**
+`referral_state.referrer_stats.claimed` grows by the referral part. The broker
+part does not change it.
 
 **An agent wallet cannot claim for its owner.** The action is sender-authorized
 and carries no `owner` field, so it always acts on the recovered signer's own
@@ -259,12 +281,22 @@ an error, so a retry after a timeout is safe.
 
 ### Claim accrued broker-code credit {#claim_builder_rewards}
 
-Drain the sender's whole accrued broker-code fee credit into spendable
-cross-collateral. No parameters.
+:::caution
+**One claim drains both credits from the next node release. Not live yet.**
+Until the release, `claim_broker_rewards` drains only the broker credit. See
+[`claim_referral_rewards`](#claim_referral_rewards).
+:::
+
+Drain the sender's whole accrued broker-code credit AND its whole accrued
+referral credit into spendable cross-collateral. No parameters.
 
 ```json
 { "type": "claim_broker_rewards", "params": {} }
 ```
+
+**This is the same claim as
+[`claim_referral_rewards`](#claim_referral_rewards).** Either action claims
+both credits. The rules there apply here.
 
 **Both names are accepted.** `claim_broker_rewards` is the name to send.
 `claim_builder_rewards` still decodes and always will, for the same reason
@@ -272,15 +304,8 @@ cross-collateral. No parameters.
 beside it keeps the `builder` spelling and is
 [`broker_state`](../info/fees-credit.md#broker_state).
 
-**The action reports no amount.** Read the balance first with
-[`broker_state`](../info/fees-credit.md#broker_state).
-
-**An agent wallet cannot claim for its owner.** The action is sender-authorized
-and carries no `owner` field, so it always acts on the recovered signer's own
-account. Sign it with the master key.
-
-**The call is idempotent.** Claiming with nothing accrued claims `0` and is not
-an error. See [broker codes](../../../concepts/broker-codes.md#claiming).
+**An agent wallet cannot claim for its owner.** Sign it with the master key.
+See [broker codes](../../../concepts/broker-codes.md#claiming).
 
 ---
 
