@@ -814,6 +814,7 @@ Two rules read this table:
 | `burn_treasury` | `BurnTreasury` ¹ | 50,000,000 | `0` |
 | `set_population_target` | `SetPopulationTarget` ¹ | 51,000,000 | `0` |
 | `pm_collateral` | `SetDynamicRiskParam` with a `pm_collateral_*` field (not live yet) | 52,000,000 | spot token id |
+| `bridge_void` | `BridgeVoidWithdrawal` (not live yet) | 53,000,000 | bridge chain id |
 | `spot_margin_params` | `SetSpotMarginParams` | 10,000,000,000 | spot pair id |
 
 ¹ Testnet only. These five actions change token supply or an account balance.
@@ -970,7 +971,7 @@ marker gives a false rotation on every restart. Compare the rows to decide.
 | `type` | string | — | `"admission"`, `"transition"`, `"rebind"`, or `"removed"` |
 | `economic_id` | string | — | `0x`-hex, 32 bytes. **The upsert key.** Rotation-invariant: it names the same withdrawal before and after a rotation |
 | `message_id` | string | — | `0x`-hex, 32 bytes. The **current** signing digest. It moves on a rotation |
-| `status` | string | — | `"awaiting_cosignatures"`, `"ready_to_release"`, `"stranded_on_retired_domain"`, or `"released"`. Derived by the node |
+| `status` | string | — | `"awaiting_cosignatures"`, `"ready_to_release"`, `"stranded_on_retired_domain"`, or `"released"`. Derived by the node. A `"removed"` record can also carry `"voided"` (not live yet) |
 | `pending_cosigner_count` | uint | — | Co-signatures held against `message_id` that are **short of quorum**. `0` once quorum is reached |
 | `released_at_ms` | uint64 \| null | ms | Consensus timestamp of the release. `null` until the entry is released |
 | `msg` | object \| absent | — | The immutable half of the withdrawal. Present on `"admission"` only |
@@ -1002,7 +1003,10 @@ marker gives a false rotation on every restart. Compare the rows to decide.
    reads `"released"` when the release is confirmed. Otherwise it carries the
    entry's last known status: the entry left through the retention prune, or
    (from the next node release) through a re-issue of a stranded withdrawal.
-   Either way the `economic_id` never returns. A re-issue replacement arrives as
+   From the next node release it reads `"voided"` when governance voided the
+   withdrawal and refunded the user on the exchange. Nothing pays a voided
+   withdrawal on the destination chain. In every case the `economic_id` never
+   returns. A re-issue replacement arrives as
    a new `admission` with its own `economic_id`.
 4. **`status` is derived. Do not recompute it.** It folds the live deployment row
    through the node's own derivation.

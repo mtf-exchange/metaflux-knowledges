@@ -588,13 +588,14 @@ list, or in [`gov_history`](./info/governance.md), knows what it is.
 | `gov_action` | A validator, on its own node only | Carries one signed governance or validator action. The node accepts it only from its own machine, so a public caller gets `AUTH_UNAUTHORIZED`, not `ACTION_UNSUPPORTED` |
 
 Some validator governance actions are not native tags at all. `/exchange` fails
-them at decode with `unknown variant`, like a misspelt name. One of them changes
-what a user reads, so it is listed here. The [node streams](../../nodes/data-streams.md#node_actions-types)
-name it `BridgeReissueWithdrawal`.
+them at decode with `unknown variant`, like a misspelt name. Two of them change
+what a user reads, so they are listed here. The [node streams](../../nodes/data-streams.md#node_actions-types)
+name them `BridgeReissueWithdrawal` and `BridgeVoidWithdrawal`.
 
 | Action | Who | What it does |
 |-----------|-----|--------------|
 | `bridge_reissue_withdrawal` | Validator governance | **Not live yet: ships with the next node release.** Re-issues one stranded or disputed bridge withdrawal under the current deployment with a new nonce. Bounded to that withdrawal's amount; refused twice for the same withdrawal. See [re-issue](./info/bridge.md#reissue) |
+| `bridge_void_withdrawal` | Validator governance | **Not live yet: ships with the next node release.** Removes one queued bridge withdrawal that no validator has signed, and refunds the full debit, fee included, to the user's exchange balance. Refused once any validator has signed it, and refused twice. See [`voided`](./info/bridge.md#voided) |
 
 Two more tags in this set, `set_metaliquidity_set` and `gov_adjust_spot_value`,
 keep their payloads and signing types below, because their `value` hashing rule
