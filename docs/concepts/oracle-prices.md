@@ -152,16 +152,15 @@ A venue whose weight is set to 0 (e.g. delisted for that symbol) is never reques
 The composed `oracle_px` is published **once per block**, derived from the consensus block timestamp (never wall-clock), and signed by the oracle validators in the active set. Because the median, the staleness/outlier filters, and the timestamp are all consensus-derived, every honest validator computes a **byte-identical** oracle snapshot for the block.
 
 A price for one asset needs fresh submissions from validators that hold at least
-**half** of the active stake. With less, the asset keeps its previous price, and
-after 60 s liquidation and funding on that market wait for a fresh price. So one
-validator can never set a price alone. The cost is liveness: if validators that
-hold half of the stake stop submitting, every externally priced market holds its
-price. With the stakes read on 2026-09-26, two dark validators can be enough:
-the largest together with the second or the third largest holds more than half.
-The largest alone holds about one third, so one dark validator does not stall
-the oracle. A validator with more than half of the stake would. **Not live
-yet:** the half-stake rule is live from the release after 2026-10-01. Until then
-the floor is one third of the active stake.
+**one third** of the active stake. Exactly one third is enough. With less, the
+asset keeps its previous price, and after 60 s liquidation and funding on that
+market wait for a fresh price. So a validator with less than one third of the
+stake cannot set a price alone. The cost is liveness: if validators that hold
+more than two thirds of the stake stop submitting, every externally priced
+market holds its price. With the stakes read on 2026-09-26, the largest
+validator holds just under one third, so no validator sets a price alone. Two
+dark validators never stall the oracle. Three can: the largest and the second
+largest together with any other one hold more than two thirds.
 
 The 60 s count runs on the block clock. So it also runs when no asset gets a
 fresh price and the chain publishes no new oracle price at all. A self-priced
