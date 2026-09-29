@@ -1,5 +1,5 @@
 ---
-description: "Agent wallets, display name, referrer, broker-fee ceiling, credit claims, multi-sig conversion, sub-accounts, and the account's margin-mode configuration."
+description: "Agent wallets, display name, referrer and referral code, broker-fee ceiling, credit claims, multi-sig conversion, sub-accounts, and the account's margin-mode configuration."
 ---
 
 # Account & access actions
@@ -66,7 +66,10 @@ Set the account's human-readable handle.
 
 ### Bind the account to a referrer {#set_referrer}
 
-Bind the account to a referrer **address** (not a code).
+Bind the account to a referrer **address**. To bind by a referral code, send
+[`set_referrer_by_code`](#set_referrer_by_code). See
+[the referral program](../../../concepts/fees.md#referral-binding) for what a
+bind does.
 
 ```json
 {
@@ -79,7 +82,127 @@ Bind the account to a referrer **address** (not a code).
 |-------|------|-------------|
 | `referrer` | hex address | 20-byte referrer address |
 
-Settable **once** per account. A later attempt is refused with `PRECONDITION_FAILED`, whose `message` names the reason.
+Settable **once** per account. No action and no governance vote can change the
+referrer later.
+
+**Rejections**, at commit, in the order the node checks them. `code` is
+`PRECONDITION_FAILED` on every row. `message` starts with
+`invalid parameters: ` on the first two rows and with `precondition failed: `
+on the others, followed by the text below.
+
+| The call | `message` text |
+|----------|----------------|
+| `referrer` is the sender | `cannot refer self` |
+| `referrer` is the zero address | `zero referrer` |
+| The sender already has referees. **Not live yet** | `an account with referees cannot set a referrer` |
+| The sender holds a referral code. **Not live yet** | `an account with a referral code cannot set a referrer` |
+| `referrer` has a referrer of its own | `multi-level referral chains are not allowed` |
+| The sender already has a referrer | `referrer already set (immutable per §L.5.1)` |
+| Referral codes are on, and `referrer` holds no code. **Not live yet** | `referrer has no referral code` |
+
+**Why the three new rows.** Referrals are single-level. A live node refuses a
+referrer that is a referee, but it does not refuse a sender that is already a
+referrer, so the order `carol → bob`, then `bob → alice`, builds a chain. The
+next release refuses both directions. A code holder cannot bind either. If it
+did, every later bind to its code would fail as a multi-level chain. While codes are on, a bind by address
+needs a referrer that holds a code. Otherwise one trader could bind a fresh
+second address to itself and skip the 30-day volume a code costs. While codes
+are off, a bind by address works as it does on a live node.
+
+---
+
+### Register a referral code {#register_referral_code}
+
+:::caution
+**Not live yet.** Ships with the next node release. Until then, a live node
+answers `unknown variant` for `register_referral_code`, the same answer a
+made-up action gets. After the release, the node also refuses it until
+governance turns referral codes on.
+:::
+
+Register the sender's referral code. A referee then binds to the sender with
+[`set_referrer_by_code`](#set_referrer_by_code).
+
+```json
+{
+  "type": "register_referral_code",
+  "params": { "code": "alice1" }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | 3 to 16 characters, `a-z` and `0-9` only |
+
+EIP-712 type string:
+`MetaFluxTransaction:RegisterReferralCode(string metafluxChain,string code,uint64 nonce)`.
+Sign it with the master key. An agent wallet cannot register a code for its
+owner.
+
+**Rejections**, at commit, in the order the node checks them. `code` is
+`PRECONDITION_FAILED` on every row. `message` starts with
+`invalid parameters: ` on the first row and with `precondition failed: ` on the
+others, followed by the text below.
+
+| The call | `message` text |
+|----------|----------------|
+| `code` is shorter than 3, longer than 16, or holds a character outside `a-z0-9`, uppercase included | `referral code must be 3-16 characters, a-z and 0-9` |
+| Referral codes are off: `referral_code_min_volume_usd` is `0` | `referral codes are not enabled` |
+| `code` is a reserved word | `referral code is reserved` |
+| The sender already holds a code | `account already has a referral code` |
+| The sender has a referrer | `a referred account cannot hold a referral code` |
+| Another account holds `code` | `referral code is taken` |
+| The sender's pooled 30-day taker plus maker volume is below `referral_code_min_volume_usd` | `30-day volume is below the referral code minimum` |
+
+**Why each rule.** The node refuses an uppercase letter and does not fold it,
+so the signed bytes and the stored code are the same, and one code has one
+spelling. A code never changes, because a referee bound to it must keep its
+referrer. A reserved word (`mtf`, `metaflux`, `admin`, `official`, `support`,
+`team`, `help`, `referral`, `hyperliquid`, `hl`) reads as the exchange and would
+mislead a referee. A referee cannot hold a code, because referrals are
+single-level. The volume rule makes each new referrer identity trade first.
+Check it before you sign:
+[`referral_state`](../info/fees-credit.md#referral_state) `code_requirement.eligible`.
+
+---
+
+### Bind the account to a referrer by code {#set_referrer_by_code}
+
+:::caution
+**Not live yet.** Ships with the next node release. Until then, a live node
+answers `unknown variant` for `set_referrer_by_code`. Bind by address with
+[`set_referrer`](#set_referrer).
+:::
+
+Bind the sender to the account that holds a referral code. The node resolves
+the code to its owner, then applies every [`set_referrer`](#set_referrer) rule
+to that owner.
+
+```json
+{
+  "type": "set_referrer_by_code",
+  "params": { "code": "alice1" }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | The referrer's referral code, in lowercase |
+
+EIP-712 type string:
+`MetaFluxTransaction:SetReferrerByCode(string metafluxChain,string code,uint64 nonce)`.
+Sign it with the master key.
+
+**Rejections**, at commit. `code` is `PRECONDITION_FAILED`.
+
+| The call | `message` text |
+|----------|----------------|
+| No account holds `code`. The node does not fold the case, so `Alice1` does not match `alice1` | `unknown referral code` |
+| The owner fails a `set_referrer` rule | the same text as [`set_referrer`](#set_referrer) |
+
+A bind is permanent. Show the referee the owner first, with
+[`referral_code`](../info/fees-credit.md#referral_code), and bind only after the
+referee confirms it.
 
 ---
 

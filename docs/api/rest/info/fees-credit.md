@@ -1,5 +1,5 @@
 ---
-description: "The volume-tiered fee card, and the accrued referral and broker credit on one account."
+description: "The volume-tiered fee card, the referral program reads, and the accrued broker credit on one account."
 ---
 
 # Fee & credit reads
@@ -43,7 +43,11 @@ series into an empty array.
     "pooled_volume_sunset_ms":  "1757376000000",
     "pooled_volume_counts":     true,
     "burn_ratio":         "0.30",
-    "referrer_share_bps": "1.0"
+    "referrer_share_bps": "1000",
+    "referee_discount_permille":    0,
+    "referral_code_min_volume_usd": "0",
+    "referee_discount_cap_usd":     "0",
+    "referrer_reward_cap_usd":      "0"
   }
 }
 ```
@@ -57,12 +61,21 @@ series into an empty array.
 | `pooled_volume_sunset_ms` | Decimal string | The same instant in milliseconds. `"0"` = not armed yet |
 | `pooled_volume_counts` | bool | `true` while pooled volume still feeds a tier |
 | `burn_ratio` | Decimal string | Fraction of fees burned |
-| `referrer_share_bps` | Decimal string | Referrer's share of fees, in basis points |
+| `referrer_share_bps` | Decimal string | The referrer's share of the taker fee a referee paid, in basis points of that fee. `"1000"` = 10%. It is a share of the fee, not a fee rate, so it has no fractional digit |
+| `referee_discount_permille` | uint32 | NOT LIVE YET. The referee discount off the taker rate, per mille. `0` = no discount |
+| `referral_code_min_volume_usd` | Decimal string | NOT LIVE YET. The trailing 30-day volume, whole USDC, that a referral code needs. `"0"` = codes are off |
+| `referee_discount_cap_usd` | Decimal string | NOT LIVE YET. Referee taker volume since the bind, whole USDC, at which the discount stops. `"0"` = no cap |
+| `referrer_reward_cap_usd` | Decimal string | NOT LIVE YET. Referee taker volume since the bind, whole USDC, at which the referrer share stops. `"0"` = no cap |
 
 **Rules**
 
 - Fee rates are decimal basis points as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), for sub-basis-point precision.
 - `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned).
+- **The five referral fields are governed, and they serve the values in force.**
+  A live node serves `referrer_share_bps` only. The other four ship with the
+  next node release, with the defaults shown above. Those defaults change no
+  fee: governance turns the program on by vote. See
+  [the referral program](../../../concepts/fees.md#referral-parameters).
 - **There is no builder-rebate field on this read, and there is no protocol rebate to a broker.**
   A broker is paid the `builder.fee` it sets on each order, and that rate is capped by the
   ceiling the trader granted it — read the ceiling from
@@ -87,6 +100,7 @@ carries a `user` block:
       "effective_taker_bps":       "4.05",
       "effective_maker_bps":       "1.2",
       "staking_discount_permille": 100,
+      "referee_discount_permille": 0,
       "maker_rebate_bps":          "0.3",
       "vip_tier":                  0,
       "mm_tier":                   0,
@@ -114,9 +128,10 @@ carries a `user` block:
 | `user.taker_volume_30d` | Decimal string | Pooled trailing 30-day taker volume, every product together |
 | `user.maker_volume_30d` | Decimal string | Pooled trailing 30-day maker volume |
 | `user.taker_bps` / `maker_bps` | Decimal string | The PERP base rate, before the discount and the rebate |
-| `user.effective_taker_bps` | Decimal string | The PERP rate a fill charges, discount applied |
+| `user.effective_taker_bps` | Decimal string | The PERP rate a fill charges, discount applied. From the next release the discount is the larger of `staking_discount_permille` and `referee_discount_permille`, never their sum |
 | `user.effective_maker_bps` | Decimal string | The PERP rate a fill charges, rebate subtracted. Negative = a credit |
 | `user.staking_discount_permille` | uint32 | Taker-only staking discount, per mille (`100` = 10%) |
+| `user.referee_discount_permille` | uint32 | NOT LIVE YET. The referee discount this account gets now, per mille. `0` when the account has no referrer, when the program is off, or when its volume reached the discount cap |
 | `user.maker_rebate_bps` | Decimal string | The PERP maker rebate, before it is subtracted |
 | `user.vip_tier` | uint | The account's VIP-tier override index. `0` when the account holds no override, which is the common case |
 | `user.mm_tier` | uint | The account's market-maker-tier override index. `0` when the account holds no override |
@@ -182,13 +197,17 @@ a bound on work, not as an exact row count.
 
 See [fees](../../../concepts/fees.md).
 
-### Accrued referral credit for one account {#referral_state}
+### Referral state of one account {#referral_state}
 
-One account's claimable referral credit, and the referrer it is bound to.
+One account's referral state: its claimable credit, its referrer, its own
+referral code, its counters as a referee and as a referrer, and whether it can
+register a code.
 
-**The parameter is `user`, not `address`.** Most reads on this page take
-`address`. These two fee-credit reads take `user`. Sending `address` answers
-`400 INVALID_REQUEST`, with `details.field` set to `user`.
+:::caution
+**Most of this shape is not live yet.** A live node answers `user`, `address`,
+`claimable_rewards` and `referrer` only. Every other field ships with the next
+node release. See [the changelog](../../../changelog/next-release.md#referral-program).
+:::
 
 **Request**
 
@@ -198,26 +217,68 @@ One account's claimable referral credit, and the referrer it is bound to.
 
 | Arg | Type | Required | Meaning |
 |-----|------|----------|---------|
-| `user` | hex address | yes | The account to read |
+| `address` | hex address | yes | The account to read. `user` is the older name and still answers |
 
-**Response**
+**Response** — a referee, with the planned program values in force:
 
 ```json
 {
   "data": {
     "type": "referral_state",
     "user":              "0x00000000000000000000000000000000000ca11e",
-    "claimable_rewards": "12.451",
-    "referrer":          "0x00000000000000000000000000000000000000bb"
+    "address":           "0x00000000000000000000000000000000000ca11e",
+    "claimable_rewards": "0",
+    "referrer":          "0x00000000000000000000000000000000000000bb",
+    "referrer_code":     "alice1",
+    "code":              null,
+    "referee": {
+      "bound_ms":                  1759104000000,
+      "volume_since_bind":         "12500",
+      "fees_paid":                 "4.125",
+      "rewarded":                  "0.4125",
+      "discount_permille":         40,
+      "discount_volume_remaining": "24987500",
+      "share_volume_remaining":    "999987500"
+    },
+    "referrer_stats": {
+      "referee_count": 0,
+      "referred_fees": "0",
+      "rewarded":      "0",
+      "claimed":       "0"
+    },
+    "code_requirement": {
+      "enabled":        true,
+      "min_volume_30d": "10000",
+      "volume_30d":     "12500",
+      "eligible":       false
+    }
   }
 }
 ```
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `user` | hex address | The account read, echoed back |
-| `claimable_rewards` | Decimal string | USDC credit this account can claim right now |
+| `user` / `address` | hex address | The account read, under both names |
+| `claimable_rewards` | Decimal string | USDC credit this account can claim right now, as a referrer |
 | `referrer` | hex address \| null | The referrer this account is bound to. `null` = never bound |
+| `referrer_code` | string \| null | The referral code of that referrer. `null` when the account has no referrer, or when the referrer holds no code |
+| `code` | string \| null | This account's own referral code. `null` = none |
+| `referee` | object \| null | This account's counters as a referee. `null` when it has no referrer |
+| `referee.bound_ms` | uint64 | Consensus time of the bind, in ms. `0` for a bind made before the release |
+| `referee.volume_since_bind` | Decimal string | Taker volume since the bind, whole USDC. Both caps read this number |
+| `referee.fees_paid` | Decimal string | USDC taker fees paid since the bind |
+| `referee.rewarded` | Decimal string | USDC share those fees paid to the referrer |
+| `referee.discount_permille` | uint32 | The referee discount in force NOW. `0` when the program is off or the discount cap is reached |
+| `referee.discount_volume_remaining` | Decimal string \| null | Volume left before the discount stops. `null` when the discount has no cap |
+| `referee.share_volume_remaining` | Decimal string \| null | Volume left before the referrer share stops. `null` when the share has no cap |
+| `referrer_stats.referee_count` | uint | Accounts bound to this account |
+| `referrer_stats.referred_fees` | Decimal string | USDC taker fees those referees paid while bound |
+| `referrer_stats.rewarded` | Decimal string | USDC share this account earned from them |
+| `referrer_stats.claimed` | Decimal string | USDC this account claimed with `claim_referral_rewards` |
+| `code_requirement.enabled` | bool | `true` while referral codes are on |
+| `code_requirement.min_volume_30d` | Decimal string | The 30-day volume a code needs, whole USDC |
+| `code_requirement.volume_30d` | Decimal string | This account's pooled 30-day taker plus maker volume |
+| `code_requirement.eligible` | bool | `true` when a `register_referral_code` from this account would pass the volume, code and referee rules now |
 
 **Rules**
 
@@ -229,17 +290,174 @@ One account's claimable referral credit, and the referrer it is bound to.
   nothing accrued claims `0` and succeeds. Do not block the button on it.
 - **`referrer: null` means the account never bound one.** It does not mean the
   node is old and it does not mean the referrer is unknown. A referrer is bound
-  once with [`set_referrer`](../exchange/account.md#set_referrer) and is immutable after
-  that, so `null` is a durable answer until the account sends that action.
-- **This read cannot list the accounts YOU referred.** The referral graph is
-  address-based and one-directional: the chain stores each referee's referrer,
-  and no reverse map. There is no read that enumerates a referrer's referees,
-  and no referral code to enumerate them by. Track your own referees off-chain.
-- **`claimable_rewards` can under-report what a referrer earned.** A referrer
-  share on a spot BUY arrives in the base token, paid at the fill, and a base
-  amount cannot join this USDC-denominated credit. Only the USDC shares
-  accumulate here. See
-  [in-kind fees](../../../concepts/fees.md#referrer-credit).
+  once and is immutable after that, so `null` is a durable answer until the
+  account binds.
+- **A `null` in `*_volume_remaining` means no cap, not zero.** A cap of `0` is
+  the "no cap" setting, so the node serves `null` instead of a number a caller
+  could read as "used up". `"0"` means the cap is reached.
+- **`discount_permille` is the discount the next fill can get, not the
+  schedule value.** It reads `0` when the program is off or the cap is reached.
+  The rate a fill charges uses the larger of this value and the staking
+  discount. [`fee_schedule`](#fee_schedule) `user.effective_taker_bps` shows the
+  result.
+- **A bind made before the release reads `bound_ms: 0` and zero counters.** The
+  chain did not record the time or the volume before the release. The caps
+  count that referee's volume from the release on.
+- **The counters are USDC only.** A referrer share on a spot BUY arrives in the
+  base token, paid at the fill. It adds to no counter and to no
+  `claimable_rewards`. The base-token volume still counts in
+  `volume_since_bind`. See
+  [in-kind fees](../../../concepts/fees.md#spot-buy-fee-in-base).
+- **To list the accounts you referred, use
+  [`referral_referees`](#referral_referees).** This read carries the count only.
+
+### Owner of a referral code {#referral_code}
+
+**NOT LIVE YET.** Ships with the next node release. A live node answers
+`UNKNOWN_TYPE`.
+
+Resolves a referral code to the account that holds it. Use it to show a referee
+who a code binds to, before it signs
+[`set_referrer_by_code`](../exchange/account.md#set_referrer_by_code).
+
+**Request**
+
+```json
+{ "type": "referral_code", "code": "alice1" }
+```
+
+| Arg | Type | Required | Meaning |
+|-----|------|----------|---------|
+| `code` | string | yes | The referral code to resolve |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type":  "referral_code",
+    "code":  "alice1",
+    "owner": "0x00000000000000000000000000000000000000bb"
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `code` | string | The code asked for, echoed back |
+| `owner` | hex address \| null | The account that holds the code. `null` = no account holds it |
+
+**Rules**
+
+- **An unknown code is a `200` with `owner: null`, not an error.** A malformed
+  code, such as one with an uppercase letter, answers the same way: no account
+  can hold it. A request with no `code` field answers `400` `INVALID_REQUEST`.
+- **The node does not fold the case.** `Alice1` is not `alice1`. Send the code
+  in lowercase.
+- **An owner never changes.** A code is immutable, so you can cache a non-null
+  answer.
+
+### Accounts one referrer referred {#referral_referees}
+
+**NOT LIVE YET.** Ships with the next node release. A live node answers
+`UNKNOWN_TYPE`.
+
+The accounts bound to one referrer, with each one's counters since the bind.
+
+**Request**
+
+```json
+{ "type": "referral_referees", "address": "0x<addr>", "limit": 100 }
+```
+
+| Arg | Type | Required | Meaning |
+|-----|------|----------|---------|
+| `address` | hex address | yes | The referrer. `user` also answers |
+| `limit` | uint | no | Rows returned. Default `100`, clamped to at most `500` |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type":    "referral_referees",
+    "address": "0x00000000000000000000000000000000000000bb",
+    "referees": [
+      { "user": "0x00000000000000000000000000000000000ca11e", "bound_ms": 1759104000000,
+        "volume_since_bind": "12500", "fees_paid": "4.125", "rewarded": "0.4125" },
+      { "user": "0x0000000000000000000000000000000000000c01", "bound_ms": 0,
+        "volume_since_bind": "0", "fees_paid": "0", "rewarded": "0" }
+    ]
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `referees[*].user` | hex address | A referee of this referrer |
+| `referees[*].bound_ms` | uint64 | Consensus time of the bind, in ms. `0` for a bind made before the release |
+| `referees[*].volume_since_bind` | Decimal string | The referee's taker volume since the bind, whole USDC |
+| `referees[*].fees_paid` | Decimal string | USDC taker fees the referee paid since the bind |
+| `referees[*].rewarded` | Decimal string | USDC share those fees paid to this referrer |
+
+**Rules**
+
+- **Rows sort by `rewarded`, largest first, then by `user` ascending.** The
+  order is total, so two calls on the same block answer the same rows.
+- **There is no cursor.** A referrer with more referees than `limit` sees the
+  `limit` referees that paid it the most. `referral_state`
+  `referrer_stats.referee_count` gives the full count.
+- **An address with no referees answers `referees: []`**, not an error.
+
+### Referral leaderboard {#referral_leaderboard}
+
+**NOT LIVE YET.** Ships with the next node release. A live node answers
+`UNKNOWN_TYPE`.
+
+Referrers ranked by the share they earned, over all time.
+
+**Request**
+
+```json
+{ "type": "referral_leaderboard", "limit": 50 }
+```
+
+| Arg | Type | Required | Meaning |
+|-----|------|----------|---------|
+| `limit` | uint | no | Rows returned. Default `50`, clamped to at most `200` |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "referral_leaderboard",
+    "rows": [
+      { "address": "0x00000000000000000000000000000000000000bb", "code": "alice1",
+        "referee_count": 12, "referred_fees": "8210.5", "rewarded": "821.05", "claimed": "800" }
+    ]
+  }
+}
+```
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `rows[*].address` | hex address | The referrer |
+| `rows[*].code` | string \| null | Its referral code. `null` for a referrer bound by address only |
+| `rows[*].referee_count` | uint | Accounts bound to it |
+| `rows[*].referred_fees` | Decimal string | USDC taker fees its referees paid while bound |
+| `rows[*].rewarded` | Decimal string | USDC share it earned |
+| `rows[*].claimed` | Decimal string | USDC it claimed |
+
+**Rules**
+
+- **Rows sort by `rewarded`, largest first, then `referee_count`, largest
+  first, then `address` ascending.** The order is total.
+- **Every referrer appears, with or without a code.** A referrer that earned
+  nothing yet appears with zeros, below every referrer that earned a share.
+- **The totals are all-time and USDC only.** A share paid in kind on a spot BUY
+  is not in `rewarded`. The counters start at the release, so a share earned
+  before it is not in `rewarded` either.
 
 ### Accrued broker credit for one account {#broker_state}
 

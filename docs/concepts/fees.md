@@ -12,8 +12,8 @@ parameters and can be updated by governance.
 ## TL;DR {#tldr}
 
 Every fill charges a maker and a taker fee, set by the [Fee schedule](./fee-schedule.md).
-A broker credit adds a charge for the order-flow originator, and a referrer
-credit routes a share of the taker fee to a referrer. After maker rebates are
+A broker credit adds a charge for the order-flow originator, and the
+[referral program](#referrer-credit) routes a share of the taker fee to a referrer. After maker rebates are
 paid, the protocol splits the remaining fee revenue **~70% buyback / ~20%
 validators / ~10% treasury**. The buyback share buys MTF on the open market and
 locks it forever in a keyless protocol address — permanently removing it from
@@ -76,7 +76,10 @@ effective_maker_rate = maker_base_rate − maker_rebate_rate
 
 `staking_discount` comes from how much MTF you stake or delegate, against the
 staking discount tiers on the [Fee schedule](./fee-schedule.md) — taker-only, and
-it can only shrink the rate, never flip it negative.
+it can only shrink the rate, never flip it negative. From the next release, an
+account bound to a referrer uses the larger of this discount and the
+[referee discount](#referral-share-and-discount), never their sum. This is not
+live yet.
 
 `maker_rebate_rate` comes from your **share of the exchange's total 30-day maker
 volume** — your maker volume divided by every maker's maker volume, summed —
@@ -199,7 +202,7 @@ maker_fee = trunc(6700 × 0.00010) = 0.67  USDC   (paid by the maker)
 Both are charged in full; the maker's `fee` on `userFills` reads a positive
 `"0.67"`.
 
-**Add a referrer.** The taker has a referrer on file:
+**Add a referrer.** The taker has a referrer on file, at the default 10% share:
 
 ```text
 referrer_share = trunc(taker_fee × 10%) = trunc(2.345 × 0.10) = 0.2345 USDC
@@ -240,7 +243,7 @@ treasury  = pooled − buyback − validator = 0.19095 USDC
 See [Where fees go](#where-fees-go) for what each share does next. A maker fee
 that is **paid, not credited**, skips the referrer step entirely and joins this
 same 70/20/10 split at its full amount — see
-[Referrer credit](#referrer-credit): the maker fee carries no referrer carve.
+[Referral program](#referrer-credit): the maker fee carries no referrer share.
 
 ## Broker credit {#broker-credit}
 
@@ -267,28 +270,167 @@ ceiling the trader's own `approve_broker_fee` set for that broker. The charge is
 exact amount credited to the broker's address, so the debit and the credit never
 drift apart.
 
-## Referrer credit {#referrer-credit}
+## Referral program {#referrer-credit}
 
-When an account has a referrer set, a share of its **taker fee** is routed to the
-referrer **before** the rest is distributed — it comes out of the protocol's take,
-not as an extra charge to the taker. The maker fee carries no referrer credit.
+:::caution
+**Most of this section is not live yet.** Referral codes, the referee discount,
+the caps, the governed referrer share, the liquidation rule and the two new
+`set_referrer` rejections ship with the next node release. See
+[the changelog](../changelog/next-release.md#referral-program). A live node
+pays a fixed 10% share, binds by address only, and has no code, no discount and
+no cap.
+:::
+
+A referrer brings a trader to the exchange. The trader is the **referee**. When
+the referee pays a taker fee, the referrer gets a **share** of that fee, and the
+referee can get a **discount** on its taker rate. Both stop at a **cap** on the
+referee's volume.
+
+### Referral codes {#referral-codes}
+
+A **referral code** is a short name for a referrer address. A referee binds with
+the code, so a referrer can hand out a name instead of an address. Register one
+with [`register_referral_code`](../api/rest/exchange/account.md#register_referral_code).
+
+- **Format: 3 to 16 characters, `a-z` and `0-9` only.** The node refuses an
+  uppercase letter. It does not fold the case. So the signed payload and the
+  stored code are the same bytes, and one code has one spelling.
+- **One code per account, and the code never changes.** A referee who bound to
+  a code must keep the same referrer. A code that could move would move the
+  referee with it.
+- **Reserved words are refused:** `mtf`, `metaflux`, `admin`, `official`,
+  `support`, `team`, `help`, `referral`, `hyperliquid` and `hl`. A code that
+  reads as the exchange would mislead a referee about who it binds to.
+- **A referee cannot hold a code.** Referrals are single-level. A code on a
+  referee would build a chain of two levels.
+- **A code needs trailing 30-day volume.** The account's pooled 30-day taker
+  volume plus its pooled 30-day maker volume must reach the governed
+  minimum. Each new referrer identity must trade first, so a farm of fresh
+  addresses cannot mint codes for free. The chain keeps a 30-day counter and no
+  lifetime counter, so the rule reads the 30-day counter.
+- **A minimum of `0` turns codes off.** Then the node refuses every
+  registration, and `set_referrer` by address works as it does on a live node.
+
+### Bind to a referrer {#referral-binding}
+
+A referee binds once, with
+[`set_referrer_by_code`](../api/rest/exchange/account.md#set_referrer_by_code) or with
+[`set_referrer`](../api/rest/exchange/account.md#set_referrer) and an address.
+
+- **The binding is permanent.** No action and no governance vote can change or
+  remove a referrer. A referrer that could change would let a trader sell its
+  flow to the highest bidder after the first referrer did the work.
+- **Referrals are single-level, in both directions.** A referee cannot bind to
+  an account that has its own referrer. From the next release, an account that
+  already has referees also cannot bind, and neither can an account that holds
+  a code. A live node checks only the first direction, so the order
+  `carol → bob`, then `bob → alice`, builds a chain.
+- **While codes are on, an address bind needs a code holder.** `set_referrer`
+  refuses a referrer that holds no code. Without this rule, one trader could
+  bind a fresh second address to itself and take the share on its own fees,
+  without the 30-day volume a code costs.
+- **You can bind after your first trade.** Nothing is retroactive. The share,
+  the discount and the counters start at the bind.
+
+### The share and the discount {#referral-share-and-discount}
+
+On each taker fill of a bound referee:
 
 ```text
-referrer_share = taker_fee × 10%     # truncated toward zero, 1e-6 USDC
+discount_permille = max(staking_discount_permille, referee_discount_permille)
+taker_rate        = trunc_0.1bps(taker_base_rate × (1 − discount_permille / 1000))
+fee_paid          = trunc_1e-6(notional × taker_rate)
+referrer_share    = trunc_1e-6(fee_paid × referrer_share_bps / 10000)
 ```
 
-That share is a fixed 10% of the **collected fee**, not of the notional, and it
-is deducted before the remainder splits 70/20/10 (see
-[Where fees go](#where-fees-go)). A **maker** fee skips this step outright and
-joins the split at its full amount — the maker side never carries a referrer
-carve, positive or negative.
+- **The share is a governed part of the fee the referee actually PAID.** It is
+  measured after the discount. The default is `1000` bps, which is 10%, the
+  same share a live node pays. The share leaves the protocol's part of the
+  fee, before the maker rebate and the 70/20/10 split. It is not an extra
+  charge to the referee.
+- **The discount is governed, taker-only, and it is the larger of two
+  discounts, never their sum.** The referee discount and the
+  [staking discount](./fee-schedule.md) compete, and the larger one applies. A
+  sum would let two ladders stack past the bound each one was set to. It
+  applies on perp and spot taker fills, where the staking discount applies.
+- **The rate truncates to a whole 0.1 basis point.** So the real discount can
+  be a little larger than the permille. At the base taker rate of 0.035%, a
+  40‰ discount gives 0.033%, not 0.0336%.
+- **A maker fee carries nothing.** The maker side has no share and no
+  discount.
+- **A liquidation fill carries no share and no discount.** The liquidation
+  engine placed that order, not the referee, so the referrer brought no flow
+  to it. The staking discount still applies. A live node pays the share on a
+  liquidation fill.
+- **A spot BUY that pays its fee in the base token pays the share in kind.**
+  See [spot fees](#spot-fees) below. That share never enters the claimable USDC
+  credit.
 
-Referrals are single-level (no multi-level chain — anti-Ponzi). A referrer is set
-once with [`set_referrer`](../api/rest/exchange/account.md#set_referrer) and is immutable
-thereafter; setting yourself as your own referrer is rejected.
+The share accrues as USDC credit on the referrer's address. Read it with
+[`referral_state`](../api/rest/info/fees-credit.md#referral_state) and claim it with
+[`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards). The
+claim moves it into the referrer's cross-collateral.
 
-A broker credit and a referrer credit can both apply to the same fill — they pay
-out independently.
+### Caps {#referral-caps}
+
+Two governed caps stop the program for one referee:
+
+| Cap | Stops | When |
+|---|---|---|
+| `referee_discount_cap_usd` | the referee discount | the referee's taker volume since the bind reaches the cap |
+| `referrer_reward_cap_usd` | the referrer share on that referee's fees | the same volume reaches this cap |
+
+- **`0` means no cap.** The default of every cap is `0`, so the release alone
+  stops no share that a live node pays.
+- **The fill that crosses a cap still counts.** The node compares the volume
+  from BEFORE the fill. The next fill gets nothing.
+- **Only a taker fill adds volume.** A maker fill and a liquidation fill add
+  none, because they carry no share and no discount.
+- **An option fill adds no volume.** It pays the share on its fee and gets no
+  referee discount. Its fee is priced on the strike face, not on a traded
+  notional, so it does not move a cap.
+- **A binding made before the release starts its volume at `0`.** The chain did
+  not count that volume before, so it cannot charge it against a cap.
+
+### Governed parameters {#referral-parameters}
+
+Validators change each value with a `vote_global` of the kind below. The node
+checks the bounds at the vote.
+
+| Kind | `kind_name` | Sets | Bounds | Default at the release |
+|---|---|---|---|---|
+| 131 | `set_referrer_share_bps` | the referrer share, bps of the fee paid | `0` to `10000` | `1000` (10%) |
+| 132 | `set_referee_discount_permille` | the referee discount, permille off the taker rate | `0` to `1000` | `0` |
+| 133 | `set_referral_code_min_volume_usd` | the 30-day volume a code needs, whole USDC. `0` = codes off | integer, `0` to 10^12 | `0` |
+| 134 | `set_referee_discount_cap_usd` | the discount cap, whole USDC of referee volume. `0` = no cap | integer, `0` to 10^15 | `0` |
+| 135 | `set_referrer_reward_cap_usd` | the share cap, whole USDC of referee volume. `0` = no cap | integer, `0` to 10^15 | `0` |
+
+**The release changes no fee.** Every default reproduces what a live node does.
+Governance turns the program on with votes. The planned values are a 10% share,
+a 40‰ (4%) discount, a 10,000 USDC code minimum, a 25,000,000 USDC discount cap
+and a 1,000,000,000 USDC share cap. They are planned, not live.
+[`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) serves the values in
+force.
+
+### What a self-referral can earn {#referral-self-referral-bound}
+
+A trader can bind a second address to its own code. That pair gets back, as a
+fraction of a fee the undiscounted rate would charge, at most:
+
+```text
+discount + share × (1 − discount)
+```
+
+`discount` is the real discount after the rate truncation. With the planned
+values at the base taker rate, the rate falls from 0.035% to 0.033%, so the
+discount is 2/35, about 5.7%. The pair gets back about
+`0.057 + 0.10 × 0.943 ≈ 15.1%`. That is never more than the fee, so a
+self-referral is a discount the pair paid volume to earn, not a way to take
+funds. The code minimum makes each referrer identity trade first, and the caps
+bound what one referee can collect.
+
+**A broker credit and a referrer credit can both apply to the same fill.** They
+pay out independently.
 
 **Where to read each balance.** They are two separate accumulators with two
 separate claims. Read the referrer balance with
@@ -480,7 +622,7 @@ quantizing here would zero the fee on a small lot and reopen the hole this rule
 closes (see consequence 3 below). For a taker buying `1.0` BTC at the `0.035%`
 base rate: `base_fee = 1.0 × 0.00035 = 0.00035` BTC exactly, `net_credit =
 0.99965` BTC — the numbers in consequence 1 below. The referrer share and maker
-rebate carve out of this same `base_fee`, in kind, by the same 10% and rebate-tier
+rebate carve out of this same `base_fee`, in kind, by the same referrer-share and rebate-tier
 rules as [above](#resolving-your-rate) — see consequence 2.
 
 Four consequences a caller must handle:
@@ -526,6 +668,10 @@ treasury to keep insurance solvent and compensate makers who absorb forced flow 
 is a design intent. The protocol charges no such fee: a liquidated account pays
 the loss settled on close and nothing beyond it. See
 [tiered liquidation](./tiered-liquidation.md) for the close mechanics.
+
+From the next release, a liquidation fill pays no referrer share and gets no
+referee discount. See [the referral program](#referral-share-and-discount). This
+is not live yet.
 
 ## Core to EVM transfer fee {#core-evm-transfer-fee}
 

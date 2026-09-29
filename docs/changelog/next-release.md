@@ -1,11 +1,11 @@
 ---
-description: "Ten changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, the reads after the fill-tape retirement, and the removal of user_ledger_updates. Also one wire row that is not verified on the running chain, and five corrections to this reference."
+description: "Eleven changes that wait for the next node or gateway release: order_status answers for a batch_cancel leg, contractAddress on a deployment receipt, mtfStatus for two transactions at one nonce, an open-interest cap on every native perp market, a deployer-set cap on a deployer market, a deficit charged to the markets that produced it, a bridge re-issue lane with spot tokens as portfolio-margin collateral, a node_gov label for every governance round, the reads after the fill-tape retirement, the removal of user_ledger_updates, and referral codes with a referee discount and caps. Also one wire row that is not verified on the running chain, and five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
 
 :::caution
-**Ten sections wait for the next node release, and two of them also wait for
+**Eleven sections wait for the next node release, and two of them also wait for
 the next gateway release:**
 [`order_status` for a `batch_cancel` leg](#batch-cancel-status),
 [`contractAddress` on a deployment receipt](#contract-address),
@@ -15,8 +15,9 @@ the next gateway release:**
 [a deficit is charged to the market that produced it](#deficit-attribution),
 [a bridge re-issue lane and spot tokens as portfolio-margin collateral](#reissue-and-pm-collateral),
 [a `node_gov` label for every governance round](#node_gov-labels),
-[the reads after the fill-tape retirement](#tape-retirement-reads) and
-[the removal of `user_ledger_updates`](#user-ledger-updates-removed). The action byte
+[the reads after the fill-tape retirement](#tape-retirement-reads),
+[the removal of `user_ledger_updates`](#user-ledger-updates-removed) and
+[referral codes, a referee discount and caps](#referral-program). The action byte
 cap and the per-leg `batch_cancel` reply went live at
 [block 17,113,494](./block-17113494.md).
 
@@ -315,6 +316,56 @@ those records. One question, one read.
 - For live balance movement, keep the
   [`ledger_updates` WS channel](../api/ws/subscriptions.md#ledger_updates). It
   does not change.
+
+## Referral codes, a referee discount and caps {#referral-program}
+
+**NOT LIVE YET.** This change ships with the next node release.
+
+**The release changes no fee.** Each new parameter starts at a value that
+reproduces a live node: a 10% share, no discount, codes off, no cap.
+Governance turns the program on with votes. Two rules change at the release
+itself, with no vote: a liquidation fill pays no referrer share, and an account
+that already has referees cannot bind to a referrer.
+
+| Surface | A live node | From the next release |
+|---|---|---|
+| [`register_referral_code`](../api/rest/exchange/account.md#register_referral_code) | `unknown variant` | accepted while codes are on. Refused with `referral codes are not enabled` while they are off |
+| [`set_referrer_by_code`](../api/rest/exchange/account.md#set_referrer_by_code) | `unknown variant` | binds the sender to the account that holds the code |
+| [`set_referrer`](../api/rest/exchange/account.md#set_referrer) from an account that has referees | accepted | refused: `an account with referees cannot set a referrer` |
+| `set_referrer` or `set_referrer_by_code` from an account that holds a referral code | — | refused: `an account with a referral code cannot set a referrer` |
+| `set_referrer` to an address with no referral code, while codes are on | — | refused: `referrer has no referral code` |
+| The referrer share | a fixed 10% of the taker fee | `referrer_share_bps` of the taker fee actually paid. Default `1000`, which is 10% |
+| The referee discount | none | `referee_discount_permille` off the taker rate. The larger of it and the staking discount applies, never their sum. Default `0` |
+| The share and the discount after the caps | — | each stops when the referee's taker volume since the bind reaches its cap. Default `0`, which is no cap |
+| A liquidation fill of a referee | pays the referrer share | pays no share and gets no referee discount |
+| [`vote_global`](../concepts/fees.md#referral-parameters) kinds 131 to 135 | unknown kind | `set_referrer_share_bps`, `set_referee_discount_permille`, `set_referral_code_min_volume_usd`, `set_referee_discount_cap_usd`, `set_referrer_reward_cap_usd` |
+| [`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) | `referrer_share_bps` only | also `referee_discount_permille`, `referral_code_min_volume_usd`, `referee_discount_cap_usd`, `referrer_reward_cap_usd`, and `user.referee_discount_permille` |
+| [`referral_state`](../api/rest/info/fees-credit.md#referral_state) | `user`, `address`, `claimable_rewards`, `referrer` | also `referrer_code`, `code`, `referee`, `referrer_stats`, `code_requirement` |
+| [`referral_code`](../api/rest/info/fees-credit.md#referral_code), [`referral_referees`](../api/rest/info/fees-credit.md#referral_referees), [`referral_leaderboard`](../api/rest/info/fees-credit.md#referral_leaderboard) | `UNKNOWN_TYPE` | new reads |
+| [`node_actions`](../nodes/data-streams.md#node_actions-types) `action_type` | — | can be `RegisterReferralCode` or `SetReferrerByCode` |
+
+**Why.** A referrer can now hand out a short code instead of an address, and a
+referee can see its discount, its counters and its caps. Governance can set the
+share, the discount and the caps, so the program changes without a release. The
+code minimum makes each referrer identity trade before it earns, and while
+codes are on, a bind by address needs a code holder, so a trader cannot bind a
+fresh address to itself for free. Referrals are single-level: a live node
+checks only one direction, and the release checks both. A liquidation fill is
+not flow the referrer brought, so it pays no share. See
+[the referral program](../concepts/fees.md#referrer-credit).
+
+**What to do.**
+
+- Nothing, until governance votes. The planned values are a 10% share, a 40‰
+  (4%) discount, a 10,000 USDC code minimum, a 25,000,000 USDC discount cap and
+  a 1,000,000,000 USDC share cap. They are planned, not live. Read the values
+  in force from `fee_schedule`.
+- Send a referral code in lowercase. The node refuses an uppercase letter and
+  does not fold it.
+- A binding made before the release keeps its referrer. It reads `bound_ms: 0`
+  and zero counters, and its caps count from the release.
+- `referral_referees` lists every referee, a referee bound before the release
+  included. Its counters start at the release.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

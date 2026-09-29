@@ -206,6 +206,8 @@ Notes on specific fields:
 |---------------|--------------|
 | `approve_agent` | `MetaFluxTransaction:ApproveAgent(string metafluxChain,address agentAddress,string agentName,uint64 expiresAtMs,uint64 nonce)` |
 | `set_referrer` | `MetaFluxTransaction:SetReferrer(string metafluxChain,address referrer,uint64 nonce)` |
+| `set_referrer_by_code` | `MetaFluxTransaction:SetReferrerByCode(string metafluxChain,string code,uint64 nonce)` |
+| `register_referral_code` | `MetaFluxTransaction:RegisterReferralCode(string metafluxChain,string code,uint64 nonce)` |
 | `approve_broker_fee` | `MetaFluxTransaction:ApproveBuilderFee(string metafluxChain,address builder,uint16 maxFeeBps,uint64 nonce)` |
 | `set_display_name` | `MetaFluxTransaction:SetDisplayName(string metafluxChain,string displayName,uint64 nonce)` |
 | `set_position_mode` | `MetaFluxTransaction:SetPositionMode(string metafluxChain,bool hedge,uint64 nonce)` |
@@ -252,6 +254,9 @@ Notes on specific fields:
   `VaultModify`, and a signature made with that older string is refused since
   [block 11,550,001](../changelog/block-11550001.md#vault_modify). See
   [the action](../api/rest/exchange/vaults.md#vault_modify).
+- `set_referrer_by_code` and `register_referral_code`: not live yet, they ship
+  with the next node release. `code` signs as the exact lowercase string the
+  payload carries. The node does not fold the case, so sign the bytes you send.
 - `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the
   envelope nonce are the only signed fields, because neither action carries
   params. Both drain the WHOLE accrued credit and neither reports the amount, so

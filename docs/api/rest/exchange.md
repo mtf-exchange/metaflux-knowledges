@@ -435,6 +435,8 @@ refuse every other market. See [options](../../products/options.md).
 | [`approve_agent`](./exchange/account.md#approve_agent) | Approve an agent wallet | master only |
 | [`set_display_name`](./exchange/account.md#set_display_name) | Set the account handle | master only |
 | [`set_referrer`](./exchange/account.md#set_referrer) | Bind to a referrer address | master only |
+| [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) | Bind to the referrer that holds a referral code. Not live yet | master only |
+| [`register_referral_code`](./exchange/account.md#register_referral_code) | Register the sender's referral code. Not live yet | master only |
 | [`approve_broker_fee`](./exchange/account.md#approve_builder_fee) | Approve a broker fee ceiling | master only |
 | [`claim_referral_rewards`](./exchange/account.md#claim_referral_rewards) | Claim accrued referral credit | master only |
 | [`claim_broker_rewards`](./exchange/account.md#claim_builder_rewards) | Claim accrued broker-code credit | master only |
@@ -530,7 +532,7 @@ never execute here.
 |-----------|----------------------------|-----------------|
 | `UpdateMarginMode` | — | No native action; isolation is the `is_isolated` flag on `update_leverage` |
 | `MultiSig` | [`multi_sig`](./exchange/account.md#multi_sig) | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts. It verifies the roster signatures and runs the inner action. (A non-wrapped action from a multi-sig account is still rejected.) |
-| `RegisterReferrer` | — | Not bridged (referrer is bound by address via `set_referrer`) |
+| `RegisterReferrer` | [`register_referral_code`](./exchange/account.md#register_referral_code) | **Bridged from the next release** (not live yet). A referee binds to the code with [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) |
 | (legacy CCTP withdraw) | [`withdraw`](./exchange/transfers.md#withdraw) | **Retired** — admitted, then rejected at every commit since genesis (`"withdraw3 disabled; use bridge_withdraw"`). Use [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) |
