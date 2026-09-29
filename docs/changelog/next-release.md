@@ -189,6 +189,7 @@ another market. See
 | [`bridge_withdrawal_history`](../api/rest/info/bridge.md#bridge_withdrawal_history) after a void | — | the entry finishes with `status: "voided"` and `open: false` |
 | [`node_bridge_outbox`](../nodes/data-streams.md#node_bridge_outbox-event) `removed` record after a void | — | `status: "voided"` |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on a void vote | — | `bridge_void` |
+| A queued withdrawal while withdrawals are halted | validators keep signing it | validators sign nothing until the halt lifts; it stays [`awaiting_cosignatures`](../api/rest/info/bridge.md#awaiting_cosignatures) |
 | [`node_gov`](../nodes/data-streams.md#node_gov) `category` on an `ArmFeatures` or SPAN shock-grid vote | `circle_promotion_attest` | `arm_features` or `pm_shock_grid` |
 | [`node_gov`](../nodes/data-streams.md#node_gov-categories) `category` on a collateral weight or price-perpetual vote | — | `pm_collateral`, not `dynamic_risk`. `coin` is empty: `asset` is a spot token id |
 | A `SetDynamicRiskParam` vote that sets a collateral field AND a market setting | — | refused. A collateral vote carries only collateral fields |

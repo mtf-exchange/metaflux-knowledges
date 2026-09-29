@@ -954,7 +954,7 @@ The entry is released and leaves the outbox:
 | `block_time` | uint64 | Consensus block timestamp, ms |
 | `events` | array | Outbox records for this block. Can be empty |
 | `configs` | array \| absent | The **full** current per-chain deployment set. Present only on a block where it differs from the last envelope |
-| `withdrawals_halted` | bool \| absent | Chain-wide refusal of new withdrawals. Present on exactly the blocks `configs` is |
+| `withdrawals_halted` | bool \| absent | Chain-wide refusal of new withdrawals. From the next node release, validators also stop signing queued withdrawals while it is `true`. Present on exactly the blocks `configs` is |
 
 :::warning
 **`configs` and `withdrawals_halted` mean "replace the stored set", not "a

@@ -65,6 +65,11 @@ Only partial-signature progress resets; the withdrawal itself is not at risk.
 
 `pending_cosigner_count` reports how many validators have signed so far.
 
+While withdrawals are halted, validators sign nothing, so a queued withdrawal
+stays here until the halt lifts. Not live yet: this ships with the next node
+release. The halt exists so that governance can still [void](#voided) a
+withdrawal before any signature exists.
+
 ### `ready_to_release`
 
 A releasable two-thirds multisig exists under the current deployment. The relay
