@@ -52,9 +52,11 @@ The trader signs one action:
 }
 ```
 
-`max_bps` is whole basis points. Approving `0` is meaningful: it makes you a
-recognized broker who charges nothing, which is different from not being approved
-at all.
+`max_bps` is whole basis points. **`max_bps: 0` revokes the approval.** The
+chain removes the row, so it is the same as never approving that broker. After a
+revoke, the chain rejects every order from that trader that names the broker,
+a `fee` of `0` included. To keep a broker that charges nothing, approve it at
+`1` or more and send its orders with `fee: 0`.
 
 Read a trader's approvals with the `approved_brokers` query.
 
