@@ -17,9 +17,9 @@ shapes now; probe one call on your target network before you depend on it.
 
 [`perp_set_oracle`](#perp_set_oracle) is RETIRED: the node refuses it.
 [`perp_set_sub_deployer_perms`](#perp_set_sub_deployers) has **shipped** — the
-node accepts it now. [`perp_set_oi_cap`](#perp_set_oi_cap) is **not live yet**:
-it ships with the node release after 2026-10-01. Every other wire shape and
-signing type on this page is unchanged.
+node accepts it now. [`perp_set_oi_cap`](#perp_set_oi_cap) has **shipped** too,
+since [block 25,599,540](../../../changelog/block-25599540.md#perp-set-oi-cap).
+Every other wire shape and signing type on this page is unchanged.
 :::
 
 Permissionless perp market deployment, plus the deployer price push the deployed
@@ -142,12 +142,6 @@ them is off by ten. Every fee is bounded by the governance ceilings
 | `min_order_size` | uint64 | `> 0` | Minimum size, in the market's size plane |
 
 ### Set the open-interest cap {#perp_set_oi_cap}
-
-:::caution
-**Not live yet.** Ships with the node release after 2026-10-01. Until then, the
-live node answers `unknown variant` for `perp_set_oi_cap`, the same answer a
-made-up action gets. Build against this shape now. Send it after the release.
-:::
 
 You set the open-interest cap of your market. It is the cap the chain enforces
 on a deployer market. The
@@ -290,7 +284,7 @@ so a delegate holding every bit still cannot grant or edit a delegation.
 | 6 | 64 | `perp_deactivate_market` |
 | 7 | 128 | `perp_set_fba_mode` |
 | 8 | 256 | [`perp_register_asset`](#perp_register_asset) into this dex |
-| 9 | 512 | [`perp_set_oi_cap`](#perp_set_oi_cap). **Not live yet:** a live node refuses bit 9 until the release after 2026-10-01 |
+| 9 | 512 | [`perp_set_oi_cap`](#perp_set_oi_cap) |
 
 `33` is bit 0 plus bit 5: push the price and activate the market, nothing else.
 
@@ -320,7 +314,7 @@ bit 8 on at least one market of that dex. Three consequences:
 | The call | Result |
 |----------|--------|
 | Either lane sent by a sub-deployer | **Rejected**, `AUTH_UNAUTHORIZED`. Delegating needs the deployer's own authority, whatever bits the delegate holds. There is no bit for it, and there will not be one |
-| `permissions` with any bit above bit 9 set | **Rejected**, `InvalidParams`. Bits 10-15 are reserved for handlers added later. **Not live yet:** until the release after 2026-10-01, bit 9 is refused too |
+| `permissions` with any bit above bit 9 set | **Rejected**, `InvalidParams`. Bits 10-15 are reserved for handlers added later. |
 | `permissions: 0` | **Accepted.** It revokes. The address is removed, not stored with an empty mask |
 | A handler called by a delegate that lacks that handler's bit | **Rejected**, `AUTH_UNAUTHORIZED` |
 | A second grant to the same address | **Accepted.** It replaces the mask |

@@ -71,7 +71,7 @@ full market lifecycle:
 | `perp_set_fee_tier` | Set the maker / taker fee tier |
 | `perp_set_maker_rebate` | Set the maker rebate (≤ 2 bps) |
 | `perp_set_min_size` | Set the market's minimum order size |
-| `perp_set_oi_cap` | Set the market's open-interest cap, in whole units. `0` removes it. **Not live yet:** ships with the node release after 2026-10-01 |
+| `perp_set_oi_cap` | Set the market's open-interest cap, in whole units. `0` removes it. |
 | `perp_activate_market` | Activate the market. Requires full config |
 | `perp_deactivate_market` | Close to new orders. Existing positions remain |
 | `perp_set_fba_mode` | Set the matching venue: `0` returns the market to the CLOB, `100`-`5000` runs a frequent batch auction with that period in ms |
@@ -83,8 +83,7 @@ full market lifecycle:
 **Eleven, not ten, nine or eight.** Older copies of this page listed eight and
 omitted `perp_set_sub_deployers`; a later copy listed nine and omitted
 `perp_set_fba_mode`. The table lists twelve tags, of which `perp_set_oracle` is
-refused. Eleven are callable once `perp_set_oi_cap` ships with the node release
-after 2026-10-01. Until then, ten are callable.
+refused. Eleven are callable.
 :::
 
 ## Delegation is per handler {#delegation}
@@ -247,7 +246,7 @@ can move any of them, so confirm the current value through
 | `max_leverage` | Highest leverage a deployed market may set. Protocol cap is 50 |
 | `max_taker_fee_dbps` | Highest taker fee, in **deci-bps**. Default `500`, i.e. 50 bps |
 | `mip3_fee_ceiling_bps` | Governance fee ceiling, in **bps** |
-| `max_oi` | The open-interest cap a deployer market starts at when it activates with no cap, in **whole units** of the base asset. The deployer then changes it with [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap): higher, lower, or `0` for no cap. **Not live yet:** until the release after 2026-10-01 there is no such action, and `max_oi` is the cap every deployer market carries |
+| `max_oi` | The open-interest cap a deployer market starts at when it activates with no cap, in **whole units** of the base asset. The deployer then changes it with [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap): higher, lower, or `0` for no cap |
 | `max_oi_per_second` | Highest open-interest increase admitted per one-second window, in **whole units** of the base asset |
 | `mip3_max_deploys_per_epoch` | New registrations allowed per **deploy epoch** — a fixed window of 100,000 committed rounds, about 3 hours at the current cadence. Not the staking epoch. `0` means uncapped |
 
@@ -321,7 +320,7 @@ builder-fee rebates, or with a user-created vault on the same market.
 
 **The protocol's [Metaliquidity vault](./mip-2.md#scope) does not quote a
 deployer market.** It trades core markets only, so do not plan your depth
-around it. From the node release after 2026-10-01, the chain also refuses a
+around it. The chain also refuses a
 vault order that opens or extends a position on a deployer market.
 
 ## MIP-4 {#mip-4}

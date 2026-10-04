@@ -406,11 +406,7 @@ its `type` reads the same `0x0` a genuine legacy transaction also reports.
 
 #### `contractAddress` on a deployment receipt {#contract-address}
 
-**Not live yet.** This ships with the next node release. Until then a live
-node answers `null` for `contractAddress` on every receipt, deployment
-included.
-
-From the next release, the node fills the field in for a successful
+The node fills the field in for a successful
 deployment only:
 
 | Receipt | `contractAddress` |
@@ -419,7 +415,7 @@ deployment only:
 | A deployment with `status` `0x0` | `null` |
 | A call (`to` is set) | `null` |
 | A system-lane call | `null` |
-| Any receipt the node stored before the release | `null` |
+| Any receipt the node stored before block 25,599,540 | `null` |
 
 **Why a failed deployment reads `null`.** A failed deployment creates no
 contract. So on MTF a non-null `contractAddress` always means the deployment
@@ -427,8 +423,8 @@ succeeded. Some Ethereum clients fill the field for a failed deployment too. Do
 not expect that here.
 
 **Why an old receipt stays `null`.** The node writes the field when it stores
-the receipt. **There is no backfill**, so a receipt stored before the release
-keeps `null` permanently. For such a receipt, compute the address locally from
+the receipt. **There is no backfill**, so a receipt stored before block
+25,599,540 keeps `null` permanently. For such a receipt, compute the address locally from
 the sender and the nonce. ethers v6 and viem both do this without an RPC call.
 The result is the same address the node reports for a new receipt.
 

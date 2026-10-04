@@ -108,7 +108,7 @@ Response (truncated to one entry per list):
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `time` | uint64 | The block time of the read (consensus ms). The gateway anchors its 24-hour window on it. **Not live yet:** the field ships with the next node release |
+| `time` | uint64 | The block time of the read (consensus ms). The gateway anchors its 24-hour window on it |
 | `perp[*].coin` | string | Market symbol, e.g. `"BTC"` (the join key) |
 | `perp[*].kind` | `"perp"` | Market kind (lowercase, join key) |
 | `perp[*].mark_px` | Decimal string | On-book mark, **human-decimal plane**, tick-snapped (oracle fallback; `"0"` if unset) |
@@ -153,13 +153,10 @@ Response (truncated to one entry per list):
 
 #### `day_ntl_vlm` can be a lower bound {#day-ntl-vlm-bound}
 
-The node sums `day_ntl_vlm` from its own bounded trade ring. A busy market
-fills that ring in less than 24 hours. The node then cannot see the whole
-window, and it says so: the row carries `day_ntl_vlm_lower_bound_from`, the
-oldest instant the sum covers. The same rule holds on a spot pair row.
-
-**Not live yet:** the rules below ship with the next node and gateway releases.
-See [the notice](../../../changelog/next-release.md#tape-retirement-reads).
+The node keeps no trade ring since [block 25,599,540](../../../changelog/block-25599540.md#tape-retirement-reads),
+so it holds no 24-hour window of its own. When a figure cannot cover the whole
+24 hours, the row says so: it carries `day_ntl_vlm_lower_bound_from`, the oldest
+instant the sum covers. The same rule holds on a spot pair row.
 
 - **The gateway fills the figure from its own window.** The gateway keeps a
   24-hour trade window for each market. When its data covers the whole 24
@@ -171,10 +168,10 @@ See [the notice](../../../changelog/next-release.md#tape-retirement-reads).
   lower bound, with `day_ntl_vlm_lower_bound_from` at the oldest instant its
   data covers. It leaves `prev_day_px` as the node sent it, because the first
   print it holds is not a price from 24 hours ago.
-- **A marker at the time of the read means NO window.** From the release that
-  arms the fill-tape retirement, the node keeps no trade ring. A node with no
-  window serves `"0"` with `day_ntl_vlm_lower_bound_from` equal to `time`.
-  When the gateway holds no window either, the row reaches you that way. Read that `"0"` as no data, never as a quiet market.
+- **A marker at the time of the read means NO window.** The node serves `"0"`
+  with `day_ntl_vlm_lower_bound_from` equal to `time`. When the gateway holds
+  no window either, the row reaches you that way. Read that `"0"` as no data,
+  never as a quiet market.
 - **A row that still carries the marker is a lower bound.** Show it as "at
   least", or show no figure. Do not rank markets by it.
 
@@ -275,10 +272,10 @@ Response (perp truncated to one entry; the `spot` section is identical to
 | `perp[*].margin_tiers` | array | Notional-banded leverage ladder; each `{max_open_interest: string\|null, max_leverage: u8, maint_margin_ratio: bps-string}`, ascending upper-bound bands, `null` = unbounded top tier |
 | `perp[*].strict_isolated` | bool | Market forces strict-isolated margin |
 | `perp[*].open` / `close` | bool | Whether opening / closing is ALLOWED on this market. They state what is permitted, not what is forbidden. **A delist does not change them:** a halted or settled market can still read `true`. Read `halted` and `settled` on [`markets`](#markets) |
-| `perp[*].oi_cap` | Decimal string | The open-interest cap the chain enforces, in the market's size units. On a native perp market it is the lower of the governance-set cap and the capacity cap. On a deployer market it is the deployer's cap: the value its deployer set with [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), or the governance default it started at. A deployer market has no capacity cap, because the protocol's backstop never takes its risk. **OMITTED** only when no cap exists (never a fabricated `"0"`). **Not live yet:** until the release after 2026-10-01 this is the governance-set cap only. See [the capacity cap](#oi-cap-capacity) |
-| `perp[*].oi_cap_usd` | Decimal string | USDC value of `oi_cap` at the committed risk mark: the mark clamped to the oracle band. **OMITTED** with `oi_cap`, and when the market has no mark. **Not live yet** |
-| `perp[*].oi_cap_bound` | `"voted"` \| `"capacity"` \| `"floor"` \| `"ceiling"` \| `"deployer"` | Which source set `oi_cap`. `"voted"` = the governance-set cap. `"capacity"`, `"floor"` and `"ceiling"` are the capacity cap: the capacity result, the floor, or the ceiling. `"deployer"` = a deployer market: the cap its deployer set, or the governance default it started at. A deployer market never reads another value. **OMITTED** with `oi_cap`. **Not live yet** |
-| `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. **Not live yet:** from the release after 2026-10-01, an order whose new exposure is larger than this headroom takes the [at-cap rules](#oi-cap-capacity). See below |
+| `perp[*].oi_cap` | Decimal string | The open-interest cap the chain enforces, in the market's size units. On a native perp market it is the lower of the governance-set cap and the capacity cap. On a deployer market it is the deployer's cap: the value its deployer set with [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), or the governance default it started at. A deployer market has no capacity cap, because the protocol's backstop never takes its risk. **OMITTED** only when no cap exists (never a fabricated `"0"`). See [the capacity cap](#oi-cap-capacity) |
+| `perp[*].oi_cap_usd` | Decimal string | USDC value of `oi_cap` at the committed risk mark: the mark clamped to the oracle band. **OMITTED** with `oi_cap`, and when the market has no mark |
+| `perp[*].oi_cap_bound` | `"voted"` \| `"capacity"` \| `"floor"` \| `"ceiling"` \| `"deployer"` | Which source set `oi_cap`. `"voted"` = the governance-set cap. `"capacity"`, `"floor"` and `"ceiling"` are the capacity cap: the capacity result, the floor, or the ceiling. `"deployer"` = a deployer market: the cap its deployer set, or the governance default it started at. A deployer market never reads another value. **OMITTED** with `oi_cap` |
+| `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the WHOLE market, in the market's **size** units: `oi_cap − open_interest`, floored at `0`. `null` = the market is UNCAPPED. `"0"` = the market sits AT its cap. Despite the name, this is a size, not a notional. An order whose new exposure is larger than this headroom takes the [at-cap rules](#oi-cap-capacity). See below |
 | `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source descriptor tracking the committed mark mode — `"oracle_median"` = the default live 3-component median, `"sync_oracle"` = mark follows the oracle price directly, `"custom"` = mark frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent-batch-auction enabled for this market |
 | `perp[*].signing_id` | uint32 | **The number you put in the EIP-712 `market` field when you sign an order for this market.** It has no other meaning on the read plane — do not use it as a sort key, a join key, or a market identity. See below |
@@ -295,8 +292,8 @@ Response (perp truncated to one entry; the `spot` section is identical to
   `settled_px`) appear
   here.
 - **The open-interest fields MOVE.** `max_market_order_ntl` is derived from live
-  open interest, so it changes on every fill. From the release after 2026-10-01,
-  `oi_cap`, `oi_cap_usd` and `oi_cap_bound` on a native perp market follow the
+  open interest, so it changes on every fill. On a native perp market, `oi_cap`,
+  `oi_cap_usd` and `oi_cap_bound` follow the
   [capacity cap](#oi-cap-capacity), which the chain recomputes every block. On
   a deployer market, `oi_cap` changes when its deployer sends
   [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap). Do not cache
@@ -313,10 +310,9 @@ loses the two conventions the served field carries.
   produce it, because `oi_cap` is OMITTED from an uncapped row. A client that
   reads a missing `oi_cap` as `0` computes a negative headroom and blocks every
   order on a market that has no limit at all. This is the inverse mistake, and it
-  is the worse one. From the release after 2026-10-01, every native perp market
-  has a [capacity cap](#oi-cap-capacity), so `null` becomes rare there. On a
-  native market it stays only when there is no governance-set cap and no
-  capacity cap: a market that has never had a mark, or any market while
+  is the worse one. Every native perp market has a
+  [capacity cap](#oi-cap-capacity), so `null` is rare there. On a native market
+  it stays only when there is no governance-set cap and no capacity cap: a market that has never had a mark, or any market while
   governance has the capacity cap switched off. A deployer market reads `null`
   when it has no cap: its deployer sent `0`, or the governance default is `0`.
 - **`"0"` means the market sits AT its cap.** The value is floored at `0` and
@@ -334,11 +330,10 @@ have; never expect the two to differ.
 
 #### How the capacity cap works {#oi-cap-capacity}
 
-:::caution
-**Not live yet.** The capacity cap ships with the node release after 2026-10-01.
-Until then, `oi_cap` is the governance-set cap only. No market has one, so every
-market is uncapped, and `oi_cap_usd` and `oi_cap_bound` are absent. See
-[the next release](../../../changelog/next-release.md#oi-cap-capacity).
+:::info
+**Live since block 25,599,540.** Before that block, `oi_cap` was the
+governance-set cap only. No market had one, so every market was uncapped. See
+[the release notice](../../../changelog/block-25599540.md#oi-cap-capacity).
 :::
 
 **Native perps only.** A deployer market has no capacity cap. Its deployer sets
@@ -631,7 +626,7 @@ Send `trades` for both asks: `coin` alone for the recent window, `coin` plus
 | Field | Type | Required | Meaning |
 |-----|------|----------|-------------|
 | `coin` | symbol | yes | Market symbol |
-| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ the full ring. It caps the ANSWER, with the ring and the archive already merged, and the trim drops the OLDEST rows |
+| `limit` | uint32 | no | Cap the number of **most-recent** records returned; absent / `0` ⇒ no cap. It caps the ANSWER, with every source already merged, and the trim drops the OLDEST rows |
 | `start_time` | uint64 | no | Window start (consensus ms, inclusive); filters on trade `time`. Absent ⇒ open lower bound |
 | `end_time` | uint64 | no | Window end (consensus ms, inclusive). Absent ⇒ open upper bound |
 
@@ -690,14 +685,9 @@ No `tid` appears twice. A ranged ask reads the archive over its window. An
 un-ranged ask reads the newest prints of the archive, then trims the merged
 answer to `limit`.
 
-**Why.** From the release that arms the fill-tape retirement, the node keeps no
-trade ring. An un-ranged ask that read the ring alone would then answer
-`"trades": []` for a market that trades.
-
-**Not live yet:** the un-ranged half and the gateway window ship with the next
-gateway release. Until then, a ranged ask reaches the archive, and an un-ranged
-ask answers from the node's ring alone. See
-[the notice](../../../changelog/next-release.md#tape-retirement-reads).
+**Why.** The node keeps no trade ring since
+[block 25,599,540](../../../changelog/block-25599540.md#tape-retirement-reads). An un-ranged ask that read the
+node alone would answer `"trades": []` for a market that trades.
 
 **Your parser does not change.** The gateway relabels an archive record and a
 gateway-window record to the shape above, so one parser reads every source.
@@ -710,9 +700,8 @@ window serves:
 | `last_trade` | The newest print **in this answer**, not the market's all-time newest |
 | `time` at the live edge | The archive consumes the node stream on a poll interval (**default 5 s**), so the newest prints reach it late. A window that runs up to now can stop a few seconds short of the tape's true end. Re-ask, or read the live [`trades` WS channel](../../ws/subscriptions.md#trades) for a sub-block tape |
 
-**No archive, no change.** On a deployment with no archive wired, the node's
-live ring answers a ranged ask too — the same records, the same window filter,
-and `"trades": []` once the window falls past the ring.
+**No archive, no history.** On a deployment with no archive wired, a ranged ask
+answers `"trades": []`, because the node keeps no trade ring.
 
 
 ### Get historical OHLCV candles {#candle_snapshot}
@@ -1130,11 +1119,9 @@ The cap is the open-interest cap the chain enforces, the same number as
 [`markets_meta`](#markets_meta) `oi_cap`. There is **no fallback to a configured
 default**: a read surface must never advertise a ceiling the chain does not
 enforce, so a market with no cap reports `null` rather than borrowing a global
-number. **Not live yet:** from the release after 2026-10-01, every native perp
-market has a [capacity cap](#oi-cap-capacity), so `max_trade_size` is a number
-on every native market that has a mark. On a deployer market it follows the
-cap its deployer set. Until then, only a governance-set cap counts, and
-no market has one.
+number. Every native perp market has the [capacity cap](#oi-cap-capacity), so
+`max_trade_size` is a number on such a market whenever it has a mark. On a
+deployer market it follows the cap its deployer set.
 
 `available_to_trade` and `max_trade_szs` are budgets from the caller's own free
 collateral, side-aware and never negative. The reducing side is larger because
@@ -1216,7 +1203,7 @@ No parameters.
 | `limits.auction_duration_blocks` | uint64 | Gas-auction window length, in blocks |
 | `limits.deployer_fee_cap_bps` | string | Ceiling on the per-market deployer fee share, a decimal string of whole basis points |
 | `limits.dutch_start_multiplier` | Decimal string | Dutch-auction start-price multiplier over the minimum bid |
-| `limits.per_market_limits.max_oi` | u128 string | The open-interest cap a deployer market starts at when it activates with no cap, in **whole units** of the base asset. Its deployer can then change it with [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), so read the market's own cap from [`markets_meta`](#markets_meta) `oi_cap`. **Not live yet:** until the release after 2026-10-01 there is no such action, and this is the cap every deployer market carries |
+| `limits.per_market_limits.max_oi` | u128 string | The open-interest cap a deployer market starts at when it activates with no cap, in **whole units** of the base asset. Its deployer can then change it with [`perp_set_oi_cap`](../exchange/deploy-perp.md#perp_set_oi_cap), so read the market's own cap from [`markets_meta`](#markets_meta) `oi_cap` |
 | `limits.per_market_limits.max_leverage` | uint | Max leverage a deployed market may offer |
 | `limits.per_market_limits.max_taker_fee_bps` | bps string | Per-market taker-fee ceiling, decimal bps (same render as [`fee_schedule`](./fees-credit.md#fee_schedule)) |
 | `limits.per_market_limits.max_oi_per_second` | u128 string | Open-interest growth-rate cap, in **whole units** of the base asset per second |

@@ -55,7 +55,6 @@ only, labeled for what it is.
 Every outbox entry carries exactly one `status`. The four values below, and what
 each means for the user. A fifth value, [`voided`](#voided), appears only on a
 finished entry in [`bridge_withdrawal_history`](#bridge_withdrawal_history).
-It is not live yet.
 
 ### `awaiting_cosignatures`
 
@@ -66,8 +65,7 @@ Only partial-signature progress resets; the withdrawal itself is not at risk.
 `pending_cosigner_count` reports how many validators have signed so far.
 
 While withdrawals are halted, validators sign nothing, so a queued withdrawal
-stays here until the halt lifts. Not live yet: this ships with the next node
-release. The halt exists so that governance can still [void](#voided) a
+stays here until the halt lifts. The halt exists so that governance can still [void](#voided) a
 withdrawal before any signature exists.
 
 ### `ready_to_release`
@@ -119,9 +117,6 @@ release timestamp; it is `null` for every other status.
 
 ## Re-issue of a withdrawal {#reissue}
 
-**Not live yet.** This lane ships with the next node release. Until then, a
-stranded withdrawal has no recovery lane. Contact the operators.
-
 Governance can re-issue a stranded withdrawal under the current deployment. The
 re-issue carries the original withdrawal's fields and a new nonce.
 
@@ -146,8 +141,6 @@ The re-issue moves no exchange balance:
   withdrawal is refused.
 
 ### `voided` {#voided}
-
-**Not live yet.** This status ships with the next node release.
 
 Governance removed the withdrawal before any validator signed it, and refunded
 the user on the exchange in the same step. The entry is finished: `open` is
@@ -251,7 +244,7 @@ it with `message_id`.
 | `entries[*].nonce` | number | Per-entry nonce |
 | `entries[*].ts_ms` | number | When the entry was recorded, consensus ms |
 | `entries[*].message_id` | string | The current signing digest for this withdrawal — see [The message id moves](#message-id) |
-| `entries[*].status` | enum | One of the four values, or `voided` on a finished entry (not live yet) — see [Withdrawal status](#status) |
+| `entries[*].status` | enum | One of the four values, or `voided` on a finished entry — see [Withdrawal status](#status) |
 | `entries[*].pending_cosigner_count` | number | How many validators have signed so far |
 | `entries[*].released_at_ms` | number \| null | Release timestamp. `null` for every status except `released` |
 | `entries[*].open` | bool | Whether the entry is still moving — see [Conventions](#conventions) |

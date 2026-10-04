@@ -463,13 +463,10 @@ it, so an empty `fills` after a restart is not the same fact as "this account ha
 never run a TWAP". Read the coverage envelope to tell the two apart.
 
 **The gateway adds the archive.** It merges the node answer with the archive
-fills of the same `address` that carry a `twap_id`, with no fill twice. From
-the release that arms the fill-tape retirement, the node keeps no fill ring, so
-the archive supplies the slices. The gateway reads the newest 5,000 archive
-fills of the `address`. A slice older than those is not in the answer.
-**Not live yet:** the merge ships with the
-next gateway release. See
-[the notice](../../../changelog/next-release.md#tape-retirement-reads).
+fills of the same `address` that carry a `twap_id`, with no fill twice. Since
+[block 25,599,540](../../../changelog/block-25599540.md#tape-retirement-reads), the node keeps no fill
+ring, so the archive supplies the slices. The gateway reads the newest 5,000
+archive fills of the `address`. A slice older than those is not in the answer.
 
 **Request**
 

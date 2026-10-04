@@ -414,8 +414,7 @@ is refused at both entry points, whether or not it prices from its own deployer
 oracle. Its bad debt can never reach vault depositors; it is handled by that
 market's own backstop settings and then by the waterfall.
 The vault also never opens or extends a position on such a market, so its
-depositors carry no trading risk there either. **Not live yet:** that order
-rule ships with the node release after 2026-10-01. See
+depositors carry no trading risk there either. See
 [Metaliquidity scope](../mip/mip-2.md#scope).
 
 What this changes for you:
@@ -440,12 +439,10 @@ genuine tail events):
    deficit first, inside the same bounds as [the first
    bite](#mlp-first-bite). Live since 2026-08-18. A
    [builder-deployed market](../mip/mip-3.md#liquidation) skips this step.
-2. **ADL haircut** — an adaptive severity controller claws back up to the
-   gains the netting counterparties **just realized** (never more than they
-   received, and never unrealized paper PnL).
+2. **ADL haircut** — an adaptive severity controller claws back realized
+   gains (never more than they received, and never unrealized paper PnL).
 
-   **Not live yet: live from the release after 2026-10-01.** The haircut then
-   reaches every gain realized on that market inside the episode. The episode
+   The haircut reaches every gain realized on that market inside the episode. The episode
    is the current 60-second window and the one before it, so a gain stays in
    reach for 60 to 120 seconds. Any fill counts, taker or maker, forced closes
    included. Netting at mark and a delisting settlement count too. Three
@@ -488,15 +485,9 @@ on several markets, so the chain first splits the deficit across markets:
 - If the account realized no loss on any market, the whole deficit goes to the
   highest asset id among the markets the liquidation touched.
 
-**Not live yet: live from the release after 2026-10-01.**
-
-Today the whole deficit goes to one market: the highest asset id among the
-markets the liquidation touched. So a loss on one market can draw the insurance
-fund of another market.
-
 Why it matters: the open-interest cap on a native market is sized from the
 insurance fund of that market. See
-[the capacity cap](../changelog/next-release.md#oi-cap-capacity).
+[the capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity).
 
 ## Two-point margin check {#two-point-margin-check}
 

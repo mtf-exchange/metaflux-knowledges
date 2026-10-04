@@ -304,11 +304,11 @@ per-order dollar cap:
   record is true position OI (positions outstanding), not the book's resting
   depth.
 
-**Not live yet.** The capacity cap and `perp_set_oi_cap` ship with the node
-release after 2026-10-01. From then, every native perp market carries an
-open-interest cap, and a deployer market carries the cap its deployer set. Until
-then, `oi_cap` is the governance-set cap only, no market has one, and every
-market is uncapped.
+Every native perp market carries the capacity cap, and a deployer market
+carries the cap its deployer set. Both are live since
+[block 25,599,540](../changelog/block-25599540.md#oi-cap-capacity).
+Before that block, `oi_cap` was the governance-set cap only, no market had one,
+and every market was uncapped.
 
 ## Account & margin modes {#account--margin-modes}
 

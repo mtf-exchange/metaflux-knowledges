@@ -20,7 +20,7 @@ T3 closes the dying position at the committed mark. On a core market the [Metali
 
 **Read the order carefully — ADL comes BEFORE the insurance fund.** The deleveraged winners' realized gains absorb first, which keeps the fund for genuine tail events. An earlier version of this page had the two the other way round.
 
-**Not live yet: live from the release after 2026-10-01.** The winners are then every account that realized a gain on the instrument in the current 60-second window or the one before it, by any fill, netting at mark or a delisting settlement. Today only the gains that the netting step itself realizes are in reach. The haircut never takes a winner below its maintenance margin. A gain that already left the cross balance, or that was realized before that window, is not reached, and the deficit goes on to the insurance fund. Realized gains are never held back from withdrawal: the reach is bounded so a winner is never pushed into liquidation. See [the deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall).
+The winners are every account that realized a gain on the instrument in the current 60-second window or the one before it, by any fill, netting at mark or a delisting settlement. The haircut never takes a winner below its maintenance margin. A gain that already left the cross balance, or that was realized before that window, is not reached, and the deficit goes on to the insurance fund. Realized gains are never held back from withdrawal: the reach is bounded so a winner is never pushed into liquidation. See [the deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall).
 
 ```
 deficit  =  |account_value|  after the account is flat

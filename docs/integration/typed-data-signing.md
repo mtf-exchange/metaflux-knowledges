@@ -254,8 +254,7 @@ Notes on specific fields:
   `VaultModify`, and a signature made with that older string is refused since
   [block 11,550,001](../changelog/block-11550001.md#vault_modify). See
   [the action](../api/rest/exchange/vaults.md#vault_modify).
-- `set_referrer_by_code` and `register_referral_code`: not live yet, they ship
-  with the next node release. `code` signs as the exact lowercase string the
+- `set_referrer_by_code` and `register_referral_code`: `code` signs as the exact lowercase string the
   payload carries. The node does not fold the case, so sign the bytes you send.
 - `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the
   envelope nonce are the only signed fields, because neither action carries
@@ -400,15 +399,13 @@ delegates hold.
 | `perp_set_fee_tier` | `MetaFluxTransaction:PerpSetFeeTier(string metafluxChain,uint32 asset,uint32 takerFeeDbps,uint32 makerFeeDbps,uint32 deployerFeeBps,uint64 nonce)` |
 | `perp_set_maker_rebate` | `MetaFluxTransaction:PerpSetMakerRebate(string metafluxChain,uint32 asset,uint16 rebateBps,uint64 nonce)` |
 | `perp_set_min_size` | `MetaFluxTransaction:PerpSetMinSize(string metafluxChain,uint32 asset,uint64 minOrderSize,uint64 nonce)` |
-| `perp_set_oi_cap` | **NOT LIVE YET:** `MetaFluxTransaction:PerpSetOiCap(string metafluxChain,uint32 asset,uint64 oiCapUnits,uint64 nonce)` |
+| `perp_set_oi_cap` | `MetaFluxTransaction:PerpSetOiCap(string metafluxChain,uint32 asset,uint64 oiCapUnits,uint64 nonce)` |
 | `perp_activate_market` | `MetaFluxTransaction:PerpActivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_deactivate_market` | `MetaFluxTransaction:PerpDeactivateMarket(string metafluxChain,uint32 asset,uint64 nonce)` |
 | `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
 | `perp_set_sub_deployer_perms` | `MetaFluxTransaction:PerpSetSubDeployerPerms(string metafluxChain,uint32 asset,address subDeployer,uint16 permissions,uint64 nonce)` |
 
-**`PerpSetOiCap` is NOT live yet.** It ships with the node release after
-2026-10-01. Until then the live node answers `unknown variant` for
-`perp_set_oi_cap`. `oiCapUnits` is in whole units of the base asset, and `0`
+In `PerpSetOiCap`, `oiCapUnits` is in whole units of the base asset, and `0`
 removes the cap. See
 [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap).
 

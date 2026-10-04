@@ -752,9 +752,6 @@ Each event is one of two shapes. Read `type` to tell them apart.
 
 #### Categories and rounds {#node_gov-categories}
 
-**NOT LIVE YET.** This table ships with the next node release. See
-[the notice](../changelog/next-release.md#node_gov-labels).
-
 Each vote kind collects its votes in a synthetic round. A **fixed** round is
 one round for the whole vote kind. A **band** starts at a base and adds an id to
 it, so one vote kind has one round per market, per chain or per pair.
@@ -813,8 +810,8 @@ Two rules read this table:
 | `mint_treasury` | `MintTreasury` ¹ | 49,000,000 | `0` |
 | `burn_treasury` | `BurnTreasury` ¹ | 50,000,000 | `0` |
 | `set_population_target` | `SetPopulationTarget` ¹ | 51,000,000 | `0` |
-| `pm_collateral` | `SetDynamicRiskParam` with a `pm_collateral_*` field (not live yet) | 52,000,000 | spot token id |
-| `bridge_void` | `BridgeVoidWithdrawal` (not live yet) | 53,000,000 | bridge chain id |
+| `pm_collateral` | `SetDynamicRiskParam` with a `pm_collateral_*` field | 52,000,000 | spot token id |
+| `bridge_void` | `BridgeVoidWithdrawal` | 53,000,000 | bridge chain id |
 | `spot_margin_params` | `SetSpotMarginParams` | 10,000,000,000 | spot pair id |
 
 ¹ Testnet only. These five actions change token supply or an account balance.
@@ -823,13 +820,14 @@ Mainnet refuses them. See [total supply](../concepts/tokenomics.md#total-supply)
 ² The circle promotion votes write no `vote_cast` record. The label keeps the
 round from reading as the band below it.
 
-**A live node labels only eight bases:** `vote_global`, `dynamic_risk`,
+**Before [block 25,599,540](../changelog/block-25599540.md#node_gov-labels),
+a node labeled only eight bases:** `vote_global`, `dynamic_risk`,
 `mb_configure_chain`, `oracle_weights`, `circle_promotion_attest`,
-`option_listing`, `option_auto_list` and `spot_margin_params`. A round that is
-not one of them takes the label of the nearest labeled base below it. For
-example, a `DisableDex` vote on round 19,000,000 reads `oracle_weights` with
-`sub_id: 12000000`. Until the release, read `action`, never `category`, to find
-the vote kind.
+`option_listing`, `option_auto_list` and `spot_margin_params`. A round that was
+not one of them took the label of the nearest labeled base below it. For
+example, a `DisableDex` vote on round 19,000,000 read `oracle_weights` with
+`sub_id: 12000000`. On a record written before that block, read `action`, never
+`category`, to find the vote kind.
 
 ### `vote_enacted` {#node_gov-vote-enacted}
 
@@ -903,7 +901,7 @@ Four record kinds, told apart by `type`:
 | `admission` | The recorder's first sight of this `economic_id`. The only kind that carries `msg` |
 | `transition` | The derived half moved: co-signature count, status, or release time |
 | `rebind` | A deployment change re-derived this entry. Emitted for **every** open entry on that block |
-| `removed` | The entry left the outbox, through release, the retention prune or a governed re-issue of a stranded withdrawal (not live yet: ships with the next node release). Terminal |
+| `removed` | The entry left the outbox, through release, the retention prune or a governed re-issue of a stranded withdrawal. Terminal |
 
 A withdrawal is admitted:
 
@@ -954,7 +952,7 @@ The entry is released and leaves the outbox:
 | `block_time` | uint64 | Consensus block timestamp, ms |
 | `events` | array | Outbox records for this block. Can be empty |
 | `configs` | array \| absent | The **full** current per-chain deployment set. Present only on a block where it differs from the last envelope |
-| `withdrawals_halted` | bool \| absent | Chain-wide refusal of new withdrawals. From the next node release, validators also stop signing queued withdrawals while it is `true`. Present on exactly the blocks `configs` is |
+| `withdrawals_halted` | bool \| absent | Chain-wide refusal of new withdrawals. Validators also stop signing queued withdrawals while it is `true`. Present on exactly the blocks `configs` is |
 
 :::warning
 **`configs` and `withdrawals_halted` mean "replace the stored set", not "a
@@ -971,7 +969,7 @@ marker gives a false rotation on every restart. Compare the rows to decide.
 | `type` | string | — | `"admission"`, `"transition"`, `"rebind"`, or `"removed"` |
 | `economic_id` | string | — | `0x`-hex, 32 bytes. **The upsert key.** Rotation-invariant: it names the same withdrawal before and after a rotation |
 | `message_id` | string | — | `0x`-hex, 32 bytes. The **current** signing digest. It moves on a rotation |
-| `status` | string | — | `"awaiting_cosignatures"`, `"ready_to_release"`, `"stranded_on_retired_domain"`, or `"released"`. Derived by the node. A `"removed"` record can also carry `"voided"` (not live yet) |
+| `status` | string | — | `"awaiting_cosignatures"`, `"ready_to_release"`, `"stranded_on_retired_domain"`, or `"released"`. Derived by the node. A `"removed"` record can also carry `"voided"` |
 | `pending_cosigner_count` | uint | — | Co-signatures held against `message_id` that are **short of quorum**. `0` once quorum is reached |
 | `released_at_ms` | uint64 \| null | ms | Consensus timestamp of the release. `null` until the entry is released |
 | `msg` | object \| absent | — | The immutable half of the withdrawal. Present on `"admission"` only |
@@ -1002,8 +1000,7 @@ marker gives a false rotation on every restart. Compare the rows to decide.
 3. **`removed` is terminal, and its `status` is not always `"released"`.** It
    reads `"released"` when the release is confirmed. Otherwise it carries the
    entry's last known status: the entry left through the retention prune, or
-   (from the next node release) through a re-issue of a stranded withdrawal.
-   From the next node release it reads `"voided"` when governance voided the
+   through a re-issue of a stranded withdrawal. It reads `"voided"` when governance voided the
    withdrawal and refunded the user on the exchange. Nothing pays a voided
    withdrawal on the destination chain. In every case the `economic_id` never
    returns. A re-issue replacement arrives as
@@ -1492,11 +1489,6 @@ its own.
 
 #### A fee claim reports what it moved {#node_actions-result-claim}
 
-:::caution
-**Not live yet.** This result ships with the next node release. A live node
-writes `result: null` on a fee claim.
-:::
-
 A successful `ClaimReferralRewards` or `ClaimBuilderRewards` fills `result` in
 with what the claim moved into the sender's cross-collateral:
 
@@ -1542,11 +1534,11 @@ appear on the tape and are not listed here.
 - **Transfers** — `UsdSend`, `SendAsset`, `Withdraw3`, `SendToEvmWithData`, `UsdClassTransfer`, `CoreEvmTransfer`
 - **Sub-accounts** — `CreateSubAccount`, `SubAccountTransfer`, `SubAccountSpotTransfer`
 - **Vaults** — `CreateVault`, `VaultTransfer`, `VaultDistribute`, `VaultModify`, `NetChildVaultPositions`, `VaultWithdraw`, `SetMetaliquiditySet`, `RegisterMetaliquidityOperator`
-- **Account** — `ApproveAgent`, `SetDisplayName`, `SetReferrer`, `SetReferrerByCode` and `RegisterReferralCode` (both not live yet: they ship with the next node release), `ApproveBuilderFee`, `ConvertToMultiSigUser`, `MultiSig`, `Noop`, `UserSetAbstraction`, `AgentSetAbstraction`, `PriorityBid`, `ClaimBuilderRewards`, `ClaimReferralRewards`
+- **Account** — `ApproveAgent`, `SetDisplayName`, `SetReferrer`, `SetReferrerByCode`, `RegisterReferralCode`, `ApproveBuilderFee`, `ConvertToMultiSigUser`, `MultiSig`, `Noop`, `UserSetAbstraction`, `AgentSetAbstraction`, `PriorityBid`, `ClaimBuilderRewards`, `ClaimReferralRewards`
 - **Staking** — `TokenDelegate`, `ClaimRewards`, `LinkStakingUser`, `RegisterValidator`, `ExtendLongTermStaking`, `StakingDeposit`, `StakingWithdraw`, `BorrowLend`
 - **Governance and validator** — `GovPropose`, `GovVote`, `VoteGlobal`, `CValidator`, `CSigner`, `ValidatorL1Vote`, `ValidatorL1Stream`, `VoteAppHash`, `ForceIncreaseEpoch`, `ApproveUpgrade`, `ArmFeatures`, `SubmitSlashingEvidence`, `SetDynamicRiskParam`, `SetOracleWeights`, `SetDisabledVenues`, `SetFundingFormula`, `SetFeeSchedule`, `SetPrimeAccount`, `SetPmShockGrid`, `SetPopulationTarget`, `SetSpotMarginParams`, `SetMarketTick`, `SetMarkMode`, `SetSpotMinNotional`, `SetPerpMaxOpenInterest`, `SetThresholdEpochKey`, `GovAdjustSpotValue`, `GovAdjustSpotBalance`, `MintTreasury`, `BurnTreasury`, `CreateEarnPool`, `ConfigTreasuryBackstop`, `TreasuryBackstopDraw`, `DisableDex`, `QuarantineUser`, `ReactivateUser`, `ForceClosePosition`, `RegisterSpot`, `Listing`, `Delisting`, `OptionListing`, `OptionAutoList`, `FbaConfigure`
 - **Market deployment** — `PerpDeploy`, `SpotDeploy`, `SetGlobal`, `SubmitGasAuctionBid`, `Mip3SetOraclePx`
-- **Bridge** — `BridgeAttest`, `BridgeWithdraw`, `BridgeEmergencyPause`, `BridgeConfigureChain`, `BridgeReissueWithdrawal` (not live yet: ships with the next node release), `RegisterBridgeCosigner`, `BridgeWithdrawReleased`, `ValidatorSignWithdrawal`, `VoteEthFinalizedWithdrawal`, `VoteEthFinalizedValidatorSetUpdate`, `SignValidatorSetUpdate`, `ValidatorBridgePause`, `CirclePromotionSchedule`, `CirclePromotionCustodyAttest`, `CirclePromotionAdvance`, `CirclePromotionPruneCosig`
+- **Bridge** — `BridgeAttest`, `BridgeWithdraw`, `BridgeEmergencyPause`, `BridgeConfigureChain`, `BridgeReissueWithdrawal`, `RegisterBridgeCosigner`, `BridgeWithdrawReleased`, `ValidatorSignWithdrawal`, `VoteEthFinalizedWithdrawal`, `VoteEthFinalizedValidatorSetUpdate`, `SignValidatorSetUpdate`, `ValidatorBridgePause`, `CirclePromotionSchedule`, `CirclePromotionCustodyAttest`, `CirclePromotionAdvance`, `CirclePromotionPruneCosig`
 - **EVM** — `EvmRawTx`, `EvmUserModify`, `FinalizeEvmContract`
 - **System** — `SystemBole`, `SystemSpotSend`, `CWithdraw`, `CUserModify`, `SystemUserModify`, `OracleSubmit`
 

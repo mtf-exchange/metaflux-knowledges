@@ -79,11 +79,6 @@ That lane is gated per chain by the `mip3_deployer_oracle` protocol feature. A [
 
 ## Self-priced markets {#self-priced-markets}
 
-**Not live yet.** The rules in this section are live from the release after
-2026-10-01. Until then, the index is the mid of the best bid and the best ask
-over every resting order, whatever its age. The depth floor, the depth band and
-the move band already apply. The rest time and the smoothing do not.
-
 Some markets have no external venue to price from. MTF is one. Governance marks
 such a market **self-priced**. Its index price then comes from a MetaFlux book:
 the `<COIN>/USDC` spot pair when one exists, else the market's own perp book.
@@ -165,9 +160,7 @@ largest together with any other one hold more than two thirds.
 The 60 s count runs on the block clock. So it also runs when no asset gets a
 fresh price and the chain publishes no new oracle price at all. A self-priced
 market needs no validator stake, so it keeps its book price while some
-validators still submit. **Not live yet:** both rules are live from the release
-after 2026-10-01. Until then the count runs only while at least one asset gets a
-fresh price.
+validators still submit.
 
 ## Relationship to mark and funding {#relationship-to-mark-and-funding}
 
@@ -210,9 +203,8 @@ address holding **some** authority on the market; `sub_deployer_perms` maps each
 one to its exact [permission mask](../mip/mip-3.md#delegation) as an integer.
 Read the mask, not the list, before you decide who can push a price: a delegate
 appears in `sub_deployers` whether it holds bit 0 or only the fee bits. A
-delegate granted before the release reads back as the full mask: `511` on a
-live node, and `1023` from the node release after 2026-10-01, which adds bit 9
-for `perp_set_oi_cap`.
+delegate added with `perp_set_sub_deployers` reads back as the full mask,
+`1023`. That mask includes bit 9 for `perp_set_oi_cap`.
 
 ## Edge cases {#edge-cases}
 

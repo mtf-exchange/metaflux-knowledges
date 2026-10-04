@@ -177,7 +177,7 @@ Initial snapshot and every push share this shape:
 - Each level is `{ px, sz, n }`: `px` / `sz` are raw fixed-point magnitudes as decimal **strings** (per-asset tick scaling is applied downstream in the gateway), `n` is the number of resting orders at that price.
 - Each side is capped at **20 aggregated levels**.
 - `time` on a PUSH is the book's `last_trade_ms` (consensus-derived); `0` until the book has traded.
-- **On a spot pair, `time` is the newest print on the pair's trade ring.** From the release that arms the fill-tape retirement, the node keeps no trade ring. `time` is then the newest print the serving node has seen since it started, and `0` until its first print after a start. A `0` on a spot book after a node restart does not mean the pair never traded. **Not live yet:** this ships with the next node release. See [the notice](../../changelog/next-release.md#tape-retirement-reads).
+- **On a spot pair, `time` is the newest print the serving node has seen since it started.** The node keeps no trade ring since [block 25,599,540](../../changelog/block-25599540.md#tape-retirement-reads). `time` is `0` until the first print after a start. A `0` on a spot book after a node restart does not mean the pair never traded.
 - **On the on-subscribe SNAPSHOT frame, `time` is the moment the gateway served the frame**, never below the node's own book time. The body is the current book; the stamp says "as of now", so a staleness guard does not refuse a warm book. Read `time` on a snapshot frame as serve time, not as the last trade. The same holds on [`bbo`](#bbo).
 
 Each push is a **full snapshot of the top 20 levels**, not a partial diff. The frame envelope carries an `is_snapshot` boolean — `true` on the initial on-subscribe snapshot, `false` on the subsequent change-driven pushes — but the **body is the full top-20 book either way**, so the field is informational: keep replacing your local book on each frame and you stay correct.
@@ -238,15 +238,16 @@ is the taker's side (`"B"` buy / `"A"` sell); `time` is the consensus block ts (
 { "method": "subscribe", "subscription": { "type": "trades", "coin": "BTC" } }
 ```
 
-**On-subscribe snapshot** (`is_snapshot: true`) — a **non-empty** array of the
-market's bounded recent prints (up to the **64** most-recent, newest-first;
-empty only if the market has never traded). Snapshot rows carry **`users: null`**
-— the counterparty addresses are not reconstructed for historical prints.
+**On-subscribe snapshot** (`is_snapshot: true`) — an array of the market's
+recent prints, up to the **64** most-recent, newest-first. Snapshot rows carry
+**`users: null`**: the counterparty addresses are not reconstructed for
+historical prints.
 
-From the release that arms the fill-tape retirement, the node keeps no trade
-ring, so its snapshot is empty. The gateway then serves the snapshot from its
-own 24-hour trade window, in the same row shape, `users: null` included. **Not live yet:** this ships
-with the next gateway release. See [the notice](../../changelog/next-release.md#tape-retirement-reads).
+The node keeps no trade ring since
+[block 25,599,540](../../changelog/block-25599540.md#tape-retirement-reads),
+so its own snapshot is empty. The gateway then serves the snapshot from its own
+24-hour trade window, in the same row shape. The snapshot is empty when that
+window holds no print for the market.
 
 ```json
 { "channel": "trades", "is_snapshot": true, "data": [
@@ -323,7 +324,7 @@ So the **snapshot is all rows** and a **delta is the changed rows only** — dem
 | `settled_px` | Decimal string \| absent | Whole-USDC price every position closed at. Absent when no position was open at the delist |
 | `time` | uint64 | Consensus ms of the commit that pushed this row. The gateway's 24-hour window ends here |
 
-**The gateway fills `day_ntl_vlm` on this channel** with the same rule as the REST [`markets`](../rest/info/perpetuals.md#day-ntl-vlm-bound) row, on the snapshot and on every delta. It anchors the 24-hour window on the row's `time`. It removes `day_ntl_vlm_lower_bound_from` only when its window covers the whole 24 hours. On a spot row it then also serves the price of the first print in the window as `prev_day_px`. A row that still carries the marker is a lower bound. A marker equal to `time` means no window: read `"0"` as no data. **Not live yet:** see [the notice](../../changelog/next-release.md#tape-retirement-reads).
+**The gateway fills `day_ntl_vlm` on this channel** with the same rule as the REST [`markets`](../rest/info/perpetuals.md#day-ntl-vlm-bound) row, on the snapshot and on every delta. It anchors the 24-hour window on the row's `time`. It removes `day_ntl_vlm_lower_bound_from` only when its window covers the whole 24 hours. On a spot row it then also serves the price of the first print in the window as `prev_day_px`. A row that still carries the marker is a lower bound. A marker equal to `time` means no window: read `"0"` as no data.
 
 Spot rows carry only the fields with a spot analogue — `coin`, `kind` (`"spot"`), `mark_px`, `mid_px` (omitted when one-sided), `day_ntl_vlm`, `day_ntl_vlm_lower_bound_from` (when set), `prev_day_px`, `time`; the perp-only fields (`oracle_px` / `premium` / `funding` / `open_interest` / `change_24h` / `halted` / `settled` / `settled_px`) are absent.
 

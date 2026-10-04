@@ -124,14 +124,15 @@ Portfolio margin, for accounts that qualify. Enrol with
 [`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin). Two
 things change:
 
-**Eligible spot tokens become collateral.** **Not live yet:** this ships with
-the next node release. A spot token counts only when governance sets a positive
-collateral weight (`pm_collateral_haircut`) for that TOKEN. The credit is
+**Eligible spot tokens become collateral.** A spot token counts only when
+governance sets a positive collateral weight (`pm_collateral_haircut`) for that TOKEN. The credit is
 `balance × mark × weight`. The mark is the oracle price of the perpetual
 market that governance names for the token or, when none is named, the
 perpetual with the same symbol. A token with no such native perpetual, or whose
 perpetual is self-priced, never counts. A token whose symbol differs from its
-perpetual, such as a bridged `gBTC` priced by `BTC`, needs the named mapping. A stale oracle removes the credit. The
+perpetual, such as a bridged `gBTC` priced by `BTC`, needs the named mapping.
+No token has a positive weight yet, so today no spot token counts. A stale
+oracle removes the credit. The
 FULL un-weighted balance is folded into the scenario sweep as a long spot leg —
 so a crash in the collateral raises the requirement. USDC is weight 1 and is
 never haircut. In the other two modes, a non-USDC spot balance is worth nothing

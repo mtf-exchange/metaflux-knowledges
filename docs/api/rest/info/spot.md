@@ -116,7 +116,7 @@ answer, not as an error.
 | `pairs[*].mid_px` | Decimal string \| null | Book mid, falls back to `mark_px`; **`null`** when neither exists |
 | `pairs[*].day_ntl_vlm` | Decimal string | 24h notional volume, whole USDC. A LOWER BOUND when the row carries `day_ntl_vlm_lower_bound_from`. See [the rule](./perpetuals.md#day-ntl-vlm-bound) |
 | `pairs[*].day_ntl_vlm_lower_bound_from` | uint64 \| absent | Consensus ms. Present only when `day_ntl_vlm` does not cover the whole 24h window. **ABSENT when the figure is complete**, never `null`. Same rule as on a [perp row](./perpetuals.md#day-ntl-vlm-bound) |
-| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; **`null`** if unknown. It reads `null` on a traded pair too, until 24 hours of history exist. **Not live yet:** from the next gateway release, the gateway serves the price of the first print in its own 24-hour window when it holds one. See [the notice](../../../changelog/next-release.md#tape-retirement-reads) |
+| `pairs[*].prev_day_px` | Decimal string \| null | Price ~24h ago; **`null`** if unknown. It reads `null` on a traded pair too, until 24 hours of history exist. The gateway serves the price of the first print in its own 24-hour window when that window covers the whole 24 hours. See [`day_ntl_vlm` can be a lower bound](./perpetuals.md#day-ntl-vlm-bound) |
 | `pairs[*].circulating_supply` | Decimal string | Base token committed supply (whole units) |
 | `tokens[*].id` | uint32 | Spot token asset id |
 | `tokens[*].name` | string | Token name (e.g. `"USDC"`, `"MTF"`) |

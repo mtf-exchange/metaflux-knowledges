@@ -120,9 +120,6 @@ health at this mark. It is not the raw `mark_px`, so the two can differ when the
 mark sits outside the band. When the risk mark is stale or absent, the vote must
 name a price.
 
-**Not live yet.** The rules below ship with the first node release after
-2026-10-01. Until then, the paragraph above is the whole rule.
-
 The chain records the oracle price of every market once an hour, at the first
 oracle update after the hour. The **six-hour average** is the mean of the six
 newest hourly records that carry the market, rounded toward zero to 8 decimals.

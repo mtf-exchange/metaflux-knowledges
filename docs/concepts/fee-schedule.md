@@ -175,10 +175,9 @@ Referral and broker-code credits apply **separately**, in addition to your
 effective rates above:
 
 - **Referral** — when you have a referrer set, a share of your taker fee is routed
-  to them out of the protocol's take; it is not an extra charge to you. From the
-  next release, a governed referee discount can also lower your taker rate. It
-  does not add to the staking discount: the larger of the two applies. This is
-  not live yet. See [the referral program](./fees.md#referral-share-and-discount).
+  to them out of the protocol's take; it is not an extra charge to you. A
+  governed referee discount can also lower your taker rate. It does not add to
+  the staking discount: the larger of the two applies. See [the referral program](./fees.md#referral-share-and-discount).
 - **Broker codes** — an order-flow originator (front-end, aggregator) can claim a
   share when their address is set on the order.
 

@@ -94,30 +94,29 @@ on the others, followed by the text below.
 |----------|----------------|
 | `referrer` is the sender | `cannot refer self` |
 | `referrer` is the zero address | `zero referrer` |
-| The sender already has referees. **Not live yet** | `an account with referees cannot set a referrer` |
-| The sender holds a referral code. **Not live yet** | `an account with a referral code cannot set a referrer` |
+| The sender already has referees | `an account with referees cannot set a referrer` |
+| The sender holds a referral code | `an account with a referral code cannot set a referrer` |
 | `referrer` has a referrer of its own | `multi-level referral chains are not allowed` |
 | The sender already has a referrer | `referrer already set (immutable per §L.5.1)` |
-| Referral codes are on, and `referrer` holds no code. **Not live yet** | `referrer has no referral code` |
+| Referral codes are on, and `referrer` holds no code | `referrer has no referral code` |
 
-**Why the three new rows.** Referrals are single-level. A live node refuses a
-referrer that is a referee, but it does not refuse a sender that is already a
-referrer, so the order `carol → bob`, then `bob → alice`, builds a chain. The
-next release refuses both directions. A code holder cannot bind either. If it
+**Why these three rows.** Referrals are single-level. The node refuses a
+referrer that is a referee, and it refuses a sender that is already a referrer.
+Without the second check, the order `carol → bob`, then `bob → alice`, builds a
+chain. A code holder cannot bind either. If it
 did, every later bind to its code would fail as a multi-level chain. While codes are on, a bind by address
 needs a referrer that holds a code. Otherwise one trader could bind a fresh
 second address to itself and skip the 30-day volume a code costs. While codes
-are off, a bind by address works as it does on a live node.
+are off, a bind by address needs no code.
 
 ---
 
 ### Register a referral code {#register_referral_code}
 
 :::caution
-**Not live yet.** Ships with the next node release. Until then, a live node
-answers `unknown variant` for `register_referral_code`, the same answer a
-made-up action gets. After the release, the node also refuses it until
-governance turns referral codes on.
+**Refused while referral codes are off.** Governance turns them on by setting
+`referral_code_min_volume_usd` above `0`. Until then, the node refuses this
+action with `referral codes are not enabled`.
 :::
 
 Register the sender's referral code. A referee then binds to the sender with
@@ -167,12 +166,6 @@ Check it before you sign:
 ---
 
 ### Bind the account to a referrer by code {#set_referrer_by_code}
-
-:::caution
-**Not live yet.** Ships with the next node release. Until then, a live node
-answers `unknown variant` for `set_referrer_by_code`. Bind by address with
-[`set_referrer`](#set_referrer).
-:::
 
 Bind the sender to the account that holds a referral code. The node resolves
 the code to its owner, then applies every [`set_referrer`](#set_referrer) rule
@@ -237,15 +230,6 @@ stays `ApproveBuilderFee`, which no signature lets you change — see
 
 ### Claim accrued referral credit {#claim_referral_rewards}
 
-:::caution
-**One claim drains both credits from the next node release. Not live yet.**
-Until the release, `claim_referral_rewards` drains only the referral credit,
-and [`claim_broker_rewards`](#claim_builder_rewards) drains only the broker
-credit. To claim everything on a live node, send one, read both balances, and
-send the other if its balance is still above `0`. See
-[the changelog](../../../changelog/next-release.md#combined-claim).
-:::
-
 Drain the sender's whole accrued referral credit AND its whole accrued
 broker-code credit into spendable cross-collateral. No parameters.
 
@@ -280,12 +264,6 @@ an error, so a retry after a timeout is safe.
 ---
 
 ### Claim accrued broker-code credit {#claim_builder_rewards}
-
-:::caution
-**One claim drains both credits from the next node release. Not live yet.**
-Until the release, `claim_broker_rewards` drains only the broker credit. See
-[`claim_referral_rewards`](#claim_referral_rewards).
-:::
 
 Drain the sender's whole accrued broker-code credit AND its whole accrued
 referral credit into spendable cross-collateral. No parameters.

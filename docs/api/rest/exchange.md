@@ -386,7 +386,7 @@ listed by governance is not one, so this lane cannot reach it.
 | [`perp_set_fee_tier`](./exchange/deploy-perp.md#perp_set_fee_tier) | Set the taker, maker and deployer fees | deployer, or bit 2 | no |
 | [`perp_set_maker_rebate`](./exchange/deploy-perp.md#perp_set_maker_rebate) | Set the maker rebate | deployer, or bit 3 | no |
 | [`perp_set_min_size`](./exchange/deploy-perp.md#perp_set_min_size) | Set the minimum order size | deployer, or bit 4 | no |
-| [`perp_set_oi_cap`](./exchange/deploy-perp.md#perp_set_oi_cap) | Set the open-interest cap, in whole units. **Not live yet:** ships with the node release after 2026-10-01 | deployer, or bit 9 | no |
+| [`perp_set_oi_cap`](./exchange/deploy-perp.md#perp_set_oi_cap) | Set the open-interest cap, in whole units | deployer, or bit 9 | no |
 | [`perp_activate_market`](./exchange/deploy-perp.md#perp_activate_market) | Open the market to trading | deployer, or bit 5 | no |
 | [`perp_deactivate_market`](./exchange/deploy-perp.md#perp_activate_market) | Close the market, and cancel every resting order and parked trigger on it | deployer, or bit 6 | no |
 | [`perp_set_sub_deployers`](./exchange/deploy-perp.md#perp_set_sub_deployers) | Grant a delegate every bit, or revoke it | deployer only | no |
@@ -435,11 +435,11 @@ refuse every other market. See [options](../../products/options.md).
 | [`approve_agent`](./exchange/account.md#approve_agent) | Approve an agent wallet | master only |
 | [`set_display_name`](./exchange/account.md#set_display_name) | Set the account handle | master only |
 | [`set_referrer`](./exchange/account.md#set_referrer) | Bind to a referrer address | master only |
-| [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) | Bind to the referrer that holds a referral code. Not live yet | master only |
-| [`register_referral_code`](./exchange/account.md#register_referral_code) | Register the sender's referral code. Not live yet | master only |
+| [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) | Bind to the referrer that holds a referral code | master only |
+| [`register_referral_code`](./exchange/account.md#register_referral_code) | Register the sender's referral code | master only |
 | [`approve_broker_fee`](./exchange/account.md#approve_builder_fee) | Approve a broker fee ceiling | master only |
-| [`claim_referral_rewards`](./exchange/account.md#claim_referral_rewards) | Claim accrued referral and broker-code credit. Draining both is not live yet | master only |
-| [`claim_broker_rewards`](./exchange/account.md#claim_builder_rewards) | The same claim as `claim_referral_rewards`. Draining both is not live yet | master only |
+| [`claim_referral_rewards`](./exchange/account.md#claim_referral_rewards) | Claim accrued referral and broker-code credit | master only |
+| [`claim_broker_rewards`](./exchange/account.md#claim_builder_rewards) | The same claim as `claim_referral_rewards` | master only |
 | [`approve_builder_fee`](./exchange/account.md#approve_builder_fee) | The older spelling of `approve_broker_fee`. It still decodes and behaves identically | master only |
 | [`claim_builder_rewards`](./exchange/account.md#claim_builder_rewards) | The older spelling of `claim_broker_rewards`. It still decodes and behaves identically | master only |
 | [`create_sub_account`](./exchange/account.md#create_sub_account) | Open a sub-account under the master | master only |
@@ -532,7 +532,7 @@ never execute here.
 |-----------|----------------------------|-----------------|
 | `UpdateMarginMode` | — | No native action; isolation is the `is_isolated` flag on `update_leverage` |
 | `MultiSig` | [`multi_sig`](./exchange/account.md#multi_sig) | **Bridged and executing** — the collect-and-execute wrapper is the live way a multi-sig account acts. It verifies the roster signatures and runs the inner action. (A non-wrapped action from a multi-sig account is still rejected.) |
-| `RegisterReferrer` | [`register_referral_code`](./exchange/account.md#register_referral_code) | **Bridged from the next release** (not live yet). A referee binds to the code with [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) |
+| `RegisterReferrer` | [`register_referral_code`](./exchange/account.md#register_referral_code) | **Bridged and live since [block 25,599,540](../../changelog/block-25599540.md#referral-program).** A referee binds to the code with [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) |
 | `UsdcTransfer` / `SpotTransfer` | — | User-to-user transfer flows not bridged |
 | `WithdrawUsdc` | — | Draft name; external withdrawal is [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) |
 | (legacy CCTP withdraw) | [`withdraw`](./exchange/transfers.md#withdraw) | **Retired** — admitted, then rejected at every commit since genesis (`"withdraw3 disabled; use bridge_withdraw"`). Use [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) |
@@ -596,8 +596,8 @@ name them `BridgeReissueWithdrawal` and `BridgeVoidWithdrawal`.
 
 | Action | Who | What it does |
 |-----------|-----|--------------|
-| `bridge_reissue_withdrawal` | Validator governance | **Not live yet: ships with the next node release.** Re-issues one stranded or disputed bridge withdrawal under the current deployment with a new nonce. Bounded to that withdrawal's amount; refused twice for the same withdrawal. See [re-issue](./info/bridge.md#reissue) |
-| `bridge_void_withdrawal` | Validator governance | **Not live yet: ships with the next node release.** Removes one queued bridge withdrawal that no validator has signed, and refunds the full debit, fee included, to the user's exchange balance. Refused once any validator has signed it, and refused twice. See [`voided`](./info/bridge.md#voided) |
+| `bridge_reissue_withdrawal` | Validator governance | Re-issues one stranded or disputed bridge withdrawal under the current deployment with a new nonce. Bounded to that withdrawal's amount; refused twice for the same withdrawal. See [re-issue](./info/bridge.md#reissue) |
+| `bridge_void_withdrawal` | Validator governance | Removes one queued bridge withdrawal that no validator has signed, and refunds the full debit, fee included, to the user's exchange balance. Refused once any validator has signed it, and refused twice. See [`voided`](./info/bridge.md#voided) |
 
 Two more tags in this set, `set_metaliquidity_set` and `gov_adjust_spot_value`,
 keep their payloads and signing types below, because their `value` hashing rule

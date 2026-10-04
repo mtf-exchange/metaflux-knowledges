@@ -156,12 +156,6 @@ Fees accrue to a running balance. Claim it with:
 do the same thing: each one drains both credits of the sender. An account that
 is a broker and a referrer claims once, not twice.
 
-:::caution
-**Not live yet.** The combined claim ships with the next node release. Until
-then, each action drains only its own credit. To claim both on a live node,
-send one action, read both balances, and send the other action if its balance
-is still above `0`.
-:::
 
 **Both names are accepted.** `claim_broker_rewards` is the name to send, and
 `claim_builder_rewards` still decodes and always will — the same second-name

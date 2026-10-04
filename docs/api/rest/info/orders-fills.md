@@ -123,9 +123,11 @@ see [trailing stops](../exchange/orders.md#trailing-stops), and sending it
 changes the order's signing digest.
 ### Recent fill history for an account {#user_fills}
 
-Account-scoped fill history: one row per execution, served directly from the
-node's committed on-chain state (a bounded per-account fill ring folded into
-the AppHash — no external indexer). For one row per
+Account-scoped fill history: one row per execution. The gateway serves it from
+the archive and merges the node's answer, so you need no external indexer. The
+node keeps no fill ring since
+[block 25,599,540](../../../changelog/block-25599540.md#tape-retirement-reads), so the archive carries
+every row. For one row per
 **opened-then-closed position** instead — peak size, average entry, average
 close, realized PnL and funding folded over the whole life — use
 [position history](../info/position-history.md).
@@ -307,8 +309,9 @@ leg in it shares one `time`.
 ### A single order's lifecycle {#order_status}
 
 Single-order lifecycle lookup by `oid` (server order id) or `cloid` (client
-order id). Reads the resting books, the trigger registry, and the committed
-fill ring.
+order id). Reads the resting books and the trigger registry. The fill legs of
+a filled order come from the archive. See
+[fill legs from the archive](#order_status-archive-legs).
 
 **Request**
 
@@ -326,7 +329,7 @@ Or by client order id:
 |-------|------|----------|---------|
 | `oid` | uint64 \| decimal-digit string | one of `oid` / `cloid` | Server order id. A number and a string are both accepted, so an `oid` read back off any response can be sent straight back |
 | `cloid` | hex string | one of `oid` / `cloid` | Client order id — `0x` + 32 hex chars |
-| `address` | hex address | no | The order's owner. The gateway reads the fill legs of a filled order from the archive with it. See [below](#order_status-archive-legs). **Not live yet:** the gateway reads it from the next gateway release. A node ignores it |
+| `address` | hex address | no | The order's owner. The gateway reads the fill legs of a filled order from the archive with it. See [below](#order_status-archive-legs). A node ignores it |
 
 Neither field present returns `400 INVALID_REQUEST`. A
 malformed `cloid` returns `400`. Resolution stops at the first hit, in this
@@ -453,17 +456,14 @@ read `fills[0]` and know that is what you chose.
 
 #### Fill legs from the archive {#order_status-archive-legs}
 
-**Send `address` with the order's owner.** From the release that arms the
-fill-tape retirement, the node keeps no fill ring, so it holds no legs for a
-filled order. The gateway then reads the legs from the archive fills of
+**Send `address` with the order's owner.** Since
+[block 25,599,540](../../../changelog/block-25599540.md#tape-retirement-reads), the node keeps no fill
+ring, so it holds no legs for a filled order. The gateway then reads the legs from the archive fills of
 `address` for that `oid`, and serves `fills` and `total_filled_sz`. An
 answer that the node gives as `unknown` then reads `filled`. Without
 `address`, the answer carries no `fills`, and a filled order can answer
 `unknown`. The gateway reads the newest 5,000 archive fills of `address`. An
 order whose legs are all older than those can also answer `unknown`.
-
-**Not live yet:** the archive legs ship with the next gateway release. See
-[the notice](../../../changelog/next-release.md#tape-retirement-reads).
 
 `"canceled"` / `"cancel_rejected"` / `"rejected"` — the order reached a terminal
 state without filling. All three carry the same `outcome` object:
@@ -542,12 +542,6 @@ An order that a [`batch_cancel`](../exchange/orders.md#batch_cancel) leg removed
 answers `canceled` here. Each leg carries its own verdict, so the node records
 only the legs that removed an order. A refused leg names an order that is
 already gone, and it leaves that order's earlier terminal state untouched.
-
-**Not live yet.** This ships with the next node release. Until then a
-batch-cancelled order answers `unknown` here: read its outcome from the
-`batch_cancel` reply or from
-[`order_updates`](../../ws/subscriptions.md#order_updates), where each leg
-reports its own result.
 
 The terminal states above come from a **node-local retention window**, not from
 committed state. A node restart empties that window, so after a restart the node

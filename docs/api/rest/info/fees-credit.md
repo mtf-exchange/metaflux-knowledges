@@ -62,19 +62,18 @@ series into an empty array.
 | `pooled_volume_counts` | bool | `true` while pooled volume still feeds a tier |
 | `burn_ratio` | Decimal string | Fraction of fees burned |
 | `referrer_share_bps` | Decimal string | The referrer's share of the taker fee a referee paid, in basis points of that fee. `"1000"` = 10%. It is a share of the fee, not a fee rate, so it has no fractional digit |
-| `referee_discount_permille` | uint32 | NOT LIVE YET. The referee discount off the taker rate, per mille. `0` = no discount |
-| `referral_code_min_volume_usd` | Decimal string | NOT LIVE YET. The trailing 30-day volume, whole USDC, that a referral code needs. `"0"` = codes are off |
-| `referee_discount_cap_usd` | Decimal string | NOT LIVE YET. Referee taker volume since the bind, whole USDC, at which the discount stops. `"0"` = no cap |
-| `referrer_reward_cap_usd` | Decimal string | NOT LIVE YET. Referee taker volume since the bind, whole USDC, at which the referrer share stops. `"0"` = no cap |
+| `referee_discount_permille` | uint32 | The referee discount off the taker rate, per mille. `0` = no discount |
+| `referral_code_min_volume_usd` | Decimal string | The trailing 30-day volume, whole USDC, that a referral code needs. `"0"` = codes are off |
+| `referee_discount_cap_usd` | Decimal string | Referee taker volume since the bind, whole USDC, at which the discount stops. `"0"` = no cap |
+| `referrer_reward_cap_usd` | Decimal string | Referee taker volume since the bind, whole USDC, at which the referrer share stops. `"0"` = no cap |
 
 **Rules**
 
 - Fee rates are decimal basis points as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), for sub-basis-point precision.
 - `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned).
 - **The five referral fields are governed, and they serve the values in force.**
-  A live node serves `referrer_share_bps` only. The other four ship with the
-  next node release, with the defaults shown above. Those defaults change no
-  fee: governance turns the program on by vote. See
+  A node serves all five, with the defaults shown above. Those defaults change
+  no fee: governance turns the program on by vote. See
   [the referral program](../../../concepts/fees.md#referral-parameters).
 - **There is no builder-rebate field on this read, and there is no protocol rebate to a broker.**
   A broker is paid the `builder.fee` it sets on each order, and that rate is capped by the
@@ -128,10 +127,10 @@ carries a `user` block:
 | `user.taker_volume_30d` | Decimal string | Pooled trailing 30-day taker volume, every product together |
 | `user.maker_volume_30d` | Decimal string | Pooled trailing 30-day maker volume |
 | `user.taker_bps` / `maker_bps` | Decimal string | The PERP base rate, before the discount and the rebate |
-| `user.effective_taker_bps` | Decimal string | The PERP rate a fill charges, discount applied. From the next release the discount is the larger of `staking_discount_permille` and `referee_discount_permille`, never their sum |
+| `user.effective_taker_bps` | Decimal string | The PERP rate a fill charges, discount applied. The discount is the larger of `staking_discount_permille` and `referee_discount_permille`, never their sum |
 | `user.effective_maker_bps` | Decimal string | The PERP rate a fill charges, rebate subtracted. Negative = a credit |
 | `user.staking_discount_permille` | uint32 | Taker-only staking discount, per mille (`100` = 10%) |
-| `user.referee_discount_permille` | uint32 | NOT LIVE YET. The referee discount this account gets now, per mille. `0` when the account has no referrer, when the program is off, or when its volume reached the discount cap |
+| `user.referee_discount_permille` | uint32 | The referee discount this account gets now, per mille. `0` when the account has no referrer, when the program is off, or when its volume reached the discount cap |
 | `user.maker_rebate_bps` | Decimal string | The PERP maker rebate, before it is subtracted |
 | `user.vip_tier` | uint | The account's VIP-tier override index. `0` when the account holds no override, which is the common case |
 | `user.mm_tier` | uint | The account's market-maker-tier override index. `0` when the account holds no override |
@@ -203,12 +202,6 @@ One account's referral state: its claimable credit, its referrer, its own
 referral code, its counters as a referee and as a referrer, and whether it can
 register a code.
 
-:::caution
-**Most of this shape is not live yet.** A live node answers `user`, `address`,
-`claimable_rewards` and `referrer` only. Every other field ships with the next
-node release. See [the changelog](../../../changelog/next-release.md#referral-program).
-:::
-
 **Request**
 
 ```json
@@ -264,7 +257,7 @@ node release. See [the changelog](../../../changelog/next-release.md#referral-pr
 | `referrer_code` | string \| null | The referral code of that referrer. `null` when the account has no referrer, or when the referrer holds no code |
 | `code` | string \| null | This account's own referral code. `null` = none |
 | `referee` | object \| null | This account's counters as a referee. `null` when it has no referrer |
-| `referee.bound_ms` | uint64 | Consensus time of the bind, in ms. `0` for a bind made before the release |
+| `referee.bound_ms` | uint64 | Consensus time of the bind, in ms. `0` for a bind made before block 25,599,540 |
 | `referee.volume_since_bind` | Decimal string | Taker volume since the bind, whole USDC. Both caps read this number |
 | `referee.fees_paid` | Decimal string | USDC taker fees paid since the bind |
 | `referee.rewarded` | Decimal string | USDC share those fees paid to the referrer |
@@ -288,9 +281,8 @@ node release. See [the changelog](../../../changelog/next-release.md#referral-pr
   [`broker_state`](#broker_state) are the only way to show a claimable balance
   or to decide whether a claim is worth sending.
 - **One claim drains this credit and the broker credit.** Show the sum of this
-  `claimable_rewards` and the `broker_state` one behind one claim button. This
-  is not live yet: until the next node release, each claim action drains only
-  its own credit.
+  `claimable_rewards` and the `broker_state` one behind one claim button. Each
+  claim action drains both credits.
 - **`claimable_rewards` of `"0"` is normal, not an error state.** Claiming with
   nothing accrued claims `0` and succeeds. Do not block the button on it.
 - **`referrer: null` means the account never bound one.** It does not mean the
@@ -305,9 +297,9 @@ node release. See [the changelog](../../../changelog/next-release.md#referral-pr
   The rate a fill charges uses the larger of this value and the staking
   discount. [`fee_schedule`](#fee_schedule) `user.effective_taker_bps` shows the
   result.
-- **A bind made before the release reads `bound_ms: 0` and zero counters.** The
-  chain did not record the time or the volume before the release. The caps
-  count that referee's volume from the release on.
+- **A bind made before block 25,599,540 reads `bound_ms: 0` and zero
+  counters.** The chain did not record the time or the volume before that
+  block. The caps count that referee's volume from that block on.
 - **The counters are USDC only.** A referrer share on a spot BUY arrives in the
   base token, paid at the fill. It adds to no counter and to no
   `claimable_rewards`. The base-token volume still counts in
@@ -317,9 +309,6 @@ node release. See [the changelog](../../../changelog/next-release.md#referral-pr
   [`referral_referees`](#referral_referees).** This read carries the count only.
 
 ### Owner of a referral code {#referral_code}
-
-**NOT LIVE YET.** Ships with the next node release. A live node answers
-`UNKNOWN_TYPE`.
 
 Resolves a referral code to the account that holds it. Use it to show a referee
 who a code binds to, before it signs
@@ -364,9 +353,6 @@ who a code binds to, before it signs
 
 ### Accounts one referrer referred {#referral_referees}
 
-**NOT LIVE YET.** Ships with the next node release. A live node answers
-`UNKNOWN_TYPE`.
-
 The accounts bound to one referrer, with each one's counters since the bind.
 
 **Request**
@@ -400,7 +386,7 @@ The accounts bound to one referrer, with each one's counters since the bind.
 | Field | Type | Meaning |
 |-------|------|---------|
 | `referees[*].user` | hex address | A referee of this referrer |
-| `referees[*].bound_ms` | uint64 | Consensus time of the bind, in ms. `0` for a bind made before the release |
+| `referees[*].bound_ms` | uint64 | Consensus time of the bind, in ms. `0` for a bind made before block 25,599,540 |
 | `referees[*].volume_since_bind` | Decimal string | The referee's taker volume since the bind, whole USDC |
 | `referees[*].fees_paid` | Decimal string | USDC taker fees the referee paid since the bind |
 | `referees[*].rewarded` | Decimal string | USDC share those fees paid to this referrer |
@@ -415,9 +401,6 @@ The accounts bound to one referrer, with each one's counters since the bind.
 - **An address with no referees answers `referees: []`**, not an error.
 
 ### Referral leaderboard {#referral_leaderboard}
-
-**NOT LIVE YET.** Ships with the next node release. A live node answers
-`UNKNOWN_TYPE`.
 
 Referrers ranked by the share they earned, over all time.
 
@@ -461,8 +444,8 @@ Referrers ranked by the share they earned, over all time.
 - **Every referrer appears, with or without a code.** A referrer that earned
   nothing yet appears with zeros, below every referrer that earned a share.
 - **The totals are all-time and USDC only.** A share paid in kind on a spot BUY
-  is not in `rewarded`. The counters start at the release, so a share earned
-  before it is not in `rewarded` either.
+  is not in `rewarded`. The counters start at block 25,599,540, so a share
+  earned before that block is not in `rewarded` either.
 
 ### Accrued broker credit for one account {#broker_state}
 
@@ -505,8 +488,7 @@ One broker's claimable broker-code fee credit.
 - **A broker credit and a referral credit are separate balances with one
   claim.** One fill can pay both. Reading one tells you nothing about the
   other, so read [`referral_state`](#referral_state) too. Either claim action
-  drains both balances. This is not live yet: until the next node release, each
-  claim action drains only its own credit. See
+  drains both balances. See
   [broker credit is not referrer credit](../../../concepts/fees.md#referrer-credit).
 - **This is a credit balance, not a fee rate.** The rate a broker charges is the
   `builder.fee` on each order, capped by its

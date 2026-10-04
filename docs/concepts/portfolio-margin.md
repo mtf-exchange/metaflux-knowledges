@@ -101,8 +101,9 @@ else:
 
 ## Multi-collateral (cross-collateral haircut) {#multi-collateral-cross-collateral-haircut}
 
-**Not live yet.** The rules in this section ship with the next node release.
-Until then, no spot token counts as portfolio-margin collateral.
+**No spot token counts today.** A token counts only after governance sets a
+positive `pm_collateral_haircut` for it. No token has one yet, so portfolio
+margin is collateralised in USDC only until that vote.
 
 By default, portfolio margin is collateralised in **USDC** only. Governance can
 also make a selected **spot token** count as portfolio-margin collateral, after a

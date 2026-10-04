@@ -33,8 +33,7 @@ or above 1000.
   on a deployer market, or flips one. The error is `PRECONDITION_FAILED`, with
   the message
   `metaliquidity vault cannot open or extend a position on a MIP-3 market`. An
-  order that only closes a position passes. **Not live yet:** this rule ships
-  with the node release after 2026-10-01.
+  order that only closes a position passes.
 - **Backstop.** The vault never absorbs a deployer market's liquidation. This
   is live. See [Liquidation on a deployed market](./mip-3.md#liquidation).
 - **Strategy.** The reference market maker refuses to start when its list
