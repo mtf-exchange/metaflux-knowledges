@@ -349,8 +349,8 @@ capability does.
 :::caution
 **Not live yet.** These three reads ship with the next archive and gateway
 release. Until then, each one answers `400` `UNKNOWN_TYPE`, the same answer a
-misspelled type gets. Points still count from genesis. The archive publishes
-every past week when the release ships.
+misspelled type gets. Points still count from genesis. When publication starts
+after the release, the archive publishes every past week.
 :::
 
 The [points program](../../concepts/points.md) publishes one table a week. The

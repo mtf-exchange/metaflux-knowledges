@@ -10,8 +10,8 @@ description: The MTF points program — testnet trading volume earns points each
 [`points_leaderboard`](../api/rest/info.md#points_leaderboard) and
 [`points_user`](../api/rest/info.md#points_user) ship with the next archive and
 gateway release. Until then, each one answers `400` `UNKNOWN_TYPE`. Points
-still count from genesis, so no week is lost. The archive publishes every past
-week when the release ships.
+still count from genesis, so no week is lost. When publication starts after the
+release, the archive publishes every past week.
 :::
 
 Trade on the testnet and earn points each week. Each week shares a pool of
@@ -158,8 +158,10 @@ The week issues `1,000,000 × 8,000,000 / 50,000,000 = 160,000` points of its
 | Eligibility | Claims are screened at the TGE against sanctions lists and the Terms. The Terms exclude UK retail consumers from crypto-derivatives. IP data serves screening only, never scoring. |
 | Final review | Weekly numbers are provisional. One review at the TGE snapshot may remove points for abuse. Removed points are not paid. |
 
-Excluded accounts do not appear in the weekly table or in the leaderboard. An
-excluded account reads the same as an account with no qualifying volume.
+Excluded accounts do not appear in the weekly table or in the leaderboard. A
+lookup of an excluded account returns no rows, the same as an account with no raw
+volume. An account with raw volume but no qualifying volume has a row with 0
+points.
 
 ## Budget and conversion {#budget}
 
