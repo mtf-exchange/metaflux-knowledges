@@ -71,6 +71,13 @@ Bind the account to a referrer **address**. To bind by a referral code, send
 [the referral program](../../../concepts/fees.md#referral-binding) for what a
 bind does.
 
+:::info
+**Referral codes are on since 2026-10-05.** So this action accepts only a
+referrer that holds a code. An address without a code fails with
+`referrer has no referral code`. Build an invite link from the code, not from
+the address, and bind with [`set_referrer_by_code`](#set_referrer_by_code).
+:::
+
 ```json
 {
   "type": "set_referrer",
@@ -113,10 +120,13 @@ are off, a bind by address needs no code.
 
 ### Register a referral code {#register_referral_code}
 
-:::caution
-**Refused while referral codes are off.** Governance turns them on by setting
-`referral_code_min_volume_usd` above `0`. Until then, the node refuses this
-action with `referral codes are not enabled`.
+:::info
+**Referral codes are on since 2026-10-05.** The code minimum,
+`referral_code_min_volume_usd`, is 10,000 USDC of trailing 30-day volume. It is
+a governed value. Read the value in force from
+[`fee_schedule`](../info/fees-credit.md#fee_schedule). A vote that sets it to
+`0` turns codes off, and then the node refuses this action with
+`referral codes are not enabled`.
 :::
 
 Register the sender's referral code. A referee then binds to the sender with
@@ -195,7 +205,8 @@ Sign it with the master key.
 
 A bind is permanent. Show the referee the owner first, with
 [`referral_code`](../info/fees-credit.md#referral_code), and bind only after the
-referee confirms it.
+referee confirms it. An invite link carries the code in the form
+`https://app.mtf.exchange/join/<code>`.
 
 ---
 

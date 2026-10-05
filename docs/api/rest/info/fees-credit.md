@@ -44,10 +44,10 @@ series into an empty array.
     "pooled_volume_counts":     true,
     "burn_ratio":         "0.30",
     "referrer_share_bps": "1000",
-    "referee_discount_permille":    0,
-    "referral_code_min_volume_usd": "0",
-    "referee_discount_cap_usd":     "0",
-    "referrer_reward_cap_usd":      "0"
+    "referee_discount_permille":    50,
+    "referral_code_min_volume_usd": "10000",
+    "referee_discount_cap_usd":     "25000000",
+    "referrer_reward_cap_usd":      "1000000000"
   }
 }
 ```
@@ -72,8 +72,10 @@ series into an empty array.
 - Fee rates are decimal basis points as strings with one fractional digit (e.g. `"2.0"` = 2 bps = 0.02%, `"0.5"` = 0.5 bps = 0.005%), for sub-basis-point precision.
 - `burn_ratio` is a decimal fraction (`"0.30"` = 30% of fees burned).
 - **The five referral fields are governed, and they serve the values in force.**
-  A node serves all five, with the defaults shown above. Those defaults change
-  no fee: governance turns the program on by vote. See
+  The example shows the values governance set on 2026-10-05. Before those votes
+  the node served the defaults: `"1000"`, `0`, `"0"`, `"0"` and `"0"`. A later
+  vote can change any of them without a release, so read this field, not this
+  page. See
   [the referral program](../../../concepts/fees.md#referral-parameters).
 - **There is no builder-rebate field on this read, and there is no protocol rebate to a broker.**
   A broker is paid the `builder.fee` it sets on each order, and that rate is capped by the
@@ -212,7 +214,7 @@ register a code.
 |-----|------|----------|---------|
 | `address` | hex address | yes | The account to read. `user` is the older name and still answers |
 
-**Response** — a referee, with the planned program values in force:
+**Response** — a referee, with the program values of 2026-10-05 in force:
 
 ```json
 {
@@ -229,7 +231,7 @@ register a code.
       "volume_since_bind":         "12500",
       "fees_paid":                 "4.125",
       "rewarded":                  "0.4125",
-      "discount_permille":         40,
+      "discount_permille":         50,
       "discount_volume_remaining": "24987500",
       "share_volume_remaining":    "999987500"
     },

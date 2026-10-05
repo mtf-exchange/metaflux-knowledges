@@ -235,7 +235,7 @@ Per-sub agent management, per-sub PM enrollment, and per-sub margin modes are al
 | `approveAgent` | [`approve_agent`](../api/rest/exchange/account.md#approve_agent) |
 | `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin) |
 | `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange/account.md#convert_to_multi_sig_user) |
-| `setReferrer` / `createReferral` | [`set_referrer_by_code`](../api/rest/exchange/account.md#set_referrer_by_code) / [`register_referral_code`](../api/rest/exchange/account.md#register_referral_code). [`set_referrer`](../api/rest/exchange/account.md#set_referrer) binds by address. A code needs **trailing 30-day** volume, not lifetime volume, and the referee discount and the referrer share each stop at a cap on the referee's volume. See [the referral program](../concepts/fees.md#referrer-credit) |
+| `setReferrer` / `createReferral` | [`set_referrer_by_code`](../api/rest/exchange/account.md#set_referrer_by_code) / [`register_referral_code`](../api/rest/exchange/account.md#register_referral_code). [`set_referrer`](../api/rest/exchange/account.md#set_referrer) binds by address, but only to an address that holds a code. A code needs **trailing 30-day** volume, not lifetime volume, and the referee discount and the referrer share each stop at a cap on the referee's volume. See [the referral program](../concepts/fees.md#referrer-credit) |
 
 ### `sendToEvmWithData` — a copied payload will be refused {#send-to-evm-with-data-note}
 

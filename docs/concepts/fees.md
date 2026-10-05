@@ -271,11 +271,36 @@ drift apart.
 
 ## Referral program {#referrer-credit}
 
-
 A referrer brings a trader to the exchange. The trader is the **referee**. When
 the referee pays a taker fee, the referrer gets a **share** of that fee, and the
 referee can get a **discount** on its taker rate. Both stop at a **cap** on the
 referee's volume.
+
+### How the program works {#referral-overview}
+
+Governance turned referral codes on 2026-10-05. Every value below is a governed
+parameter. Read the value in force from
+[`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) before you show it.
+
+| Step | Rule | Value on 2026-10-05 |
+|---|---|---|
+| Get a code | Your trailing 30-day taker plus maker volume reaches `referral_code_min_volume_usd`. Then you register one code. The code is permanent | 10,000 USDC |
+| Share the code | Send the invite link `https://app.mtf.exchange/join/<code>` | — |
+| Bind | The trader binds to the code once. The bind is permanent | — |
+| The referee earns | `referee_discount_permille` off its taker rate | `50` (5%) |
+| The referrer earns | `referrer_share_bps` of each taker fee the referee pays | `1000` (10%) |
+| The discount stops | The referee's taker volume since the bind reaches `referee_discount_cap_usd` | 25,000,000 USDC |
+| The share stops | The same volume reaches `referrer_reward_cap_usd` | 1,000,000,000 USDC |
+
+- **Bind with a code.** While codes are on, a bind by address works only to an
+  account that holds a code. So an invite link must carry the code, not an
+  address.
+- **A referred account cannot get a code, and a code holder cannot bind.**
+  Referrals are single-level.
+- **The share is USDC credit.** Read it with
+  [`referral_state`](../api/rest/info/fees-credit.md#referral_state) and claim it
+  with [`claim_referral_rewards`](../api/rest/exchange/account.md#claim_referral_rewards).
+  The claim also drains the broker credit.
 
 ### Referral codes {#referral-codes}
 
@@ -300,7 +325,8 @@ with [`register_referral_code`](../api/rest/exchange/account.md#register_referra
   addresses cannot mint codes for free. The chain keeps a 30-day counter and no
   lifetime counter, so the rule reads the 30-day counter.
 - **A minimum of `0` turns codes off.** Then the node refuses every
-  registration, and `set_referrer` by address needs no code.
+  registration, and `set_referrer` by address needs no code. The minimum is
+  10,000 USDC since 2026-10-05, so codes are on.
 
 ### Bind to a referrer {#referral-binding}
 
@@ -315,7 +341,9 @@ A referee binds once, with
   an account that has its own referrer. An account that already has referees
   also cannot bind, and neither can an account that holds a code.
 - **While codes are on, an address bind needs a code holder.** `set_referrer`
-  refuses a referrer that holds no code. Without this rule, one trader could
+  refuses a referrer that holds no code, with `referrer has no referral code`.
+  Codes are on, so an invite link that carries an address fails for every
+  address without a code. Without this rule, one trader could
   bind a fresh second address to itself and take the share on its own fees,
   without the 30-day volume a code costs.
 - **You can bind after your first trade.** Nothing is retroactive. The share,
@@ -343,7 +371,7 @@ referrer_share    = trunc_1e-6(fee_paid × referrer_share_bps / 10000)
   applies on perp and spot taker fills, where the staking discount applies.
 - **The rate truncates to a whole 0.1 basis point.** So the real discount can
   be a little larger than the permille. At the base taker rate of 0.035%, a
-  40‰ discount gives 0.033%, not 0.0336%.
+  50‰ discount gives 0.033%, not 0.03325%.
 - **A maker fee carries nothing.** The maker side has no share and no
   discount.
 - **A liquidation fill carries no share and no discount.** The liquidation
@@ -367,8 +395,9 @@ Two governed caps stop the program for one referee:
 | `referee_discount_cap_usd` | the referee discount | the referee's taker volume since the bind reaches the cap |
 | `referrer_reward_cap_usd` | the referrer share on that referee's fees | the same volume reaches this cap |
 
-- **`0` means no cap.** The default of every cap is `0`, so no cap stops a
-  share until governance sets one.
+- **`0` means no cap.** The default of every cap is `0`. Governance set both
+  caps on 2026-10-05: 25,000,000 USDC for the discount and 1,000,000,000 USDC
+  for the share.
 - **The fill that crosses a cap still counts.** The node compares the volume
   from BEFORE the fill. The next fill gets nothing.
 - **Only a taker fill adds volume.** A maker fill and a liquidation fill add
@@ -384,20 +413,18 @@ Two governed caps stop the program for one referee:
 Validators change each value with a `vote_global` of the kind below. The node
 checks the bounds at the vote.
 
-| Kind | `kind_name` | Sets | Bounds | Default |
-|---|---|---|---|---|
-| 131 | `set_referrer_share_bps` | the referrer share, bps of the fee paid | `0` to `10000` | `1000` (10%) |
-| 132 | `set_referee_discount_permille` | the referee discount, permille off the taker rate | `0` to `1000` | `0` |
-| 133 | `set_referral_code_min_volume_usd` | the 30-day volume a code needs, whole USDC. `0` = codes off | integer, `0` to 10^12 | `0` |
-| 134 | `set_referee_discount_cap_usd` | the discount cap, whole USDC of referee volume. `0` = no cap | integer, `0` to 10^15 | `0` |
-| 135 | `set_referrer_reward_cap_usd` | the share cap, whole USDC of referee volume. `0` = no cap | integer, `0` to 10^15 | `0` |
+| Kind | `kind_name` | Sets | Bounds | Default | Value on 2026-10-05 |
+|---|---|---|---|---|---|
+| 131 | `set_referrer_share_bps` | the referrer share, bps of the fee paid | `0` to `10000` | `1000` (10%) | `1000` (10%) |
+| 132 | `set_referee_discount_permille` | the referee discount, permille off the taker rate | `0` to `1000` | `0` | `50` (5%) |
+| 133 | `set_referral_code_min_volume_usd` | the 30-day volume a code needs, whole USDC. `0` = codes off | integer, `0` to 10^12 | `0` | `10000` |
+| 134 | `set_referee_discount_cap_usd` | the discount cap, whole USDC of referee volume. `0` = no cap | integer, `0` to 10^15 | `0` | `25000000` |
+| 135 | `set_referrer_reward_cap_usd` | the share cap, whole USDC of referee volume. `0` = no cap | integer, `0` to 10^15 | `0` | `1000000000` |
 
-**The defaults change no fee.**
-Governance turns the program on with votes. The planned values are a 10% share,
-a 40‰ (4%) discount, a 10,000 USDC code minimum, a 25,000,000 USDC discount cap
-and a 1,000,000,000 USDC share cap. They are planned, not live.
-[`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) serves the values in
-force.
+**The defaults change no fee. The votes of 2026-10-05 turned the program on.**
+A later vote can change any value without a release, so this table can lag the
+chain. [`fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule) serves the
+values in force.
 
 ### What a self-referral can earn {#referral-self-referral-bound}
 
@@ -408,8 +435,8 @@ fraction of a fee the undiscounted rate would charge, at most:
 discount + share × (1 − discount)
 ```
 
-`discount` is the real discount after the rate truncation. With the planned
-values at the base taker rate, the rate falls from 0.035% to 0.033%, so the
+`discount` is the real discount after the rate truncation. With the values of
+2026-10-05 at the base taker rate, the rate falls from 0.035% to 0.033%, so the
 discount is 2/35, about 5.7%. The pair gets back about
 `0.057 + 0.10 × 0.943 ≈ 15.1%`. That is never more than the fee, so a
 self-referral is a discount the pair paid volume to earn, not a way to take
