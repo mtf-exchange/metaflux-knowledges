@@ -89,19 +89,26 @@ route is **never mounted on mainnet** (`chainId 8964`). Full contract:
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
-  -d '{"address":"0x<YOUR_ADDRESS>"}'
+  -d '{"address":"0x<YOUR_ADDRESS>","expires":<unix seconds>,"signature":"0x<personal_sign result>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
 - Grants **3000 USDC** cross-collateral and **10 MTF** spot — **once ever per
   address** (a second claim returns `429 address already funded`).
-- `amount` is optional (whole USDC) and caps the USDC grant *downward* (≤ 3000).
-  The MTF grant is fixed — see [Limits](api/rest/faucet.md#limits).
+- The recipient signs the claim with `personal_sign`, and must hold at least
+  **0.01 ETH on Ethereum mainnet**. The node checks both from its next release;
+  not live yet. See [sign the claim](api/rest/faucet.md#sign) and
+  [who can claim](api/rest/faucet.md#eligibility).
+- The grant is fixed. Send no `amount`: the node ignores it from its next
+  release, and until then it only lowers the USDC grant. See
+  [Limits](api/rest/faucet.md#limits).
 - Per source IP: one claim per minute. The per-IP window crosses with the
   per-address rule: a new address behind a used IP waits, and a used address is
   refused from any IP.
 - `400` invalid address · `429` already funded or IP-throttled · `503` backlog
-  full — body `{"error":"…"}`.
+  full — body `{"error":"…"}`. From the next node release, `400` and `403` also
+  refuse an unsigned, expired or foreign claim and a recipient under the
+  balance. See [errors](api/rest/faucet.md#errors).
 
 :::info
 **`"queued"` means staged, not credited.** The faucet transfers out of a reserve

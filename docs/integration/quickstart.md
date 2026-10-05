@@ -36,15 +36,21 @@ See [networks](../networks.md) for the full list including testnet and (post-lau
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
-  -d '{"address":"0x<YOUR_ADDRESS>"}'
+  -d '{"address":"0x<YOUR_ADDRESS>","expires":<unix seconds>,"signature":"0x<personal_sign result>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
+
+The recipient signs the claim: an EIP-191 `personal_sign` over a four-line text
+that names the address, the chain id and `expires`. From the next node release
+the node checks the signature, and refuses a recipient that holds less than
+**0.01 ETH on Ethereum mainnet**; not live yet. See
+[sign the claim](../api/rest/faucet.md#sign).
 
 One claim grants **3000 USDC** cross-collateral **and 10 MTF** spot tokens —
 **once ever per address** (a second claim returns `429 address already funded`),
 rate-limited per source IP (one claim per minute) and crossed with the
-per-address rule. The optional `amount` only caps the USDC grant *downward*
-(≤ 3000); MTF is fixed — see [Limits](../api/rest/faucet.md#limits). The grant is
+per-address rule. The grant is fixed; send no `amount` — see
+[Limits](../api/rest/faucet.md#limits). The grant is
 `"queued"` — it lands ~1 block later, so wait a moment before confirming the
 balance:
 
