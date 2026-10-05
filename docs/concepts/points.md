@@ -58,9 +58,9 @@ user vault goes to its root.
 
 **Qualifying fill.** A fill qualifies when all five of these hold:
 
-1. The market is a governance-listed perpetual market or spot pair. Builder-deployed
-   ([MIP-3](../mip/mip-3.md)) markets, options, the MTF/USDC spot pair and the
-   MTF perpetual market do not count.
+1. The market is a governance-listed perpetual market. Spot pairs, builder-deployed
+   ([MIP-3](../mip/mip-3.md)) markets, options and the MTF perpetual market do not count.
+   A spot pair has no outside price to check a fill against: its mark is its own last trade.
 2. Neither side of the trade is a liquidation.
 3. The fill price is inside the mark band:
    `0.99 × bar.low ≤ px ≤ 1.01 × bar.high`. `bar` is the market's 1-minute
@@ -146,10 +146,10 @@ The week issues `1,000,000 × 8,000,000 / 50,000,000 = 160,000` points of its
 | Rule | Statement |
 |---|---|
 | Scope | Only testnet trading volume earns points. Mainnet activity earns none. |
-| Markets | Governance-listed perpetual markets and spot pairs only. The MTF/USDC spot pair, the MTF perpetual market, builder-deployed markets and options earn nothing. |
+| Markets | Governance-listed perpetual markets only. Spot pairs, the MTF perpetual market, builder-deployed markets and options earn nothing. |
 | Root account | A sub-account earns as its parent, and a user vault as its leader. A fill between a root and its own sub-account or vault earns nothing. |
 | Exclusion | Protocol accounts, validators, protocol vaults and accounts operated by the MetaFlux team earn no points. A fill against an excluded account earns nothing for either side. The one exception is a taker fill against the protocol Metaliquidity vault (vault id 1). |
-| Cluster | Two roots are one cluster when one of these links them: a transfer between them; one agent wallet approved by both; a trade between them outside the mark band; a closed trading group, where most of each member's volume is against the other members. Faucet grants never link accounts. A fill inside a cluster earns nothing. The 25% rule counts a cluster as one counterparty. |
+| Cluster | Two roots are one cluster when one of these links them: transfers in both directions between them, above a threshold; one agent wallet that signs for both; a trade between them outside the mark band; a closed trading group, where most of each member's volume is against the other members. A link one side makes alone, such as a small transfer to another account, never joins two accounts. Faucet grants never link accounts. A fill inside a cluster earns nothing, and the 25% rule counts a cluster as one counterparty. |
 | Concentration | Volume against one counterparty cluster counts up to 25% of your weekly raw volume. Taker volume against vault id 1 is exempt. |
 | Mark band | A fill more than 1% outside the market's 1-minute mark range earns nothing. |
 | Liquidations | A trade with a liquidation on either side earns nothing. |
