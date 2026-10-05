@@ -131,7 +131,7 @@ These votes do not exist on mainnet.
 
 | Bucket | Share | Tokens | Unlock | Purpose |
 |--------|------:|-------:|--------|---------|
-| **Community airdrop** | 30% | 300,000,000 | 100% claimable at TGE on mainnet; optional lock bonus (see below) | Active traders, market makers, and points-program participants from the 6-month testnet |
+| **Community airdrop** | 30% | 300,000,000 | The points-program allocation is 100% claimable at TGE on mainnet; optional lock bonus (see below). The unallocated rest stays reserved. | Testnet points program (genesis to TGE, at most 100,000,000 MTF; see [Points](points.md)). The other 200,000,000 MTF is reserved and unallocated. |
 | **Core contributors** | 20% | 200,000,000 | 12-month cliff, then 72-month linear | Founders and core team. Zero unlock in year one. |
 | **Liquidity & market making** | 12% | 120,000,000 | Governance-released; ≤ 6% of bucket per quarter | Protocol-owned liquidity vault seed ([MIP-2](../mip/mip-2.md)), market-maker token loans |
 | **Validator bootstrap** | 8% | 80,000,000 | Emitted via the stake-curve reward schedule, sized to a 36-month runway | Early staking APR before fee revenue carries the yield |
@@ -151,8 +151,8 @@ Notes:
 
 ### Airdrop lock bonus {#airdrop-lock-bonus}
 
-The 30% airdrop is fully claimable at TGE. Claimants may instead commit their
-allocation to a ve-lock at claim time and receive a bonus, funded from the
+The points-program allocation is fully claimable at TGE. Claimants may instead
+commit their allocation to a ve-lock at claim time and receive a bonus, funded from the
 Ecosystem & incentives bucket:
 
 | Choice at claim | Bonus | Lock |
@@ -171,7 +171,8 @@ one like any other locked stake.
 ```text
 genesis            : 1,000,000,000 MTF, fixed
 
-TGE (mainnet)      : 300M airdrop claimable (locked portion earns bonus, out of float)
+TGE (mainnet)      : up to 100M points MTF claimable (locked portion earns bonus, out of float)
+                     the other 200M of the airdrop bucket stays reserved
                      liquidity bucket begins quarterly releases
                      validator bootstrap begins emitting on the stake curve
 

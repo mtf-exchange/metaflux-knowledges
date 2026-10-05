@@ -267,6 +267,7 @@ type for its request fields and response schema.
 | **[Governance](./info/governance.md)**<br/>proposals, votes and the parameter set | [`validator_votes`](./info/governance.md#validator_votes) · [`gov_state`](./info/governance.md#gov_state) · [`gov_proposals`](./info/governance.md#gov_proposals) · [`gov_history`](./info/governance.md#gov_history) |
 | **[Chain activity](./info/chain.md)**<br/>recent blocks, and one action's outcome | [`recent_blocks`](./info/chain.md#recent_blocks) · [`recent_transactions`](./info/chain.md#recent_transactions) |
 | **[Node snapshots](./info/node.md)**<br/>peers, sync state and node-scoped figures | [`exchange_status`](./info/node.md#exchange_status) · [`user_twaps`](./info/node.md#user_twaps) · [`vault_summaries`](./info/node.md#vault_summaries) · [`user_rate_limit`](./info/node.md#user_rate_limit) · [`approved_brokers`](./info/node.md#approved_brokers) · [`validator_l1_votes`](./info/node.md#validator_l1_votes) · [`validator_summaries`](./info/node.md#validator_summaries) · [`gossip_root_ips`](./info/node.md#gossip_root_ips) |
+| **[Points](#points-reads)** (not live yet)<br/>the weekly points table | [`points_weeks`](#points_weeks) · [`points_leaderboard`](#points_leaderboard) · [`points_user`](#points_user) |
 
 ## Removed reads {#retired-reads}
 
@@ -342,6 +343,196 @@ capability does.
 |---|---|
 | `mip3_deployer_oracle` | The `mip3_deployer_oracle` protocol feature is armed on the target chain |
 | `fba_batch_state` | The FBA engine becomes reachable from `/exchange` |
+
+## Points reads {#points-reads}
+
+:::caution
+**Not live yet.** These three reads ship with the next archive and gateway
+release. Until then, each one answers `400` `UNKNOWN_TYPE`, the same answer a
+misspelled type gets. Points still count from genesis. The archive publishes
+every past week when the release ships.
+:::
+
+The [points program](../../concepts/points.md) publishes one table a week. The
+history archive computes it, and these three reads serve it.
+
+**Amounts are decimal strings in whole units**: USD for a volume, points for a
+point count. They carry up to six decimals. Week numbers, season numbers, blocks
+and times are numbers. A time is in milliseconds.
+
+**Weeks count from genesis.** Week 1 ends 2026-09-09 00:00 UTC. Each later week
+ends seven days after the one before it, on a Wednesday 00:00 UTC cut. A `week`
+argument is this number, not a week inside a season.
+
+**A rejected argument answers `400`** with the message `missing field: season`,
+`missing field: address` or `invalid user address: <value>`. Test the type of
+`error` before you read `code`, as on [the archive lane](#archive-lane).
+
+**With no archive behind the endpoint**, each read answers `200` with
+`rows: []` and a `flag` string. The public endpoint runs the archive.
+
+### `points_weeks` {#points_weeks}
+
+Every published week, oldest first. A published week never changes, so its two
+hashes never change.
+
+**Request**
+
+```json
+{ "type": "points_weeks" }
+```
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "points_weeks",
+    "rows": [
+      {
+        "week": 5,
+        "season": 1,
+        "week_start": 1790726400000,
+        "week_end": 1791331200000,
+        "block_from": 23140512,
+        "block_to": 28617903,
+        "gap_blocks": 0,
+        "pool": "1000000",
+        "q_floor": "50000000",
+        "total_qualifying_volume": "8000000",
+        "issued_points": "160000",
+        "table_sha256": "a5c941fbd48fb9774d4938a4cd625f345a324562f2e19c3d80e8ae84f492828e",
+        "inputs_sha256": "3103ca2c526671100cddc82b201afff8768a8c39b2dafefc6f0c5ccc9cc66441",
+        "published_at": 1791332400000
+      }
+    ]
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `week` | Week number since genesis |
+| `season` | Season number, 1 to 4 |
+| `week_start` / `week_end` | The week's start (inclusive) and its cut (exclusive) |
+| `block_from` / `block_to` | The first block of the week, and the cut block: the last block before `week_end` |
+| `gap_blocks` | Blocks of the range where the archive has a recorded gap in fills. The week counts the fills the archive holds, and the pool does not change |
+| `pool` | Points the week shares. `"1000000"`, except the partial last week before the TGE |
+| `q_floor` | `Q_floor`, in USD |
+| `total_qualifying_volume` | `Σqv` over every root, in USD |
+| `issued_points` | Points the week issued. Below `pool` when `Σqv` is below `q_floor` |
+| `table_sha256` | SHA-256 of the full table. See [check the table hash](../../concepts/points.md#how-to-check) |
+| `inputs_sha256` | SHA-256 of the week's exclusion, root and cluster inputs. It commits to them without showing them |
+| `published_at` | When the archive published the week |
+
+### `points_leaderboard` {#points_leaderboard}
+
+The full table of one week, or the season total. Ranked by points, highest
+first, then by address. 1,000 rows a page.
+
+**Request**
+
+```json
+{ "type": "points_leaderboard", "season": 1, "week": 5, "offset": 0 }
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `season` | number | yes | Season number |
+| `week` | number | no | Week number since genesis. Omit it for the season total. A week outside `season` answers no rows |
+| `offset` | number | no | Rows to skip. Default `0`. Add 1,000 for the next page |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "points_leaderboard",
+    "season": 1,
+    "week": 5,
+    "offset": 0,
+    "rows": [
+      {
+        "rank": 1,
+        "address": "0x1933587ffa064e26bf8f6c7b0fdec771644b56de",
+        "raw_volume": "5350000",
+        "qualifying_volume": "5350000",
+        "points": "107000"
+      },
+      {
+        "rank": 2,
+        "address": "0xac7dc3a2f08610ddc46c7a3e4f54b80745cbd8e9",
+        "raw_volume": "3000000",
+        "qualifying_volume": "2650000",
+        "points": "53000"
+      }
+    ]
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `week` | The week you asked for, or `null` for the season total |
+| `rank` | `offset` plus the row's place on the page, from 1 |
+| `address` | The root account |
+| `raw_volume` / `qualifying_volume` | `raw` and `qv`, in USD |
+| `points` | Points for the week, or for the season |
+
+**The table holds every root with raw volume**, not only roots that earned. A
+root under the $1,000 minimum has a row with `points` `"0"`. Excluded accounts
+have no row. A page with fewer than 1,000 rows is the last page.
+
+### `points_user` {#points_user}
+
+One account's points, one row per week it traded.
+
+**Request**
+
+```json
+{ "type": "points_user", "address": "0xdaca1e722d0a355b2242f144b3dfb1cc378e9405", "season": 1 }
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `address` | address | yes | Any account. A sub-account or user vault answers with its root's rows |
+| `season` | number | no | Season number. Omit it for every season |
+
+**Response**
+
+```json
+{
+  "data": {
+    "type": "points_user",
+    "address": "0xdaca1e722d0a355b2242f144b3dfb1cc378e9405",
+    "root": "0xac7dc3a2f08610ddc46c7a3e4f54b80745cbd8e9",
+    "season": 1,
+    "rows": [
+      {
+        "week": 5,
+        "season": 1,
+        "week_end": 1791331200000,
+        "raw_volume": "3000000",
+        "qualifying_volume": "2650000",
+        "points": "53000"
+      }
+    ]
+  }
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `address` | The address you sent, in lower case |
+| `root` | The account that earns for `address`. It differs from `address` for a sub-account or a user vault |
+| `season` | The season you asked for, or `null` for every season |
+| `rows` | The root's weeks, oldest first |
+
+**The rows are the root's, not the sub-account's own.** A sub-account and its
+parent answer the same `rows`.
+
+**An empty `rows` has three causes**: the account had no raw volume, no week is
+published yet, or the account is excluded. The read does not tell them apart.
 
 
 ## Errors {#errors}

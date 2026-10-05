@@ -15,6 +15,7 @@ const sidebars = {
 
     {type: 'doc', id: 'concepts/consensus', label: 'MetaFluxBFT'},
     {type: 'doc', id: 'concepts/tokenomics', label: 'Tokenomics'},
+    {type: 'doc', id: 'concepts/points', label: 'Points'},
 
     {
       type: 'category',
