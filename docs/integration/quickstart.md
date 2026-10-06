@@ -1,20 +1,24 @@
-# Quickstart — 5-minute end-to-end
+# Quickstart
+
+This page takes a client through one full round trip on testnet: deposit, order, cancel and
+withdrawal.
 
 :::info
 **Status.** **stable** wire surface. Testnet endpoints, no mainnet warranty.
 :::
 
-Deposit, place an order, cancel, withdraw. By the end of this page your TypeScript / Python / curl session has done a complete round-trip against testnet.
+At the end of this page, your TypeScript, Python or curl session has deposited, placed an order,
+cancelled it and withdrawn on testnet. It takes about 5 minutes.
 
 ## Prerequisites {#prerequisites}
 
-- An EVM private key (any 32-byte hex; generate a fresh one — never reuse a mainnet key)
-- USDC on a MetaBridge source chain (Base or Arbitrum) — on testnet the faucet replaces this
-- `curl` or any HTTP client
+- An EVM private key: any 32-byte hex value. Generate a new one. Never reuse a mainnet key.
+- USDC on a MetaBridge source chain (Base or Arbitrum). On testnet, the faucet replaces this.
+- `curl` or any HTTP client.
 
 ## Endpoints {#endpoints}
 
-The gateway is the single public front door, serving the MTF-native surface.
+The gateway is the one public entry point. It serves the MTF-native surface.
 
 | Service | URL (testnet) |
 |---------|--------------|
@@ -24,14 +28,13 @@ The gateway is the single public front door, serving the MTF-native surface.
 | Faucet | `POST /faucet` |
 | Explorer | `https://app.mtf.exchange/explorer` |
 
-> The faucet is **not** a separate service — it's the `POST /faucet` route on the
-> gateway front door. Running the node yourself? The same native surface
-> (`/info` · `/exchange` · `/ws` · `/faucet`) is served directly at
-> `http://localhost:8080`. See [`POST /faucet`](../api/rest/faucet.md).
+The faucet is not a separate service. It is the `POST /faucet` route on the gateway. If you run
+the node yourself, it serves the same native surface (`/info` · `/exchange` · `/ws` · `/faucet`)
+at `http://localhost:8080`. See [`POST /faucet`](../api/rest/faucet.md).
 
-See [networks](../networks.md) for the full list including testnet and (post-launch) mainnet.
+[Networks](../networks.md) has the full list, with testnet and, after launch, mainnet.
 
-## Step 1 — Get testnet USDC {#step-1-get-testnet-usdc}
+## 1. Get testnet USDC {#step-1-get-testnet-usdc}
 
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/faucet \
@@ -40,30 +43,28 @@ curl -X POST https://api.testnet.mtf.exchange/faucet \
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
-One claim grants **3000 USDC** cross-collateral **and 10 MTF** spot tokens —
-**once ever per address** (a second claim returns `429 address already funded`),
-rate-limited per source IP (one claim per minute) and crossed with the
-per-address rule. The optional `amount` only caps the USDC grant *downward*
-(≤ 3000); MTF is fixed — see [Limits](../api/rest/faucet.md#limits). The grant is
-`"queued"` — it lands ~1 block later, so wait a moment before confirming the
-balance:
+One claim grants 3000 USDC cross-collateral and 10 MTF spot tokens. Each address can claim only
+once. A second claim returns `429 address already funded`. The faucet also limits each source IP
+to one claim per minute, in addition to the rule per address. The optional `amount` can only
+lower the USDC grant (≤ 3000). The MTF grant is fixed. See
+[Limits](../api/rest/faucet.md#limits). The grant is `"queued"` and lands about 1 block later.
+Wait a moment before you confirm the balance:
 
-:::info
-**`"queued"` means staged, not credited.** The faucet transfers out of a reserve
-account rather than creating tokens, so the grant lands about one block later.
-The reserve is checked before the response, so a `200` means it could pay at that
-moment. Confirm with `account_state` below before you trade — see
+:::info `"queued"` means staged, not credited
+The faucet transfers out of a reserve account. It does not create tokens, so the grant lands about
+one block later. The faucet checks the reserve before it responds, so a `200` means the reserve
+could pay at that moment. Confirm with `account_state` below before you trade. See
 [the reserve](../api/rest/faucet.md#reserve).
 :::
 
-> The faucet is a **test-network convenience only**. To fund a real account
-> with bridged USDC, deposit through the MetaBridge custody bridge — call the
-> source chain's `deposit(mtfDest, amount)` (never a plain transfer to the
-> custody address). See [bridge → deposit](../bridge/index.md#deposit-source-chain--metaflux).
+The faucet exists for testnet only. To fund a real account with bridged USDC, deposit through the
+MetaBridge custody bridge. Call `deposit(mtfDest, amount)` on the source chain. Never send a plain
+transfer to the custody address. See
+[bridge deposit](../bridge/index.md#deposit-source-chain--metaflux).
 
-The raw curls below speak **MTF-native** on the gateway (snake_case types like
-`account_state` / `open_orders`). The `@metaflux-dex/client` examples speak the
-same native surface — the SDK just builds the signed envelope for you.
+The raw curls below use the MTF-native surface on the gateway, with snake_case types such as
+`account_state` / `open_orders`. The `@metaflux-dex/client` examples use the same native surface.
+The SDK builds the signed envelope for you.
 
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/info \
@@ -71,17 +72,18 @@ curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"account_state","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-You should see `data.account_value: "3000"`.
+The response shows `data.account_value: "3000"`.
 
-## Step 2 — Place a limit order {#step-2--place-a-limit-order}
+## 2. Place a limit order {#step-2--place-a-limit-order}
 
 :::tip
-**Going further than this quickstart?** [Placing orders](./placing-orders.md) is
-the canonical order guide — the raw wire request and response, the two number
-planes, and a tiered map of every order action.
+[Placing orders](./placing-orders.md) is the main order guide. It covers the raw wire request and
+response, the two number planes, and a tiered map of every order action.
 :::
 
-The full signing flow is in [signing](./signing.md). For this quickstart use the official TypeScript SDK (`@metaflux-dex/client` — ships before mainnet; see [TypeScript SDK](./typescript-sdk.md)).
+[Signing](./signing.md) has the full signing flow. For this quickstart, use the official
+TypeScript SDK, `@metaflux-dex/client`. It ships before mainnet. See
+[TypeScript SDK](./typescript-sdk.md).
 
 ```typescript
 import { Client } from '@metaflux-dex/client';
@@ -117,7 +119,8 @@ if (result.route === 'batch_order') {
 }
 ```
 
-Raw curl (MTF-native shape — you build the signature yourself; see [signing](./signing.md)):
+Raw curl, in the MTF-native shape. You build the signature yourself. See
+[signing](./signing.md).
 
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/exchange \
@@ -125,15 +128,15 @@ curl -X POST https://api.testnet.mtf.exchange/exchange \
   -d @order.json
 ```
 
-where `order.json` is the signed MTF-native envelope you assembled.
+Here `order.json` is the signed MTF-native envelope that you assembled.
 
 ### Spot trading example {#spot-trading-example}
 
-[Spot](../products/spot.md) is a token-for-token CLOB, separate from
-perps — no leverage, no positions. Place a spot order with the native
-[`spot_order`](../api/rest/exchange/spot.md#spot_order) action: it takes a **spot pair
-id** (not a perp `market`), a `side`, a `limit_px`, a `size`, and a `tif`. A
-resting `gtc`/`alo` order locks reserved-balance escrow; `ioc` never rests.
+[Spot](../products/spot.md) is a token-for-token CLOB, separate from perps. It has no leverage
+and no positions. Place a spot order with the native
+[`spot_order`](../api/rest/exchange/spot.md#spot_order) action. It takes a spot pair id (not a
+perp `market`), a `side`, a `limit_px`, a `size` and a `tif`. A resting `gtc`/`alo` order locks
+reserved-balance escrow. An `ioc` order never rests.
 
 ```jsonc
 // the `action` you sign and POST to /exchange (sender-authorized; owner is optional)
@@ -150,12 +153,12 @@ resting `gtc`/`alo` order locks reserved-balance escrow; `ioc` never rests.
 }
 ```
 
-The synchronous response carries the assigned `oid` with a `resting` or `filled`
-entry (the same status union as a perp order). Read your spot balances and open
-spot orders back via [`POST /info`](../api/rest/info.md); cancel with
+The synchronous response carries the assigned `oid` with a `resting` or `filled` entry. This is
+the same status union as a perp order. Read your spot balances and open spot orders through
+[`POST /info`](../api/rest/info.md). Cancel with
 [`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel), which refunds the escrow.
 
-## Step 3 — Check the order is on the book {#step-3--check-the-order-is-on-the-book}
+## 3. Check the order on the book {#step-3--check-the-order-is-on-the-book}
 
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/info \
@@ -163,9 +166,9 @@ curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"open_orders","address":"0x<YOUR_ADDRESS>"}'
 ```
 
-You should see your order with the `oid` from step 2.
+The response shows your order with the `oid` from step 2.
 
-Or, subscribe to live updates (preferred for any non-trivial usage):
+You can also subscribe to live updates. This is the preferred method for any real use:
 
 ```typescript
 const ws = await client.connectWs();
@@ -175,7 +178,7 @@ ws.onMessage((f) => {
 await ws.subscribe({ type: 'order_updates', user: owner });
 ```
 
-## Step 4 — Cancel {#step-4--cancel}
+## 4. Cancel {#step-4--cancel}
 
 ```typescript
 if (result.route === 'batch_order') {
@@ -191,7 +194,7 @@ curl -X POST https://api.testnet.mtf.exchange/exchange \
   -d @cancel.json
 ```
 
-## Step 5 — Withdraw {#step-5--withdraw}
+## 5. Withdraw {#step-5--withdraw}
 
 ```typescript
 await client.mbWithdraw({
@@ -202,9 +205,11 @@ await client.mbWithdraw({
 });
 ```
 
-This queues a MetaBridge withdrawal. After the MetaFlux validator set co-signs it to a ⅔ stake-weighted quorum and the dispute window elapses (a few minutes), you can `claim` on the destination chain (see [bridge](../bridge/)).
+This call queues a MetaBridge withdrawal. The MetaFlux validator set co-signs it to a ⅔
+stake-weighted quorum. Then the dispute window elapses, which takes a few minutes. Then you can
+`claim` on the destination chain. See [bridge](../bridge/).
 
-## What just happened {#what-just-happened}
+## Request flow {#what-just-happened}
 
 ```mermaid
 sequenceDiagram
@@ -236,13 +241,14 @@ sequenceDiagram
 
 ## Next steps {#next-steps}
 
-- [Placing orders](./placing-orders.md) — the canonical order guide: batches, spot, cancels, number planes
-- [Signing](./signing.md) — what's inside the SDK's signing
-- [Agent wallets in practice](./agent-wallets-howto.md) — production hot-key pattern
-- [Order types](../concepts/order-types.md) — beyond plain limit orders
-- [Error handling](./error-handling.md) — admission vs commit vs network
-- [WS subscriptions](../api/ws/subscriptions.md) — push for live data
-- [Migrating from HL](./migrating-from-hl.md) — already have a Hyperliquid bot? this page first
+- [Placing orders](./placing-orders.md): the main order guide, with batches, spot, cancels and
+  number planes
+- [Signing](./signing.md): what the SDK signing does
+- [Agent wallets in practice](./agent-wallets-howto.md): the production hot-key pattern
+- [Order types](../concepts/order-types.md): order types other than plain limit orders
+- [Error handling](./error-handling.md): admission, commit and network errors
+- [WS subscriptions](../api/ws/subscriptions.md): push for live data
+- [Migrating from HL](./migrating-from-hl.md): read this first if you have a Hyperliquid bot
 
 ## Troubleshooting {#troubleshooting}
 
@@ -251,18 +257,18 @@ sequenceDiagram
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `401 signer is not the sender` | Wrong EIP-712 domain chain id | The SDK signs against `MTF_CHAIN_ID` (testnet `114514`, mainnet `8964`) by default — don't override `chainId` on a call unless you mean to target a different network |
+| `401 signer is not the sender` | Wrong EIP-712 domain chain id | The SDK signs against `MTF_CHAIN_ID` (testnet `114514`, mainnet `8964`) by default. Do not override `chainId` on a call unless you mean to target a different network |
 | `400 action: <parse error>` | Wrong field name, wrong type, or a missing required field | Check the action's entry in the catalog |
-| `404 unknown user` on info | Address has no on-chain state yet | Deposit first (faucet) |
-| `429 rate limit` | Too many requests | See [rate limits](../api/rate-limits.md); back off |
-| Withdrawal stuck on destination | MetaBridge withdrawal pending (dispute window) | Wait for the ⅔ co-signature + dispute window; then `claim` on the destination chain (see [bridge](../bridge/)) |
+| `404 unknown user` on info | The address has no on-chain state yet | Deposit first (faucet) |
+| `429 rate limit` | Too many requests | See [rate limits](../api/rate-limits.md), and back off |
+| Withdrawal stuck on destination | MetaBridge withdrawal pending (dispute window) | Wait for the ⅔ co-signature and the dispute window, then `claim` on the destination chain. See [bridge](../bridge/) |
 
 </details>
 
 ## See also {#see-also}
 
-- [Networks](../networks.md) — testnet and mainnet endpoints + chainIds
-- [Signing](./signing.md) — the full envelope spec
+- [Networks](../networks.md): testnet and mainnet endpoints and chainIds
+- [Signing](./signing.md): the full envelope spec
 - [`POST /exchange`](../api/rest/exchange.md)
 - [`POST /info`](../api/rest/info.md)
 - [WS](../api/ws/index.md)

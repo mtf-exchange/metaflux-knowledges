@@ -4,17 +4,20 @@ description: "Move MTF in and out of the staking balance, delegate and undelegat
 
 # Staking actions
 
-Actions on [`POST /exchange`](../exchange.md). The request envelope, the
-EIP-712 signing rules, the number planes and the response shape are on that
-page and apply to every action here.
+These actions move MTF into and out of staking, delegate stake and claim rewards.
+
+They are actions on [`POST /exchange`](../exchange.md). That page describes the
+request envelope, the EIP-712 signing rules, the number planes and the response
+shape. These apply to every action here.
 
 ### Move MTF into free staking balance {#c_deposit}
 
-Move whole-MTF from the sender's **spot MTF balance** into their **free staking
-balance** (the undelegated pool that [`token_delegate`](#token_delegate) draws
-from). Pure value-move between two ledgers — no mint, no burn — and it does
-**not** touch delegations, vote power, or the validator set. **Sender-authorized**
-— no `owner` field.
+This action moves whole MTF from the spot MTF balance of the sender into the
+free staking balance of the sender. The free staking balance is the undelegated
+pool that [`token_delegate`](#token_delegate) draws from. The action moves value
+between two ledgers. It does not mint or burn. It does not change delegations,
+vote power or the validator set. The action is sender-authorized and has no
+`owner` field.
 
 ```json
 {
@@ -25,32 +28,34 @@ from). Pure value-move between two ledgers — no mint, no burn — and it does
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `amount` | decimal string | MTF to move spot → free staking balance (`> 0`), as a JSON string |
+| `amount` | decimal string | MTF to move from spot to the free staking balance (`> 0`), as a JSON string |
 
-**Response.** Non-order action →
-[`202 Accepted` admission envelope](../exchange.md#202-accepted--non-order-admission). Confirm
-the resulting balances via [`/info`](../info.md).
+**Response.** This is a non-order action. It returns the
+[`202 Accepted` admission envelope](../exchange.md#202-accepted--non-order-admission).
+Confirm the resulting balances with [`/info`](../info.md).
 
 **Common errors** (at commit): `amount must be positive`, `insufficient spot MTF
-balance`, MTF spot asset not configured on this chain.
+balance`, and "MTF spot asset not configured on this chain".
 
-**`amount` must sit on the token's wei grid.** An amount finer than the token's
-declared `wei_decimals` is refused with `PRECONDITION_FAILED` and the message
-`amount is finer than the token's wei_decimals`. MTF declares 8 `wei_decimals`,
-so `"0.00000001"` is accepted and `"0.000000001"` is refused. Trailing zeros do
-not count: `"1.000000000"` is on an 8-decimal grid. The check exists because a
-sub-wei amount leaves dust that no ledger row can render. The same rule applies to
-[`c_withdraw`](#c_withdraw).
+**`amount` must be on the wei grid of the token.** The chain refuses an amount
+that is finer than the declared `wei_decimals` of the token, with
+`PRECONDITION_FAILED` and the message
+`amount is finer than the token's wei_decimals`. MTF declares 8
+`wei_decimals`. The chain accepts `"0.00000001"` and refuses `"0.000000001"`.
+Trailing zeros do not count: `"1.000000000"` is on an 8-decimal grid. The check
+exists because a sub-wei amount leaves dust that no ledger row can show. The
+same rule applies to [`c_withdraw`](#c_withdraw).
 
 ---
 
 ### Move MTF out of staking balance {#c_withdraw}
 
-The exact reverse of [`c_deposit`](#c_deposit): move whole-MTF from the sender's
-**free staking balance** back to their **spot MTF balance**. No unbonding window
-applies — this is the *free* (undelegated) balance; **delegated** stake has its
-own undelegation window via [`token_delegate`](#token_delegate), which this does
-not touch. **Sender-authorized** — no `owner` field.
+This action is the exact reverse of [`c_deposit`](#c_deposit). It moves whole
+MTF from the free staking balance of the sender back to the spot MTF balance of
+the sender. No unbonding window applies, because this is the free
+(undelegated) balance. Delegated stake has its own undelegation window through
+[`token_delegate`](#token_delegate). This action does not change it. The action
+is sender-authorized and has no `owner` field.
 
 ```json
 {
@@ -61,21 +66,22 @@ not touch. **Sender-authorized** — no `owner` field.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `amount` | decimal string | MTF to move free staking balance → spot (`> 0`), as a JSON string |
+| `amount` | decimal string | MTF to move from the free staking balance to spot (`> 0`), as a JSON string |
 
-**Response.** Non-order action →
+**Response.** This is a non-order action. It returns the
 [`202 Accepted` admission envelope](../exchange.md#202-accepted--non-order-admission).
 
 **Common errors** (at commit): `amount must be positive`, `insufficient staking
-balance`, MTF spot asset not configured on this chain.
+balance`, and "MTF spot asset not configured on this chain".
 
 ---
 
 ### Delegate or undelegate stake {#token_delegate}
 
-Delegate or undelegate stake to a validator. The delegate side draws from the
-**free staking balance** (funded by [`c_deposit`](#c_deposit)); undelegation
-enters a slashable unbonding window before the stake returns to that balance.
+This action delegates stake to a validator, or undelegates it. A delegation
+draws from the free staking balance, which [`c_deposit`](#c_deposit) funds. An
+undelegation enters a slashable unbonding window. After the window, the stake
+returns to the free staking balance.
 
 ```json
 {
@@ -93,14 +99,14 @@ enters a slashable unbonding window before the stake returns to that balance.
 |-------|------|-------------|
 | `validator` | hex address | 20-byte validator address |
 | `amount` | decimal (string or number) | Stake amount |
-| `is_undelegate` | bool | `true` = unstake / queue undelegation; `false` = delegate |
-| `lock_months` | uint8 | Optional, default `0`. One of `0` (flexible) / `1` / `6` / `24`. Ignored on undelegate; a non-zero value is admitted only for a governance-allowlisted validator |
+| `is_undelegate` | bool | `true` = unstake and queue an undelegation. `false` = delegate |
+| `lock_months` | uint8 | Optional, default `0`. One of `0` (flexible), `1`, `6` or `24`. The chain ignores it on an undelegation. It admits a non-zero value only for a validator on the governance allowlist |
 
 ---
 
 ### Claim staking rewards {#claim_rewards}
 
-Claim staking rewards, optionally scoped to one validator.
+This action claims staking rewards. It can claim from one validator only.
 
 ```json
 {
@@ -111,22 +117,21 @@ Claim staking rewards, optionally scoped to one validator.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `validator` | hex address \| null | `null` / omitted = claim across all delegations |
+| `validator` | hex address \| null | `null` or omitted = claim across all delegations |
 
-**A claim pays into the STAKING free pool, not into spot.** That is the same
-balance [`token_delegate`](#token_delegate) spends, so a claimed reward can be
-re-delegated with no second step. To spend it, move it to spot with
-[`c_withdraw`](#c_withdraw), which the free pool returns with no unbonding
-window.
+**A claim pays into the free staking pool, not into spot.** That is the balance
+that [`token_delegate`](#token_delegate) spends, so you can delegate a claimed
+reward again with no second step. To spend it, move it to spot with
+[`c_withdraw`](#c_withdraw). The free pool returns it with no unbonding window.
 
-Claiming nothing is not an error. A claim with no accrued reward commits, moves
-no money, and writes no ledger row.
+A claim of nothing is not an error. A claim with no accrued reward commits,
+moves no money and writes no ledger row.
 
 ---
 
 ### Alias a staking target address {#link_staking_user}
 
-Alias a staking target address to the sender.
+This action makes a staking target address an alias of the sender.
 
 ```json
 {

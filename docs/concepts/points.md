@@ -1,8 +1,10 @@
 ---
-description: The MTF points program — testnet trading volume earns points each week from genesis, in four seasons, by a public formula. Points convert to MTF at the TGE.
+description: The MTF points program. Testnet trading volume earns points each week from genesis, in four seasons, by a public formula. Points convert to MTF at the TGE.
 ---
 
 # Points
+
+The points program pays points each week for testnet trading volume. Points convert to MTF at the TGE.
 
 :::caution
 **The weekly table and its three reads are not live yet.** The reads
@@ -14,10 +16,10 @@ still count from genesis, so no week is lost. When publication starts after the
 release, the archive publishes every past week.
 :::
 
-Trade on the testnet and earn points each week. Each week shares a pool of
-**1,000,000 points** among the accounts that traded, pro rata to qualifying
-volume. Points count from testnet genesis, **2026-09-01 15:08 UTC**. At the TGE
-on mainnet, points convert to MTF.
+Accounts that trade on the testnet earn points each week. Each week shares a
+pool of 1,000,000 points among the accounts that traded, pro rata to qualifying
+volume. Points count from testnet genesis, 2026-09-01 15:08 UTC. At the TGE on
+mainnet, points convert to MTF.
 
 Only testnet trading volume earns points. Mainnet activity earns none. The
 program page on the official site is [mtf.exchange/tge](https://mtf.exchange/tge).
@@ -25,7 +27,7 @@ program page on the official site is [mtf.exchange/tge](https://mtf.exchange/tge
 ## Seasons {#seasons}
 
 The program runs in four seasons, from testnet genesis to the TGE snapshot. The
-claim at the TGE is named **Gimle**.
+claim at the TGE is named *Gimle*.
 
 | Season | Name | Window (UTC) | Weeks | MTF ceiling |
 |---:|---|---|---:|---|
@@ -34,7 +36,7 @@ claim at the TGE is named **Gimle**.
 | 3 | Bifrost | Season 2 end, plus 8 weeks | 8 | Set at season start |
 | 4 | Ragnarok | Season 3 end to the TGE snapshot | the rest | Set at season start |
 
-The API and the weekly tables use the season **number**. The name is a label
+The API and the weekly tables use the season number. The name is a label
 only. Season 1 counts back to genesis. The [TGE page](https://mtf.exchange/tge)
 states the date Season 1 ends.
 
@@ -101,14 +103,14 @@ points = 1,000,000 × qv / max(Σqv, Q_floor)
 | `Q_floor` | $50,000,000 of qualifying volume a week |
 | Rounding | Toward zero, to 0.000001 point |
 
-**There is no per-account cap.** Pro rata is linear, so one account split into
-ten accounts earns the same total. Each part still needs $1,000 of `qv`.
+There is no per-account cap. Pro rata is linear, so one account split into ten
+accounts earns the same total. Each part still needs $1,000 of `qv`.
 
-**`Q_floor` bounds a thin week.** When `Σqv` is below $50,000,000, the formula
+`Q_floor` limits a thin week. When `Σqv` is below $50,000,000, the formula
 divides by `Q_floor`, and the week issues less than its pool. The points not
 issued are not paid, and no MTF is paid for them.
 
-**There is no referrer share.** A referral earns the referrer no points.
+There is no referrer share. A referral earns the referrer no points.
 
 ## Worked example {#worked-example}
 
@@ -122,7 +124,7 @@ volume above the limit (excess)                $350,000
 qualifying volume (qv)                       $2,650,000
 ```
 
-**A busy week.** `Σqv` is $200,000,000. That is above `Q_floor`, so the formula
+**Busy week.** `Σqv` is $200,000,000. That is above `Q_floor`, so the formula
 divides by `Σqv`:
 
 ```text
@@ -131,7 +133,7 @@ points = 1,000,000 × 2,650,000 / 200,000,000 = 13,250
 
 The week issues its whole pool of 1,000,000 points.
 
-**A thin week.** `Σqv` is $8,000,000. That is below `Q_floor`, so the formula
+**Thin week.** `Σqv` is $8,000,000. That is below `Q_floor`, so the formula
 divides by $50,000,000:
 
 ```text
@@ -183,13 +185,13 @@ For Season 2, that is at most `10,000,000 / (8 × 1,000,000) = 1.25` MTF per
 point. No fixed rate is published. A fixed rate would put a price on volume that
 costs nothing to make.
 
-**The upper bound per dollar.** $1 of qualifying volume earns at most 0.02
-points, because the formula divides by at least $50,000,000. At the Season 2
-ceiling, that is at most 0.025 MTF per $1.
+**Upper bound per dollar.** $1 of qualifying volume earns at most 0.02 points,
+because the formula divides by at least $50,000,000. At the Season 2 ceiling,
+that is at most 0.025 MTF per $1.
 
 ## How to check {#how-to-check}
 
-Not live yet: the three reads below answer `UNKNOWN_TYPE` until the next archive
+Not live yet. The three reads below answer `UNKNOWN_TYPE` until the next archive
 and gateway release.
 
 | You want | Read |
@@ -199,7 +201,7 @@ and gateway release.
 | The full table of one week, or the season total, 1,000 rows a page | [`points_leaderboard`](../api/rest/info.md#points_leaderboard) |
 
 **Recompute your points.** Take one week from `points_weeks` and your row from
-`points_user`:
+`points_user`, then apply:
 
 ```text
 points = pool × qualifying_volume / max(total_qualifying_volume, q_floor)
@@ -235,7 +237,7 @@ does not change.
 ## The claim: Gimle {#claim}
 
 At the TGE on mainnet, points convert to MTF at the rate of their season. The
-claim is named **Gimle**. The TGE target is **2027-03-01**. The date may move.
+claim is named *Gimle*. The TGE target is 2027-03-01. The date may move.
 
 - The points-program allocation is 100% claimable at the TGE.
 - You can lock your claim for a bonus. See
@@ -247,8 +249,8 @@ and the published weeks.
 
 ## See also {#see-also}
 
-- [Tokenomics](./tokenomics.md) — the supply, the allocation and the lock bonus
-- [Sub-accounts](./sub-accounts.md) — why a sub-account earns as its parent
-- [Agent wallets](./agent-wallets.md) — the agent link in the cluster rule
-- [Mark prices](./mark-prices.md) — the price the mark band reads
-- [`POST /info`](../api/rest/info.md#points-reads) — the three points reads
+- [Tokenomics](./tokenomics.md): the supply, the allocation and the lock bonus.
+- [Sub-accounts](./sub-accounts.md): why a sub-account earns as its parent.
+- [Agent wallets](./agent-wallets.md): the agent link in the cluster rule.
+- [Mark prices](./mark-prices.md): the price that the mark band reads.
+- [`POST /info`](../api/rest/info.md#points-reads): the three points reads.

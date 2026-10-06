@@ -1,10 +1,13 @@
 # Error handling
 
+This page tells a production client what to do about each class of error.
+
 :::tip
 **Stable.**
 :::
 
-A decision tree for production clients. Every error code, and the status it answers with, is in [errors](../api/errors.md); this page tells you what to **do** about each class.
+The [errors](../api/errors.md) page lists every error code and the status it answers with. This
+page gives the action for each class.
 
 ## Three failure layers {#three-failure-layers}
 
@@ -19,13 +22,13 @@ flowchart TD
     N --> N2["no response<br/>(drop)"]
 ```
 
-| Layer | When fires | How surfaced |
-|-------|-----------|--------------|
+| Layer | When it fires | Where it shows |
+|-------|---------------|----------------|
 | Admission | At `/exchange` request | HTTP status + body |
-| Commit | At block commit, post-admission | [`order_updates`](../api/ws/subscriptions.md#order_updates) / [`fills`](../api/ws/subscriptions.md#fills) WS push, or visible in `user_fills` / `open_orders` |
+| Commit | At block commit, after admission | [`order_updates`](../api/ws/subscriptions.md#order_updates) / [`fills`](../api/ws/subscriptions.md#fills) WS push, or visible in `user_fills` / `open_orders` |
 | Network | Anywhere | TCP error, timeout, partial response |
 
-Each layer has different semantics. Confusing them is the most common production bug.
+Each layer has different semantics. A mix-up between them is the most common production bug.
 
 ## Decision tree {#decision-tree}
 
@@ -40,43 +43,41 @@ flowchart TD
     S -->|429| R429["backoff on the refill rate<br/>no retry hint is sent"]
 ```
 
-## Layer 1 — admission errors {#layer-1--admission-errors}
+## Admission errors {#layer-1--admission-errors}
 
-The request was parsed, but rejected at admission. The body is the failure
-envelope: an `error` object, and **no `data` key**.
+The server parsed the request and rejected it at admission. The body is the failure envelope: an
+`error` object, and no `data` key.
 
 ```json
 { "error": { "code": "ORDER_INVALID_PRICE", "message": "...", "details": { "field": "px", "limit": "100", "actual": "12345" } } }
 ```
 
-:::danger
-**Branch on `error.code`, never on `error.message`.** `code` is the stable
-contract. `message` is prose for a human and it can be reworded in any release —
-a handler keyed off the sentence breaks silently, and it breaks in the direction
-where a known rejection reads as an unknown one.
+:::danger Branch on `error.code`, never on `error.message`
+`code` is the stable contract. `message` is prose for a human, and any release can reword it. A
+handler keyed on the sentence breaks without a signal. It breaks in the bad direction: a known
+rejection reads as an unknown one.
 
-**And do not treat a null `data` as a failure.** A read can succeed with no
-content and answer `{"data": null}`. Test whether `error` is PRESENT.
+Do not treat a null `data` as a failure. A read can succeed with no content and answer
+`{"data": null}`. Test whether `error` is PRESENT.
 :::
 
 | Class | `error.code` | Retry rule |
 |-------|--------------|------------|
-| **Client bug** | `INVALID_REQUEST`, `UNKNOWN_TYPE`, `ACTION_UNSUPPORTED` | DO NOT retry — fix the code |
-| **Signing bug** | `AUTH_BAD_SIGNATURE`, `AUTH_UNAUTHORIZED` | DO NOT retry — verify chainId / key / owner |
+| **Client bug** | `INVALID_REQUEST`, `UNKNOWN_TYPE`, `ACTION_UNSUPPORTED` | DO NOT retry. Fix the code |
+| **Signing bug** | `AUTH_BAD_SIGNATURE`, `AUTH_UNAUTHORIZED` | DO NOT retry. Verify chainId / key / owner |
 | **Auth state** | `AUTH_AGENT_FORBIDDEN` | The approval is missing or expired. Re-approve, then retry |
-| **Order shape** | `ORDER_INVALID_PRICE`, `ORDER_INVALID_SIZE`, `ORDER_ZERO_SIZE`, `ORDER_BELOW_MIN_NOTIONAL` | Compute the right value from `details.limit`; retry |
-| **State** | `MARGIN_INSUFFICIENT`, `ASSET_INSUFFICIENT_BALANCE`, `MARKET_INACTIVE`, `MARKET_OI_CAP`, `PRECONDITION_FAILED` | Add margin, or wait for the state to change; then retry |
-| **Not found** | `ORDER_NOT_FOUND`, `MARKET_NOT_FOUND`, `NOT_FOUND` | Don't retry; check the resource |
-| **Ours, not yours** | `INTERNAL`, `UNAVAILABLE` | Retry with backoff, then report |
+| **Order shape** | `ORDER_INVALID_PRICE`, `ORDER_INVALID_SIZE`, `ORDER_ZERO_SIZE`, `ORDER_BELOW_MIN_NOTIONAL` | Compute the right value from `details.limit`, then retry |
+| **State** | `MARGIN_INSUFFICIENT`, `ASSET_INSUFFICIENT_BALANCE`, `MARKET_INACTIVE`, `MARKET_OI_CAP`, `PRECONDITION_FAILED` | Add margin, or wait for the state to change, then retry |
+| **Not found** | `ORDER_NOT_FOUND`, `MARKET_NOT_FOUND`, `NOT_FOUND` | Do not retry. Check the resource |
+| **Server error** | `INTERNAL`, `UNAVAILABLE` | Retry with backoff, then report |
 
-The full list, with the status each code answers and the action for each, is in
+The full list, with the status and the action for each code, is in
 [errors](../api/errors.md#catalog).
 
-The classes below (`ClientBugError`, `AuthError`, …) are an example taxonomy for
-a hand-rolled client working directly against `fetch`. The TypeScript SDK does
-not export them — it throws one class, `MetaFluxApiError`, carrying the error
-code, and you branch on that yourself (see
-[TypeScript SDK](./typescript-sdk.md#error-handling)).
+The classes below (`ClientBugError`, `AuthError`, …) are an example taxonomy for a hand-written
+client that calls `fetch` directly. The TypeScript SDK does not export them. It throws one class,
+`MetaFluxApiError`, which carries the error code, and you branch on the code yourself. See
+[TypeScript SDK](./typescript-sdk.md#error-handling).
 
 ```typescript
 async function handleAdmissionResponse(r: Response) {
@@ -117,19 +118,21 @@ async function handleAdmissionResponse(r: Response) {
 }
 ```
 
-## Layer 2 — commit errors {#layer-2--commit-errors}
+## Commit errors {#layer-2--commit-errors}
 
-The action was admitted (`202`) but failed at commit. You learn about it only via the event stream.
+The server admitted the action (`202`), but it failed at commit. Only the event stream reports
+this failure.
 
 | Error | Cause | Retry? |
 |-------|-------|--------|
 | `reduce_only_violation_post_admit` | Position changed between admit and dispatch | YES if intent still applies |
-| `stp_rejected` | Self-trade prevention killed the order | NO — caller's other order matched first |
-| `mark_price_band_violation` | Order price too far from mark at dispatch | NO — re-evaluate price and re-place |
+| `stp_rejected` | Self-trade prevention killed the order | NO. The caller's other order matched first |
+| `mark_price_band_violation` | Order price too far from mark at dispatch | NO. Re-evaluate the price and place again |
 | `evicted_under_cap_pressure` | Admitted but evicted from mempool before block | YES (with backoff) |
-| `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch | NO — fix margin first |
+| `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch | NO. Fix margin first |
 
-Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates) — the live, per-account order-lifecycle channel — and dispatch on `status`:
+Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates), the live order-lifecycle
+channel for each account, and dispatch on `status`:
 
 ```typescript
 import { isChannelFrame } from '@metaflux-dex/client';
@@ -153,26 +156,26 @@ ws.onMessage((f) => {
 await ws.subscribe({ type: 'order_updates', user: address });
 ```
 
-A partial fill does not get its own `status`: a maker leg reports its per-match
-`filled_sz` with `status` still `open` while size rests, and a taker's fully
-filled record carries `status: 'filled'` with `filled_sz` / `avg_px` set. See
-[`order_updates`](../api/ws/subscriptions.md#order_updates) for the full field
-table — including the gap on `modify` / `batchModify` / engine-initiated
-cancels, which carry no per-order delta on this channel (use
-[`open_orders`](../api/ws/subscriptions.md#open_orders) instead, a full
-resting-set snapshot re-emitted on every change).
+A partial fill has no `status` of its own. A maker leg reports its `filled_sz` per match, with
+`status` still `open` while size rests. A taker's fully filled record carries `status: 'filled'`
+with `filled_sz` / `avg_px` set. See [`order_updates`](../api/ws/subscriptions.md#order_updates)
+for the full field table. The table also shows a gap: `modify`, `batchModify` and
+engine-initiated cancels carry no per-order delta on this channel. For those, use
+[`open_orders`](../api/ws/subscriptions.md#open_orders). It is a full snapshot of the resting set,
+sent again on every change.
 
-## Layer 3 — network errors {#layer-3--network-errors}
+## Network errors {#layer-3--network-errors}
 
-The most ambiguous class. Did the server receive the request? Did the action commit?
+This is the most ambiguous class. You do not know if the server received the request, or if the
+action committed.
 
 | Symptom | Action |
 |---------|--------|
-| TCP RST before response | Reconcile: query state to determine outcome |
-| Response timeout (you set the timeout) | Same — reconcile |
-| Partial / truncated response | Same — reconcile |
-| Connection refused | Server side is unavailable; retry with exponential backoff |
-| DNS failure | Networking / DNS issue; retry with exponential backoff |
+| TCP RST before response | Reconcile: query state to find the outcome |
+| Response timeout (you set the timeout) | Same. Reconcile |
+| Partial / truncated response | Same. Reconcile |
+| Connection refused | The server is unavailable. Retry with exponential backoff |
+| DNS failure | Network or DNS issue. Retry with exponential backoff |
 
 ### Reconciliation pattern {#reconciliation-pattern}
 
@@ -191,7 +194,8 @@ flowchart TD
     L -->|not visible after 10 attempts| D4["action never made it;<br/>safe to retry with new nonce"]
 ```
 
-The cloid-on-orders pattern (see [idempotency](./idempotency.md)) makes this cheap: query open orders, see if your cloid is there.
+A cloid on every order makes this cheap (see [idempotency](./idempotency.md)). Query open orders
+and look for your cloid.
 
 For non-order actions, match on `action_hash`. It is deterministic and you can
 compute it locally:
@@ -200,25 +204,23 @@ compute it locally:
 action_hash = keccak256( action_json ‖ owner_20 ‖ nonce_be8 )
 ```
 
-- **`action_json` is the raw JSON bytes of the `action` field, exactly as you
-  sent them.** The node hashes the bytes it received. Re-serializing changes key
-  order or whitespace and gives a different hash. Keep the exact string you
-  posted.
-- **`owner_20` is the resolved account**, not the signer. For an agent-signed
-  order that is the master, not the agent.
+- `action_json` is the raw JSON bytes of the `action` field, exactly as you sent them. The node
+  hashes the bytes it received. A new serialization changes key order or whitespace, and gives
+  a different hash. Keep the exact string that you posted.
+- `owner_20` is the resolved account, not the signer. For an agent-signed order, it is the
+  master and not the agent.
 - `nonce_be8` is the nonce as 8 big-endian bytes.
 
-The same params with a new nonce give a different hash. `action_hash` is
-returned synchronously in the `/exchange` admission response — it is **not**
-echoed on any per-account WS event. For a committed order, correlate by
-`cloid` on [`order_updates`](../api/ws/subscriptions.md#order_updates) /
-[`open_orders`](../api/ws/subscriptions.md#open_orders) instead. **No global, hash-keyed feed answers this any more.** The `explorer_txs` WS
-channel that carried the hash is
-[removed](../changelog/ids-and-wire-shapes.md#explorer-channels-removed), and
-its replacement [`recent_transactions`](../api/rest/info/chain.md#recent_transactions)
-does not carry a hash. Correlate by `cloid`, or read
-[`action_outcome`](../api/rest/info/account-history.md#action_outcome) for the commit-time
-verdict on one submitted action.
+The same params with a new nonce give a different hash. The synchronous `/exchange` admission
+response returns `action_hash`. No per-account WS event echoes it. For a committed order,
+correlate by `cloid` on [`order_updates`](../api/ws/subscriptions.md#order_updates) /
+[`open_orders`](../api/ws/subscriptions.md#open_orders). No global feed keyed by hash answers this
+any more. The `explorer_txs` WS channel that carried the hash is
+[removed](../changelog/ids-and-wire-shapes.md#explorer-channels-removed). Its replacement,
+[`recent_transactions`](../api/rest/info/chain.md#recent_transactions), does not carry a hash.
+Correlate by `cloid`, or read
+[`action_outcome`](../api/rest/info/account-history.md#action_outcome) for the commit-time verdict
+on one submitted action.
 
 ## Production recipes {#production-recipes}
 
@@ -258,7 +260,7 @@ async function placeOrderSafely(
 }
 ```
 
-### Cancel with idempotent safety {#cancel-with-idempotent-safety}
+### Idempotent cancel {#cancel-with-idempotent-safety}
 
 ```typescript
 async function cancelSafely(client: Client, address: string, market: number, oid: number) {
@@ -280,8 +282,8 @@ async function cancelSafely(client: Client, address: string, market: number, oid
 
 ### WS commit reconciliation {#ws-commit-reconciliation}
 
-`order_updates` has no `action_hash` field — correlate by `cloid` instead
-(set one on every order you place):
+`order_updates` has no `action_hash` field. Correlate by `cloid`, and set one on every order you
+place:
 
 ```typescript
 import { isChannelFrame, type NativeOrder } from '@metaflux-dex/client';
@@ -318,19 +320,25 @@ async function submit(order: NativeOrder) {
 <details>
 <summary>Show edge cases</summary>
 
-- **Gateway returns 5xx but the action actually committed.** Can happen if the gateway's post-admit reply was lost. Treat like a network drop: reconcile via cloid/action_hash.
-- **WS feed is behind real state.** Resume buffer may have evicted the events while you were reconnecting. Re-poll `/info` on resume to anchor; switch to WS for the live tail.
-- **Same nonce submitted twice — once succeeds.** Server enforces nonce monotonicity; the second attempt sees `nonce_too_small` and you learn the first one is live. Use this signal.
-- **Time-bomb logical errors.** A `Trigger` order that admits today but never fires because its trigger condition never holds. No error; just a resting order that hangs around. Periodically reconcile your open-order set against your bot's expected set.
+- **The gateway returns 5xx, but the action committed.** This happens when the gateway's reply
+  after admission is lost. Treat it as a network drop: reconcile through cloid or action_hash.
+- **The WS feed is behind the real state.** The resume buffer can evict events while you
+  reconnect. Poll `/info` again on resume to anchor, then use WS for the live tail.
+- **The same nonce is submitted twice, and one succeeds.** The server enforces nonce
+  monotonicity. The second attempt gets `nonce_too_small`, and you learn that the first one is
+  live. Use this signal.
+- **Delayed logical errors.** A `Trigger` order admits today but never fires, because its
+  trigger condition never holds. There is no error, only a resting order that stays. Reconcile
+  your open-order set against your bot's expected set at regular intervals.
 
 </details>
 
 ## See also {#see-also}
 
-- [Errors](../api/errors.md) — complete catalog
-- [Idempotency](./idempotency.md) — nonce + cloid mechanics
-- [WS subscriptions](../api/ws/subscriptions.md) — commit-time events
-- [Rate limits](../api/rate-limits.md) — pace retries
+- [Errors](../api/errors.md): the complete catalog
+- [Idempotency](./idempotency.md): nonce and cloid mechanics
+- [WS subscriptions](../api/ws/subscriptions.md): commit-time events
+- [Rate limits](../api/rate-limits.md): pace retries
 
 ## FAQ {#faq}
 
@@ -338,12 +346,12 @@ async function submit(order: NativeOrder) {
 <summary>Show FAQ</summary>
 
 **Q: Should I treat commit-time errors as exceptions or as data?**
-A: Data. They're regular order outcomes — `cancelled` because of STP, `error` because of post-admit reduce-only. Log + handle per business logic; don't crash on them.
+A: As data. They are normal order outcomes: `cancelled` because of STP, or `error` because of reduce-only after admission. Log them and handle them per your business logic. Do not crash on them.
 
 **Q: Is there ever a reason to ignore an admission error?**
-A: For pure idempotent flows (cancel of a non-existent order), `404` is fine to swallow. For everything else, log at INFO+ and either retry or surface to the operator.
+A: For a purely idempotent flow, such as a cancel of an order that does not exist, you can ignore a `404`. For everything else, log at INFO or above, then retry or report to the operator.
 
 **Q: How do I cap retries?**
-A: Wall-clock budget per logical operation. For order placement, 5 seconds is generous; for cancels, 2 seconds. Beyond that, surface to the operator or your risk-watcher.
+A: Set a wall-clock budget per logical operation. For order placement, 5 seconds is generous. For cancels, use 2 seconds. After that, report to the operator or to your risk-watcher.
 
 </details>

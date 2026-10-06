@@ -1,16 +1,22 @@
 # WebSocket API
 
 :::info
-The node `/ws` surface pushes real committed data, change-driven: a channel emits a frame only when its state changed since the last commit. It also serves `post` (request/response over WS) and `ping`/`pong`. See [subscriptions](./subscriptions.md#channels-at-a-glance) for the channel list, the key each one takes, and their frame shapes.
+The node `/ws` surface pushes committed data. A channel emits a frame only when its state changed since the last commit. The surface also serves `post` (request and response over WS) and `ping` / `pong`. See [subscriptions](./subscriptions.md#channels-at-a-glance) for the channel list, the key of each channel and the frame shapes.
 :::
 
 :::info
-**Channel names are snake_case (MTF-native).** The node `/ws` surface is MTF-native, so channel wire names are snake_case: `l2_book`, `bbo`, `trades`, `markets`, `fills`, `order_updates`. The gateway serves this same native WS at `api.<net>.mtf.exchange/ws`, and adds `candles` on top of it.
+Channel names are snake_case, for example `l2_book`, `bbo`, `trades`, `markets`, `fills` and `order_updates`. The gateway serves the same WS at `api.<net>.mtf.exchange/ws` and adds `candles`.
 :::
 
-## TL;DR {#tldr}
+## Overview {#tldr}
 
-A single WS connection multiplexes subscriptions to many channels. The frame protocol mirrors HL's (`{"method":"subscribe","subscription":{"type":...}}`), but the **channel names are MTF-native snake_case** (`l2_book`, `order_updates`, …): you send a subscribe, the server replies with a `subscriptionResponse` ack followed by an initial snapshot, and then pushes `{"channel":...,"data":...}` frames as state commits. Book channels (`l2_book`, `bbo`) are **per-market** and require a `coin`. Read this page for the connection lifecycle; see [subscriptions](./subscriptions.md) for the channel catalog.
+One WS connection carries subscriptions to many channels. The frame protocol uses the same shape as Hyperliquid (`{"method":"subscribe","subscription":{"type":...}}`). The channel names are snake_case (`l2_book`, `order_updates`).
+
+1. The client sends a subscribe.
+2. The server replies with a `subscriptionResponse` ack, then an initial snapshot.
+3. The server pushes `{"channel":...,"data":...}` frames as state commits.
+
+The book channels (`l2_book`, `bbo`) are per-market and need a `coin`. This page describes the connection lifecycle. [Subscriptions](./subscriptions.md) lists the channels.
 
 ## URL {#url}
 
@@ -18,12 +24,12 @@ A single WS connection multiplexes subscriptions to many channels. The frame pro
 wss://api.<net>.mtf.exchange/ws
 ```
 
-MTF-native WS (snake_case channels) is served by the gateway at `/ws`. The gateway front door terminates TLS (`wss://`). Running the node yourself, the same native WS is served plain at `ws://localhost:8080/ws` — the frame protocol is identical either way.
+The gateway serves the WS at `/ws` and terminates TLS (`wss://`). If you run the node yourself, it serves the same WS in plain text at `ws://localhost:8080/ws`. The frame protocol is the same in both cases.
 
 :::warning
-**`candles` is a serving-layer channel. The node does not serve it.** The node does not aggregate OHLCV. The serving layer (the gateway) builds the bars from the node's `trades` firehose and its price-sample tape. Every other channel on this page is served by both.
+`candles` is a serving-layer channel. The node does not serve it, and it does not aggregate OHLCV. The gateway builds the bars from the `trades` feed of the node and its price-sample tape. Both serve every other channel on this page.
 
-A node-direct `candles` subscribe is refused as an unknown channel, and gets no `subscriptionResponse` ack:
+A `candles` subscribe sent directly to the node fails as an unknown channel. The node sends no `subscriptionResponse` ack:
 
 ```json
 {"channel":"error","data":{"error":"unknown channel: candles"}}
@@ -54,9 +60,9 @@ sequenceDiagram
 
 ## Frames {#frames}
 
-All frames are JSON **text** frames by default. Binary frames from the client are rejected with an error frame (the connection stays open). Inbound frames are keyed by `method`; outbound frames are keyed by `channel`.
+All frames are JSON text frames by default. The server rejects a binary frame from the client with an error frame, and the connection stays open. Inbound frames use the key `method`. Outbound frames use the key `channel`.
 
-A connection that negotiates [compression](#websocket-compression-zstd) receives its data frames as **binary** frames that hold the same JSON, compressed. Compression is opt-in: a client that offers no subprotocol receives text frames, unchanged. Frames you send stay text in every mode.
+A connection that negotiates [compression](#websocket-compression-zstd) receives its data frames as binary frames. They hold the same JSON, compressed. Compression is opt-in. A client that offers no subprotocol receives text frames. Frames that you send stay text in every mode.
 
 ### `subscribe` {#subscribe}
 
@@ -67,10 +73,10 @@ A connection that negotiates [compression](#websocket-compression-zstd) receives
 }
 ```
 
-- `subscription.type` (required) — the channel name (snake_case, e.g. `l2_book`). Unknown names produce an error frame.
-- `subscription.coin` (required for per-market channels `l2_book` / `bbo` / `trades`; omitted for the account channels) — see [Coin parameter](#coin-parameter).
+- `subscription.type` (required): the channel name in snake_case, for example `l2_book`. An unknown name produces an error frame.
+- `subscription.coin`: required for the per-market channels `l2_book`, `bbo` and `trades`. Omit it for the account channels. See [Coin parameter](#coin-parameter).
 
-The server replies with **two** frames, in order:
+The server replies with two frames, in this order:
 
 1. The ack:
 
@@ -81,9 +87,9 @@ The server replies with **two** frames, in order:
 }
 ```
 
-2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2_book` / `bbo` this is a real snapshot of the latest committed book; for channels with no live source yet it is an empty-but-valid body.
+2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2_book` and `bbo`, this is a snapshot of the latest committed book. A channel with no live source yet sends an empty body that is still valid.
 
-A duplicate subscribe to the same `(type, coin)` is **silently ignored** (no second ack, no error) — matching HL behavior.
+The server ignores a duplicate subscribe to the same `(type, coin)`. It sends no second ack and no error. Hyperliquid behaves the same way.
 
 ### `unsubscribe` {#unsubscribe}
 
@@ -91,7 +97,7 @@ A duplicate subscribe to the same `(type, coin)` is **silently ignored** (no sec
 { "method": "unsubscribe", "subscription": { "type": "l2_book", "coin": "BTC" } }
 ```
 
-Ack (mirrors the subscribe ack with `method: "unsubscribe"`):
+The ack mirrors the subscribe ack, with `method: "unsubscribe"`:
 
 ```json
 {
@@ -100,7 +106,7 @@ Ack (mirrors the subscribe ack with `method: "unsubscribe"`):
 }
 ```
 
-After the ack no more frames arrive on that `(type, coin)` until you re-subscribe. Unsubscribing a `(type, coin)` you never subscribed to is a no-op (you still get the ack).
+After the ack, no more frames arrive on that `(type, coin)` until you subscribe again. An unsubscribe for a `(type, coin)` that you never subscribed to does nothing. You still get the ack.
 
 ### `ping` / `pong` {#ping--pong}
 
@@ -112,40 +118,46 @@ After the ack no more frames arrive on that `(type, coin)` until you re-subscrib
 { "channel": "pong" }
 ```
 
-A bare `{"method":"ping"}` (no `subscription`) is the application-level heartbeat; the server replies `{"channel":"pong"}`. The node also answers low-level WebSocket control-frame pings (RFC 6455 `Ping`) with a `Pong` automatically, so either heartbeat mechanism works.
+A bare `{"method":"ping"}` with no `subscription` is the application-level heartbeat. The server replies `{"channel":"pong"}`. The node also answers WebSocket control-frame pings (RFC 6455 `Ping`) with a `Pong`. Either heartbeat works.
 
 ### Error frame {#error-frame}
 
-Any malformed or unrecognized inbound frame produces an error frame **without closing the connection**:
+A malformed or unrecognized inbound frame produces an error frame. The connection stays open:
 
 ```json
 { "channel": "error", "data": { "error": "<reason>" } }
 ```
 
-Causes include: malformed JSON, missing `method`, missing `subscription` / `subscription.type`, an unknown channel name (`"unknown channel: <name>"`), a binary frame, or an unknown method. The client can correct and retry on the same socket.
+These inputs cause an error frame:
+
+- Malformed JSON.
+- A missing `method`.
+- A missing `subscription` or `subscription.type`.
+- An unknown channel name (`"unknown channel: <name>"`).
+- A binary frame.
+- An unknown method.
+
+The client can correct the frame and retry on the same socket.
 
 ### Push messages {#push-messages}
 
-Live data frames share one envelope:
+All live data frames use one envelope:
 
 ```json
 { "channel": "<channel>", "data": { /* channel-specific */ }, "is_snapshot": false }
 ```
 
-- `is_snapshot` is a boolean: `true` on the initial on-subscribe frame (the full snapshot), `false` on the subsequent change-driven pushes. **Every frame body is a full snapshot regardless** (e.g. `l2_book` is the full top-20 levels, `account_state` the full account state) — `is_snapshot` is informational, not a "this is a diff" flag. A client that replaces its local state on every frame stays correct and can ignore the field.
-- There is **no** `seq`, `ts`, or `sub_id` field on the frame. Demultiplex on `channel` (and, for per-market channels, the `coin` inside `data`).
+- `is_snapshot` is a boolean. It is `true` on the initial frame after a subscribe and `false` on later pushes.
+- Every frame body is a full snapshot. For example, `l2_book` holds the full top 20 levels and `account_state` holds the full account state. `is_snapshot` is informational and never marks a diff. A client that replaces its local state on every frame stays correct and can ignore the field.
+- The frame has no `seq`, `ts` or `sub_id` field. Demultiplex on `channel`. For per-market channels, also use the `coin` inside `data`.
 
-Updates are **change-driven**: after each commit the node publishes a frame for a subscribed channel **only when that channel's committed state actually changed** since the previous commit. A commit that leaves a watched channel untouched emits nothing for it — so you receive fewer frames than there are blocks, never a redundant re-push of unchanged data (see [Per-subscriber push](#per-subscriber-push)).
+Updates are change-driven. After each commit, the node publishes a frame for a subscribed channel only when the committed state of that channel changed since the previous commit. A commit that leaves a watched channel unchanged emits nothing for it. You receive fewer frames than blocks, and never a repeat of unchanged data (see [Per-subscriber push](#per-subscriber-push)).
 
 ### `post` (request/response over WS) {#post-requestresponse-over-ws}
 
-A `post` is a one-shot request/response call over the same socket, instead of a separate
-[`POST /exchange`](../rest/exchange.md) connection per action. **The gateway carries it, so the
-public endpoint answers it today** — you can place and cancel orders over the socket.
+A `post` is a one-shot request and response on the same socket. It replaces a separate [`POST /exchange`](../rest/exchange.md) connection for each action. The gateway carries it, so the public endpoint answers it today. You can place and cancel orders over the socket.
 
-The `request` body is the same `{type, payload}` envelope the REST routes accept, and it is
-dispatched through the **exact same handlers** as `POST /info` and `POST /exchange` — signature
-verification on actions included. The validator and the gateway serve the same shapes.
+The `request` body is the same `{type, payload}` envelope that the REST routes accept. The same handlers process it as `POST /info` and `POST /exchange`, including signature verification on actions. The validator and the gateway serve the same shapes.
 
 Request:
 
@@ -157,7 +169,7 @@ Request:
 }
 ```
 
-Response (correlate on `id`):
+The response carries the same `id`:
 
 ```json
 {
@@ -170,43 +182,31 @@ Response (correlate on `id`):
 ```
 
 - `request.type` is `"info"` or `"action"`.
-- For `"action"`, `payload` must be a full signed-exchange envelope (`signature` / `nonce` / `action`, plus the optional [`expires_after`](../rest/exchange.md#optional-action-expiry-expiresafter)), identical to [`POST /exchange`](../rest/exchange.md). The action is signed over the **compact `serde_json` serialization of the `action` object** — the deterministic canonical form the SDK pins.
-- Errors are returned as a normal `post` frame with `response.type: "error"` and a string `payload` (never a connection close):
+- For `"action"`, `payload` must be a full signed-exchange envelope: `signature`, `nonce` and `action`, plus the optional [`expires_after`](../rest/exchange.md#optional-action-expiry-expiresafter). It is identical to [`POST /exchange`](../rest/exchange.md). The signature covers the compact `serde_json` serialization of the `action` object. This is the deterministic canonical form that the SDK pins.
+- An error comes back as a normal `post` frame with `response.type: "error"` and a string `payload`. The connection stays open:
 
 ```json
 { "channel": "post", "data": { "id": 42, "response": { "type": "error", "payload": "<message>" } } }
 ```
 
-A well-formed action the node REFUSES is **not** an `error`-type response. It comes back as a normal
-`action` response, and its `payload` is the REST
-[rejection envelope](../rest/exchange.md#rejection-envelope) — `{"error": {"code": …, "message": …}}`.
-A bad signature reads `AUTH_BAD_SIGNATURE` there. There is **no** `accepted` field, on this lane or
-on REST: the presence of `error` is the refusal.
+A well-formed action that the node refuses is not an `error`-type response. It comes back as a normal `action` response. Its `payload` is the REST [rejection envelope](../rest/exchange.md#rejection-envelope): `{"error": {"code": …, "message": …}}`. A bad signature reads `AUTH_BAD_SIGNATURE` there. Neither this lane nor REST has an `accepted` field. The presence of `error` marks the refusal.
 
 ## WebSocket compression (zstd) {#websocket-compression-zstd}
 
-Compression is **opt-in** and per connection. You ask for it in the WebSocket
-handshake, and the server answers in the same handshake. Market-data frames
-compress well, because they repeat a small set of keys, coins and price shapes;
-expect a large reduction on `l2_book`, which dominates a normal client's byte
-budget.
+Compression is opt-in and applies to one connection. The client asks for it in the WebSocket handshake, and the server answers in the same handshake. Market-data frames compress well because they repeat a small set of keys, coins and price shapes. Expect a large reduction on `l2_book`, which uses most of the bytes of a normal client.
 
-Compression is a **gateway** capability. A node-direct socket
-(`ws://localhost:8080/ws`) selects no subprotocol and sends text frames, exactly
-as it does today.
+Compression is a gateway feature. A socket that connects directly to the node (`ws://localhost:8080/ws`) selects no subprotocol and sends text frames.
 
 ### Negotiation {#compression-negotiation}
 
-Offer subprotocols on connect, in the `Sec-WebSocket-Protocol` request header, in
-this preference order:
+Offer subprotocols on connect in the `Sec-WebSocket-Protocol` request header. Use this order of preference:
 
 | Token | Meaning |
 | --- | --- |
-| `mtf-zstd.v1.d<id>` | zstd **with** dictionary `<id>`. Offer it only if you hold those dictionary bytes. |
-| `mtf-zstd.v1` | zstd, **no** dictionary. |
+| `mtf-zstd.v1.d<id>` | zstd with dictionary `<id>`. Offer it only if you hold those dictionary bytes. |
+| `mtf-zstd.v1` | zstd, no dictionary. |
 
-The server echoes **one** token in the `Sec-WebSocket-Protocol` response header,
-or echoes nothing. That answer is the mode:
+The server echoes one token in the `Sec-WebSocket-Protocol` response header, or echoes nothing. That answer sets the mode:
 
 | Server selects | Data frames you receive |
 | --- | --- |
@@ -224,36 +224,24 @@ const ws = new WebSocket("wss://api.<net>.mtf.exchange/ws", [
 ws.onopen = () => console.log(ws.protocol); // "" when the server selects nothing
 ```
 
-**Why the handshake carries this.** The server's answer arrives before the first
-frame. You know the mode up front, so you never guess it from the bytes of the
-first frame, and you never race your own `subscribe` messages.
+The handshake carries the mode because the answer of the server arrives before the first frame. You know the mode up front. You never guess it from the bytes of the first frame, and your `subscribe` messages never race it.
 
-**Why opt-in.** An existing client drops a binary frame it does not expect. A
-client that offers nothing receives plain JSON text frames, unchanged, forever.
-Compression can never reach a client that did not ask for it.
+Compression is opt-in because an existing client drops a binary frame that it does not expect. A client that offers nothing always receives plain JSON text frames. Compression never reaches a client that did not ask for it.
 
 ### Frame format {#compression-frame-format}
 
-The rule is by **WebSocket opcode**, never by channel:
+The WebSocket opcode sets the rule. The channel does not.
 
-- A **binary** frame is one standard zstd frame. Decompress it. The result is
-  exactly the JSON text you receive without compression — same envelope, same
-  fields, same bytes.
-- A **text** frame is plain JSON. Parse it.
+- A binary frame is one standard zstd frame. Decompress it. The result is the JSON text that you receive without compression, with the same envelope, fields and bytes.
+- A text frame is plain JSON. Parse it.
 
-Handle both on **any** channel. Do not build a per-channel table.
+Handle both on any channel. Do not build a table for each channel.
 
-**Why opcode-based.** Which frames the server compresses can change. The opcode
-always tells you what to do with the bytes in your hand, so your client stays
-correct across that change.
+The rule uses the opcode because the set of frames that the server compresses can change. The opcode always tells you what to do with the bytes in your hand, so your client stays correct across a change.
 
-**Control frames stay text in every mode**: `subscriptionResponse`, `error`,
-`pong`, and `post` replies. They are small and request/response shaped, so
-compression buys nothing on them.
+Control frames stay text in every mode: `subscriptionResponse`, `error`, `pong` and `post` replies. They are small and have a request and response shape, so compression gains nothing on them.
 
-**Frames you send stay text in every mode.** The server still rejects an inbound
-binary frame with an [error frame](#error-frame). There is no inbound
-compression, so a binary frame from a client is still a client defect.
+Frames that you send stay text in every mode. The server still rejects an inbound binary frame with an [error frame](#error-frame). There is no inbound compression, so a binary frame from a client is a client defect.
 
 ### Dictionary {#compression-dictionary}
 
@@ -268,10 +256,9 @@ GET /ws/dict
 | Body | the dictionary bytes |
 | `Content-Type` | `application/octet-stream` |
 | `x-mtf-dict-id` | the dictionary id |
-| `ETag` | `"<id>"` — the same id, quoted |
+| `ETag` | `"<id>"`, the same id in quotes |
 
-The id is the **first 8 lowercase hex characters of the SHA-256 of the dictionary
-bytes**. It is a content hash, so an id names exactly one set of bytes.
+The id is the first 8 lowercase hex characters of the SHA-256 of the dictionary bytes. It is a content hash, so an id names exactly one set of bytes.
 
 Client flow:
 
@@ -281,96 +268,71 @@ Client flow:
 4. When the server selects the dict token, load the cached bytes into your zstd
    decoder for that connection.
 
-**Why a dictionary at all.** One frame is small, so a compressor finds little to
-learn inside it. The dictionary holds the shared structure — the envelope keys,
-the coin names, the common price and size shapes — so each frame carries only
-what is new in that frame.
+A frame is small, so a compressor finds little to learn inside it. The dictionary holds the shared structure: the envelope keys, the coin names and the common price and size shapes. Each frame then carries only what is new in that frame.
 
-Dictionary-compressed frames also carry zstd's own 4-byte dictionary id in the
-standard frame header. Your zstd decoder checks it for you. **Why two ids:** the
-8-hex id rides the handshake and the HTTP headers, so it costs no bytes per
-frame; the in-frame id is a decode-time check only.
+A dictionary-compressed frame also carries the 4-byte dictionary id of zstd in the standard frame header. Your zstd decoder checks it for you. The two ids have different jobs. The 8-hex id travels in the handshake and the HTTP headers, so it costs no bytes for each frame. The in-frame id is a check at decode time only.
 
-### Degradation — never corruption {#compression-degradation}
+### Degradation without corruption {#compression-degradation}
 
-If the id in your dict token is not the server's current id, that token matches
-nothing on the server. The server selects `mtf-zstd.v1` instead. You still get
-zstd, without the dictionary: always decodable, a weaker ratio.
+If the id in your dict token is not the current id of the server, the token matches nothing. The server selects `mtf-zstd.v1` instead. You still get zstd without the dictionary. Every frame stays decodable, with a weaker ratio.
 
-**Why the fork happens once, at the handshake.** A dictionary-compressed frame
-cannot be decoded without those exact dictionary bytes. So the server decides
-before it sends any frame. There is no per-frame fallback, and the dictionary
-never changes during a connection.
+The choice happens once, at the handshake. A dictionary-compressed frame cannot be decoded without those exact dictionary bytes, so the server decides before it sends any frame. There is no fallback for each frame, and the dictionary never changes during a connection.
 
-**Read "I offered a dict token and the server selected the plain token" as "my
-dictionary is stale."** Refetch `GET /ws/dict`, and use the new id on your next
-connect. A reconnect straight after a gateway upgrade can run dictionary-free
-until you refetch. That costs ratio, never data.
+If you offered a dict token and the server selected the plain token, your dictionary is stale. Fetch `GET /ws/dict` again and use the new id on your next connect. A reconnect right after a gateway upgrade can run without the dictionary until you fetch it again. This costs ratio and never loses data.
 
 ### Per-account channels {#compression-per-account-channels}
 
-Per-account frames (`fills`, `order_updates`, and the other account channels) are
-compressed with the **same public dictionary** as every other frame. The compress
-path does not look at the channel.
+Account frames (`fills`, `order_updates` and the other account channels) use the same public dictionary as every other frame. The compression path does not look at the channel.
 
-The dictionary is trained on **public market channels only**. It is never trained
-on account data.
+The dictionary is trained on public market channels only. It is never trained on account data. A zstd dictionary holds literal byte sequences from its training samples, and the server publishes it to every client. A dictionary trained on account channels would show the balances, positions and order flow of one account to everyone.
 
-**Why that rule exists.** A zstd dictionary holds literal byte sequences from the
-samples it was trained on, and it is published to every client. A dictionary
-trained on account channels would hand one account's balances, positions and
-order flow to everyone.
+Using the public dictionary on your private frames is safe. The compressed output is only your own frame, on your own subscription. The dictionary adds only bytes that are already public.
 
-**Why using it on your private frames is still safe.** Compressing your frame
-with the public dictionary emits only your own frame, on your own subscription.
-The dictionary contributes bytes that are already public.
-
-A per-account frame gains less than a book frame, because the public dictionary
-knows less about its content. That is a ratio note, not a limit.
+An account frame gains less than a book frame, because the public dictionary knows less about its content. This affects the ratio only. It is not a limit.
 
 ## Coin parameter {#coin-parameter}
 
-The fanout hub is keyed by `(channel, coin)`. For the per-market channels `l2_book` and `bbo` this means:
+The fanout hub uses the key `(channel, coin)`. For the per-market channels `l2_book` and `bbo`, this has two effects:
 
-- **`coin` is required.** Without it you land on the coinless `(channel, None)` bucket, which the per-market book publisher never writes to — you would receive only the initial empty snapshot and no live updates.
-- **A `BTC` subscriber only receives `BTC` frames.** ETH commits never reach a BTC subscription, and vice-versa.
+- `coin` is required. Without it, you land in the coinless `(channel, None)` bucket. The per-market book publisher never writes to that bucket, so you receive only the initial empty snapshot and no live updates.
+- A `BTC` subscriber receives only `BTC` frames. An ETH commit never reaches a BTC subscription, and the reverse is also true.
 
-`coin` is canonicalized to an **asset-id string** before keying, so two forms resolve to the same bucket:
+The node converts `coin` to an asset-id string before it builds the key. Three forms resolve to the same bucket:
 
-- A **numeric asset id** — e.g. `"0"`, `"7"` — maps directly to that market (the MTF-native canonical key). A spot **pair id** works the same way.
-- A **symbol** — e.g. `"BTC"` — is resolved against the committed universe (`mip3_market_specs`, matching on `symbol` or `asset_name`) to its asset id.
-- A **spot pair name** — e.g. `"BTC/USDC"` — is resolved against the registered spot pairs to its pair id, so `l2_book` / `bbo` stream real spot depth for the pair (in the pair's own tick / size planes).
+- A numeric asset id, for example `"0"` or `"7"`, maps directly to that market. This is the canonical key. A spot pair id works the same way.
+- A symbol, for example `"BTC"`, resolves against the committed universe (`mip3_market_specs`, matching on `symbol` or `asset_name`) to its asset id.
+- A spot pair name, for example `"BTC/USDC"`, resolves against the registered spot pairs to its pair id. Then `l2_book` and `bbo` stream spot depth for the pair, in the tick and size planes of the pair.
 
-A subscriber keyed by `"BTC"` and one keyed by the numeric id `"0"` (if BTC is asset 0) therefore share the **same** routing bucket as the per-commit publish. A coin that is neither numeric nor a known universe symbol is kept verbatim as its own bucket — you get the ack + empty snapshot but never live frames (honest "unknown market" rather than a fabricated mapping).
+A subscriber keyed by `"BTC"` and one keyed by the numeric id `"0"` (if BTC is asset 0) share the same routing bucket for the publish on each commit. A coin that is neither numeric nor a known universe symbol stays as its own bucket. You get the ack and an empty snapshot but never live frames. This reports an unknown market and does not invent a mapping.
 
 ## Per-subscriber push {#per-subscriber-push}
 
-Pushes are **subscriber-gated, per-market, and change-driven**. After each committed block the node, for each market, checks `has_receivers(channel, coin)` — an O(1) lookup — and only then aggregates that market's book, and broadcasts it **only if it changed** since the previous commit. Consequences:
+Pushes depend on subscribers, apply to one market and follow changes. After each committed block, the node checks `has_receivers(channel, coin)` for each market. This is an O(1) lookup. Only then does it aggregate the book of that market. It broadcasts the book only if the book changed since the previous commit. This has four effects:
 
-- A market nobody is watching costs only the O(1) check; no book is built.
+- A market that nobody watches costs only the O(1) check. The node builds no book.
 - A `BTC` subscriber never triggers an `ETH` book build.
-- A market whose book is unchanged on a commit broadcasts nothing for it that commit — no redundant re-push.
-- Frames are delivered to **every** current subscriber of that `(channel, coin)` bucket.
+- A market whose book did not change on a commit broadcasts nothing for that commit.
+- The node delivers frames to every current subscriber of that `(channel, coin)` bucket.
 
 ## Backpressure & lag {#backpressure--lag}
 
-Each subscription is backed by a bounded broadcast ring buffer (capacity **256** frames). A consumer that falls more than 256 frames behind is **dropped**: the server sends a final error frame describing the lag and then stops forwarding on that subscription.
+Each subscription uses a bounded broadcast ring buffer with a capacity of 256 frames. The server drops a consumer that falls more than 256 frames behind. It sends a final error frame that describes the lag, then stops forwarding on that subscription.
 
 ```json
 { "channel": "error", "data": { "error": "lagged behind broadcast by <n> messages" } }
 ```
 
-On this signal, re-subscribe (you will get a fresh snapshot). The node does **not** silently skip ahead — for a derivatives chain a gap in book state is worse than an explicit drop.
+On this signal, subscribe again. You get a fresh snapshot. The node never skips ahead silently, because a gap in book state is worse than an explicit drop on a derivatives chain.
 
 ## Authentication {#authentication}
 
-Public market channels (`l2_book`, `bbo`, `trades`, `markets`) require **no auth**.
+The public market channels (`l2_book`, `bbo`, `trades`, `markets`) need no authentication.
 
-Per-account channels (`fills`, `order_updates`) are live and route per 0x `user` address, but there is **no auth gate yet** — any connection can subscribe to any address's feed (the data is the same public committed fills, keyed by account). A dedicated auth-at-subscribe envelope (so a connection only sees its own account) is roadmap. For authenticated reads/writes today, use the `post` channel (info reads, and signed actions through the same EIP-712 verification as `POST /exchange`). See [subscriptions](./subscriptions.md).
+The account channels (`fills`, `order_updates`) are live and route by the 0x `user` address. They have no authentication gate yet. Any connection can subscribe to the feed of any address. The data is the same public committed fills, keyed by account. An authentication envelope at subscribe time, so that a connection sees only its own account, is planned. For authenticated reads and writes today, use the `post` channel. It serves info reads, and it checks signed actions with the same EIP-712 verification as `POST /exchange`. See [subscriptions](./subscriptions.md).
 
 ## Multiplexing {#multiplexing}
 
-A single connection can hold many subscriptions; each is demuxed by its `(channel, coin)`. Each subscription owns its own broadcast receiver and forwarder task; the connection interleaves their frames onto the one socket. Route inbound frames by `channel` plus the `coin` inside `data`.
+One connection can hold many subscriptions. The `(channel, coin)` pair identifies each one. Each subscription has its own broadcast receiver and forwarder task. The connection interleaves their frames on the one socket. Route inbound frames by `channel` and the `coin` inside `data`.
 
 ```
 l2_book  coin "0" (BTC)
@@ -380,24 +342,24 @@ bbo      coin "0" (BTC)
 
 ## Close behavior {#close-behavior}
 
-- A client `close` frame (or EOF) tears down the connection and aborts every forwarder task.
-- A read error logs and closes.
-- A lagging subscription is dropped individually (error frame), but the **connection stays open** — other subscriptions on it keep flowing.
+- A client `close` frame or EOF ends the connection and aborts every forwarder task.
+- A read error is logged and closes the connection.
+- The server drops a lagging subscription on its own and sends an error frame. The connection stays open, and the other subscriptions on it keep flowing.
 
-There is no custom close-code table today; standard WebSocket close codes apply.
+There is no custom close-code table today. Standard WebSocket close codes apply.
 
 ## Reconnect strategy {#reconnect-strategy}
 
-1. On disconnect, reconnect with exponential backoff (suggested: base 200 ms, max 30 s, jitter ±20%).
-2. Re-subscribe each `(type, coin)` from scratch. The first frame after each subscribe is a fresh snapshot, so there is no resume token to manage — discard local book state and rebuild from the snapshot.
-3. On a `lagged` error frame, treat it the same as a disconnect for that subscription and re-subscribe.
+1. On disconnect, reconnect with exponential backoff. Suggested values: base 200 ms, maximum 30 s, jitter ±20%.
+2. Subscribe again to each `(type, coin)`. The first frame after each subscribe is a fresh snapshot, so there is no resume token to manage. Discard the local book state and rebuild it from the snapshot.
+3. On a `lagged` error frame, treat the subscription as disconnected and subscribe again.
 
 :::warning
-There is **no** `seq` / `resume` / `resume_token` mechanism today. Every (re)subscribe starts from a fresh snapshot. Resume buffers are roadmap, not implemented.
+There is no `seq`, `resume` or `resume_token` mechanism today. Every subscribe starts from a fresh snapshot. Resume buffers are planned and not implemented.
 :::
 
 ## See also {#see-also}
 
 - [WS subscriptions catalog](./subscriptions.md)
-- [`POST /exchange`](../rest/exchange.md) — same EIP-712 envelope used by the `post` action path
-- [`POST /info`](../rest/info.md) — REST equivalents for one-shot reads (also reachable via `post`)
+- [`POST /exchange`](../rest/exchange.md): the EIP-712 envelope that the `post` action path uses.
+- [`POST /info`](../rest/info.md): the REST equivalents for one-shot reads. `post` also reaches them.

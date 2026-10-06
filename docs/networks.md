@@ -4,13 +4,12 @@ description: The one hosted MetaFlux network, its endpoints and signing paramete
 
 # Networks
 
-:::warning
-**Sign with `chainId` 114514, not 31337.** `31337` is what a node picks when you
-run one yourself and set no chain id. It is not the network behind
-`api.testnet.mtf.exchange`. The chain id is part of the EIP-712 domain, so a
-wrong one does not mostly work — the first signed write is rejected.
+This page lists the hosted MetaFlux network, its endpoints and signing parameters, the faucet, and what changes at mainnet launch.
 
-Confirm it at any time:
+:::warning
+Sign with `chainId` 114514, not 31337. A node that you run yourself uses `31337` when you set no chain id. The network behind `api.testnet.mtf.exchange` does not use it. The chain id is part of the EIP-712 domain, so a wrong chain id fails: the node rejects the first signed write.
+
+To confirm the chain id:
 
 ```bash
 curl -s https://api.testnet.mtf.exchange/evm -X POST \
@@ -28,24 +27,17 @@ curl -s https://api.testnet.mtf.exchange/evm -X POST \
 | Your own node, default config | self-hosted | `31337` | yes |
 | Mainnet | not launched | `8964` | yes |
 
-**Testnet is the only network with a public endpoint.** Mainnet endpoints are
-published before launch.
+Testnet is the only network with a public endpoint. Mainnet endpoints are published before launch.
 
 :::info
-**`api.devnet.mtf.exchange` is not the integration endpoint.** An earlier
-revision of this page named it. It resolves, and it answers `/info`, so a client
-pointed at it looks connected — but its faucet reserve is empty and its books are
-one-sided, so a claim credits nothing and an order finds no counterparty. Point
-your client at `api.testnet.mtf.exchange`.
+`api.devnet.mtf.exchange` is not the integration endpoint. An earlier revision of this page named it. It resolves and answers `/info`, so a client looks connected. But its faucet reserve is empty and its books are one-sided. A claim credits nothing, and an order finds no counterparty. Point your client at `api.testnet.mtf.exchange`.
 :::
 
 ## Testnet {#testnet}
 
-The integration network. Free USDC and MTF from the faucet, real matching, real
-consensus, no economic value.
+Testnet is the integration network. It has real matching and real consensus, and the faucet gives free USDC and MTF. The tokens have no economic value.
 
-The gateway is the single public front door. The MTF-native surface is served at
-`/info` · `/exchange` · `/ws`; EVM JSON-RPC at `/evm`.
+The gateway is the single public front door. It serves the MTF-native surface at `/info`, `/exchange` and `/ws`, and EVM JSON-RPC at `/evm`.
 
 | Service | Endpoint |
 |---------|----------|
@@ -56,9 +48,7 @@ The gateway is the single public front door. The MTF-native surface is served at
 | Gateway WS (native) | `wss://api.testnet.mtf.exchange/ws` |
 | Explorer | `https://app.mtf.exchange/explorer` |
 
-Running the node yourself? It serves the same native surface directly at
-`http://localhost:8080` (`/info` · `/exchange` · `/ws` · `/faucet`), and its raw
-EVM RPC at `http://localhost:8545`. Those are self-hosted ports, not public URLs.
+A node that you run yourself serves the same native surface at `http://localhost:8080` (`/info`, `/exchange`, `/ws` and `/faucet`). It serves its raw EVM RPC at `http://localhost:8545`. These are self-hosted ports, not public URLs.
 
 | Signing parameter | Value |
 |--------------------|-------|
@@ -67,9 +57,7 @@ EVM RPC at `http://localhost:8545`. Those are self-hosted ports, not public URLs
 | EIP-712 domain `version` | `"1"` |
 | EIP-712 domain `verifyingContract` | `0x0000000000000000000000000000000000000000` |
 
-USDC bridging goes through the **MetaBridge custody bridge**
-([bridge](./bridge/)), not Circle CCTP. Testnet deposits use the Base Sepolia
-`Bridge` deployment and Circle's Base Sepolia test USDC.
+USDC bridging uses the MetaBridge custody bridge ([bridge](./bridge/)), not Circle CCTP. Testnet deposits use the Base Sepolia `Bridge` deployment and Circle's Base Sepolia test USDC.
 
 Differences from mainnet:
 
@@ -77,14 +65,11 @@ Differences from mainnet:
 - The validator set is operator-controlled.
 - No real economic value.
 
-The wire shape is identical to mainnet's. A client tested here should need
-**only the `chainId` and the base URL** changed to flip to mainnet.
+The wire shape is identical to mainnet. A client tested here needs only a new `chainId` and base URL to use mainnet.
 
 ### Faucet {#faucet}
 
-`POST /faucet` on the gateway front door credits an address with test funds. The
-route is **never mounted on mainnet** (`chainId 8964`). Full contract:
-[`POST /faucet`](api/rest/faucet.md).
+`POST /faucet` on the gateway front door credits an address with test funds. The route is never mounted on mainnet (`chainId 8964`). See [`POST /faucet`](api/rest/faucet.md) for the full contract.
 
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/faucet \
@@ -93,32 +78,22 @@ curl -X POST https://api.testnet.mtf.exchange/faucet \
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
-- Grants **3000 USDC** cross-collateral and **10 MTF** spot — **once ever per
-  address** (a second claim returns `429 address already funded`).
-- `amount` is optional (whole USDC) and caps the USDC grant *downward* (≤ 3000).
-  The MTF grant is fixed — see [Limits](api/rest/faucet.md#limits).
-- Per source IP: one claim per minute. The per-IP window crosses with the
-  per-address rule: a new address behind a used IP waits, and a used address is
-  refused from any IP.
-- `400` invalid address · `429` already funded or IP-throttled · `503` backlog
-  full — body `{"error":"…"}`.
+- The grant is 3000 USDC cross-collateral and 10 MTF spot, once ever per address. A second claim returns `429 address already funded`.
+- `amount` is optional (whole USDC). It caps the USDC grant downward (at most 3000). The MTF grant is fixed. See [Limits](api/rest/faucet.md#limits).
+- Each source IP gets one claim per minute. The per-IP window combines with the per-address rule: a new address behind a used IP waits, and a used address is refused from any IP.
+- Errors: `400` invalid address, `429` already funded or IP-throttled, `503` backlog full. The body is `{"error":"…"}`.
 
 :::info
-**`"queued"` means staged, not credited.** The faucet transfers out of a reserve
-account rather than creating tokens, so the grant lands about one block later.
-The reserve is checked before the response, so a `200` means the reserve could
-pay at that moment. Confirm the balance with `account_state` before you trade —
-see [the reserve](api/rest/faucet.md#reserve).
+`"queued"` means staged, not credited. The faucet transfers out of a reserve account and does not create tokens, so the grant lands about one block later. The faucet checks the reserve before it responds, so a `200` means the reserve could pay at that moment. Confirm the balance with `account_state` before you trade. See [the reserve](api/rest/faucet.md#reserve).
 :::
 
 ### State resets {#state-resets}
 
-Testnet may be reset for protocol upgrades: on demand during pre-mainnet
-development, with notice where possible.
+Testnet may reset for protocol upgrades. Resets happen on demand during pre-mainnet development, with notice where possible.
 
 ## Mainnet (planned) {#mainnet-planned}
 
-Production network. Real USDC, real value, real validators.
+Mainnet is the production network. It has real USDC, real value and real validators.
 
 | Service | Endpoint |
 |---------|----------|
@@ -130,15 +105,14 @@ Mainnet `chainId`: `8964` (`0x2304`).
 
 Differences from testnet:
 
-- USDC is real, bridged via MetaBridge custody from Base (and later Arbitrum).
+- USDC is real. It bridges through MetaBridge custody from Base, and later from Arbitrum.
 - The validator set is permissionless (governance-elected).
 - Real economic value.
 - Rate limits and fees per [rate limits](./api/rate-limits.md) and [fees](./concepts/fees.md).
 
 ## Bridge corridors {#bridge-corridors}
 
-USDC and other assets bridge through the **MetaBridge custody bridge** —
-validator ⅔ stake-weighted co-signing, no Circle CCTP dependency. Source chains:
+USDC and other assets bridge through the MetaBridge custody bridge. Validators co-sign with ⅔ stake weight. The bridge has no Circle CCTP dependency. The source chains are:
 
 | Chain | Status |
 |-------|--------|
@@ -156,7 +130,7 @@ See [bridge](./bridge/) for the deposit and withdraw flow and the deployment tab
 
 ## See also {#see-also}
 
-- [Quickstart](./integration/quickstart.md) — a first call against testnet
-- [Signing](./integration/signing.md) — how `chainId` enters the digest
-- [Bridge](./bridge/) — MetaBridge custody bridge details
-- [Versioning](./versioning.md) — wire-shape change policy
+- [Quickstart](./integration/quickstart.md): a first call against testnet.
+- [Signing](./integration/signing.md): how `chainId` enters the digest.
+- [Bridge](./bridge/): MetaBridge custody bridge details.
+- [Versioning](./versioning.md): the wire-shape change policy.

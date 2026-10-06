@@ -1,243 +1,236 @@
 ---
-description: The live spot CLOB — token-for-token swaps with reserved-balance escrow, no leverage.
+description: The spot CLOB of MetaFlux. Spot swaps one token for another, holds resting orders in a reserved-balance escrow and has no leverage.
 ---
 
 # Spot trading
 
+This page describes the spot market: pairs, escrow, matching, fees, order rules and limits.
+
 :::tip
-**Live.** Plain spot trading is shipped — a token-for-token order book, separate
-from perps, with no leverage and no positions. (Leveraged spot is the separate,
-planned [spot-margin](./spot-margin.md) track.)
+**Live.** Spot trading is shipped. It is a token-for-token order book, separate from perps,
+with no leverage and no positions. Leveraged spot is the separate, planned
+[spot-margin](./spot-margin.md) track.
 :::
 
 :::info
-**Non-leveraged spot is the one Sharia-compliant product on MetaFlux** — see
+Non-leveraged spot is the one Sharia-compliant product on MetaFlux. See
 [Sharia compliance](./index.md#sharia). Leveraged [spot margin](./spot-margin.md) is not.
 :::
 
-## TL;DR {#tldr}
+## Overview {#tldr}
 
-Spot is a **token-for-token central limit order book**: you swap one token for
-another at a price you choose. It is entirely separate from perps — separate
-books, separate balances, **no leverage and no positions**. You trade only what
-you own. A resting spot order locks the funds it would owe on fill into a
-**reserved balance** (escrow); those funds are paid to the counterparty on fill,
-or refunded to you on cancel.
+Spot is a token-for-token central limit order book. You swap one token for another at a
+price you choose. Spot is fully separate from perps. It has its own books and balances, and
+it has no leverage and no positions. You trade only what you own. A resting spot order
+locks the funds that it owes on a fill into a reserved balance (escrow). A fill pays
+those funds to the counterparty. A cancel returns them to you.
 
-A spot order is just another [`/exchange`](../api/rest/exchange.md) action —
-[`spot_order`](../api/rest/exchange/spot.md#spot_order) to place,
-[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) to cancel. Both are
-**sender-authorized by default** (omit `owner` and the recovered signer is the
-trader); both also take an **optional** `owner` so an approved
-[agent wallet](../concepts/agent-wallets.md) can trade for the account it is
-approved for.
+A spot order is an [`/exchange`](../api/rest/exchange.md) action.
+[`spot_order`](../api/rest/exchange/spot.md#spot_order) places an order, and
+[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) cancels one. Both are
+sender-authorized by default: when you omit `owner`, the recovered signer is the trader.
+Both also take an optional `owner`. With it, an approved
+[agent wallet](../concepts/agent-wallets.md) trades for the account that approved it.
 
-The three orders the node runs FOR you —
+The node runs three orders for you:
 [TWAP](../concepts/order-types.md#twap), the
-[scale ladder](../concepts/order-types.md#scale-orders) and the
-[chase](../concepts/order-types.md#chase-orders) — also accept a spot pair id. See
+[scale ladder](../concepts/order-types.md#scale-orders) and
+[chase](../concepts/order-types.md#chase-orders). All three also accept a spot pair id. See
 [The three on a spot pair](../concepts/order-types.md#synth-on-spot).
 
-## What a spot pair is {#what-a-spot-pair-is}
+## Spot pairs {#what-a-spot-pair-is}
 
-A spot pair trades a **base** token against a **quote** token (e.g. `B/Q`). The
-order side picks the direction:
+A spot pair trades a base token against a quote token (for example `B/Q`). The order
+side sets the direction:
 
 | `side` | You give | You receive | Escrow locked while resting |
 |--------|----------|-------------|------------------------------|
-| `bid` (buy) | quote | base | **quote** — notional at your limit price |
-| `ask` (sell) | base | quote | **base** — the base you are offering |
+| `bid` (buy) | quote | base | quote: the notional at your limit price |
+| `ask` (sell) | base | quote | base: the base you offer |
 
-The order field is the **spot pair id** (`pair`), which is distinct from a perp
-`market` id and from a token id. Pairs are deployed under
-[MIP-1](../mip/mip-1.md) (spot token standard + market deploy); each carries its
-own base/quote tokens, size decimals, optional minimum notional, and fee
-overrides.
+The order field is the spot pair id (`pair`). It is different from a perp `market` id
+and from a token id. Pairs deploy under [MIP-1](../mip/mip-1.md), the spot token standard
+and market deploy. Each pair has its own base and quote tokens, size decimals, optional
+minimum notional and fee overrides.
 
 ## Reserved-balance escrow {#reserved-balance-escrow}
 
-This is the core of how spot stays solvent without leverage. When a `gtc` / `alo`
-order (or the un-crossed residual of one) **rests** on the book, the protocol
-moves the funds it would owe on a full fill out of your spendable balance into a
-**reserved balance**:
+Escrow keeps spot solvent without leverage. A `gtc` or `alo` order can rest on the book,
+or the un-crossed residual of one can. The protocol then moves the funds that the order
+owes on a full fill. They leave your spendable balance and go into a reserved balance:
 
-- A resting **bid** reserves **quote** equal to its notional at the limit price
+- A resting bid reserves quote equal to its notional at the limit price
   (`size × limit_px`).
-- A resting **ask** reserves the **base** it offers.
+- A resting ask reserves the base that it offers.
 
-Reserved funds are not spendable. They are:
+You cannot spend reserved funds. The protocol:
 
-- **paid to the counterparty** when the order fills,
-- **refunded to your spendable balance** on [cancel](#lifecycle--cancel-refunds-escrow),
-  on self-trade-prevention, or if the market is deactivated.
+- pays them to the counterparty when the order fills.
+- returns them to your spendable balance on a [cancel](#lifecycle--cancel-refunds-escrow),
+  on self-trade prevention, or when the market is deactivated.
 
-Per-token balances are conserved exactly across every rest, fill, cancel, and
-STP event — spendable plus reserved is invariant per token per account (it is
-fuzz-verified across randomized rest/cross/cancel streams).
+Each token balance is conserved exactly across every rest, fill, cancel and STP event. For
+each token and account, spendable plus reserved does not change. Fuzz tests verify this
+across random streams of rests, crosses and cancels.
 
 ## Affordability clamping {#affordability-clamping}
 
-You can never rest or fill more than you can fund. At admission the order size is
-**clamped** to what your balance covers:
+You can never rest or fill more than you can fund. At admission, the order size is
+clamped to what your balance covers:
 
-- a priced **bid** (`limit_px > 0`) is clamped by `quote_balance ÷ limit_px`,
-- a **market bid** (`limit_px = 0`) is clamped by walking the resting asks level
-  by level against your quote balance — there is no single price to divide by,
-- an **ask**, priced or market, is clamped by the base you actually own.
+- A priced bid (`limit_px > 0`) is clamped by `quote_balance ÷ limit_px`.
+- A market bid (`limit_px = 0`) is clamped by a walk of the resting asks, level by
+  level, against your quote balance. There is no single price to divide by.
+- An ask, priced or market, is clamped by the base that you own.
 
-**The market-bid walk counts only asks the engine will actually fill.** It skips
-your own asks and every ask in your
-[self-trade-prevention group](../concepts/order-types.md#stp-groups) — a shared
-sub-account, or the other side of a Metaliquidity vault/operator pair. The engine
-refuses to fill those, so counting them would price your budget against
-liquidity you cannot buy, and the order would then walk deeper than the budget
-allows.
+The market-bid walk counts only asks that the engine fills. It skips your own asks. It
+also skips every ask in your
+[self-trade-prevention group](../concepts/order-types.md#stp-groups). Such a group is a
+shared sub-account, or the other side of a Metaliquidity vault and operator pair. The engine
+refuses to fill those asks. If the walk counted them, it would price your budget against
+liquidity you cannot buy. The order would then walk deeper than the budget allows.
 
-An order that is entirely unaffordable is **refused** with
-`insufficient spot balance` — nothing fills, nothing rests, no order id is burned.
-The refusal is about money, not liquidity: a funded order that finds no
-counterparty still answers `filled` with `total_sz: "0"`. One exception stays an
-accepted no-op: a market buy that holds quote, when the pair carries no ask the
-engine would fill for you — every ask is your own or a group peer. You have the
-money, so this is not a balance error. That no-op burns no order id and emits no
-STP cancellations, so the peers' orders stay on the book and their escrow stays
-reserved. An ask the engine WOULD fill, that your quote cannot buy one lot of, is
-a refusal, not a no-op. A partially-affordable order trades/rests the
-affordable portion. Because the clamp runs **before** matching, every resulting
-fill and every escrow reservation is funded; there is no post-match fill drop.
+The engine refuses an order that you cannot afford at all, with
+`insufficient spot balance`. Nothing fills, nothing rests and no order id is used. The
+refusal is about money, not liquidity. A funded order that finds no counterparty still
+answers `filled` with `total_sz: "0"`.
 
-## Matching, fills, and fees {#matching-fills-and-fees}
+One case stays an accepted no-op. A market buy holds quote, but the pair has no ask that the
+engine fills for you, because every ask is your own or belongs to a group peer. You have the
+money, so this is not a balance error. That no-op uses no order id and emits no STP cancels.
+The orders of the peers stay on the book and their escrow stays reserved. An ask that the
+engine WOULD fill, but of which your quote cannot buy one lot, gets a refusal. It is not a
+no-op.
 
-Spot matching is the same price-time CLOB the rest of MetaFlux uses. A fill swaps
-base for quote at the **maker's resting price**.
+An order that you can afford in part trades or rests the part that you can afford. The
+clamp runs before matching, so every fill and every escrow reservation that results is
+funded. No fill drops after the match.
 
-**Today both sides pay their fee in the QUOTE token of the pair.** The fee leaves
-the payer's spendable quote balance, never the base balance. Fees accrue to a
-dedicated spot fee account, separate from the perp fee pool.
+## Matching, fills and fees {#matching-fills-and-fees}
+
+Spot matching uses the same price-time CLOB as the rest of MetaFlux. A fill swaps base for
+quote at the resting price of the maker.
+
+Today both sides pay their fee in the QUOTE token of the pair. The fee leaves the
+spendable quote balance of the payer, never the base balance. Fees go to a dedicated spot
+fee account, separate from the perp fee pool.
 
 | Side | Fee taken from | Rate |
 |------|----------------|------|
-| **Taker** | your spendable quote balance | pair `taker_fee_bps`, else the global spot default |
-| **Maker** | your spendable quote balance | pair `maker_fee_bps`, else the global spot default |
+| Taker | your spendable quote balance | pair `taker_fee_bps`, else the global spot default |
+| Maker | your spendable quote balance | pair `maker_fee_bps`, else the global spot default |
 
-:::caution A BUY pays its fee in the BASE token
-A **buy** is credited the base token **minus** its fee, taker and maker alike,
-and a **sell** pays from the USDC it receives. So the fill `sz` stays gross while
-the balance credit is net — **read the balance, never the sum of fill sizes**.
-Buy admission reserves no quote fee headroom. The full rule, the in-kind referrer
-share and the sub-lot dust are in
+:::caution A buy pays its fee in the base token
+A buy gets the base token minus its fee. This applies to taker and maker. A sell
+pays from the USDC that it receives. The fill `sz` stays gross, and the balance credit is
+net. Read the balance. Do not add up fill sizes. Buy admission reserves no headroom for
+a quote fee. The full rule, the in-kind referrer share and the sub-lot dust are in
 [fees](../concepts/fees.md#spot-buy-fee-in-base).
 :::
 
-Spot fees are **per-pair**: a pair may set its own `taker_fee_bps` /
-`maker_fee_bps`, and when unset the global spot default applies. Spot uses a flat
-per-pair rate — the perp volume / maker-rebate / staking tiers do **not** apply to
-spot. Query the live values in the [`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule)
-response; see [fees](../concepts/fees.md#spot-fees) for the settlement model.
+Spot fees are per pair. A pair can set its own `taker_fee_bps` and `maker_fee_bps`.
+When a pair sets no rate, the global spot default applies. Spot uses a flat rate for each
+pair. The perp volume, maker-rebate and staking tiers do not apply to spot. Read the
+current values in the [`/info fee_schedule`](../api/rest/info/fees-credit.md#fee_schedule)
+response. See [fees](../concepts/fees.md#spot-fees) for the settlement model.
 
 ## Time-in-force {#time-in-force}
 
-Spot orders carry the same TIF set as perps, with one spot-specific rule:
+Spot orders use the same TIF set as perps, with one rule that applies to spot only:
 
 | `tif` | Behavior on spot |
 |-------|------------------|
-| `gtc` | Crosses what it can; any residual **rests** (escrow-backed) until filled or cancelled |
-| `alo` | Add-liquidity-only; a crossing `alo` is **rejected** (never takes). A non-crossing `alo` rests |
-| `ioc` | Crosses what it can immediately; the residual is discarded — **never rests**, never escrows |
+| `gtc` | Crosses what it can. Any residual rests, backed by escrow, until it fills or you cancel it. |
+| `alo` | Add-liquidity-only. A crossing `alo` is rejected and never takes. A non-crossing `alo` rests. |
+| `ioc` | Crosses what it can at once. The residual is discarded. It never rests and never uses escrow. |
 
-`aon` is rejected (no core equivalent). Self-trade prevention uses the same
-[`stp_mode`](../concepts/order-types.md) set as perps (`cancel_oldest` / `cancel_newest` /
-`cancel_both`); `reject` is not supported.
+The engine rejects `aon`, because core has no equivalent. Self-trade prevention uses the
+same [`stp_mode`](../concepts/order-types.md) set as perps (`cancel_oldest`,
+`cancel_newest`, `cancel_both`). Spot does not support `reject`.
 
 :::info
-**A market order must be `ioc`.** Send `limit_px = 0` to place a market order —
-it crosses the book at whatever price is available, bounded by your balance (a
-buy walks the asks up to what your quote funds; a sell is bounded by the base you
-own). A market order carries no resting price, so it must use `tif: "ioc"`;
-`gtc` or `alo` with `limit_px = 0` is rejected. A priced order (`limit_px > 0`)
-may use any `tif`.
+A market order must be `ioc`. To place a market order, send `limit_px = 0`. The order
+crosses the book at the available price, bounded by your balance. A buy walks the asks up to
+what your quote funds. A sell is bounded by the base that you own. A market order has no
+resting price, so it must use `tif: "ioc"`. The engine rejects `gtc` or `alo` with
+`limit_px = 0`. A priced order (`limit_px > 0`) can use any `tif`.
 :::
 
-## Lifecycle — cancel refunds escrow {#lifecycle--cancel-refunds-escrow}
+## Cancel and escrow refund {#lifecycle--cancel-refunds-escrow}
 
-[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) retires one of **your**
-resting orders by `oid` on a pair and refunds the escrow it locked back to your
-spendable balance.
+[`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) removes one of your resting
+orders by `oid` on a pair. It returns the escrow that the order locked to your spendable
+balance.
 
-- **Owner-only.** Only the order's owner may cancel it; a third party is rejected
-  (`not the order owner`).
-- **Typed miss.** An unknown or already-gone `oid` returns `order not found`
-  (harmless).
-- **Always available.** Cancels are **not** gated by the spot halt — even when
-  new orders are disabled, you can always exit a resting order and reclaim its
-  escrow.
+- **Owner only.** Only the owner of the order can cancel it. The engine rejects a third
+  party (`not the order owner`).
+- **Typed miss.** An unknown `oid`, or one that is already gone, returns `order not found`.
+  This is harmless.
+- **Always available.** The spot halt does not gate cancels. When new orders are
+  disabled, you can still remove a resting order and get its escrow back.
 
 ## Limits and governance {#limits-and-governance}
 
-- **Resting-order cap.** Each account may rest up to **1000** orders per spot
-  pair; a new resting order past the cap is rejected (`spot resting-order cap
-  reached — cancel some orders first`). Recognized market-maker accounts are
-  exempt. `ioc` orders never rest, so they are never subject to the cap.
-- **Minimum notional.** A pair may set a minimum notional; an order below it is
-  rejected.
-- **Spot halt (governance).** Spot trading can be globally enabled or disabled by
-  governance. When disabled, **new** orders are rejected (`spot trading
-  disabled`), but cancels still work so resting escrow is never trapped.
+- **Resting-order cap.** Each account can rest up to 1000 orders per spot pair. The
+  engine rejects a new resting order past the cap (`spot resting-order cap
+  reached — cancel some orders first`). Recognized market-maker accounts are exempt. `ioc`
+  orders never rest, so the cap never applies to them.
+- **Minimum notional.** A pair can set a minimum notional. The engine rejects an order below
+  it.
+- **Spot halt (governance).** Governance can enable or disable spot trading for all pairs.
+  When it is disabled, the engine rejects new orders (`spot trading
+  disabled`). Cancels still work, so resting escrow is never trapped.
 
 ## Reading spot state {#reading-spot-state}
 
-Spot balances and open spot orders are queryable via
-[`POST /info`](../api/rest/info.md). A `spot_order` returns a **synchronous**
-per-order status once it commits — the real assigned `oid` with a `resting` or
-`filled` entry (or `error`), or `pending` if no commit lands within the
-order-wait window — the same status union as the perp
+[`POST /info`](../api/rest/info.md) returns spot balances and open spot orders. A
+`spot_order` returns a synchronous status for each order when it commits. The status
+gives the real assigned `oid` with a `resting`, `filled` or `error` entry. If no commit lands
+in the order-wait window, the status is `pending`. This is the same status union as the perp
 [`submit_order`](../api/rest/exchange/orders.md#submit_order).
 
-## Relationship to spot-margin and Earn {#relationship-to-spot-margin-and-earn}
+## Spot margin and Earn {#relationship-to-spot-margin-and-earn}
 
-Plain spot is the **baseline**: trade only what you own, no leverage, no
+Plain spot is the baseline. You trade only what you own, with no leverage and no
 liquidation. Two planned overlays build on it:
 
-- [**Spot margin**](./spot-margin.md) (planned) — borrow quote against collateral
-  to buy spot with leverage, with a maintenance margin and a liquidation price.
-- [**Earn**](../concepts/earn.md) (planned) — a USDC lending pool that funds spot-margin
+- [Spot margin](./spot-margin.md) (planned): you borrow quote against collateral to buy
+  spot with leverage. It has a maintenance margin and a liquidation price.
+- [Earn](../concepts/earn.md) (planned): a USDC lending pool. It funds spot-margin
   borrows and earns the borrow interest as yield.
 
-Both are **opt-in overlays**; plain spot is unaffected by them.
+Both overlays are opt-in. They do not change plain spot.
 
 ## See also {#see-also}
 
-- [`spot_order`](../api/rest/exchange/spot.md#spot_order) / [`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel) — the wire actions and field tables
-- [Order types](../concepts/order-types.md) — TIF and STP semantics shared with perps
-- [Fees](../concepts/fees.md#spot-fees) — the spot fee schedule and quote-side charging
-- [Spot margin](./spot-margin.md) — the planned leveraged spot track
-- [MIP-1](../mip/mip-1.md) — spot token standard and market deploy
+- [`spot_order`](../api/rest/exchange/spot.md#spot_order) and [`spot_cancel`](../api/rest/exchange/spot.md#spot_cancel): the wire actions and their field tables.
+- [Order types](../concepts/order-types.md): the TIF and STP rules that spot shares with perps.
+- [Fees](../concepts/fees.md#spot-fees): the spot fee schedule and the fee charge on the quote side.
+- [Spot margin](./spot-margin.md): the planned leveraged spot track.
+- [MIP-1](../mip/mip-1.md): the spot token standard and market deploy.
 
 ## FAQ {#faq}
 
 <details>
 <summary>Show FAQ</summary>
 
-**Q: Do I need collateral or margin to trade spot?**
-A: No. Spot is balance-only — you trade what you own. There is no margin, no
-leverage, and no liquidation. (Leverage is the separate, planned
-[spot-margin](./spot-margin.md) track.)
+Q: Do I need collateral or margin to trade spot?
+A: No. Spot uses balances only. You trade what you own. There is no margin, no leverage and
+no liquidation. Leverage is the separate, planned [spot-margin](./spot-margin.md) track.
 
-**Q: What happens to my funds when my order is resting?**
-A: They are held in a reserved balance (escrow) — not spendable, but yours. They
-pay the counterparty on fill, or come back to your spendable balance on cancel.
+Q: What happens to my funds when my order rests?
+A: A reserved balance (escrow) holds them. You cannot spend them, but they stay yours. A
+fill pays them to the counterparty. A cancel returns them to your spendable balance.
 
-**Q: Why did my large buy only partially fill / rest?**
-A: Affordability clamping. The order size is reduced to what your quote balance
-funds at the limit price. An entirely unaffordable order is refused
+Q: Why did my large buy fill or rest only in part?
+A: Affordability clamping. The engine reduces the order size to what your quote balance
+funds at the limit price. The engine refuses an order that you cannot afford at all
 (`insufficient spot balance`).
 
-**Q: Can I place a spot market order?**
-A: Yes — send `limit_px = 0` with `tif: "ioc"`. `gtc` / `alo` require a positive
-`limit_px`.
+Q: Can I place a spot market order?
+A: Yes. Send `limit_px = 0` with `tif: "ioc"`. `gtc` and `alo` need a positive `limit_px`.
 
-**Q: Are spot fills and perp fills on the same book?**
-A: No. Spot has its own books, balances, and fee account, entirely separate from
-perps.
+Q: Are spot fills and perp fills on the same book?
+A: No. Spot has its own books, balances and fee account. They are fully separate from perps.
 
 </details>

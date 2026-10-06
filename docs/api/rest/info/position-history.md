@@ -1,35 +1,36 @@
 ---
-description: POST /info read queries for closed position lifecycles — user_position_history and user_position_history_by_time, their completeness flags, and how to page them.
+description: POST /info reads for closed position lifecycles. It covers user_position_history and user_position_history_by_time, their completeness flags, and how to page them.
 ---
 
-# `POST /info` — position history
+# Position history reads {#post-info--position-history}
 
-Read queries for **closed position lifecycles**. Same `POST /info` endpoint,
-envelope, and conventions as the [base page](../info.md) — these are the
-lifecycle-specific `type`s.
+These reads return the closed position lifecycles of an account.
 
-## TL;DR {#tldr}
+They use the same `POST /info` endpoint, envelope and conventions as the
+[base page](../info.md). This page lists the lifecycle `type`s.
 
-One row per position that was **opened and then closed**. A row folds every fill
-of that life into a single record: peak size, average entry, average close,
-realized PnL, fees and funding.
+## Summary {#tldr}
+
+There is one row for each position that was opened and then closed. A row
+folds every fill of that life into one record: peak size, average entry,
+average close, realized PnL, fees and funding.
 
 :::warning
-**This is not a trade log.** One row covers a whole life, not one execution. For
-**per-fill** rows — one record per execution, with price, size, fee and order id
-— use [`user_fills`](./orders-fills.md#user_fills) and
-[`user_fills`](./orders-fills.md#user_fills) with a time window. If you are porting code
-that reads another exchange's per-trade history, `user_fills` is the query you
-want, not this one.
+**This is not a trade log.** One row covers a whole life, not one execution.
+For one record for each execution, with price, size, fee and order id, use
+[`user_fills`](./orders-fills.md#user_fills) and
+[`user_fills`](./orders-fills.md#user_fills) with a time window. If you port
+code that reads the per-trade history of a different exchange, use
+`user_fills`, not this read.
 :::
 
 :::info
-**An OPEN position is never returned.** A life enters this history only when it
-closes. An open position is not lost — the live position is served by
-[`clearinghouse_state`](./account.md#clearinghouse_state) from the node's
-clearinghouse state. The two reads are complements: `clearinghouse_state` for
-what you hold now, position
-history for what you already closed.
+**An open position is never returned.** A life enters this history only when
+it closes. An open position is not lost.
+[`clearinghouse_state`](./account.md#clearinghouse_state) serves the current
+position from the clearinghouse state of the node. The two reads complete each
+other: `clearinghouse_state` for what you hold now, and position history for
+what you already closed.
 :::
 
 ## Query types {#query-types}
@@ -44,44 +45,46 @@ history for what you already closed.
 |-----|------|----------|-------------|
 | `address` | hex address | yes | Account address |
 | `limit` | uint32 | no | Rows returned. Default `500`, clamped to `1 … 5000` |
-| `start_time` | uint64 | no | Window start (ms, inclusive). Filters on `closed_at`. Absent ⇒ open lower bound |
-| `end_time` | uint64 | no | Window end (ms, inclusive). Filters on `closed_at`. Absent ⇒ open upper bound |
+| `start_time` | uint64 | no | Window start (ms, inclusive). Filters on `closed_at`. If absent, the lower bound is open |
+| `end_time` | uint64 | no | Window end (ms, inclusive). Filters on `closed_at`. If absent, the upper bound is open |
 
 :::warning
-**The request field is `address`, not `user`.** Sending `user` is rejected with
+**The request field is `address`, not `user`.** A request with `user` gets
 `400`:
 
 ```json
 { "error": "missing field: address" }
 ```
 
-An unparseable address is rejected the same way, with the value named:
+An address that cannot be parsed gets the same rejection, which names the
+value:
 
 ```json
 { "error": "invalid user address: nothex" }
 ```
 
-**These two reads answer a validation error as a BARE STRING.** `error` holds
+**These two reads answer a validation error as a bare string.** `error` holds
 the message directly. There is **no** `error.code` key and no `error.message`
-key, unlike every other `/info` read, which answers `{"error":{"code":…,
-"message":…}}`. A client that reads `error.code` gets `undefined` here and can
-report the rejection as a success. Handle a string `error` before you index into
-it.
+key. Every other `/info` read answers `{"error":{"code":…,
+"message":…}}`. A client that reads `error.code` gets `undefined` here, and can
+report the rejection as a success. Handle a string `error` before you index
+into it.
 :::
 
-There is **no per-market filter**. This read is account-scoped only; `coin` is
-not an accepted argument. Filter by `coin` on the client after the read.
+There is no filter for each market. This read is scoped to the account only.
+`coin` is not an accepted argument. Filter by `coin` on the client after the
+read.
 
-An account with no closed positions returns `"positions": []` with **200**, not
-an error and not a `404`.
+An account with no closed positions returns `"positions": []` with `200`. It is
+not an error and not a `404`.
 
 Response:
 
 :::warning
-**`type` sits on the ENVELOPE here, not inside `data`.** Both position-history
+**`type` is on the envelope here, not inside `data`.** Both position-history
 reads answer `{"type": …, "data": {"address", "positions"}}`. Every other
-`/info` read puts `type` inside `data`. A client that reads `data.type` to route
-the reply gets `undefined` on these two. Read the outer `type`.
+`/info` read puts `type` inside `data`. A client that reads `data.type` to
+route the reply gets `undefined` on these two. Read the outer `type`.
 :::
 
 ```json
@@ -115,7 +118,7 @@ the reply gets `undefined` on these two. Read the outer `type`.
 }
 ```
 
-Rows are ordered **newest first** by `closed_at`.
+Rows are in newest-first order by `closed_at`.
 
 ### Closed position lifecycles in a time window {#user_position_history_by_time}
 
@@ -123,180 +126,180 @@ Rows are ordered **newest first** by `closed_at`.
 { "type": "user_position_history_by_time", "address": "0x<addr>", "start_time": 1700000000000, "end_time": 1700003600000 }
 ```
 
-Same arguments and the same row shape as
-[`user_position_history`](#user_position_history). One difference: rows are
-ordered **oldest first**.
+This read has the same arguments and the same row shape as
+[`user_position_history`](#user_position_history). There is one difference:
+rows are in oldest-first order.
 
-Both types accept the same window. The ordering is the only difference, and it
-decides which rows survive a `limit` cut — see [paging](#paging).
+Both types accept the same window. The order is the only difference, and it
+decides which rows stay after a `limit` cut. See [paging](#paging).
 
-## The window is judged at CLOSE {#window}
+## Window filter {#window}
 
-`start_time` and `end_time` filter on **`closed_at`**, never on `opened_at`.
+`start_time` and `end_time` filter on `closed_at`, never on `opened_at`.
 
-A lifecycle is a point event at the moment it closes. So a position that was
-**opened before the window and closed inside it IS returned** — with its true
-`opened_at`, which falls outside the window you asked for. This is deliberate:
-the alternative hides the exact rows a period-PnL report needs.
+A lifecycle is a point event at the time it closes. A position that was opened
+before the window and closed inside it is therefore returned. It has its true
+`opened_at`, which is outside the window that you asked for. This is
+deliberate. The alternative hides the rows that a period-PnL report needs.
 
-A position opened inside the window but **not yet closed** is absent, because it
-is not closed yet. It appears once it closes, in whatever window holds its
+A position opened inside the window but not closed yet is absent, because it is
+not closed. It appears when it closes, in the window that holds its
 `closed_at`.
 
 ## Paging {#paging}
 
-`limit` caps the rows returned. Compare the row count you got against the `limit`
-you asked for:
+`limit` caps the rows returned. Compare the row count that you got with the
+`limit` that you asked for:
 
-- `len(positions) < limit` ⇒ you have every row in the window.
-- `len(positions) == limit` ⇒ there may be more. Rows were dropped.
+- If `len(positions) < limit`, you have every row in the window.
+- If `len(positions) == limit`, there can be more. Rows were dropped.
 
-**Which rows get dropped depends on the type.**
-`user_position_history` keeps the **newest** and drops the oldest.
-`user_position_history_by_time` keeps the **oldest** and drops the newest.
+**The type decides which rows are dropped.**
+`user_position_history` keeps the newest rows and drops the oldest.
+`user_position_history_by_time` keeps the oldest rows and drops the newest.
 
-To reach the dropped rows, narrow the window with `start_time` / `end_time` and
-read again, or raise `limit` (up to `5000`). Walk a long history by moving the
-`closed_at` window, using the last row's `closed_at` as the next boundary.
+To get the dropped rows, narrow the window with `start_time` and `end_time` and
+read again, or increase `limit` (up to `5000`). To walk a long history, move
+the `closed_at` window. Use the `closed_at` of the last row as the next
+boundary.
 
 ## Row fields {#row-fields}
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `coin` | string | Market symbol the position traded on |
+| `coin` | string | The market symbol that the position traded on |
 | `side` | `"long"` / `"short"` | Direction of the life |
-| `max_sz` | Decimal string \| null | Peak size the position reached, **base units**. `null` when `entry_complete` is `false` |
-| `closed_sz` | Decimal string | Size closed over the life, **base units**. The field was once `closed_qty`; that name is gone |
-| `avg_entry_px` | Decimal string \| null | Size-weighted average entry price, **decimal USDC**. `null` when `entry_complete` is `false` |
-| `avg_close_px` | Decimal string \| null | Size-weighted average close price, **decimal USDC** |
-| `closed_pnl` | Decimal string | Realized PnL before fees, **decimal USDC** (signed). The chain's own lot-matched number — see [the warning below](#closed-pnl) |
-| `fee_paid` | Decimal string | Total trading fees over the life, **decimal USDC** |
-| `realized_pnl` | Decimal string | `closed_pnl − fee_paid`, **decimal USDC** (signed) |
-| `funding_paid` | Decimal string | Net funding over the life, **decimal USDC** (signed). `"0"` means UNKNOWN when `funding_complete` is `false` |
-| `net_pnl` | Decimal string | `realized_pnl + funding_paid`, **decimal USDC** (signed) |
+| `max_sz` | Decimal string \| null | Peak size that the position reached, in **base units**. `null` when `entry_complete` is `false` |
+| `closed_sz` | Decimal string | Size closed over the life, in **base units**. The field was once `closed_qty`. That name is gone |
+| `avg_entry_px` | Decimal string \| null | Size-weighted average entry price, in **decimal USDC**. `null` when `entry_complete` is `false` |
+| `avg_close_px` | Decimal string \| null | Size-weighted average close price, in **decimal USDC** |
+| `closed_pnl` | Decimal string | Realized PnL before fees, in **decimal USDC** (signed). The lot-matched number of the chain. See [the warning below](#closed-pnl) |
+| `fee_paid` | Decimal string | Total trading fees over the life, in **decimal USDC** |
+| `realized_pnl` | Decimal string | `closed_pnl − fee_paid`, in **decimal USDC** (signed) |
+| `funding_paid` | Decimal string | Net funding over the life, in **decimal USDC** (signed). `"0"` means unknown when `funding_complete` is `false` |
+| `net_pnl` | Decimal string | `realized_pnl + funding_paid`, in **decimal USDC** (signed) |
 | `opened_at` | uint64 | Open timestamp (consensus ms) |
-| `closed_at` | uint64 | Close timestamp (consensus ms). The field the window filters on |
-| `open_block` | uint64 | Committed block height of the first fill observed for this life |
-| `close_block` | uint64 | Committed block height the life closed at |
-| `entry_complete` | bool | `false` ⇒ the opening fill was never observed; entry-side numbers are withheld |
-| `close_complete` | bool | `false` ⇒ close-side numbers are floors, not totals |
-| `funding_complete` | bool | `false` ⇒ `funding_paid` is UNKNOWN and `net_pnl` excludes funding |
+| `closed_at` | uint64 | Close timestamp (consensus ms). The window filters on this field |
+| `open_block` | uint64 | The committed block height of the first fill observed for this life |
+| `close_block` | uint64 | The committed block height at which the life closed |
+| `entry_complete` | bool | `false` means that the opening fill was never observed. The read withholds the entry-side numbers |
+| `close_complete` | bool | `false` means that the close-side numbers are floors, not totals |
+| `funding_complete` | bool | `false` means that `funding_paid` is unknown and `net_pnl` excludes funding |
 
-### The two identities {#identities}
+### Identities {#identities}
 
 ```
 realized_pnl = closed_pnl − fee_paid
 net_pnl      = realized_pnl + funding_paid
 ```
 
-Both are computed server-side from the fields beside them, so the numbers in one
-row always agree with each other.
+The server computes both from the fields next to them, so the numbers in one
+row always agree.
 
-### `closed_pnl` is lot-matched {#closed-pnl}
+### Lot-matched `closed_pnl` {#closed-pnl}
 
 :::warning
-**Do not recompute `closed_pnl` from the average prices.** It is **not**
-`(avg_close_px − avg_entry_px) × closed_sz`, and checking it that way produces
+**Do not calculate `closed_pnl` again from the average prices.** It is **not**
+`(avg_close_px − avg_entry_px) × closed_sz`. A check of that kind produces
 false mismatches.
 
-`closed_pnl` is the chain's own number, matched lot by lot as each closing fill
-consumed specific opening lots. The two averages are summaries of the same life;
-they lose the lot pairing, so the product of the averages does not reproduce the
-matched result. Trust `closed_pnl`; use the averages for display.
+`closed_pnl` is the number of the chain. The chain matches it lot by lot, as
+each closing fill consumes specific opening lots. The two averages summarize the
+same life. They lose the lot pairing, so the product of the averages does not
+give the matched result. Trust `closed_pnl`. Use the averages for display.
 :::
 
-## The three honesty flags {#honesty-flags}
+## Completeness flags {#honesty-flags}
 
-`entry_complete`, `close_complete` and `funding_complete` say whether the numbers
-beside them are trustworthy. They are per row. A row with a `false` flag is
-**degraded, not wrong** — the fields that could be misleading come back `null`
-rather than carrying a partial average as if it were whole.
+`entry_complete`, `close_complete` and `funding_complete` say if the numbers
+next to them are trustworthy. Each row has its own flags. A row with a `false`
+flag is degraded, not wrong. The fields that could mislead come back `null`.
+The read does not return a partial average as if it were complete.
 
 Read the flag before you read the number.
 
 ### `entry_complete` {#entry-complete}
 
-`false` when the **opening fill was never observed**. Three causes: the open sits
-below the history retention floor, the open happened before a restart of the
-history service, or the open sits inside a recorded archive gap.
+It is `false` when the opening fill was never observed. There are three causes:
+the open is below the history retention floor, the open happened before a
+restart of the history service, or the open is inside a recorded archive gap.
 
 When it is `false`, **`max_sz` and `avg_entry_px` are `null`**. An average over
-part of a life is worse than no average, so no number is served instead of a
-plausible wrong one. `null` here means "not known", never "zero".
+part of a life is worse than no average. The read serves no number instead of
+a plausible wrong one. `null` here means "not known", never "zero".
 
 ### `close_complete` {#close-complete}
 
-`false` in two situations.
+It is `false` in two cases:
 
-1. The leg went flat with **no closing fill observed**, so the close was
-   reconstructed from the newest fill that was seen.
-2. **Whenever `entry_complete` is `false`.** The same cut that hid the open can
-   hide a close, so no close-side number can claim to be whole over a known loss.
+1. The leg went flat with no closing fill observed. The close was rebuilt from
+   the newest fill that was seen.
+2. `entry_complete` is `false`. The same cut that hid the open can hide a
+   close, so no close-side number can claim to be complete over a known loss.
 
-When it is `false`, treat `closed_sz`, `closed_pnl` and `fee_paid` as **floors** —
-at least this much, possibly more.
+When it is `false`, treat `closed_sz`, `closed_pnl` and `fee_paid` as floors:
+at least this much, and possibly more.
 
 ### `funding_complete` {#funding-complete}
 
-`false` when the funding total cannot be trusted. **`funding_paid` is then `"0"`
-meaning UNKNOWN — not "no funding was paid"**, and `net_pnl` equals
-`realized_pnl` because it excludes funding entirely.
+It is `false` when the funding total cannot be trusted. **`funding_paid` is
+then `"0"` with the meaning unknown, not "no funding was paid".** `net_pnl`
+equals `realized_pnl`, because it excludes funding fully.
 
-Either boundary flag reading `false` shortens the span the funding total sums
-over, so it clears `funding_complete` too.
+If either boundary flag reads `false`, the span that the funding total sums
+over is shorter. That also clears `funding_complete`.
 
-A `false` `funding_complete` is common and does **not** imply a data fault: the
-funding stream lags the fill stream in normal operation, so a recently closed
-position often has funding still catching up.
+A `false` `funding_complete` is common, and it does not mean a data fault. The
+funding stream lags the fill stream in normal operation. The funding of a
+recently closed position is often still catching up.
 
-**Whether it can heal depends on the boundary flags.**
+**The boundary flags decide if it can recover.**
 
-- `entry_complete` and `close_complete` both `true` ⇒ this is the lag case.
-  Re-read the row later and `funding_complete` will turn `true`.
-- Either boundary flag `false` ⇒ **`funding_complete` never turns `true`.** The
-  boundary loss shortens the span the total sums over, so the funding figure
-  stays UNKNOWN permanently. Do not poll such a row waiting for it.
+- If `entry_complete` and `close_complete` are both `true`, this is the lag
+  case. Read the row again later, and `funding_complete` becomes `true`.
+- If either boundary flag is `false`, **`funding_complete` never becomes
+  `true`.** The boundary loss shortens the span that the total sums over, so the
+  funding figure stays unknown permanently. Do not poll such a row for it.
 
-## A restart leaves a permanent mark {#restart-mark}
+## Effect of a restart {#restart-mark}
 
 :::warning
-**A position that was open across a restart of the history service yields a
-degraded row, forever.**
+**A position that was open across a restart of the history service gives a
+degraded row permanently.**
 
-Open positions are accumulated **in memory**. On a restart that memory is gone.
+The service accumulates open positions in memory. A restart loses that memory.
 When the fills resume, the service sees a position that is already non-zero and
-cannot know where it started, so it opens a fresh accumulation at the first fill
-it observes and marks `entry_complete: false`.
+cannot know where it started. It starts a new accumulation at the first fill
+that it observes, and marks `entry_complete: false`.
 
-The consequences, all permanent — the row never heals, because the fills that
+All the results are permanent. The row never recovers, because the fills that
 would fix it are already behind the read:
 
-- `entry_complete` is `false`, and so `close_complete` is too.
-- `funding_complete` is `false` as well, because a broken boundary shortens the
-  span funding sums over. `funding_paid` stays `"0"` meaning UNKNOWN and
-  `net_pnl` excludes funding **for good** on this row. Do not poll it waiting
-  for the flag to clear — it will not.
+- `entry_complete` is `false`, so `close_complete` is also `false`.
+- `funding_complete` is also `false`, because a broken boundary shortens the
+  span that funding sums over. `funding_paid` stays `"0"` with the meaning
+  unknown, and `net_pnl` excludes funding permanently on this row. Do not poll
+  it for the flag to clear. It will not clear.
 - `max_sz` and `avg_entry_px` are `null`.
-- `open_block` and `opened_at` reflect the **first fill observed after the
-  restart**, not the true open. When a single fill both starts the accumulation
-  and closes the position, `open_block == close_block` and
-  `opened_at == closed_at` — the row appears to have opened and closed in one
-  block.
+- `open_block` and `opened_at` show the first fill observed after the restart,
+  not the true open. When one fill both starts the accumulation and closes the
+  position, `open_block == close_block` and `opened_at == closed_at`. The row
+  seems to open and close in one block.
 
-The example row [above](#user_position_history) is exactly this case: equal
-blocks, equal timestamps, both entry fields `null`.
+The example row [above](#user_position_history) is this case: equal blocks,
+equal timestamps, and both entry fields `null`.
 
-**This is expected behaviour, not a bug.** A `null` entry price on such a row is
-the system reporting honestly that it cannot know the entry.
+**This is expected behaviour, not a bug.** A `null` entry price on such a row
+is the system correctly reporting that it cannot know the entry.
 
-What you can still use: `avg_close_px`, `closed_pnl`, `fee_paid` and `closed_sz`
-all come from real observed fills. Read them as **floors** covering the part of
-the life that was seen, not as whole-life totals.
+You can still use `avg_close_px`, `closed_pnl`, `fee_paid` and `closed_sz`.
+They all come from real observed fills. Read them as floors that cover the
+observed part of the life, not as totals for the whole life.
 :::
 
 ## See also {#see-also}
 
-- [`user_fills`](./orders-fills.md#user_fills) — per-fill history, one row per execution
-- [`account_state`](./account.md#account_state) — live margin health and balances
-- [`clearinghouse_state`](./account.md#clearinghouse_state) — live perp positions
-- [`POST /info` base page](../info.md) — envelope and shared conventions
+- [`user_fills`](./orders-fills.md#user_fills): fill history, one row for each execution
+- [`account_state`](./account.md#account_state): current margin health and balances
+- [`clearinghouse_state`](./account.md#clearinghouse_state): current perp positions
+- [`POST /info` base page](../info.md): the envelope and shared conventions

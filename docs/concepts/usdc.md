@@ -1,96 +1,94 @@
 ---
-description: Where a trader's USDC lives on MetaFlux — one unified balance, four identities (perp collateral, spot token 100, the EVM FiatToken, external chains), and the precision of each surface.
+description: "Where a trader's USDC lives on MetaFlux: one unified balance, four identities (perp collateral, spot token 100, the EVM FiatToken, external chains), and the precision of each surface."
 ---
 
 # USDC
 
+This page explains where USDC lives on MetaFlux, which balance each order spends and how each surface scales the number.
+
 :::tip
-**Stable.** USDC is **one balance** on MetaFlux. The perp collateral account and
-the spendable spot-USDC balance are the same number. One exception: a
-`standard`-mode account holds two — see [the standard-mode split](#standard-split).
+**Stable.** USDC is one balance on MetaFlux. The perp collateral account and the spendable
+spot-USDC balance are the same number. One exception applies: a `standard`-mode account holds two.
+See [the standard-mode split](#standard-split).
 :::
 
-## TL;DR {#tldr}
+## Overview {#tldr}
 
-- One pool. A perp order, a spot buy, an Earn deposit and a withdrawal all spend
-  the **same** USDC, gated on the **same** free collateral.
-- The concept still carries **several ids**: `asset: 0` on bridge and withdraw
-  surfaces, `asset: 100` on spot market and balance surfaces, an ERC-20 on the
-  EVM, and a separate contract on every external chain.
-- Two number planes. `/info` and most `/exchange` fields are **whole-USDC decimal
-  strings**. [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and the EVM
-  token are **6-decimal integers**. Mixing them is an error of 10⁶.
-- [`usd_class_transfer`](#moving-usdc) is **rejected** on a unified account. There
-  is no second pool to move to. A split `standard` account is the one exception —
-  see [the standard-mode split](#standard-split).
+- One pool. A perp order, a spot buy, an Earn deposit and a withdrawal all spend the same USDC.
+  They use the same free collateral as the gate.
+- The concept still carries several ids. `asset: 0` is on bridge and withdraw surfaces. `asset: 100`
+  is on spot market and balance surfaces. The EVM has an ERC-20, and every external chain has a
+  separate contract.
+- There are two number planes. `/info` and most `/exchange` fields are whole-USDC decimal strings.
+  [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and the EVM token are
+  6-decimal integers. Mixing them is an error of 10⁶.
+- The chain rejects [`usd_class_transfer`](#moving-usdc) on a unified account, because there is no
+  second pool to move to. A split `standard` account is the one exception. See
+  [the standard-mode split](#standard-split).
 
 ## The four identities {#four-identities}
 
-One concept, four addressing schemes. This is the table to read before you write
-any code that names USDC.
+One concept has four addressing schemes. Read this table before you write any code that names USDC.
 
 | Surface | How USDC is addressed | Number plane |
 |---------|----------------------|--------------|
-| **Perp collateral** (the pool) | Not a ledger row. It is the account's own balance, read as `account_value` / `withdrawable`. Bridge deposits, [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) address it as **`asset: 0`** | whole-USDC decimal string |
-| **Spot token** | Asset id **`100`** — the `quote` of every `*/USDC` pair and the id of the `USDC` row in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `tokens[]` and in `account_state` `spot.balances[]` | whole-USDC decimal string |
-| **EVM token** | ERC-20 at the fixed predeploy `0x0000000000000000000000000000000000010000` | **6-decimal integer** |
-| **External chains** | Each chain's own USDC contract, held in [MetaBridge](../bridge/index.md) custody | 6-decimal integer on the MTF wire |
+| Perp collateral (the pool) | Not a ledger row. It is the own balance of the account, read as `account_value` and `withdrawable`. Bridge deposits, [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) address it as `asset: 0` | whole-USDC decimal string |
+| Spot token | Asset id `100`. It is the `quote` of every `*/USDC` pair and the id of the `USDC` row in [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) `tokens[]` and in `account_state` `spot.balances[]` | whole-USDC decimal string |
+| EVM token | ERC-20 at the fixed predeploy `0x0000000000000000000000000000000000010000` | 6-decimal integer |
+| External chains | The USDC contract of each chain, held in [MetaBridge](../bridge/index.md) custody | 6-decimal integer on the MTF wire |
 
 :::warning
-**`asset: 0` and `asset: 100` both mean USDC.** They are not two currencies and,
-on this network, not two balances either. `0` is the collateral-plane id the
-bridge and withdraw paths use; `100` is the spot-ledger token id the market and
-balance surfaces use. Which id an action wants is **fixed per action** — it is
-not a free choice:
+`asset: 0` and `asset: 100` both mean USDC. They are not two currencies. On this network they are
+not two balances either. `0` is the collateral-plane id that the bridge and withdraw paths use.
+`100` is the spot-ledger token id that the market and balance surfaces use. Each action fixes which
+id it takes. You cannot choose freely.
 
 - [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) and
-  [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) take **`0`**.
-  On `core_evm_transfer`, `asset: 100` is rejected with
-  `asset not linked to an EVM contract` — the spot USDC token id carries **no EVM
-  contract binding**, because the EVM-side USDC is reached through the
-  collateral-plane id instead. `asset` defaults to `0`; leave it alone.
-- The spot market and balance surfaces — [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta),
-  [`account_state` `spot.balances[]`](../api/rest/info/account.md#account_state),
-  and every `*/USDC` pair's `quote` — use **`100`**.
+  [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) take `0`. On
+  `core_evm_transfer`, the chain rejects `asset: 100` with `asset not linked to an EVM contract`.
+  The spot USDC token id has no EVM contract binding, because the EVM-side USDC is reached through
+  the collateral-plane id. `asset` defaults to `0`. Leave it alone.
+- The spot market and balance surfaces use `100`. These are
+  [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta),
+  [`account_state` `spot.balances[]`](../api/rest/info/account.md#account_state) and the `quote` of
+  every `*/USDC` pair.
 :::
 
 ## One pool {#one-pool}
 
-MetaFlux does **not** hold a separate spendable spot-USDC ledger. Every USDC
-movement — perp margin, spot buys, spot-order escrow, Earn deposits, spot-margin
-positions, account-to-account sends, EVM moves and external withdrawals — debits
-and credits **one** account balance: the settled USDC balance that
-[`account_state`](#account-state) reports in its USDC row and folds into
-`account_value`.
+MetaFlux does not hold a separate spendable spot-USDC ledger. Every USDC movement debits and credits
+one account balance. The movements are perp margin, spot buys, spot-order escrow, Earn deposits,
+spot-margin positions, account-to-account sends, EVM moves and external withdrawals. The balance is
+the settled USDC balance that [`account_state`](#account-state) reports in its USDC row and folds
+into `account_value`.
 
-The spot token id `100` still exists. It names the `*/USDC` pairs and it still
-keys the **escrow bucket** that holds USDC locked behind a resting spot bid. What
-it no longer keys is a second spendable balance.
+The spot token id `100` still exists. It names the `*/USDC` pairs. It also still keys the escrow
+bucket that holds USDC locked behind a resting spot bid. It no longer keys a second spendable
+balance.
 
 :::info
-**Self-hosted networks differ.** The unified rule is active from block 0 on the
-public network (`chainId 114514`) and on mainnet (`chainId 8964`). A network
-running any **other** chain id keeps two separate USDC ledgers — a spot balance
-and a perp collateral balance — until its validators arm the change by a
-two-thirds stake vote. On such a network `usd_class_transfer` is a working
-action. Check which world you are in with `eth_chainId`.
+**Self-hosted networks differ.** The unified rule is active from block 0 on the public network
+(`chainId 114514`) and on mainnet (`chainId 8964`). A network with any other chain id keeps two
+separate USDC ledgers: a spot balance and a perp collateral balance. This holds until its
+validators arm the change by a two-thirds stake vote. On such a network, `usd_class_transfer` is a
+working action. Check which case you are in with `eth_chainId`.
 :::
 
 ## Which balance your order spends {#which-balance}
 
-All of them spend the pool. What differs is the **gate**.
+All of these spend the pool. The gate differs.
 
 | You do this | It spends | Gate |
 |-------------|-----------|------|
 | Open or add to a perp position | the pool | initial margin ≤ free collateral |
-| Place a **spot buy** | the pool | the buyable size is clamped to **free collateral**, not to any spot balance |
-| Rest a **spot bid** | the pool | the quote cost moves out of the pool into escrow (`hold`) at admission |
-| Place a **spot sell** | the base token on the spot ledger | you must own the base |
+| Place a spot buy | the pool | the buyable size is clamped to free collateral, not to any spot balance |
+| Rest a spot bid | the pool | the quote cost moves out of the pool into escrow (`hold`) at admission |
+| Place a spot sell | the base token on the spot ledger | you must own the base |
 | Deposit to [Earn](./earn.md) | the pool | amount ≤ free collateral |
 | Open a [spot-margin](../products/spot-margin.md) position | the pool | its initial margin is held against the pool |
-| [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) / [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) / a send | the pool | amount ≤ free collateral |
+| [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw), [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) or a send | the pool | amount ≤ free collateral |
 
-**Free collateral** is the one budget every debit above is measured against:
+*Free collateral* is the one budget that every debit above is measured against:
 
 ```
 free collateral = settled USDC balance
@@ -99,119 +97,110 @@ free collateral = settled USDC balance
                 − any impending funding CHARGE
 ```
 
-**The gate figure is signed; the published field is not.** The admission and
-withdrawal checks compare a debit against the raw value above, which goes
-**negative** when open profit funds the held margin. The API publishes the same
-budget as `withdrawable`, clamped:
+The gate figure is signed. The published field is not. The admission and withdrawal checks compare
+a debit against the raw value above. That value goes negative when open profit funds the held
+margin. The API publishes the same budget as `withdrawable`, clamped:
 
 ```
 withdrawable = max(0, free collateral)
 ```
 
-Read it from [`account_state.withdrawable`](../api/rest/info/account.md#account_state)
-or the lighter [`account_state` with `detail: "margin"`](../api/rest/info/account.md#account_state). A
-`withdrawable` of `"0"` therefore means "nothing to take out", NOT "the account
-is broke" — see [account value](./account-value.md#withdrawable). Two rules
-behind the formula are worth stating:
+Read it from [`account_state.withdrawable`](../api/rest/info/account.md#account_state) or from the
+lighter [`account_state` with `detail: "margin"`](../api/rest/info/account.md#account_state). A
+`withdrawable` of `"0"` means there is nothing to take out. It does not mean the account is broke.
+See [account value](./account-value.md#withdrawable). Two rules sit behind the formula:
 
-- **Unrealised gains never count.** Free collateral folds an impending funding
-  **debit** but never an unrealised profit — so a paper gain does not fund a new
-  order, a spot buy or a withdrawal.
-- **Nothing is subtracted twice.** A committed lock (spot escrow, an Earn
-  deposit, a spot-margin post) is **debited out of the balance** at the moment it
-  commits. It is gone from the balance, not carried as a separate held term.
+- Unrealised gains never count. Free collateral folds in an impending funding debit but never an
+  unrealised profit. So a paper gain does not fund a new order, a spot buy or a withdrawal.
+- Nothing is subtracted twice. A committed lock is debited out of the balance at the moment it
+  commits. Spot escrow, an Earn deposit and a spot-margin post are such locks. The lock is gone
+  from the balance. The formula does not carry it as a separate held term.
 
-Because it is one pool, the two directions are real and intended:
+Because it is one pool, both directions below are real and intended:
 
-- A resting spot bid **lowers your perp margin headroom** for as long as it rests.
-- A perp loss **lowers what you can spend** on spot or supply to Earn.
+- A resting spot bid lowers your perp margin headroom for as long as it rests.
+- A perp loss lowers what you can spend on spot or supply to Earn.
 
 Cancel the bid and the escrow returns to the pool.
 
 ## The standard-mode split {#standard-split}
 
 :::info
-**Live from node 0.9.7, block 5,710,001.** An account already in `standard` at the
-swap keeps one balance until it leaves the mode and enters again.
+**Live from node 0.9.7, block 5,710,001.** An account already in `standard` at the swap keeps one
+balance until it leaves the mode and enters again.
 :::
 
-From the swap, an account that **enters** `standard` mode holds **two** USDC
-wallets:
+From the swap, an account that enters `standard` mode holds two USDC wallets:
 
-- The **perp wallet** is the collateral account. Perp margin, funding, liquidation,
-  ADL, vaults and bridge withdrawals read and write this one.
-- The **spot wallet** is spot token `100`. Spot orders, spot fills, spot fees,
-  `send_asset` of USDC, Core→EVM transfers and **Earn** read and write this one. An
-  Earn deposit the spot wallet cannot fund is refused `PRECONDITION_FAILED` with
-  the message `insufficient balance`, not `ASSET_INSUFFICIENT_BALANCE`.
-- [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer) is the
-  **only** lane that crosses. It moves one amount from one wallet to the other.
+- The perp wallet is the collateral account. Perp margin, funding, liquidation, ADL, vaults and
+  bridge withdrawals read and write this wallet.
+- The spot wallet is spot token `100`. Spot orders, spot fills, spot fees, `send_asset` of USDC,
+  Core to EVM transfers and Earn read and write this wallet. The chain refuses an Earn deposit that
+  the spot wallet cannot fund with `PRECONDITION_FAILED` and the message `insufficient balance`. It
+  does not use `ASSET_INSUFFICIENT_BALANCE`.
+- [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer) is the only lane
+  that crosses. It moves one amount from one wallet to the other.
 
 Four rules follow, and each is deliberate:
 
-1. **A perp loss cannot reach the spot wallet.** A split account's perp bankruptcy
-   is absorbed by the insurance fund and ADL, never by its spot USDC.
-2. **A split account has no reservations.** It is refused spot margin
+1. A perp loss cannot reach the spot wallet. The insurance fund and ADL absorb the perp bankruptcy
+   of a split account. Its spot USDC never does.
+2. A split account has no reservations. The chain refuses it spot margin
    (`spot margin is not available in standard mode`) and every reservation
    (`a split standard account has no reservations`).
-3. **Each wallet funds its own orders, with no cap.** Perp and option orders are
-   admitted against the perp wallet's free collateral. Spot orders are admitted
-   against the spot wallet. A spot order the spot wallet cannot fund is refused:
-   `insufficient spot balance`.
-4. **Only entry splits.** An account already in `standard` at the swap keeps one
-   balance until it leaves the mode and enters again. Leaving folds the spot
-   wallet back into the pool.
+3. Each wallet funds its own orders, with no cap. The chain admits perp and option orders against
+   the free collateral of the perp wallet. It admits spot orders against the spot wallet. It
+   refuses a spot order that the spot wallet cannot fund: `insufficient spot balance`.
+4. Only entry splits. An account already in `standard` at the swap keeps one balance until it
+   leaves the mode and enters again. Leaving folds the spot wallet back into the pool.
 
-**Reading the two wallets.** `account_value` and `withdrawable` on
-[`account_state`](../api/rest/info/account.md#account_state) are the perp wallet.
-The USDC row of `spot.balances` is the spot wallet, and `total − hold` is what a
-new spot order may spend. Add `account_value` and that row's `total` for the
-account total.
+To read the two wallets: `account_value` and `withdrawable` on
+[`account_state`](../api/rest/info/account.md#account_state) are the perp wallet. The USDC row of
+`spot.balances` is the spot wallet. The value `total − hold` is what a new spot order may spend. Add
+`account_value` and the `total` of that row for the account total.
 
 ## Moving USDC {#moving-usdc}
 
 | Move | How | What it costs |
 |------|-----|---------------|
-| Perp ↔ spot class | [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer), **split `standard` accounts only** | No protocol fee. **Rejected** on every other account — see below |
+| Perp to spot class, or back | [`usd_class_transfer`](../api/rest/exchange/transfers.md#usd_class_transfer), split `standard` accounts only | No protocol fee. Rejected on every other account (see below) |
 | To another MetaFlux account | [`send_asset`](../integration/typed-data-signing.md#transfers) | No protocol fee |
-| Parent ↔ sub-account | [`sub_account_transfer`](../api/rest/exchange/account.md#sub_account_transfer) / [`sub_account_spot_transfer`](../api/rest/exchange/account.md#sub_account_spot_transfer) | No protocol fee |
-| Core → EVM | [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | No protocol fee; the amount is rescaled ×10⁶ |
-| EVM → Core | An EVM **burn** transaction — **not** an `/exchange` action | EVM gas |
+| Parent to sub-account, or back | [`sub_account_transfer`](../api/rest/exchange/account.md#sub_account_transfer) or [`sub_account_spot_transfer`](../api/rest/exchange/account.md#sub_account_spot_transfer) | No protocol fee |
+| Core to EVM | [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | No protocol fee. The amount is rescaled ×10⁶ |
+| EVM to Core | An EVM burn transaction. It is not an `/exchange` action | EVM gas |
 | Off the network | [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) | A bridge withdraw fee, withheld from the released amount |
 
 :::warning
-**`usd_class_transfer` is rejected**, with
-`USDC is unified; no class transfer needed`. Nothing is lost — the move it used
-to perform has no destination now.
+The chain rejects `usd_class_transfer` with `USDC is unified; no class transfer needed`. Nothing is
+lost. The move it used to perform has no destination now.
 
-The rejection is in the shared handler, so **every** route to it rejects: the
-`/exchange` action, the CoreWriter `UsdClassTransfer` from an EVM contract, and a
-self-`send_asset` on asset `100` that crosses the spot/perp boundary (which is
-routed into the same handler by design).
+The rejection is in the shared handler, so every route to it rejects. The routes are the
+`/exchange` action, the CoreWriter `UsdClassTransfer` from an EVM contract and a self-`send_asset`
+on asset `100` that crosses the spot and perp boundary. The design routes that last one into the
+same handler.
 :::
 
-**Every debit path is free-collateral gated; no credit path is.** A send, an EVM
-move or a withdrawal is rejected when it would eat collateral that is margining
-an open position — you cannot withdraw your way below maintenance margin. An
-incoming credit only raises free collateral, so it needs no gate.
+Every debit path is gated on free collateral. No credit path is. The chain rejects a send, an EVM
+move or a withdrawal when it would eat collateral that margins an open position. You cannot
+withdraw your way below maintenance margin. An incoming credit only raises free collateral, so it
+needs no gate.
 
-**The bridge withdraw fee** is a governance parameter in 6-decimal units,
-withheld from the released amount: you are debited the gross `amount`, the
-outbound message carries the net, and the difference accrues to the protocol.
-The action rejects when `amount` does not **exceed** the fee. This page does not
-publish the live fee value — read the rejection, or quote the withdrawal in your
-client and compare gross against released.
+The bridge withdraw fee is a governance parameter in 6-decimal units. The chain withholds it from
+the released amount. You are debited the gross `amount`, the outbound message carries the net, and
+the difference accrues to the protocol. The action rejects when `amount` does not exceed the fee.
+This page does not publish the live fee value. Read the rejection, or quote the withdrawal in your
+client and compare the gross amount with the released amount.
 
-## Precision, surface by surface {#precision}
+## Precision by surface {#precision}
 
 | Surface | Field | Unit | `1 USDC` looks like |
 |---------|-------|------|---------------------|
-| `POST /info` reads | `account_value`, `withdrawable`, `spot.balances[*].total` / `.hold` | whole-USDC **decimal string** | `"1"` |
-| `POST /exchange` `send_asset` | `amount` | whole-USDC **decimal string** | `"1"` |
-| `POST /exchange` `core_evm_transfer` | `amount` | whole-USDC **decimal string** | `"1"` |
-| `POST /exchange` `bridge_withdraw` | `amount` | **6-decimal integer** (`uint64`) | `1000000` |
-| EVM ERC-20 at `0x…010000` | `balanceOf`, `transfer` | **6-decimal integer** | `1000000` |
-| Bridge deposit attestations | amount | **6-decimal integer** | `1000000` |
+| `POST /info` reads | `account_value`, `withdrawable`, `spot.balances[*].total` and `.hold` | whole-USDC decimal string | `"1"` |
+| `POST /exchange` `send_asset` | `amount` | whole-USDC decimal string | `"1"` |
+| `POST /exchange` `core_evm_transfer` | `amount` | whole-USDC decimal string | `"1"` |
+| `POST /exchange` `bridge_withdraw` | `amount` | 6-decimal integer (`uint64`) | `1000000` |
+| EVM ERC-20 at `0x…010000` | `balanceOf`, `transfer` | 6-decimal integer | `1000000` |
+| Bridge deposit attestations | amount | 6-decimal integer | `1000000` |
 
 The one conversion:
 
@@ -220,114 +209,103 @@ evm_or_bridge_units = whole_usdc × 1_000_000
 ```
 
 :::warning
-**`bridge_withdraw` is the exception, and it is a 10⁶ trap.** It is the only
-MTF-native USDC field that is a **bare integer in base units** rather than a
-decimal string. `"amount": 1000000` there is **1 USDC**. The same literal on
-`send_asset` or `core_evm_transfer` is **1,000,000 USDC** — those fields are
-whole-USDC strings. Check which action you are signing before you fill the field.
+`bridge_withdraw` is the exception, and it is a 10⁶ trap. It is the only MTF-native USDC field that
+is a bare integer in base units, not a decimal string. `"amount": 1000000` there is 1 USDC. The
+same literal on `send_asset` or `core_evm_transfer` is 1,000,000 USDC, because those fields are
+whole-USDC strings. Check which action you sign before you fill the field.
 :::
 
-Both planes are exact: MetaFlux holds USDC as a fixed-point decimal, never a
-float, and the ×10⁶ rescale only repositions the decimal point. See
-[two price planes](./mark-prices.md#two-price-planes-read-this-before-reading-any-number)
-for the separate question of price scaling.
+Both planes are exact. MetaFlux holds USDC as a fixed-point decimal, never a float. The ×10⁶
+rescale only moves the decimal point. For the separate question of price scaling, see
+[two price planes](./mark-prices.md#two-price-planes-read-this-before-reading-any-number).
 
 ## What the account reads report {#account-reads}
 
-Two reads claim to show "your USDC". They do not agree, and one of them shows
-nothing at all.
+Two reads claim to show your USDC. They do not agree, and one of them shows nothing at all.
 
 ### `account_state` {#account-state}
 
-[`POST /info` `account_state`](../api/rest/info/account.md#account_state) is the read to
-use.
+Use [`POST /info` `account_state`](../api/rest/info/account.md#account_state).
 
 | Field | What it is | The rule behind it |
 |-------|-----------|--------------------|
-| `account_value` | Mark-aware **equity**: settled USDC plus unrealised perp PnL, unrealised funding and spot-margin unrealised PnL | This is the figure the liquidation engine judges you on. **Split `standard` account:** the perp wallet only |
-| `spot.balances[0]` (`name: "USDC"`, `signing_id: 100`) | `total` = **settled** USDC plus escrow; `hold` = USDC escrowed behind resting spot bids | `total` deliberately **excludes unrealised PnL**, so it never moves with the mark. `total − hold` is **not** spendable: `hold` is spot escrow only and never holds perp margin, so the subtraction leaves the margin in. Use `withdrawable`. **Split `standard` account:** the row is the spot wallet alone, so `total − hold` is what a spot order may spend — see [the standard-mode split](#standard-split) |
-| `withdrawable` | What a new order, send, withdrawal or Earn deposit may consume | The [budget above](#which-balance), **clamped at zero**. **Split `standard` account:** a USDC send and a spot order read the **spot wallet** (`insufficient spot balance`), and so does an Earn deposit (`insufficient balance`). `withdrawable` bounds perp and option orders and withdrawals only — see [the standard-mode split](#standard-split) |
+| `account_value` | Mark-aware equity: settled USDC plus unrealised perp PnL, unrealised funding and spot-margin unrealised PnL | The liquidation engine judges you on this figure. Split `standard` account: the perp wallet only |
+| `spot.balances[0]` (`name: "USDC"`, `signing_id: 100`) | `total` is settled USDC plus escrow. `hold` is USDC escrowed behind resting spot bids | `total` deliberately excludes unrealised PnL, so it never moves with the mark. `total − hold` is not spendable. `hold` is spot escrow only and never holds perp margin, so the subtraction leaves the margin in. Use `withdrawable`. Split `standard` account: the row is the spot wallet alone, so `total − hold` is what a spot order may spend. See [the standard-mode split](#standard-split) |
+| `withdrawable` | What a new order, send, withdrawal or Earn deposit may consume | The [budget above](#which-balance), clamped at zero. Split `standard` account: a USDC send and a spot order read the spot wallet (`insufficient spot balance`), and so does an Earn deposit (`insufficient balance`). `withdrawable` bounds perp and option orders and withdrawals only. See [the standard-mode split](#standard-split) |
 
-**Why two numbers.** `account_value` and `spot.balances[0].total` both look like "my
-USDC" and differ by unrealised PnL. Use `account_value` for equity and risk; use
-`spot.balances[0].total` for cash that has actually settled. The USDC row is always
-present, even at zero.
+There are two numbers because `account_value` and `spot.balances[0].total` both look like your
+USDC and differ by unrealised PnL. Use `account_value` for equity and risk. Use
+`spot.balances[0].total` for cash that has settled. The USDC row is always present, even at zero.
 
 ### One ledger, one read {#one-ledger}
 
-[`account_state` `spot.balances`](../api/rest/info/account.md#account_state) carries the WHOLE
-token ledger: the unified USDC pool in row 0, and every spot token after it.
-There is no second balance read to merge in.
+[`account_state` `spot.balances`](../api/rest/info/account.md#account_state) carries the whole token
+ledger. Row 0 is the unified USDC pool, and every spot token follows. There is no second balance
+read to merge in.
 
 :::warning
-**Read `withdrawable`, not `total − hold`.** `hold` is spot order escrow only.
-USDC that margins an open perpetual position stays in `total` and never enters
-`hold`, so the subtraction leaves the margin in and overstates the budget.
+Read `withdrawable`, not `total − hold`. `hold` is spot order escrow only. USDC that margins an
+open perpetual position stays in `total` and never enters `hold`. So the subtraction leaves the
+margin in and overstates the budget.
 :::
 
-Cost basis rides on the same rows.
-[`avg_entry_px`](../api/rest/info/account.md#avg-entry-px) is the per-token acquisition
-price spot PnL needs. The USDC row always reads `null` — a cost basis on the
-quote asset in terms of itself has no meaning.
+Cost basis rides on the same rows. [`avg_entry_px`](../api/rest/info/account.md#avg-entry-px) is
+the per-token acquisition price that spot PnL needs. The USDC row always reads `null`, because a
+cost basis on the quote asset in terms of itself has no meaning.
 
 ### A worked check {#worked-check}
 
-Claim the testnet [faucet](../networks.md#faucet), which grants 3000 USDC and
-10 MTF, then read `account_state`:
+Claim the testnet [faucet](../networks.md#faucet), which grants 3000 USDC and 10 MTF. Then read
+`account_state`:
 
-- `account_value: "3000"`, and `spot.balances` carries the USDC row (`signing_id 100`,
-  `total "3000"`) **and** an MTF row (`asset 104`, `total "10"`).
+- `account_value: "3000"`.
+- `spot.balances` carries the USDC row (`signing_id 100`, `total "3000"`) and an MTF row
+  (`asset 104`, `total "10"`).
 
-One call, both rows. That is the unification.
+One call returns both rows. That is the unification.
 
 ## USDC on the MetaFlux EVM {#evm-side}
 
-USDC on the [MetaFlux EVM](../evm/index.md) is Circle's `FiatTokenV2_2`
-implementation behind a proxy, seeded at genesis at the fixed address
-**`0x0000000000000000000000000000000000010000`**, with **6 decimals**. It is a
-real ERC-20 — `balanceOf`, `transfer`, `approve` — and, being the Circle
-implementation, it carries `permit` (EIP-2612) and `transferWithAuthorization`
-(EIP-3009).
+USDC on the [MetaFlux EVM](../evm/index.md) is the Circle `FiatTokenV2_2` implementation behind a
+proxy. Genesis seeds it at the fixed address `0x0000000000000000000000000000000000010000`, with 6
+decimals. It is a real ERC-20 with `balanceOf`, `transfer` and `approve`. It is the Circle
+implementation, so it also carries `permit` (EIP-2612) and `transferWithAuthorization` (EIP-3009).
 
-**Core → EVM** is [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer).
-The Core debit is atomic at commit and the EVM credit is minted on the next EVM
-block, so the queued credit is always fully backed. Optional calldata attached to
-the transfer **never unwinds the credit**: if it reverts, the transfer still
-stands — read its receipt.
+Core to EVM uses [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer). The
+Core debit is atomic at commit. The chain mints the EVM credit on the next EVM block, so the queued
+credit is always fully backed. Optional calldata attached to the transfer never unwinds the credit.
+If the calldata reverts, the transfer still stands. Read its receipt.
 
-**EVM → Core is not an `/exchange` action.** It must originate as an EVM
-transaction that **burns** the EVM USDC; the node then mirrors the confirmed burn
-onto the Core balance. Posting `core_evm_transfer` with `to_evm: false` is
-rejected. The rule behind it: crediting Core without a confirmed burn would mint
-value out of nothing.
+EVM to Core is not an `/exchange` action. It must start as an EVM transaction that burns the EVM
+USDC. The node then mirrors the confirmed burn onto the Core balance. The chain rejects
+`core_evm_transfer` with `to_evm: false`. The rule behind this: crediting Core without a confirmed
+burn would mint value out of nothing.
 
-Full mechanics and timings: [Core ↔ EVM transfers](../evm/core-evm-transfers.md).
+For full mechanics and timings, see [Core and EVM transfers](../evm/core-evm-transfers.md).
 
 ## USDC from outside {#external-side}
 
-All USDC enters and leaves MetaFlux through the self-built
-[MetaBridge](../bridge/index.md) custody bridge, co-signed by two thirds of
-active validator stake. There is no Circle CCTP path.
+All USDC enters and leaves MetaFlux through the self-built [MetaBridge](../bridge/index.md) custody
+bridge. Two thirds of active validator stake co-sign it. There is no Circle CCTP path.
 
-- A **deposit** credits the pool directly — it lands as collateral, ready to
-  margin a perp or fund a spot buy, with no second step.
-- A **withdrawal** is [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) with
-  `asset: 0`. Only USDC is bridgeable today; any other asset id is rejected.
-- The destination-chain release is asynchronous: the Core debit is immediate at
-  commit, the payout follows co-signing and relay.
+- A deposit credits the pool directly. It lands as collateral, ready to margin a perp or fund a
+  spot buy, with no second step.
+- A withdrawal is [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) with
+  `asset: 0`. Only USDC is bridgeable today. The chain rejects any other asset id.
+- The release on the destination chain is asynchronous. The Core debit is immediate at commit. The
+  payout follows co-signing and relay.
 
 ## Not covered here {#not-covered}
 
-- **The live bridge withdraw-fee value.** The mechanism is above; the number is a
-  governance parameter and no `/info` read publishes it.
-- **Per-chain USDC contract addresses.** See the [bridge page](../bridge/index.md).
-- **Non-USDC collateral.** Cross-asset collateral haircuts are a
-  [portfolio-margin](./portfolio-margin.md) topic.
+- The live bridge withdraw-fee value. The mechanism is above. The number is a governance parameter,
+  and no `/info` read publishes it.
+- Per-chain USDC contract addresses. See the [bridge page](../bridge/index.md).
+- Non-USDC collateral. Cross-asset collateral haircuts belong to
+  [portfolio margin](./portfolio-margin.md).
 
 ## See also {#see-also}
 
-- [Margin modes](./margin-modes.md) — how the initial and maintenance margin that
-  reduce free collateral are computed
-- [Spot](../products/spot.md) — the escrow model behind `hold`
-- [Earn](./earn.md) — the lending pool USDC can be supplied to
-- [Bridge](../bridge/index.md) — deposits, withdrawals and the co-signing pipeline
+- [Margin modes](./margin-modes.md): how the chain computes the initial and maintenance margin that reduce free collateral
+- [Spot](../products/spot.md): the escrow model behind `hold`
+- [Earn](./earn.md): the lending pool that USDC can be supplied to
+- [Bridge](../bridge/index.md): deposits, withdrawals and the co-signing pipeline

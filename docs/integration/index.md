@@ -1,35 +1,41 @@
 ---
-description: Bring a client up against MetaFlux — SDKs, signing, migration, idempotency, error handling.
+description: How to connect a client to MetaFlux. SDKs, signing, migration, idempotency and error handling.
 ---
 
 # Integration
 
-How to connect a client to MetaFlux. Pick the path that matches your starting point.
+This section explains how to connect a client to MetaFlux. Pick the page that matches your
+starting point.
 
 ## Starting points {#starting-points}
 
-| If you're starting from… | Go to |
-|--------------------------|-------|
-| Nothing — just want to try it | [Quickstart](./quickstart.md) |
-| A working key, now placing real orders | [Placing orders](./placing-orders.md) |
-| An existing HL bot / tool | [Migrating from HL](./migrating-from-hl.md) |
-| Greenfield TypeScript / browser | [TypeScript SDK](./typescript-sdk.md) |
-| Greenfield Rust service | [Rust SDK](./rust-sdk.md) |
-| Anything else (Python, Go, …) | [Typed-data signing](./typed-data-signing.md) — implement the EIP-712 typed-data signature yourself |
+| Starting point | Page |
+|----------------|------|
+| No code yet, and you want to try the API | [Quickstart](./quickstart.md) |
+| A working key, and you want to place real orders | [Placing orders](./placing-orders.md) |
+| An existing Hyperliquid bot or tool | [Migrating from HL](./migrating-from-hl.md) |
+| A new TypeScript or browser project | [TypeScript SDK](./typescript-sdk.md) |
+| A new Rust service | [Rust SDK](./rust-sdk.md) |
+| Any other language (Python, Go and others) | [Typed-data signing](./typed-data-signing.md). Implement the EIP-712 typed-data signature yourself. |
 
 ## Topics {#topics}
 
-- [Quickstart](./quickstart.md) — 5-minute end-to-end (deposit → trade → withdraw)
-- [Placing orders](./placing-orders.md) — the canonical order guide: one order, batches, spot, cancels, and which order actions to skip
-- [Typed-data signing](./typed-data-signing.md) — the EIP-712 signing scheme, end-to-end with working examples
-- [Signing walkthrough](./signing.md) — pointer to typed-data signing (kept for older links)
-- [Agent wallets howto](./agent-wallets-howto.md) — concrete code for the hot-key pattern
-- [Idempotency](./idempotency.md) — nonce strategy + safe retry
-- [Error handling](./error-handling.md) — admission vs commit vs network decision tree
-- [Risk-watcher pattern](./risk-watcher.md) — automated margin top-up
-- [Market-maker performance](./market-maker-performance.md) — async confirm + batch quotes + cloid for a finality-decoupled quote loop
-- [Optimizing latency](./latency.md) — measure the block cadence, pick the write transport, and learn where an order sits inside a block
-- [Migrating from HL](./migrating-from-hl.md) — switch a Hyperliquid bot to the MTF-native API
+- [Quickstart](./quickstart.md): a 5-minute run from deposit to trade to withdrawal.
+- [Placing orders](./placing-orders.md): the main order guide. It covers one order, batches,
+  spot, cancels, and the order actions to skip.
+- [Typed-data signing](./typed-data-signing.md): the EIP-712 signing scheme, end to end, with
+  working examples.
+- [Signing walkthrough](./signing.md): a pointer to typed-data signing, kept for older links.
+- [Agent wallets howto](./agent-wallets-howto.md): code for the hot-key pattern.
+- [Idempotency](./idempotency.md): nonce strategy and safe retry.
+- [Error handling](./error-handling.md): a decision tree for admission, commit and network
+  errors.
+- [Risk-watcher pattern](./risk-watcher.md): automated margin addition.
+- [Market-maker performance](./market-maker-performance.md): async confirm, batch quotes and
+  cloid for a quote loop that does not wait on finality.
+- [Optimizing latency](./latency.md): measure the block cadence, pick the write transport, and
+  find where an order sits inside a block.
+- [Migrating from HL](./migrating-from-hl.md): move a Hyperliquid bot to the MTF-native API.
 
 ## SDKs {#sdks}
 
@@ -38,29 +44,40 @@ How to connect a client to MetaFlux. Pick the path that matches your starting po
 | TypeScript / JavaScript | preview | [`@metaflux-dex/client`](./typescript-sdk.md) |
 | Rust | preview | [`metaflux-client`](./rust-sdk.md) |
 
-For other languages (Python, Go, Java, C++ …), implement the EIP-712 typed-data signature per [typed-data signing](./typed-data-signing.md) — every step is documented with worked examples. The wire is small enough that a hand-rolled client is the right call for niche stacks.
+For other languages (Python, Go, Java, C++ and others), implement the EIP-712 typed-data
+signature as [typed-data signing](./typed-data-signing.md) describes. That page documents every
+step with worked examples. The wire format is small, so a hand-written client is a good choice
+for less common stacks.
 
 ## Network endpoints {#network-endpoints}
 
-See [networks](../networks.md) for the full per-network reference.
+The [networks](../networks.md) page is the full reference for each network.
 
-The gateway (`https://api.<net>.mtf.exchange`) is the single public front door.
+The gateway (`https://api.<net>.mtf.exchange`) is the one public entry point.
 
 | Path | Serves | Purpose |
 |------|--------|---------|
 | `POST /info` · `POST /exchange` · `GET /ws` | MTF-native | Native snake_case surface |
 | `POST /evm` | EVM JSON-RPC | EVM sidechain RPC |
-| `POST /faucet` | Faucet | testnet test tap |
+| `POST /faucet` | Faucet | Testnet faucet |
 
-Production deployments terminate TLS at the gateway and front it with a CDN; the
-node is intentionally not internet-facing — it sits behind the gateway. Running
-the node yourself, the same native surface is served directly at
-`http://localhost:8080` (raw EVM RPC at `http://localhost:8545`).
+Production deployments terminate TLS at the gateway and put a CDN in front of it. The node is
+not internet-facing by design. It sits behind the gateway. If you run the node yourself, it
+serves the same native surface at `http://localhost:8080`, and raw EVM RPC at
+`http://localhost:8545`.
 
 ## Common patterns {#common-patterns}
 
-- **Maker bot** — agent-signed, persistent quoting, risk-watcher sidecar, ALO orders for guaranteed-maker tier
-- **Liquidation watcher** — WS subscriber on [`notifications`](../api/ws/subscriptions.md#notifications) (`yellow_card`) + [`account_state`](../api/ws/subscriptions.md#account_state); fires top-ups before T1
-- **TWAP wrapper** — submits `twap_order`, watches [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) + [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history) for slice telemetry, optional manual cancel mid-run
-- **Vault manager** — `VaultDeploy` once, then agent-signed Orders for the vault address as you re-balance
-- **Institutional custody** — multi-sig master + per-host agents + multi-sig wrapping for high-value flows
+- **Maker bot.** Agent-signed, persistent quoting, a risk-watcher sidecar, and ALO orders for
+  the guaranteed-maker tier.
+- **Liquidation watcher.** A WS subscriber on
+  [`notifications`](../api/ws/subscriptions.md#notifications) (`yellow_card`) and
+  [`account_state`](../api/ws/subscriptions.md#account_state). It adds margin before T1.
+- **TWAP wrapper.** It submits `twap_order` and watches
+  [`user_twap_slice_fills`](../api/ws/subscriptions.md#user_twap_slice_fills) and
+  [`user_twap_history`](../api/ws/subscriptions.md#user_twap_history) for slice telemetry. It
+  can cancel by hand during the run.
+- **Vault manager.** `VaultDeploy` once, then agent-signed orders for the vault address on each
+  rebalance.
+- **Institutional custody.** A multi-sig master, one agent per host, and multi-sig wrapping for
+  high-value flows.

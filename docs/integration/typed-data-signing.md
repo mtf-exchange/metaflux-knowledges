@@ -1,16 +1,12 @@
 # Typed-data signing
 
+Every `/exchange` action is signed as structured EIP-712 typed data (`eth_signTypedData_v4`).
+
 :::info
-**Status: this is the signing scheme.** Every `/exchange` action is signed as
-**structured EIP-712 typed data** (`eth_signTypedData_v4`). There is no alternate
-or legacy scheme to choose between — a wallet (MetaMask, Rabby, Ledger,
-WalletConnect) renders each action field by name in its signing prompt.
+**Status: this is the signing scheme.** There is no alternate or legacy scheme to choose. A wallet (MetaMask, Rabby, Ledger, WalletConnect) shows each action field by name in its signing prompt.
 :::
 
-Each action has a real per-action EIP-712 type, so the wallet shows the user the
-actual fields they are signing — `destination`, `amount`, `agentName` — rather
-than an opaque blob. The server reconstructs the typed struct from `action.type`
-+ `action.params`, recomputes the digest, and recovers the signer.
+Each action has its own EIP-712 type. The wallet shows the user the real fields they sign, such as `destination`, `amount` and `agentName`, and not an opaque blob. The server builds the typed struct from `action.type` and `action.params`, recomputes the digest and recovers the signer.
 
 ## How it works {#how-it-works}
 
@@ -20,9 +16,7 @@ than an opaque blob. The server reconstructs the typed struct from `action.type`
 | Primary type | `MetaFluxTransaction:<Action>` (one per action) |
 | What is hashed | The structured fields (atomic EIP-712 encoding) |
 
-Users **see what they sign** in a standard wallet — transfers, withdrawals, agent
-approvals, and account/staking/vault/spot-margin/earn/bridge settings all carry
-named fields.
+A standard wallet shows the user what they sign. Transfers, withdrawals, agent approvals, and account, staking, vault, spot-margin, earn and bridge settings all carry named fields.
 
 ## Wire shape {#wire-shape}
 
@@ -39,24 +33,19 @@ named fields.
 
 | Field | Meaning |
 |-------|---------|
-| `nonce` | The single envelope `nonce` is **also** the `nonce` field inside the signed typed struct — they must match. |
+| `nonce` | The envelope `nonce` is also the `nonce` field in the signed typed struct. The two values must match. |
 | `action.type` | `snake_case` action tag. |
-| `action.params` | The action fields. Must carry the **same values** (and the same canonical decimal strings) you hashed. |
+| `action.params` | The action fields. They carry the same values, and the same canonical decimal strings, that you hashed. |
 
-The server reconstructs the typed struct from `action.type` + `action.params`,
-recomputes the EIP-712 digest, recovers the signer, and authorizes it (signer is
-the account, or an approved [agent](../concepts/agent-wallets.md) of it).
+The server builds the typed struct from `action.type` and `action.params`, recomputes the EIP-712 digest and recovers the signer. It then authorizes the signer: the account itself, or an approved [agent](../concepts/agent-wallets.md) of the account.
 
 :::info
-**`sig_scheme` is vestigial.** Earlier builds carried a `sig_scheme` selector on
-the envelope. It is no longer required and the server ignores it — typed-data
-recovery runs unconditionally. **Omit it.** If you do send it, the only accepted
-value is `"typed"`.
+**`sig_scheme` is vestigial.** Earlier builds carried a `sig_scheme` selector on the envelope. The server now ignores it and always runs typed-data recovery. Omit the field. If you send it, the only accepted value is `"typed"`.
 :::
 
 ## EIP-712 domain {#eip-712-domain}
 
-One domain per network, cache it:
+Each network has one domain. Cache it.
 
 ```
 EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)
@@ -66,9 +55,7 @@ EIP712Domain(string name,string version,uint256 chainId,address verifyingContrac
   verifyingContract = 0x0000000000000000000000000000000000000000
 ```
 
-Every typed message also carries a **`metafluxChain`** string as its first field.
-It is a human-readable tag of the same chain id, and it is part of the signed
-struct:
+Every typed message also carries a `metafluxChain` string as its first field. The string is a readable tag of the same chain id, and it is part of the signed struct:
 
 | `chainId` | `metafluxChain` |
 |-----------|-----------------|
@@ -77,13 +64,11 @@ struct:
 | `31337` | `"Devnet"` |
 | any other | `"Devnet"` |
 
-The chain id is fixed per network — take it from [networks](../networks.md#summary)
-and use the matching tag. A `metafluxChain` or `chainId` that
-doesn't match the node recovers a different signer and the request is rejected.
+The chain id is fixed per network. Take it from [networks](../networks.md#summary) and use the matching tag. A `metafluxChain` or `chainId` that does not match the node recovers a different signer, and the node rejects the request.
 
 ## Encoding rules (atomic EIP-712) {#encoding-rules-atomic-eip-712}
 
-Standard EIP-712 `hashStruct`:
+The encoding is standard EIP-712 `hashStruct`:
 
 ```
 typeHash    = keccak256(encodeType)
@@ -91,7 +76,7 @@ hashStruct  = keccak256( typeHash ‖ encodeData )
 digest      = keccak256( 0x19 0x01 ‖ domainSeparator ‖ hashStruct )
 ```
 
-`encodeData` is each field, in declared order, encoded to one 32-byte word:
+`encodeData` encodes each field, in declared order, to one 32-byte word:
 
 | Field type | Encoding |
 |------------|----------|
@@ -102,55 +87,30 @@ digest      = keccak256( 0x19 0x01 ‖ domainSeparator ‖ hashStruct )
 | `bytes` | `keccak256(raw_bytes)`. |
 | `T[]` (e.g. `address[]`) | `keccak256(` concat of each element's 32-byte word `)`. |
 
-Sign the 32-byte `digest` with secp256k1 and serialize the signature as
-`r ‖ s ‖ v` (65 bytes). Both legacy `v ∈ {27, 28}` and `v ∈ {0, 1}` are accepted.
+Sign the 32-byte `digest` with secp256k1 and serialize the signature as `r ‖ s ‖ v` (65 bytes). The node accepts both `v ∈ {27, 28}` and `v ∈ {0, 1}`.
 
-### Decimals are canonical strings — hash then parse {#decimals-are-canonical-strings--hash-then-parse}
+### Canonical decimal strings {#decimals-are-canonical-strings--hash-then-parse}
 
-Any amount / quantity field is an EIP-712 **`string`** carrying the canonical
-decimal text (`"1500.5"`, `"750.25"`). The server hashes the **verbatim string**
-and *then* parses it to a number — so the exact characters matter:
+Each amount or quantity field is an EIP-712 `string` that holds the canonical decimal text (`"1500.5"`, `"750.25"`). The server hashes the verbatim string and then parses it to a number, so the exact characters matter.
 
 :::warning
-**`"1.0"` and `"1.00"` hash differently** even though they are the same number.
-Pick **one** canonical form per amount and send the **identical** string in
-`action.params` that you put in the typed message you signed. A mismatch
-(trailing zero, missing decimal point, scientific notation) recovers a different
-signer and is rejected.
+`"1.0"` and `"1.00"` hash differently, although they are the same number. Pick one canonical form per amount. Send the identical string in `action.params` that you put in the typed message you signed. A mismatch (trailing zero, missing decimal point, scientific notation) recovers a different signer, and the node rejects the action.
 :::
 
-This is why typed signing carries decimals as strings rather than scaled
-integers: the wallet prompt shows a human-readable amount, and the hash-then-parse
-rule keeps the signed bytes unambiguous.
+Typed signing carries decimals as strings, not as scaled integers. The wallet prompt then shows a readable amount, and the hash-then-parse rule keeps the signed bytes unambiguous.
 
 ## Action type strings {#action-type-strings}
 
-For each action the **primary type** is `MetaFluxTransaction:<Action>` and the
-`encodeType` string is given below (the field order is the message field order).
-`action.type` is the `snake_case` tag you put on the POST.
+The primary type of each action is `MetaFluxTransaction:<Action>`. The tables below give the `encodeType` string, with the fields in message order. `action.type` is the `snake_case` tag you put on the POST.
 
 :::warning
-**These tables are PARTIAL — they list roughly half of the chain's type
-strings.** They cover the actions an integrator assembles by hand. Not listed:
-the order and
-cancel bodies (see [Orders and cancels](#orders-and-cancels)), the RFQ and FBA
-lanes, and the governance, validator and deployer actions.
+**These tables are partial.** They list about half of the chain's type strings: the actions an integrator builds by hand. They do not list the order and cancel bodies (see [Orders and cancels](#orders-and-cancels)), the RFQ and FBA lanes, or the governance, validator and deployer actions.
 
-For a trading or account action with no row here, take the string from a client
-SDK, not from a guess. [`@metaflux-dex/client`](./typescript-sdk.md) and
-`metaflux-client` (Rust) carry the order, cancel, TWAP, sub-account and RFQ
-strings byte-identical to the chain.
+For a trading or account action with no row here, take the string from a client SDK. Do not guess it. [`@metaflux-dex/client`](./typescript-sdk.md) and `metaflux-client` (Rust) carry the order, cancel, TWAP, sub-account and RFQ strings byte-identical to the chain.
 
-**The governance and validator actions are in NEITHER SDK.** `ApproveUpgrade`,
-`ApproveUpgradeAt`, `ArmFeatures`, `ArmFeaturesAt`, `CValidator`,
-`GovAdjustSpotValue`, `GovVote`, `SetMarkMode`, `SetMetaliquiditySet`,
-`SetPmShockGrid`, `VoteAppHash` and `VoteGlobal` have no row here and no SDK
-type. A validator casts them with the `mtf-node gov` CLI over its local socket,
-which builds the digest itself, so no integrator assembles them by hand.
+Neither SDK carries the governance and validator actions. `ApproveUpgrade`, `ApproveUpgradeAt`, `ArmFeatures`, `ArmFeaturesAt`, `CValidator`, `GovAdjustSpotValue`, `GovVote`, `SetMarkMode`, `SetMetaliquiditySet`, `SetPmShockGrid`, `VoteAppHash` and `VoteGlobal` have no row here and no SDK type. A validator casts them with the `mtf-node gov` CLI over its local socket. The CLI builds the digest itself, so no integrator builds them by hand.
 
-A type string is hashed whole into the typehash, so one wrong byte, one wrong
-field order or one missing field makes the action unsignable — the chain
-recovers a stranger and refuses it. **Copy the string; never retype it.**
+The typehash covers the whole type string. One wrong byte, one wrong field order or one missing field makes the action unsignable: the chain recovers a stranger and refuses the action. Copy the string. Never retype it.
 :::
 
 ### Transfers {#transfers}
@@ -161,16 +121,11 @@ recovers a stranger and refuses it. **Copy the string; never retype it.**
 | `usd_class_transfer` ⚠️ | `MetaFluxTransaction:UsdClassTransfer(string metafluxChain,string ntl,bool toPerp,uint64 nonce)` |
 | `withdraw` | `MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uint32 destinationChainId,bool useCctp,uint64 nonce)` |
 
-⚠️ **`usd_class_transfer` is REJECTED on this network.** The type string above is
-the frozen truth and your library may still carry it, but the action never
-succeeds: there is one USDC pool, so there is no second class to move to. It
-answers `USDC is unified; no class transfer needed`, and **the nonce is spent
-either way**. See [USDC](../concepts/usdc.md#moving-usdc).
+⚠️ The network rejects `usd_class_transfer`. The type string above is the frozen form and your library may still carry it, but the action never succeeds. There is one USDC pool, so there is no second class to move to. The action answers `USDC is unified; no class transfer needed`, and it spends the nonce either way. See [USDC](../concepts/usdc.md#moving-usdc).
 
-### Core → EVM {#core--evm}
+### Core to EVM {#core--evm}
 
-Two actions move value from the Core ledger to MetaFluxEVM. See
-[which one to use](../api/rest/exchange/transfers.md#core-evm-which-action).
+Two actions move value from the Core ledger to MetaFluxEVM. See [which one to use](../api/rest/exchange/transfers.md#core-evm-which-action).
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -180,25 +135,10 @@ Two actions move value from the Core ledger to MetaFluxEVM. See
 
 Notes on specific fields:
 
-- `core_evm_transfer`: **the envelope you send picks the type string.** Carry
-  neither `data` nor `destination_chain_id` and you sign `CoreEvmTransfer`,
-  byte-identically to before those fields existed. Include **either** key and you
-  sign `CoreEvmTransferV2`. **Presence is the selector, not emptiness** —
-  `"data": []` and `"destination_chain_id": 0` both count as present.
-- `send_to_evm_with_data`: **two different nonces.** `transferNonce` is
-  `params.nonce`, carried with the transfer. The trailing `nonce` is the ordinary
-  envelope nonce. They are separate signed fields, so sending the same value for
-  both is legal but not required.
-- `send_to_evm_with_data`: `data` is a `bytes` field — hashed as
-  `keccak256(raw_bytes)`, so an empty payload hashes the empty byte string. On the
-  POST it is an array of byte integers, not a hex string.
-- **`send_to_evm_with_data` is live.** An earlier version of this note said the
-  network refused the action. That stopped being true when the lane was restored
-  and released. The type string above is frozen. The action does refuse five
-  things: a `source_dex` other than `0`, `to_perp: true`, a
-  `destination_chain_id` that is neither `0` nor the local EVM chain id, `data`
-  over 4096 bytes, and an amount that truncates to a zero EVM credit. See
-  [the action](../api/rest/exchange/transfers.md#send_to_evm_with_data) for each rule.
+- `core_evm_transfer`: the envelope you send picks the type string. With neither `data` nor `destination_chain_id`, you sign `CoreEvmTransfer`, byte-identical to the form before those fields existed. With either key, you sign `CoreEvmTransferV2`. Presence selects the type, not emptiness: `"data": []` and `"destination_chain_id": 0` both count as present.
+- `send_to_evm_with_data`: the struct holds two nonces. `transferNonce` is `params.nonce`, and it travels with the transfer. The trailing `nonce` is the ordinary envelope nonce. They are separate signed fields. You may send the same value for both, but you do not have to.
+- `send_to_evm_with_data`: `data` is a `bytes` field, hashed as `keccak256(raw_bytes)`. An empty payload hashes the empty byte string. On the POST it is an array of byte integers, not a hex string.
+- `send_to_evm_with_data` is live. An earlier version of this note said the network refused the action. The lane has since been restored and released. The type string above is frozen. The action refuses five cases: a `source_dex` other than `0`, `to_perp: true`, a `destination_chain_id` that is neither `0` nor the local EVM chain id, `data` over 4096 bytes, and an amount that truncates to a zero EVM credit. See [the action](../api/rest/exchange/transfers.md#send_to_evm_with_data) for each rule.
 
 ### Account, staking & vault {#account-staking--vault}
 
@@ -225,46 +165,15 @@ Notes on specific fields:
 
 Notes on specific fields:
 
-- `claim_rewards`: `validator` = the zero address means **claim across all
-  delegations**.
-- `create_vault`: `kind` is `0` = User, `1` = Metaliquidity.
-- [`noop`](../api/rest/exchange/rfq-utility.md#noop): the chain tag and the envelope nonce are
-  the **only** signed fields, because the action carries no params. It touches no
-  state; it burns the nonce. Use it to invalidate an in-flight action signed with
-  the same nonce.
-- `approve_broker_fee`: the row above is **not** a typographic error. The action
-  type says `broker`; the `encodeType` says `ApproveBuilderFee`. Sign the string
-  exactly as printed. The type string is hashed into every signature ever made
-  for this action, so one changed byte stops every historical signature from
-  verifying. The older action type `approve_builder_fee` is still accepted and
-  signs the same string. See [broker codes](../concepts/broker-codes.md#approval).
-- `approve_agent`: **`expiresAtMs` is a sentinel, and it is always in the
-  digest.** For an approval that never expires, OMIT `expires_at_ms` from the
-  POST params and sign `expiresAtMs = 0`. Sign a non-zero value and the approval
-  carries that expiry. A caller that leaves the field out of the struct signs a
-  four-field digest the chain never computes, so the recovered signer is a
-  stranger and the action is refused.
-- `vault_modify`: **the digest binds every field the action applies.** Each
-  optional field signs as two words — a presence `bool`, then the value. Set the
-  flag to `true` only when the wire payload carries that key. Sign the value as
-  `0` or `false` when it does not. An absent key and a key sent as `0` are
-  DIFFERENT digests, so one signature covers exactly one wire form. `newName`
-  signs as `""` when the payload sends no name; the chain refuses an empty name,
-  so `""` can only mean unchanged. This string replaces a four-field
-  `VaultModify`, and a signature made with that older string is refused since
-  [block 11,550,001](../changelog/block-11550001.md#vault_modify). See
-  [the action](../api/rest/exchange/vaults.md#vault_modify).
-- `set_referrer_by_code` and `register_referral_code`: `code` signs as the exact lowercase string the
-  payload carries. The node does not fold the case, so sign the bytes you send.
-- `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the
-  envelope nonce are the only signed fields, because neither action carries
-  params. Both drain the WHOLE accrued credit and neither reports the amount, so
-  read the credit first — see [fees](../concepts/fees.md#referrer-credit).
-- `claim_broker_rewards`: the same frozen-spelling rule as `approve_broker_fee`.
-  The action type says `broker`; the `encodeType` says `ClaimBuilderRewards`.
-  Sign the string exactly as printed. The older action type
-  `claim_builder_rewards` is still accepted and signs the same string. See
-  [broker codes](../concepts/broker-codes.md#claiming).
+- `claim_rewards`: a `validator` of the zero address claims across all delegations.
+- `create_vault`: `kind` is `0` for User and `1` for Metaliquidity.
+- [`noop`](../api/rest/exchange/rfq-utility.md#noop): the chain tag and the envelope nonce are the only signed fields, because the action has no params. It touches no state and spends the nonce. Use it to invalidate an in-flight action signed with the same nonce.
+- `approve_broker_fee`: the row above is not a typo. The action type says `broker` and the `encodeType` says `ApproveBuilderFee`. Sign the string exactly as printed. The type string is hashed into every signature ever made for this action, so one changed byte stops every historical signature from verifying. The older action type `approve_builder_fee` is still accepted and signs the same string. See [broker codes](../concepts/broker-codes.md#approval).
+- `approve_agent`: `expiresAtMs` is a sentinel, and it is always in the digest. For an approval that never expires, omit `expires_at_ms` from the POST params and sign `expiresAtMs = 0`. Sign a non-zero value and the approval carries that expiry. A caller that leaves the field out of the struct signs a four-field digest that the chain never computes. The recovered signer is then a stranger, and the chain refuses the action.
+- `vault_modify`: the digest binds every field the action applies. Each optional field signs as two words, a presence `bool` and then the value. Set the flag to `true` only when the wire payload carries that key. When it does not, sign the value as `0` or `false`. An absent key and a key sent as `0` give different digests, so one signature covers exactly one wire form. `newName` signs as `""` when the payload sends no name. The chain refuses an empty name, so `""` can only mean unchanged. This string replaces a four-field `VaultModify`. The chain refuses a signature made with the older string since [block 11,550,001](../changelog/block-11550001.md#vault_modify). See [the action](../api/rest/exchange/vaults.md#vault_modify).
+- `set_referrer_by_code` and `register_referral_code`: `code` signs as the exact lowercase string the payload carries. The node does not fold the case, so sign the bytes you send.
+- `claim_referral_rewards` and `claim_broker_rewards`: the chain tag and the envelope nonce are the only signed fields, because neither action has params. Both drain the whole accrued credit and neither reports the amount. Read the credit first. See [fees](../concepts/fees.md#referrer-credit).
+- `claim_broker_rewards`: the same frozen-spelling rule as `approve_broker_fee` applies. The action type says `broker` and the `encodeType` says `ClaimBuilderRewards`. Sign the string exactly as printed. The older action type `claim_builder_rewards` is still accepted and signs the same string. See [broker codes](../concepts/broker-codes.md#claiming).
 
 ### Margin {#margin}
 
@@ -281,18 +190,9 @@ Notes on specific fields:
 |---------------|--------------|
 | `token_delegate` | `MetaFluxTransaction:TokenDelegate(string metafluxChain,address validator,string amount,bool isUndelegate,uint8 lockMonths,uint64 nonce)` |
 
-`amount` is a canonical decimal string. `isUndelegate` = `true` undelegates,
-`false` delegates.
+`amount` is a canonical decimal string. `isUndelegate` set to `true` undelegates and `false` delegates.
 
-`lockMonths` is the staking lock tier: `0` (flexible), `1`, `6` or `24`.
-**Omitting it from the POST params is not the same as omitting it from the
-digest.** The POST field defaults to `0`, so a bare delegate stays valid on the
-wire. The typed struct has no such default: `lockMonths` is always one of the six
-signed fields, including on an undelegate, where the chain ignores the value but
-still hashes it. Sign a five-field struct and the chain computes a digest you
-never signed, so the recovered signer is a stranger and the action is refused.
-Tier `0` earns no revenue share — see
-[staking](../concepts/staking.md#token_delegate) for the tier rules.
+`lockMonths` is the staking lock tier: `0` (flexible), `1`, `6` or `24`. Omitting it from the POST params is not the same as omitting it from the digest. The POST field defaults to `0`, so a bare delegate stays valid on the wire. The typed struct has no default. `lockMonths` is always one of the six signed fields, including on an undelegate, where the chain ignores the value but still hashes it. If you sign a five-field struct, the chain computes a digest you never signed. The recovered signer is then a stranger, and the chain refuses the action. Tier `0` earns no revenue share. See [staking](../concepts/staking.md#token_delegate) for the tier rules.
 
 ### Vault {#vault}
 
@@ -301,8 +201,7 @@ Tier `0` earns no revenue share — see
 | `vault_transfer` | `MetaFluxTransaction:VaultTransfer(string metafluxChain,uint64 vaultId,bool deposit,string amount,uint64 nonce)` |
 | `vault_withdraw` | `MetaFluxTransaction:VaultWithdraw(string metafluxChain,uint64 vaultId,string shares,uint64 nonce)` |
 
-`vault_transfer.deposit` = `true` deposits, `false` withdraws; `amount` is a
-canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
+`vault_transfer.deposit` set to `true` deposits and `false` withdraws. `amount` is a canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
 
 ### Metaliquidity {#metaliquidity}
 
@@ -310,15 +209,9 @@ canonical decimal string. `vault_withdraw.shares` is a canonical decimal string.
 |---------------|--------------|
 | `register_metaliquidity_operator` | `MetaFluxTransaction:RegisterMetaliquidityOperator(string metafluxChain,uint64 vaultId,address operator,bool allowed,uint64 expiresAtMs,uint64 nonce)` |
 
-**`expiresAtMs` is a sentinel.** For an operator that never expires, OMIT
-`expires_at_ms` from the POST params and sign `expiresAtMs = 0`. **Sending an
-explicit `expires_at_ms: 0` is rejected**, because absent and explicit zero
-flatten to the same digest and the node refuses the ambiguity.
+`expiresAtMs` is a sentinel. For an operator that never expires, omit `expires_at_ms` from the POST params and sign `expiresAtMs = 0`. The node rejects an explicit `expires_at_ms: 0`, because an absent key and an explicit zero flatten to the same digest and the node refuses the ambiguity.
 
-`expiresAtMs` is **always** in the digest, even though `expires_at_ms` is
-optional on the wire. **Omitting it signs as `0`** — encode `expiresAtMs = 0`.
-Sign a non-zero value and the approval carries that expiry. See
-[`register_metaliquidity_operator`](../api/rest/exchange/vaults.md#register_metaliquidity_operator).
+`expiresAtMs` is always in the digest, although `expires_at_ms` is optional on the wire. Omitting it signs as `0`, so encode `expiresAtMs = 0`. Sign a non-zero value and the approval carries that expiry. See [`register_metaliquidity_operator`](../api/rest/exchange/vaults.md#register_metaliquidity_operator).
 
 ### Spot margin {#spot-margin}
 
@@ -326,8 +219,7 @@ Sign a non-zero value and the approval carries that expiry. See
 |---------------|--------------|
 | `spot_margin_open` | `MetaFluxTransaction:SpotMarginOpen(string metafluxChain,uint32 pair,uint64 size,uint64 limitPx,string borrow,uint64 nonce)` |
 
-`amount` and `borrow` are canonical decimal strings; `size` and `limitPx` are
-integers.
+`amount` and `borrow` are canonical decimal strings. `size` and `limitPx` are integers.
 
 ### Earn {#earn}
 
@@ -338,9 +230,7 @@ integers.
 
 `amount` and `shares` are canonical decimal strings.
 
-There is **no typed struct for `createEarnPool`**. It is a validator governance
-vote, not a user action, and it is
-[not on `/exchange`](../api/rest/exchange/transfers.md#non-bridged-actions).
+`createEarnPool` has no typed struct. It is a validator governance vote, not a user action, and it is [not on `/exchange`](../api/rest/exchange/transfers.md#non-bridged-actions).
 
 ### BOLE pool {#bole-pool}
 
@@ -348,20 +238,13 @@ vote, not a user action, and it is
 |---------------|--------------|
 | `borrow_lend` | `MetaFluxTransaction:BorrowLend(string metafluxChain,uint8 kind,string amount,uint64 nonce)` |
 
-**`kind` signs as a `uint8`, not as the string you POST.** The wire carries
-`"Lend"` / `"UnLend"` / `"Borrow"` / `"Repay"`; the digest carries `0` / `1` / `2`
-/ `3` in that order. Sign the number, post the string. `amount` is a canonical
-decimal string.
+`kind` signs as a `uint8`, not as the string you POST. The wire carries `"Lend"`, `"UnLend"`, `"Borrow"` or `"Repay"`. The digest carries `0`, `1`, `2` or `3` in that order. Sign the number and post the string. `amount` is a canonical decimal string.
 
-`"Borrow"` is refused unless the sender is an approved liquidator. The other three
-kinds are open to any account. See
-[`borrow_lend`](../api/rest/exchange/transfers.md#non-bridged-actions).
+The chain refuses `"Borrow"` unless the sender is an approved liquidator. The other three kinds are open to any account. See [`borrow_lend`](../api/rest/exchange/transfers.md#non-bridged-actions).
 
 ### Spot deployment (MIP-1) {#spot-deployment}
 
-The six [spot deployer](../api/rest/exchange/deploy-spot.md) actions.
-Each is sender-authorized, so **no struct carries an `owner`** — the recovered
-signer is the deployer.
+These are the six [spot deployer](../api/rest/exchange/deploy-spot.md) actions. Each action is sender-authorized, so no struct carries an `owner`. The recovered signer is the deployer.
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -375,26 +258,17 @@ signer is the deployer.
 ### Perp deployer actions {#perp-deployer-actions}
 
 :::warning
-**`PerpSetSubDeployerPerms` is LIVE.** Measured on the public testnet: the node
-accepts the variant and asks for its `params`, while a made-up action name in
-the same request answers `unknown variant`. That control is what separates the
-two answers.
+**`PerpSetSubDeployerPerms` is live.** On the public testnet, the node accepts the variant and asks for its `params`. A made-up action name in the same request answers `unknown variant`. That control separates the two answers.
 
-**`PerpRegisterAsset` also CHANGES in a coming release.** It gains `string name`, the
-name of the dex the market joins. The type string below is the NEW one, so the
-digest moves: a signature built over the old struct, without `name`, is invalid
-after the upgrade, and a signature over the new struct is invalid before it.
+`PerpRegisterAsset` also changes in a coming release. It gains `string name`, the name of the dex the market joins. The type string below is the new one, so the digest moves. After the upgrade, a signature over the old struct without `name` is invalid. Before the upgrade, a signature over the new struct is invalid.
 :::
 
-The [perp deployer](../api/rest/exchange/deploy-perp.md) actions. Each
-is sender-authorized: the recovered signer is the deployer, and per-market
-authority is checked against the market's deployer and the permission bits its
-delegates hold.
+These are the [perp deployer](../api/rest/exchange/deploy-perp.md) actions. Each action is sender-authorized: the recovered signer is the deployer. The node checks per-market authority against the market's deployer and the permission bits its delegates hold.
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
 | `perp_register_asset` | `MetaFluxTransaction:PerpRegisterAsset(string metafluxChain,string symbol,uint8 decimals,string name,uint64 nonce)` |
-| `perp_set_oracle` | **RETIRED** — `MetaFluxTransaction:PerpSetOracle(string metafluxChain,uint32 asset,uint16 oracleSourceMask,uint64 nonce)` |
+| `perp_set_oracle` | RETIRED: `MetaFluxTransaction:PerpSetOracle(string metafluxChain,uint32 asset,uint16 oracleSourceMask,uint64 nonce)` |
 | `perp_set_leverage` | `MetaFluxTransaction:PerpSetLeverage(string metafluxChain,uint32 asset,uint8 maxLeverage,uint64 nonce)` |
 | `perp_set_fee_tier` | `MetaFluxTransaction:PerpSetFeeTier(string metafluxChain,uint32 asset,uint32 takerFeeDbps,uint32 makerFeeDbps,uint32 deployerFeeBps,uint64 nonce)` |
 | `perp_set_maker_rebate` | `MetaFluxTransaction:PerpSetMakerRebate(string metafluxChain,uint32 asset,uint16 rebateBps,uint64 nonce)` |
@@ -405,54 +279,26 @@ delegates hold.
 | `perp_set_sub_deployers` | `MetaFluxTransaction:PerpSetSubDeployers(string metafluxChain,uint32 asset,address subDeployer,bool add,uint64 nonce)` |
 | `perp_set_sub_deployer_perms` | `MetaFluxTransaction:PerpSetSubDeployerPerms(string metafluxChain,uint32 asset,address subDeployer,uint16 permissions,uint64 nonce)` |
 
-In `PerpSetOiCap`, `oiCapUnits` is in whole units of the base asset, and `0`
-removes the cap. See
-[`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap).
+In `PerpSetOiCap`, `oiCapUnits` is in whole units of the base asset, and `0` removes the cap. See [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap).
 
-**Both rows below are live.**
+Both changes below are live.
 
-- **`PerpSetSubDeployerPerms` is new.** It grants a delegate an exact permission
-  mask instead of every power. `permissions` is in the digest, so one signature
-  binds one (market, delegate, mask) triple. The bit table is on
-  [`perp_set_sub_deployers`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
-- **`PerpSetOracle` is retired.** The type string is NOT deleted and every
-  committed payload still decodes, but the node refuses the action. Stop signing
-  it. The mask it wrote has no reader.
+- `PerpSetSubDeployerPerms` is new. It grants a delegate an exact permission mask instead of every power. `permissions` is in the digest, so one signature binds one (market, delegate, mask) triple. The bit table is on [`perp_set_sub_deployers`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
+- `PerpSetOracle` is retired. The type string is not deleted, and every committed payload still decodes, but the node refuses the action. Stop signing it. The mask it wrote has no reader.
 
-**`PerpSetSubDeployers` itself does not change.** Its type string, its digest and
-its meaning are the same before and after: `add: true` grants every permission
-bit, `add: false` revokes. A client that signs it keeps working, and a delegate
-you already granted keeps every power it has.
+`PerpSetSubDeployers` itself does not change. Its type string, its digest and its meaning are the same before and after. `add: true` grants every permission bit and `add: false` revokes. A client that signs it keeps working, and a delegate you already granted keeps every power it has.
 
-**`name` sits between `decimals` and `nonce`, and it is in the digest.** It names
-the dex, and `symbol` must start with `name` plus `:`. Both strings are hashed,
-so one signature binds one (dex, symbol) pair and cannot be re-aimed at another
-dex. `name` is required on your first registration and write-once after it — the
-rejection rules are on
-[`perp_register_asset`](../api/rest/exchange/deploy-perp.md#perp_register_asset).
+`name` sits between `decimals` and `nonce`, and it is in the digest. It names the dex, and `symbol` must start with `name` plus `:`. Both strings are hashed, so one signature binds one (dex, symbol) pair and cannot be re-aimed at another dex. `name` is required on your first registration and write-once after it. The rejection rules are on [`perp_register_asset`](../api/rest/exchange/deploy-perp.md#perp_register_asset).
 
-**Fee units differ inside one struct.** `takerFeeDbps` and `makerFeeDbps` are
-DECI-bps; `deployerFeeBps` is bps. A value moved between the two fields is off by
-ten.
+Fee units differ inside one struct. `takerFeeDbps` and `makerFeeDbps` are deci-bps. `deployerFeeBps` is bps. A value moved between the two fields is off by ten.
 
-**No struct carries a bid.** A perp market is priced by the Dutch clock and paid
-at registration, so a non-zero bid is refused.
+No struct carries a bid. The Dutch clock prices a perp market and the deployer pays at registration, so the node refuses a non-zero bid.
 
-`maxDeployFee` and `maxSupply` are canonical decimal strings under the
-[hash-then-parse rule](#decimals-are-canonical-strings--hash-then-parse) — hash
-the exact characters you send.
+`maxDeployFee` and `maxSupply` are canonical decimal strings under the [hash-then-parse rule](#decimals-are-canonical-strings--hash-then-parse). Hash the exact characters you send.
 
-**`spot_seed_holders` carries two arrays**, and both are in the digest.
-`holders` is `address[]`; `amounts` is `string[]`, one canonical decimal string
-per holder, in the **same order**. Encode each array as
-`keccak256(` concat of the elements' 32-byte words `)`, where a `string[]`
-element's word is `keccak256(utf8_bytes)` of that string. The two arrays are
-parallel: reordering one alone changes the digest and produces a different
-distribution.
+`spot_seed_holders` carries two arrays, and both are in the digest. `holders` is `address[]`. `amounts` is `string[]`, with one canonical decimal string per holder, in the same order. Encode each array as `keccak256(` concat of the elements' 32-byte words `)`. The word of a `string[]` element is `keccak256(utf8_bytes)` of that string. The two arrays are parallel. Reordering one alone changes the digest and produces a different distribution.
 
-**None of these six carries a bid field.** The deploy fee is paid at commit and
-bounded by the signed `maxDeployFee`; there is nothing to escrow and nothing to
-refund.
+None of the six spot deployer actions carries a bid field. The deploy fee is paid at commit and bounded by the signed `maxDeployFee`. There is nothing to escrow and nothing to refund.
 
 ### Agent abstraction & bridge {#agent-abstraction--bridge}
 
@@ -463,22 +309,13 @@ refund.
 
 Notes on specific fields:
 
-- `agent_set_abstraction`: `value` is an EIP-712 **`string`** — sign the verbatim
-  string (it is not a number; hashed as `keccak256(utf8)`).
-- `bridge_withdraw`: the typed `chain` field is a **`uint8`** — `1` = Base, `2` =
-  Arbitrum. But the POST `action.params.chain` is the **string name** (`"Base"` /
-  `"Arbitrum"`). So sign the `uint8` in the typed message and send the string name
-  in `params`.
-- `bridge_withdraw`: `amount` is a `uint64` **integer** (not a decimal string);
-  `dstAddr` is the destination-chain address string.
+- `agent_set_abstraction`: `value` is an EIP-712 `string`. Sign the verbatim string. It is not a number, and it is hashed as `keccak256(utf8)`.
+- `bridge_withdraw`: the typed `chain` field is a `uint8`, where `1` is Base and `2` is Arbitrum. The POST `action.params.chain` is the string name (`"Base"` or `"Arbitrum"`). Sign the `uint8` in the typed message and send the string name in `params`.
+- `bridge_withdraw`: `amount` is a `uint64` integer, not a decimal string. `dstAddr` is the destination-chain address string.
 
 ### Scale ladder {#scale-ladder}
 
-The [scale ladder](../api/rest/exchange/orders.md#scale_order) actions bind the **compact
-request** — you sign the range and the distribution, not the expanded rungs. Each
-has an owner-less primary type and a `_WITH_OWNER` twin; the twin is used **only**
-when the wire carries an `owner` (an agent / operator acting for another account),
-with `owner` inserted right after `metafluxChain`, mirroring `batch_order`.
+The [scale ladder](../api/rest/exchange/orders.md#scale_order) actions bind the compact request. You sign the range and the distribution, not the expanded rungs. Each action has an owner-less primary type and a `_WITH_OWNER` twin. The twin applies only when the wire carries an `owner` (an agent or operator acting for another account). It inserts `owner` right after `metafluxChain`, as `batch_order` does.
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -489,25 +326,13 @@ with `owner` inserted right after `metafluxChain`, mirroring `batch_order`.
 
 Notes on specific fields:
 
-- `weights` is a **`bytes32`** the client **pre-hashes** `T[]`-style:
-  `keccak256(concat(per-weight uint256 words))` for `dist == "custom"`, and the
-  **zero hash** (`0x00…00`) for every other `dist`. This binds the exact weight
-  vector without inflating the message — a 100-rung ladder signs the same size
-  message as a 2-rung one. The wire `params.weights` still carries the full array
-  (the server rebuilds and re-verifies it); for a non-`custom` `dist` send an
-  **empty** array.
-- `side` / `dist` / `tif` / `stpMode` / `positionSide` / `cloid` are EIP-712
-  **`string`s**, signed verbatim in their `snake_case` wire form (`positionSide`
-  is `""` when omitted).
-- `pxLow` / `pxHigh` / `totalSize` are `uint64` integers on the wire (widened
-  internally).
+- `weights` is a `bytes32` that the client pre-hashes `T[]`-style. For `dist == "custom"`, it is `keccak256(concat(per-weight uint256 words))`. For every other `dist`, it is the zero hash (`0x00…00`). This binds the exact weight vector without inflating the message: a 100-rung ladder signs a message of the same size as a 2-rung one. The wire `params.weights` still carries the full array, and the server rebuilds and re-verifies it. For a non-`custom` `dist`, send an empty array.
+- `side`, `dist`, `tif`, `stpMode`, `positionSide` and `cloid` are EIP-712 `string`s, signed verbatim in their `snake_case` wire form. `positionSide` is `""` when omitted.
+- `pxLow`, `pxHigh` and `totalSize` are `uint64` integers on the wire. The node widens them internally.
 
 ### Chase {#chase}
 
-A [chase order](../api/rest/exchange/orders.md#chase_order) binds one self-repricing
-leg: you sign the intent, the node re-prices the resting leg to track the touch.
-Like the scale ladder it has an owner-less primary type and a `_WITH_OWNER` twin
-(`owner` right after `metafluxChain`).
+A [chase order](../api/rest/exchange/orders.md#chase_order) binds one self-repricing leg. You sign the intent, and the node re-prices the resting leg to track the touch. Like the scale ladder, it has an owner-less primary type and a `_WITH_OWNER` twin (`owner` right after `metafluxChain`).
 
 | `action.type` | `encodeType` |
 |---------------|--------------|
@@ -518,45 +343,30 @@ Like the scale ladder it has an owner-less primary type and a `_WITH_OWNER` twin
 
 Notes on specific fields:
 
-- `side` / `stpMode` / `positionSide` / `cloid` are EIP-712 **`string`s** signed
-  verbatim in their `snake_case` wire form; each is `""` when omitted. `cloid` is
-  hashed as the verbatim `0x`-hex STRING, not the raw 16 bytes.
-- `size` / `intervalBlocks` / `ttlMs` / `maxReprices` are integer words.
-- `cancel_chase.chaseOid` is the registry cancel handle from the `chase_order`
-  ack (`statuses[0].chase.chase_oid`), **not** the resting leg oid.
+- `side`, `stpMode`, `positionSide` and `cloid` are EIP-712 `string`s signed verbatim in their `snake_case` wire form. Each is `""` when omitted. `cloid` is hashed as the verbatim `0x`-hex string, not the raw 16 bytes.
+- `size`, `intervalBlocks`, `ttlMs` and `maxReprices` are integer words.
+- `cancel_chase.chaseOid` is the registry cancel handle from the `chase_order` ack (`statuses[0].chase.chase_oid`). It is not the resting leg oid.
 
 ### Fields that are *not* in the typed digest {#fields-that-are-not-in-the-typed-digest}
 
-One action has a `params` key that the typed type string does **not** cover, so
-the server forces it to its default:
+One action has a `params` key that the typed type string does not cover, so the server forces the key to its default:
 
-- `create_vault` — the `CreateVault` type has **no `parent`**, so `create_vault`
-  is **top-level** (no parent). **Omit** `parent`.
+- `create_vault`: the `CreateVault` type has no `parent`, so `create_vault` is top-level. Omit `parent`.
 
-`approve_agent` is **not** in this class, whatever an older copy of this page
-said. `ApproveAgent` DOES bind `uint64 expiresAtMs`. Omitting `expires_at_ms`
-from the POST is right for a never-expiring approval, but the STRUCT still
-carries the field and signs it as `0`.
+`approve_agent` is not in this class, whatever an older copy of this page said. `ApproveAgent` does bind `uint64 expiresAtMs`. For a never-expiring approval, omit `expires_at_ms` from the POST. The struct still carries the field and signs it as `0`.
 
 ## Action expiry (`expiresAfter`) {#action-expiry-expiresafter}
 
-Every action type optionally carries a top-level **`expiresAfter`** (uint64
-milliseconds): an expiry time, signed into the digest, after which the action is
-no longer valid. It is a defence against late replay — a signature that leaks or
-is held back by a relay stops working once its expiry passes. See
-[`POST /exchange` → optional action expiry](../api/rest/exchange.md#optional-action-expiry-expiresafter)
-for the wire behaviour and rejection rules.
+Every action type optionally carries a top-level `expiresAfter` (uint64 milliseconds). It is an expiry time, signed into the digest. After it, the action is no longer valid. It defends against late replay: a signature that leaks, or that a relay holds back, stops working once its expiry passes. See [`POST /exchange`, optional action expiry](../api/rest/exchange.md#optional-action-expiry-expiresafter) for the wire behavior and rejection rules.
 
-The fold is **uniform across every action type** and follows one rule:
+The fold is the same for every action type and follows one rule:
 
-- **`expiresAfter == 0` (or absent) — the default.** The digest is **byte-for-byte
-  identical** to the action's normal digest. Nothing about signing changes unless
-  you opt in.
-- **`expiresAfter != 0`.** Two changes, both deterministic:
-  1. The type string's trailing `…,uint64 nonce)` becomes
-     `…,uint64 nonce,uint64 expiresAfter)`.
-  2. One extra 32-byte word — `expiresAfter` as a big-endian `uint64`, left-padded
-     — is appended to `encodeData` **after** the `nonce` word.
+- `expiresAfter == 0` or absent (the default). The digest is byte-for-byte identical to the normal digest of the action. Nothing about signing changes unless you opt in.
+- `expiresAfter != 0`. Two changes apply:
+  1. The trailing `…,uint64 nonce)` of the type string becomes `…,uint64 nonce,uint64 expiresAfter)`.
+  2. One extra 32-byte word is appended to `encodeData` after the `nonce` word. The word is `expiresAfter` as a big-endian `uint64`, left-padded.
+
+For `withdraw`, the two forms are:
 
 So for `withdraw`:
 
@@ -570,40 +380,30 @@ MetaFluxTransaction:Withdraw(string metafluxChain,uint32 asset,string amount,uin
 
 ### `eth_signTypedData_v4` field placement {#expiresafter-field-placement}
 
-When `expiresAfter` is non-zero, add it as the **last** field of the action's type
-array and set it in the message (as a decimal string, like any `uint64`):
+When `expiresAfter` is non-zero, add it as the last field of the type array of the action. Set it in the message as a decimal string, like any `uint64`:
 
 ```js
 types['MetaFluxTransaction:Withdraw'].push({ name: 'expiresAfter', type: 'uint64' });
 message.expiresAfter = '1735693200000';   // only when non-zero
 ```
 
-When it is `0` / absent, do **not** add the field or the message key — that
-reproduces the legacy typed data exactly.
+When the value is `0` or absent, do not add the field or the message key. That reproduces the legacy typed data exactly.
 
-### Worked delta — `withdraw` with and without expiry {#worked-delta--withdraw-expiry}
+### Worked delta for `withdraw` {#worked-delta--withdraw-expiry}
 
-A `withdraw` of `"100.5"` of asset `0` to chain id `8453` on **Testnet**
-(`chainId = 114514`), `useCctp = false`, `nonce = 1735689600000`. The two digests
-below are pinned by the cross-implementation known-answer test — a compliant
-`eth_signTypedData_v4` assembly reproduces them exactly:
-
+Take a `withdraw` of `"100.5"` of asset `0` to chain id `8453` on Testnet (`chainId = 114514`), with `useCctp = false` and `nonce = 1735689600000`. A cross-implementation known-answer test pins the two digests below. A compliant `eth_signTypedData_v4` assembly reproduces them exactly:
 | `expiresAfter` | Signed EIP-712 digest (32 bytes) |
 |----------------|----------------------------------|
 | `0` / omitted  | `0x425495f369661cdff0c274cd16ee5ad91294892a924b9a84033f09183b087c0e` |
 | `1735693200000` | `0x9ad23a96bb83b8bdd427fe9023b4855e8689be66da73da745f9af0acb59f5833` |
 
-The first row is **identical** to the digest you get from the plain (no-expiry)
-`withdraw` — proof that opting out costs nothing. The second row differs only
-because the folded type string and the appended `expiresAfter` word changed the
-struct hash.
+The first row is identical to the digest of the plain `withdraw` without expiry, so opting out costs nothing. The second row differs only because the folded type string and the appended `expiresAfter` word change the struct hash.
 
-## Worked example — `send_asset` (a transfer) {#worked-example--send_asset-a-transfer}
+## Worked example: `send_asset` {#worked-example--send_asset-a-transfer}
 
-A transfer of `"750.25"` of asset `2` from spot DEX `0` to perp DEX `1`, into the
-perp wallet, on **Testnet** (`chainId = 114514`).
+This example sends `"750.25"` of asset `2` from spot DEX `0` to perp DEX `1`, into the perp wallet, on Testnet (`chainId = 114514`).
 
-The object you hand to `eth_signTypedData_v4`:
+Pass this object to `eth_signTypedData_v4`:
 
 ```json
 {
@@ -673,12 +473,9 @@ await fetch(`${BASE_URL}/exchange`, {
 });
 ```
 
-## Worked example — `approve_agent` (an account action) {#worked-example--approve_agent-an-account-action}
+## Worked example: `approve_agent` {#worked-example--approve_agent-an-account-action}
 
-Approve an agent named `"trading-bot"` on **Testnet** (`chainId = 114514`), with
-no expiry. `expiresAtMs` is in the struct and signs as `0`; the POST omits
-`expires_at_ms` entirely. Leave the field out of the struct and the digest has
-four fields where the chain hashes five, so the signature recovers a stranger.
+This example approves an agent named `"trading-bot"` on Testnet (`chainId = 114514`), with no expiry. `expiresAtMs` is in the struct and signs as `0`. The POST omits `expires_at_ms` entirely. If you leave the field out of the struct, the digest has four fields where the chain hashes five, and the signature recovers a stranger.
 
 ```json
 {
@@ -738,39 +535,21 @@ await fetch(`${BASE_URL}/exchange`, {
 });
 ```
 
-See [agent wallets](../concepts/agent-wallets.md) for the approval lifecycle (an
-approval becomes effective one block after commit).
+See [agent wallets](../concepts/agent-wallets.md) for the approval lifecycle. An approval becomes effective one block after commit.
 
 ## Verifying your encoding {#verifying-your-encoding}
 
-Before submitting, recover the signer locally against your own assembled digest
-and confirm it matches the expected address — if it doesn't, the bug is in your
-typed-data assembly, not the chain. The atomic encoding above is the full
-specification; a cross-implementation known-answer test pins each action's digest
-byte-for-byte, so any compliant `eth_signTypedData_v4` implementation reproduces
-the same result.
+Before you submit, recover the signer locally from your own assembled digest. Confirm that it matches the expected address. If it does not, the bug is in your typed-data assembly, not in the chain. The atomic encoding above is the full specification. A cross-implementation known-answer test pins the digest of each action byte-for-byte, so any compliant `eth_signTypedData_v4` implementation reproduces the same result.
 
 ## Orders and cancels {#orders-and-cancels}
 
-Orders and cancels (`submit_order`, `batch_order`, `cancel_order`,
-`batch_cancel`, and the [`scale_order` / `cancel_scale`](#scale-ladder) ladder
-actions) are submitted through the same `/exchange` envelope and signed the same
-EIP-712 typed-data way. Their action-body shapes are in the
-[`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
+Orders and cancels (`submit_order`, `batch_order`, `cancel_order`, `batch_cancel`, and the [`scale_order` / `cancel_scale`](#scale-ladder) ladder actions) use the same `/exchange` envelope and the same EIP-712 typed-data signing. Their action-body shapes are in the [`POST /exchange` action catalog](../api/rest/exchange.md#action-catalog).
 
 ### Order type strings and the trailing fold {#order-type-strings-and-the-trailing-fold}
 
-A trigger leg may carry a **trailing callback**,
-[`trigger.trail_px`](../api/rest/exchange/orders.md#trailing-stops). That field moves
-WHERE a position closes, so it is a control field and it is **signed**. It is
-folded into the order type strings the same presence-selected way
-[`expiresAfter`](#action-expiry-expiresafter) is folded into every action: **no
-`trail_px` key, no change at all; a `trail_px` key anywhere, a different type
-string and a different digest.**
+A trigger leg may carry a trailing callback, [`trigger.trail_px`](../api/rest/exchange/orders.md#trailing-stops). The field moves where a position closes, so it is a control field and the signature covers it. It folds into the order type strings with the same presence-selected rule that folds [`expiresAfter`](#action-expiry-expiresafter) into every action. With no `trail_px` key, nothing changes. With a `trail_px` key anywhere, the type string and the digest change.
 
-**The selector is presence, not value.** An explicit `trail_px: 0` is a
-*present* trail. It takes the trailing digest and is then rejected on admission
-(`trailing callback must be > 0`). To sign as before, omit the key.
+Presence selects the fold, not the value. An explicit `trail_px: 0` counts as a present trail. It takes the trailing digest, and admission then rejects it (`trailing callback must be > 0`). To sign as before, omit the key.
 
 #### `submit_order` {#trailing-fold-submit_order}
 
@@ -782,21 +561,13 @@ MetaFluxTransaction:SubmitOrder(string metafluxChain,uint32 market,string side,s
 MetaFluxTransaction:SubmitOrder(string metafluxChain,uint32 market,string side,string kind,uint64 size,uint64 limitPx,string tif,string stpMode,bool reduceOnly,string cloid,uint16 builderFee,address builderUser,string positionSide,uint64 triggerPx,bool triggerIsMarket,string triggerTpsl,uint64 trailPx,uint64 nonce)
 ```
 
-`trailPx` is one extra 32-byte word — the callback as a big-endian `uint64`,
-left-padded — inserted **after `triggerTpsl` and before `nonce`**. It is not
-appended at the end, so it does not collide with the `expiresAfter` fold, which
-still goes last.
+`trailPx` is one extra 32-byte word: the callback as a big-endian `uint64`, left-padded. It goes after `triggerTpsl` and before `nonce`. It is not appended at the end, so it does not collide with the `expiresAfter` fold, which still goes last.
 
 #### `batch_order` {#trailing-fold-batch_order}
 
-A batch does **not** widen its per-leg encoding. The `orders` field stays exactly
-what it was — a keccak over each leg's fixed-width words, in leg order — so a leg
-is the same number of words whether it trails or not. Widening a leg would make
-the per-leg encoding variable-length inside a flat, unprefixed concatenation,
-which is malleable: two different batches could hash the same.
+A batch does not widen its per-leg encoding. The `orders` field stays what it was: a keccak over the fixed-width words of each leg, in leg order. A leg has the same number of words whether it trails or not. A wider leg would make the per-leg encoding variable-length inside a flat, unprefixed concatenation. That is malleable, because two different batches could hash the same.
 
-Instead the callbacks travel in a **second** field, `trailPxs`, present only when
-at least one leg trails:
+Instead, the callbacks travel in a second field, `trailPxs`. It is present only when at least one leg trails:
 
 ```
 // no leg carries trail_px — frozen, unchanged
@@ -808,23 +579,14 @@ MetaFluxTransaction:BatchOrder(string metafluxChain,bytes32 orders,string groupi
 MetaFluxTransaction:BatchOrder(string metafluxChain,address owner,bytes32 orders,string grouping,bytes32 trailPxs,uint64 nonce)
 ```
 
-**Computing `trailPxs`.** Like `orders`, it is a plain keccak over a
-concatenation you build yourself, not an EIP-712 array encoding. Walk the legs in
-the **same order** `orders` walks them, and emit **two fixed-width words per
-leg**:
+To compute `trailPxs`, build a plain keccak over a concatenation, as for `orders`. It is not an EIP-712 array encoding. Walk the legs in the same order that `orders` walks them. Emit two fixed-width words per leg:
 
-1. the presence flag — a 32-byte word, `1` if that leg carries `trail_px`, else `0`
-2. the callback — `trail_px` as a big-endian `uint64`, left-padded to 32 bytes;
-   `0` for a leg that does not trail
+1. The presence flag: a 32-byte word, `1` if the leg carries `trail_px`, else `0`.
+2. The callback: `trail_px` as a big-endian `uint64`, left-padded to 32 bytes. Use `0` for a leg that does not trail.
 
-`trailPxs = keccak256(concat(those words))`. Every leg contributes both words,
-including the ones with no trail — that is what makes **which** leg trails part
-of the digest. Moving the trail from leg 0 to leg 1 changes `trailPxs` while
-`orders` stays identical, and the signature stops verifying.
+`trailPxs = keccak256(concat(those words))`. Every leg contributes both words, including legs with no trail. That makes the identity of the trailing leg part of the digest. If you move the trail from leg 0 to leg 1, `trailPxs` changes while `orders` stays identical, and the signature stops verifying.
 
-The presence word is not redundant with the value word: without it, "no trail"
-and "a trail of 0" would hash alike, and one signature would cover two wire forms
-that behave differently.
+The presence word is not redundant with the value word. Without it, "no trail" and "a trail of 0" hash alike, and one signature covers two wire forms that behave differently.
 
 #### `eth_signTypedData_v4` field placement {#trailing-fold-field-placement}
 
@@ -839,41 +601,27 @@ types['MetaFluxTransaction:BatchOrder'].splice(3, 0, { name: 'trailPxs', type: '
 message.trailPxs = '0x...';
 ```
 
-When no trail is present, do **not** add the field or the message key. That
-reproduces the legacy typed data exactly, which is why an older client that never
-heard of `trail_px` keeps signing valid orders with no change.
+When no trail is present, do not add the field or the message key. That reproduces the legacy typed data exactly, so an older client that does not know `trail_px` keeps signing valid orders unchanged.
 
 #### Known-answer digests {#trailing-fold-kat}
 
-Pinned on **Testnet** (`chainId = 114514`), `nonce = 1`. A compliant
-`eth_signTypedData_v4` assembly reproduces them byte-for-byte.
+These vectors are pinned on Testnet (`chainId = 114514`) with `nonce = 1`. A compliant `eth_signTypedData_v4` assembly reproduces them byte-for-byte.
 
 | Vector | `expiresAfter` | Signed EIP-712 digest |
 |---|---|---|
 | `submit_order` with `trailPx = 50000000` | `0` | `0xf78212e9ab8ad38ad455552cd9343a7a6637a8d331f23528fe7ae84713a20b64` |
 | the same order | `1900000000000` | `0x3f4d7fd0d3fb293e604fe6e5c4fc52e7b76830eaa39f8dc5d4d26b34372d5d92` |
-| `batch_order` with `owner`, 2 legs, **leg 1 trails** | `0` | `0xdf6da2a4e1c3cabd1852bfa1aa05495a839d3787f1a01e2df18c199b53453b88` |
-| the same batch with **no leg trailing** | `0` | `0xef21c04ccb568652ab2d8950dffd1bd289acaafde846199f74a8ba72e0f5dad8` |
+| `batch_order` with `owner`, 2 legs, leg 1 trails | `0` | `0xdf6da2a4e1c3cabd1852bfa1aa05495a839d3787f1a01e2df18c199b53453b88` |
+| the same batch with no leg trailing | `0` | `0xef21c04ccb568652ab2d8950dffd1bd289acaafde846199f74a8ba72e0f5dad8` |
 
-The last row is the control, and it is **identical** to the digest the same batch
-produced before `trail_px` was bound — proof that not sending the field costs
-nothing. The two batch rows also share one `orders` hash,
-`0x1894b6b95a1e0af9b6c694e7ff0eef0f467701a1215973bb25c42f932f43f300`, and differ
-only in `trailPxs`:
-`0x74a1e15aa3dfcb4bfbf5c65b533597fe064fc7492edd6f5f843427d22feaf26d` (trailing)
-versus
-`0x012893657d8eb2efad4de0a91bcd0e39ad9837745dec3ea923737ea803fc8e3d` (control).
+The last row is the control. It is identical to the digest the same batch produced before `trail_px` was bound, so not sending the field costs nothing. The two batch rows share one `orders` hash, `0x1894b6b95a1e0af9b6c694e7ff0eef0f467701a1215973bb25c42f932f43f300`. They differ only in `trailPxs`: `0x74a1e15aa3dfcb4bfbf5c65b533597fe064fc7492edd6f5f843427d22feaf26d` (trailing) and `0x012893657d8eb2efad4de0a91bcd0e39ad9837745dec3ea923737ea803fc8e3d` (control).
 
 #### Which actions can trail {#trailing-fold-scope}
 
-Only `submit_order` and `batch_order` carry `trail_px`. The
-[`scale_order`](#scale-ladder) ladder, [`chase_order`](#chase), TWAP and RFQ
-derive their legs with no trailing callback, and their type strings are
-untouched. A [multi-sig](../concepts/multi-sig.md) inner payload is signed over
-its own bytes and is likewise unaffected.
+Only `submit_order` and `batch_order` carry `trail_px`. The [`scale_order`](#scale-ladder) ladder, [`chase_order`](#chase), TWAP and RFQ derive their legs with no trailing callback, and their type strings do not change. A [multi-sig](../concepts/multi-sig.md) inner payload is signed over its own bytes and is also unaffected.
 
 ## See also {#see-also}
 
-- [`POST /exchange`](../api/rest/exchange.md) — the endpoint and full action catalog
-- [Agent wallets](../concepts/agent-wallets.md) — approval lifecycle
-- [Networks](../networks.md) — `chainId` per network
+- [`POST /exchange`](../api/rest/exchange.md): the endpoint and full action catalog
+- [Agent wallets](../concepts/agent-wallets.md): approval lifecycle
+- [Networks](../networks.md): `chainId` per network

@@ -1,14 +1,16 @@
 # Auto-deleverage (ADL)
 
+Auto-deleverage (ADL) covers the bad debt that a liquidation leaves. This page describes when it runs and how it allocates the loss.
+
 :::info
-**Preview.** T4 fires only when a T3 close leaves the account flat and still negative — rare in normal operations, and deterministic when it happens.
+**Preview.** T4 runs only when a T3 close leaves the account flat and still negative. This is rare in normal operation, and the result is deterministic when it occurs.
 :::
 
-## TL;DR {#tldr}
+## Summary {#tldr}
 
-When a liquidation leaves bad debt, the protocol claws back the realized gains of profitable counter-parties on the same instrument, pro-rata to those gains. For a cross account with positions on several markets, [Which market pays](./tiered-liquidation.md#which-market-pays) defines which market takes the deficit. ADL runs **before** the insurance fund, and after the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) has taken what it can. MetaFlux's allocation uses an online-learning ranking that aims to minimise **excess haircut** (haircut beyond what the deficit requires).
+When a liquidation leaves bad debt, the protocol takes back realized gains from profitable counter-parties on the same instrument, pro-rata to those gains. For a cross account with positions on several markets, [Which market pays](./tiered-liquidation.md#which-market-pays) defines which market takes the deficit. ADL runs before the insurance fund, and after the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) takes what it can. The MetaFlux allocation uses an online-learning controller. Its aim is to minimize *excess haircut*, which is a haircut larger than the deficit requires.
 
-## When ADL fires {#when-adl-fires}
+## When ADL runs {#when-adl-fires}
 
 The [tiered ladder](./tiered-liquidation.md):
 
@@ -16,11 +18,11 @@ The [tiered ladder](./tiered-liquidation.md):
 T0 yellow card  →  T1 partial  →  T2 full  →  T3 backstop  →  T4 ADL
 ```
 
-T3 closes the dying position at the committed mark. On a core market the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) takes the first bite; what it declines is netted against profitable counter-parties. If the account is then flat and its equity is still negative, T4 runs.
+T3 closes the failing position at the committed mark. On a core market, the [Metaliquidity vault](./tiered-liquidation.md#mlp-first-bite) takes the first bite. The engine nets what the vault declines against profitable counter-parties. If the account is then flat and its equity is still negative, T4 runs.
 
-**Read the order carefully — ADL comes BEFORE the insurance fund.** The deleveraged winners' realized gains absorb first, which keeps the fund for genuine tail events. An earlier version of this page had the two the other way round.
+ADL comes before the insurance fund. The realized gains of the deleveraged winners absorb the loss first. This keeps the fund for real tail events. An earlier version of this page gave the two in the opposite order.
 
-The winners are every account that realized a gain on the instrument in the current 60-second window or the one before it, by any fill, netting at mark or a delisting settlement. The haircut never takes a winner below its maintenance margin. A gain that already left the cross balance, or that was realized before that window, is not reached, and the deficit goes on to the insurance fund. Realized gains are never held back from withdrawal: the reach is bounded so a winner is never pushed into liquidation. See [the deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall).
+The winners are all accounts that realized a gain on the instrument in the current 60-second window or the window before it. The gain can come from any fill, from netting at mark, or from a delisting settlement. The haircut never takes a winner below its maintenance margin. ADL cannot reach a gain that has already left the cross balance, or a gain realized before that window. That part of the deficit goes on to the insurance fund. The protocol never holds back realized gains from withdrawal. Instead, the reach is bounded, so a haircut never pushes a winner into liquidation. See [the deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall).
 
 ```
 deficit  =  |account_value|  after the account is flat
@@ -29,19 +31,24 @@ if deficit > 0:
     fire_adl(asset, deficit)                      # then insurance, then treasury
 ```
 
-For the whole order — vault, ADL, insurance fund, treasury queue — see [the deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall).
+[The deficit waterfall](./tiered-liquidation.md#t4--the-deficit-waterfall) gives the full order: vault, ADL, insurance fund and treasury queue.
 
 ## How ADL is computed {#how-adl-is-computed}
 
-> **Further reading:** "Autodeleveraging as Online Learning" (arXiv:2602.15182).
+Further reading: "Autodeleveraging as Online Learning" (arXiv:2602.15182).
 
-MTF does **not** use a single ranking score. ADL splits into two independent sub-problems: a 1-D **severity** decision (how much to haircut this round) learned online, and a deterministic **pro-rata allocation** (who, by PnL capacity).
+MTF does not use a single ranking score. ADL splits into two independent problems:
 
-> ⚠️ **Correction vs. prior text.** The earlier doc described a single online-learning *ranking* `score = α·pnl% + β·leverage + γ·age`. That is **not** the implemented algorithm. The real controller is `θ ∈ [0,1]` severity via projected OGD + capacity-pro-rata allocation. The `α/β/γ` ranking formula was rejected ("2D OGD — dimension blow-up"). The classical `pnl% × leverage` queue is the HL baseline MTF replaces, not what MTF runs.
+- A one-dimensional *severity* decision: how much to haircut in this round. The controller learns it online.
+- A deterministic *pro-rata allocation*: who pays, in proportion to PnL capacity.
 
-### 1. Severity — 1-D online gradient descent on θ {#1-severity--1-d-online-gradient-descent-on-θ}
+:::note
+An earlier version of this page described a single online-learning ranking, `score = α·pnl% + β·leverage + γ·age`. That is not the implemented algorithm. The implemented controller is a severity `θ ∈ [0,1]` set by projected OGD, plus a capacity pro-rata allocation. The `α/β/γ` ranking formula was rejected ("2D OGD — dimension blow-up"). The classical `pnl% × leverage` queue is the HL baseline that MTF replaces. MTF does not run it.
+:::
 
-Each round picks a scalar `θ_t ∈ [0,1]` = the fraction of this round's deficit to haircut:
+### 1. Severity by online gradient descent on θ {#1-severity--1-d-online-gradient-descent-on-θ}
+
+Each round picks a scalar `θ_t ∈ [0,1]`. It is the fraction of the round's deficit to haircut:
 
 ```
 B_t          = θ_t · D_t                                  # budget for this round
@@ -50,37 +57,38 @@ grad         = D_t · sign(θ_t − θ_needed_t)
 θ_{t+1}      = clamp(θ_t − η · grad, 0, 1)                 # projected OGD step
 ```
 
-`D_t` = round deficit, `B̂_needed` = the execution-price estimator's guess of the true need.
+`D_t` is the round deficit. `B̂_needed` is the estimate of the true need from the execution-price estimator.
 
-**Step size η**:
-- Default mode is **Adaptive** (paper Cor. 1): `η* = sqrt( (1 + 2·P_T^θ) / Σ D_t² )`, recomputed each round from running telemetry (`path_variation`, `cumulative_squared_deficit`).
-- On the first round (`Σ D_t² == 0`) it falls back to the governance-tunable `η₀ = 0.01` (`default_eta`).
-- A `Fixed(c)` mode pins `η = c` (governance kill-switch / reproducibility).
+Step size η:
 
-The controller carries a **dynamic-regret bound** (Prop 1):
+- The default mode is *Adaptive* (paper Cor. 1): `η* = sqrt( (1 + 2·P_T^θ) / Σ D_t² )`. The controller recomputes it each round from running telemetry (`path_variation`, `cumulative_squared_deficit`).
+- On the first round (`Σ D_t² == 0`), it falls back to the governance-tunable `η₀ = 0.01` (`default_eta`).
+- A `Fixed(c)` mode pins `η = c`. It serves as a governance kill switch and for reproducibility.
+
+The controller has a *dynamic-regret bound* (Prop 1):
 
 ```
 Reg_T^dyn  ≤  sqrt( (1 + 2·P_T^θ) · Σ D_t² )
 ```
 
-exposed as `analytical_bound()`; `check_bound(slack)` asserts empirical regret ≤ `slack · bound` (default slack 4) in the chaos tests.
+The bound is available as `analytical_bound()`. In the chaos tests, `check_bound(slack)` asserts that empirical regret is at most `slack · bound` (default slack 4).
 
-Every fractional field (`θ`, `η`, `path_variation`, …) is exact fixed-point, and the square root is an integer method — there is no floating point on this path. Every accumulator saturates instead of overflowing, so an extreme value cannot halt the chain. The controller state is committed, so all validators agree on it.
+Every fractional field (`θ`, `η`, `path_variation`, …) is exact fixed-point. The square root is an integer method. There is no floating point on this path. Every accumulator saturates instead of overflowing, so an extreme value cannot halt the chain. The controller state is committed, so all validators agree on it.
 
-### 2. Allocation — deterministic capacity pro-rata {#2-allocation--deterministic-capacity-pro-rata}
+### 2. Allocation by capacity pro-rata {#2-allocation--deterministic-capacity-pro-rata}
 
-Given budget `B_t`, distribute across the profitable counter-parties `W_t` (each with haircut capacity `u_i` = the realized gain still in reach, in whole USDC, `u128`):
+The budget `B_t` goes to the profitable counter-parties `W_t`. Each one has a haircut capacity `u_i`: the realized gain still in reach, in whole USDC, as `u128`.
 
 ```
 total_u = Σ u_i
 x_i     = floor( u_i · B_t / total_u )      capped at u_i        # 128-bit mul then 128-bit div
 ```
 
-Integer-division **dust** `B_t − Σ x_i` is redistributed one unit at a time in **ascending AccountId order** to any winner with remaining capacity (`BTreeMap` iterates in key order → byte-identical across nodes). If `B_t > total_u` the round is capacity-bound and `Σ x_i = total_u`.
+Integer division leaves *dust*, `B_t − Σ x_i`. The engine gives the dust one unit at a time, in ascending AccountId order, to any winner with remaining capacity. `BTreeMap` iterates in key order, so the result is byte-identical on all nodes. If `B_t > total_u`, capacity limits the round and `Σ x_i = total_u`.
 
-This replaces the rejected vector-mirror-descent and ILP allocators (the ILP is optimal but a non-deterministic solver — can't go on-chain).
+This replaces the rejected vector-mirror-descent and ILP allocators. The ILP is optimal, but its solver is not deterministic, so it cannot run on-chain.
 
-**Why pro-rata** (HL Oct-10 2025 replay):
+Pro-rata was chosen on the HL Oct-10 2025 replay:
 
 | Algorithm | Oct-10 total objective (lower = better) |
 |-----------|-----------------------------------------|
@@ -89,96 +97,96 @@ This replaces the rejected vector-mirror-descent and ILP allocators (the ILP is 
 | Vector mirror descent | $4.41M |
 | Min-max ILP (optimal, off-chain only) | $106k |
 
-Pro-rata also gives **0 %** monotonicity violations (vs HL's 11.4 %) and rank stability ≈ 1.0 (vs HL's 0.34).
+Pro-rata also gives 0 % monotonicity violations (HL: 11.4 %) and rank stability ≈ 1.0 (HL: 0.34).
 
-### Quoting ADL price (read side) {#quoting-adl-price-read-side}
+### ADL price quotes {#quoting-adl-price-read-side}
 
-The EVM precompile `0x0902 adl_pro_rata_price` lets a Solidity helper *quote* the VWAP fill an ADL of size N would clear at, walking the queue in side-appropriate priority (long ADL: highest price first; short ADL: lowest first) — **all prices on the 1e8 fixed-point plane** (`price_e8`, `capacity_e8`). It is pro-rata-only; the severity OGD lives in core-state, not the stateless precompile (severity is one decision per round; price quoting is many calls/sec).
+The EVM precompile `0x0902 adl_pro_rata_price` lets a Solidity helper quote the VWAP fill that an ADL of size N would clear at. It walks the queue in the priority for the side: for a long ADL, highest price first; for a short ADL, lowest price first. All prices are on the 1e8 fixed-point plane (`price_e8`, `capacity_e8`). The precompile does pro-rata only. The severity OGD is in core-state, not in the stateless precompile, because severity is one decision per round, while price quotes are many calls per second.
 
-## What "haircut" means mechanically {#what-haircut-means-mechanically}
+## How a haircut works {#what-haircut-means-mechanically}
 
-Haircut is not a position transfer — the counter-party's position size **shrinks** and their unrealised PnL is converted into a realised loss. The dying account's opposite-side position evaporates by the same amount.
+A haircut is not a position transfer. The position size of the counter-party decreases, and its unrealized PnL becomes realized PnL. The opposite-side position of the failing account closes by the same amount.
 
-Concretely: suppose account A is long 1 BTC at entry 100 and account B is short 1 BTC at entry 100, mark = 110.
+Example: account A is long 1 BTC at entry 100, account B is short 1 BTC at entry 100, and the mark is 110.
 
-- A is profitable (+10 USDC unrealised).
-- B is the dying account, liquidated; the position resolves at mark 110 but B has only 5 USDC of equity. 5 USDC shortfall.
-- Insurance pool: 0 (depleted).
-- ADL fires against A:
-  - A's long is reduced to 0.5 BTC.
-  - A realises +5 USDC PnL (the part that got haircut).
-  - A's remaining 0.5 BTC long is at entry 100, mark 110, +5 USDC unrealised.
-  - B's short is fully closed.
+- A is profitable (+10 USDC unrealized).
+- B is the failing account and is liquidated. The position resolves at mark 110, but B has only 5 USDC of equity. The shortfall is 5 USDC.
+- The insurance pool is 0 (depleted).
+- ADL runs against A:
+  - A's long decreases to 0.5 BTC.
+  - A realizes +5 USDC PnL (the part that the haircut closed).
+  - A's remaining 0.5 BTC long has entry 100, mark 110 and +5 USDC unrealized.
+  - B's short closes fully.
 
-A keeps the unrealised PnL on its remaining position; A only loses the *closed* portion's PnL.
+A keeps the unrealized PnL on its remaining position. A loses only the PnL of the closed portion.
 
 ## Notification {#notification}
 
-ADL execution carries **no dedicated event on any channel today** — no
-[`notifications`](../api/ws/subscriptions.md#notifications) kind, no
-`fills` entry, and no `ledger_updates` record. The haircut is a direct
-state mutation, so the only live signal is your position itself: the
-affected account's position size and unrealised PnL change on the next
-[`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state) push (it
-is change-driven — any position or PnL move triggers a frame).
+No channel has a dedicated ADL event today. There is no
+[`notifications`](../api/ws/subscriptions.md#notifications) kind, no `fills`
+entry and no `ledger_updates` record. The haircut changes state directly. The
+only live signal is the position itself: the position size and unrealized PnL of
+the affected account change on the next
+[`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state) push. The
+push is change-driven, so any position or PnL change sends a frame.
 
-For automated bots, subscribe to `clearinghouse_state` and diff your position set
-between pushes; treat a shrink you did not order yourself as a forced event
-(ADL haircut or liquidation) and re-evaluate your strategy.
+For an automated bot, subscribe to `clearinghouse_state` and compare your
+position set between pushes. Treat a decrease that you did not order as a forced
+event (an ADL haircut or a liquidation), and re-evaluate your strategy.
 
 ## Predicting ADL exposure {#predicting-adl-exposure}
 
 Read [`clearinghouse_state` with `detail: "adl"`](../api/rest/info/account.md#account_state-adl).
-Each position row then carries `adl_lamps`, an integer from `0` to `4`. More
-lamps means the position sits sooner in the queue.
+Each position row then has `adl_lamps`, an integer from `0` to `4`. More lamps
+means that the position is earlier in the queue.
 
-**What the lamps rank is step 1 — the netting at mark.** That step closes the
-dying leg against the most profitable OPPOSITE-side positions, ordered by return
-on committed margin (`unrealised PnL ÷ |entry notional|`, highest first). The
-lamps are the quartile of your seat in exactly that order: `4` = top quarter,
-`1` = bottom quarter. Hedge legs rank separately, because the step settles per
-leg.
+The lamps rank step 1, the netting at mark. That step closes the failing leg
+against the most profitable positions on the opposite side. The order is return
+on committed margin (`unrealised PnL ÷ |entry notional|`), highest first. The
+lamps are the quartile of your position in that order: `4` is the top quarter,
+`1` is the bottom quarter. Hedge legs rank separately, because the step settles
+each leg separately.
 
-The lamps do **not** rank step 2, the [deficit
-haircut](#2-allocation--deterministic-capacity-pro-rata). That step is
-capacity-pro-rata and has no queue at all — every winner gives up the same
-fraction of capacity, so there is nothing to rank.
+The lamps do not rank step 2, the [deficit
+haircut](#2-allocation--deterministic-capacity-pro-rata). That step is capacity
+pro-rata and has no queue. Every winner gives up the same fraction of capacity,
+so there is nothing to rank.
 
 :::warning
-**It is a RANKING, not a probability.** Four lamps with nobody being liquidated
-on the other side still means nothing happens. Do not render it as a percentage
-chance.
+The lamps are a ranking, not a probability. Four lamps mean nothing when no
+account on the other side is being liquidated. Do not show the value as a
+percentage chance.
 
-**ZERO lamps is meaningful, not unknown.** Zero says the position is not in the
-queue at all — no committed mark, no unrealised profit, no cost basis, or nobody
-on the opposite side to be deleveraged against. A hedge account whose only
-opposing leg is its OWN reads zero on both legs, because ADL never nets an
-account against itself.
+Zero lamps is a real value, not an unknown. Zero means that the position is not
+in the queue: it has no committed mark, no unrealized profit or no cost basis,
+or no account on the opposite side can be deleveraged against it. A hedge
+account whose only opposing leg is its own reads zero on both legs, because ADL
+never nets an account against itself.
 :::
 
-The depth is opt-in: each lamp costs one pass over the market's positions, so
-ask for `detail: "adl"` only on a screen that shows the column, and poll the
-default shape otherwise. The
+The depth is opt-in. Each lamp costs one pass over the positions of the market.
+Ask for `detail: "adl"` only on a screen that shows the column, and poll the
+default shape at other times. The
 [WS `clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state) frame
-always carries the default shape and never `adl_lamps`.
+always has the default shape and never has `adl_lamps`.
 
-For market makers running large books, the headline risk is still concentration
-— one big winning position dominating the asset's profitable side; diversifying
-across assets reduces ADL exposure.
+For market makers with large books, the main risk is still concentration: one
+large winning position that dominates the profitable side of the asset.
+Diversification across assets reduces ADL exposure.
 
 ## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
 
-- **Multiple shortfalls in one block.** Each is allocated independently against the then-current counter-party set. Ranks can move between events.
-- **Empty counter-party set.** If literally no profitable counter-party on the same instrument exists, the shortfall is socialised to the insurance pool's "uncovered loss" register, payable at the next pool replenishment. Should never happen for a liquid asset; can theoretically happen on a long-tail MIP-3 market.
-- **PM-enrolled counter-party.** ADL still targets unrealised PnL on the same instrument — PM enrollment doesn't change ADL's per-asset granularity. The PM scenario engine sees the post-haircut state at the next block.
-- **Spot markets.** Spot doesn't have unrealised PnL in the perp sense. Spot ADL is not defined for V1; spot positions are excluded from ADL ranking.
+- **Multiple shortfalls in one block.** The engine allocates each one independently against the counter-party set at that time. Ranks can change between events.
+- **Empty counter-party set.** If no profitable counter-party exists on the same instrument, the shortfall goes to the "uncovered loss" register of the insurance pool. It is payable at the next pool replenishment. This should never occur on a liquid asset. It can occur in theory on a long-tail MIP-3 market.
+- **PM-enrolled counter-party.** ADL still targets unrealized PnL on the same instrument. PM enrollment does not change the per-asset granularity of ADL. The PM scenario engine sees the post-haircut state at the next block.
+- **Spot markets.** Spot has no unrealized PnL in the perp sense. Spot ADL is not defined for V1. ADL ranking excludes spot positions.
 
 </details>
 
-## Sequence — ADL on a thin tail asset {#sequence--adl-on-a-thin-tail-asset}
+## ADL on a thin tail asset {#sequence--adl-on-a-thin-tail-asset}
 
 ```
 block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
@@ -197,15 +205,15 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
              B's position haircut by 25 USDC of PnL realised, 25 kept
 ```
 
-(Allocation is **capacity-pro-rata**, not a score-ranked walk: every winner gives up the same *fraction* of capacity — here 50 % — which is exactly the min-max fairness property pro-rata buys. Compare this to the old "rank by score, drain top tier first" model, which is not what the code does.)
+The allocation is capacity pro-rata, not a walk down a score ranking. Every winner gives up the same fraction of capacity, here 50 %. This is the min-max fairness property that pro-rata gives. The old model ranked by score and drained the top tier first. The code does not do that.
 
 ## See also {#see-also}
 
-- [Tiered liquidation](./tiered-liquidation.md) — full ladder
-- [Insurance pool](./vaults.md#insurance-pool) — T3 mechanism
-- [Portfolio margin](./portfolio-margin.md) — how PM interacts with ADL
-- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state) — the only live signal that an ADL haircut changed your position
-- [`clearinghouse_state` with `detail: "adl"`](../api/rest/info/account.md#account_state-adl) — the `adl_lamps` queue indicator
+- [Tiered liquidation](./tiered-liquidation.md): the full ladder.
+- [Insurance pool](./vaults.md#insurance-pool): the T3 mechanism.
+- [Portfolio margin](./portfolio-margin.md): how PM interacts with ADL.
+- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state): the only live signal that an ADL haircut changed your position.
+- [`clearinghouse_state` with `detail: "adl"`](../api/rest/info/account.md#account_state-adl): the `adl_lamps` queue indicator.
 
 ## FAQ {#faq}
 
@@ -213,15 +221,15 @@ block T:   account X liquidates on asset 42 (MIP-3 market), loss = 100 USDC
 <summary>Show FAQ</summary>
 
 **Q: Can I opt out of ADL?**
-A: No. ADL is a protocol-level loss-mutualisation mechanism; opting out would just push the loss onto someone else. The minimisation-of-excess-haircut objective is the protection.
+A: No. ADL is a loss-mutualization mechanism at the protocol level. An opt-out would only move the loss onto another account. The objective to minimize excess haircut is the protection.
 
-**Q: Why allocate pro-rata by PnL capacity instead of a score-ranked queue?**
-A: Pro-rata haircuts every winner by the same *fraction* of their haircut-able PnL — built-in min-max fairness, no monotonicity violations (two accounts with the same capacity get the same fate), and rank stability ≈ 1.0. It measured ~13× better than HL's ROE-heuristic queue on the Oct-10 2025 replay and within ~30 % of an off-chain ILP optimum, while staying fully deterministic and on-chain. The *severity* (how much total to haircut) is the part that's learned online; *who pays* is plain pro-rata.
+**Q: Why allocate pro-rata by PnL capacity instead of with a score-ranked queue?**
+A: Pro-rata haircuts every winner by the same fraction of the PnL that the haircut can reach. This gives min-max fairness and no monotonicity violations: two accounts with the same capacity get the same result. Rank stability is ≈ 1.0. On the Oct-10 2025 replay, it measured ~13× better than the HL ROE-heuristic queue, and within ~30 % of an off-chain ILP optimum. It also stays fully deterministic and on-chain. The controller learns the severity (how much to haircut in total) online. Who pays is plain pro-rata.
 
 **Q: Does ADL respect Strict-Iso?**
-A: Yes. ADL is per-asset by construction; Strict-Iso positions are counter-party candidates if and only if they hold the same asset.
+A: Yes. ADL is per-asset by design. A Strict-Iso position is a counter-party candidate if and only if it holds the same asset.
 
 **Q: Is the ranking deterministic across validators?**
-A: Yes — all inputs (each winner's PnL capacity `u_i`, the round deficit `D_t`) are read from committed state, and the severity controller's state (`θ`, `path_variation`, `Σ D_t²`, `η`) lives in BOLE accumulator slot 5, folded into the LtHash so every node verifies byte-identical. Pro-rata uses 128-bit integer mul/div with ascending-AccountId dust handling — no float, no `HashMap`.
+A: Yes. All inputs (the PnL capacity `u_i` of each winner and the round deficit `D_t`) come from committed state. The severity controller state (`θ`, `path_variation`, `Σ D_t²`, `η`) is in BOLE accumulator slot 5, which is folded into the LtHash, so every node verifies a byte-identical value. Pro-rata uses 128-bit integer mul and div, with dust handled in ascending AccountId order. It uses no float and no `HashMap`.
 
 </details>

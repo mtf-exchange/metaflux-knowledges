@@ -4,22 +4,24 @@ description: "Chain-wide activity: recent blocks, and the action outcome of a su
 
 # Chain activity reads
 
-Read queries on [`POST /info`](../info.md). The endpoint, the request
-envelope, the number planes and the error shape are on that page and apply
-to every query here.
+These reads return recent blocks and recent order-lifecycle events.
+
+They are read queries on [`POST /info`](../info.md). That page describes the
+endpoint, the request envelope, the number planes and the error shape. These
+apply to every query here.
 
 ## Chain activity query types {#chain-activity-query-types}
 
-Recent blocks and recent order-lifecycle events, served by the gateway from the
-standalone history archive. **They are the replacement for the removed
-`explorer_block` / `explorer_txs` WS channels** — see
+The gateway serves recent blocks and recent order-lifecycle events from the
+standalone history archive. **These reads replace the removed `explorer_block`
+and `explorer_txs` WS channels.** See
 [Ids and wire shapes](../../../changelog/ids-and-wire-shapes.md#explorer-channels-removed)
-for why a validator no longer pushes that firehose.
+for the reason that a validator no longer pushes that full stream.
 
-Both answer in the standard `/info` envelope, with `type` inside `data`. The
-[history-archive lane](../info.md#archive-lane) differs in its rejection shape
-only. A gateway with no archive configured answers an empty array with a `flag`,
-never an error.
+Both reads answer in the standard `/info` envelope, with `type` inside `data`.
+The [history-archive lane](../info.md#archive-lane) differs only in its
+rejection shape. A gateway with no archive configured answers an empty array
+with a `flag`. It never answers an error.
 
 ### Recent committed blocks {#recent_blocks}
 
@@ -58,17 +60,20 @@ never an error.
 | `blocks[*].action_count` | uint32 | Signed actions committed in the block |
 | `blocks[*].fill_count` | uint32 | Fills settled in the block |
 
-**There is no `proposer`.** The removed WS header carried the proposing
-validator index; the archive record does not. Nothing else serves it today.
+**There is no `proposer`.** The removed WS header had the index of the
+proposing validator. The archive record does not. No other read serves it
+today.
 
-**Size a poll so it cannot gap.** The block cadence is about 100 ms, so 100 rows
-span roughly 10 seconds of chain and a 2-second poll always overlaps. Measure the
-cadence rather than trusting that figure — it moves between releases.
+**Size a poll so that it has no gaps.** The block cadence is about 100 ms, so
+100 rows cover about 10 seconds of chain. A 2-second poll always overlaps.
+Measure the cadence. Do not trust that figure, because it changes between
+releases.
 
 ### Recent order-lifecycle events {#recent_transactions}
 
-One row per order TRANSITION, not per order. A single order emits several rows
-(placed, then filled, then cancelled), so `oid` repeats and cannot key a list.
+This read returns one row for each order transition, not for each order. One
+order emits several rows (placed, then filled, then cancelled). `oid` therefore
+repeats and cannot key a list.
 
 **Request**
 
@@ -101,7 +106,7 @@ One row per order TRANSITION, not per order. A single order emits several rows
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `txns[*].oid` | decimal-digit string | Order id. **Not unique across rows** — one order emits one row per transition |
+| `txns[*].oid` | decimal-digit string | Order id. It is not unique across rows, because one order emits one row for each transition |
 | `txns[*].user` | hex address | Acting account |
 | `txns[*].coin` | string | Market symbol or spot pair name |
 | `txns[*].action` | string | Readable lifecycle label (`"resting"` / `"filled"` / `"canceled"` …). Treat it as an open set |
@@ -109,7 +114,7 @@ One row per order TRANSITION, not per order. A single order emits several rows
 | `txns[*].side` | uint8 | `0` = bid, `1` = ask |
 | `txns[*].time` | uint64 | Event timestamp (consensus ms) |
 
-**There is no `hash`.** The removed WS row carried the originating action hash,
-and [`/exchange`](../exchange.md) pointed at it as the hash-keyed way to check a
-submitted action. Correlate by `cloid` instead, or read
+**There is no `hash`.** The removed WS row had the hash of the originating
+action. [`/exchange`](../exchange.md) referred to it as the way to check a
+submitted action by hash. Correlate by `cloid` instead, or read
 [`action_outcome`](./account-history.md#action_outcome).

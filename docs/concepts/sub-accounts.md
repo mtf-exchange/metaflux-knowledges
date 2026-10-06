@@ -1,35 +1,27 @@
 # Sub-accounts
 
 :::info
-**Preview.** The user-visible API is stable; the address-derivation scheme is finalised before mainnet.
+**Preview.** The user-visible API is stable. The address-derivation scheme is finalized before mainnet.
 :::
 
-## TL;DR {#tldr}
+A sub-account is an address derived from a master account. It holds its own balance and its own risk.
 
-A sub-account is a derived address under a master. It holds its own balance and
-its own risk, and it moves funds in and out only through the master. Up to 32
-subs per master.
+## Summary {#tldr}
+
+A sub-account moves funds in and out only through its master. A master can have up to 32 sub-accounts.
 
 :::warning
-**A sub-account cannot sign today, so it cannot trade today.**
+A sub-account cannot sign today, so it cannot trade today.
 
-A sub address is a hash of the master address and the index. **No private key
-exists for it.** An action reaches an account in one of two ways — the account's
-own key signs it, or an approved agent of the account signs it — and a sub can
-use neither:
+A sub address is a hash of the master address and the index. No private key exists for it. An action reaches an account in one of two ways: the account's own key signs it, or an approved agent of the account signs it. A sub-account can use neither:
 
 - It has no key, so it cannot sign for itself.
-- Its approved-agent set is always empty. `create_sub_account` never fills it,
-  and [`approve_agent`](../api/rest/exchange/account.md#approve_agent) adds an agent to
-  the **signer's** account. Only the sub could approve an agent of the sub, and
-  the sub cannot sign.
+- Its approved-agent set is always empty. `create_sub_account` never fills it. [`approve_agent`](../api/rest/exchange/account.md#approve_agent) adds an agent to the signer's account. Only the sub-account could approve an agent of the sub-account, and the sub-account cannot sign.
 
-So a sub is a **fund-segregation bucket** the master funds and defunds. It cannot
-place orders, hold positions it opened itself, or enrol in portfolio margin. Plan
-for one master account per trading strategy until sub-account signing ships.
+So a sub-account is a fund-segregation bucket that the master funds and defunds. It cannot place orders, hold positions it opened itself, or enrol in portfolio margin. Use one master account per trading strategy until sub-account signing ships.
 :::
 
-## Mental model {#mental-model}
+## Model {#mental-model}
 
 ```mermaid
 flowchart TD
@@ -48,17 +40,13 @@ flowchart TD
     sub2 --> own2
 ```
 
-Each sub is a first-class account **in the state machine** — own balance, own
-liquidation threshold. The master-of-sub relationship is recorded in a side map.
-"First-class" describes the ledger, not the signing surface: no sub can sign, so
-no sub can act. See the [TL;DR warning](#tldr).
+Each sub-account is a first-class account in the state machine. It has its own balance and its own liquidation threshold. A side map records which master owns which sub-account. "First-class" describes the ledger, not the signing surface: no sub-account can sign, so none can act. See the [summary warning](#tldr).
 
-Hard cap: **32 subs** per master. Hitting the cap returns
-`PRECONDITION_FAILED` on `create_sub_account`.
+The hard cap is 32 sub-accounts per master. At the cap, `create_sub_account` returns `PRECONDITION_FAILED`.
 
 ## Transfers {#transfers}
 
-Only between master and sub:
+Transfers run only between a master and its sub-accounts:
 
 ```mermaid
 flowchart LR
@@ -68,27 +56,27 @@ flowchart LR
     m4["master"] -->|"sub_account_spot_transfer{ n, asset, deposit, amount }"| e4["same for spot"]
 ```
 
-External withdrawals (off-chain, to a third address) must come from the **master**. Sub-accounts cannot withdraw directly off-chain.
+An external withdrawal to a third address must come from the master. A sub-account cannot withdraw off-chain directly.
 
 ## Address derivation {#address-derivation}
 
-Each sub-account index `n` maps deterministically to an address derived from the master's 20-byte address:
+Each sub-account index `n` maps to an address derived from the 20-byte master address:
 
 ```
 sub_addr_n = first_20_bytes( keccak256( master_addr || uint64_be(n) ) )
 ```
 
-Anyone can compute a sub's address without on-chain state. The derivation is consensus-fixed at V1 launch; treat returned addresses as authoritative until then.
+Anyone can compute a sub-account address without on-chain state. The derivation is fixed by consensus at V1 launch. Until then, treat the returned address as authoritative.
 
 ## Fund-segregation guarantees {#fund-segregation-guarantees}
 
 | Guarantee | Mechanism |
 |-----------|-----------|
-| A sub's loss cannot drain master | Sub liquidates against its own balance; master sees only the transfer ledger |
-| A sub's loss cannot drain other subs | Same — each sub is a first-class isolation boundary |
-| Master CAN choose to backstop a losing sub | Voluntarily, via `sub_account_transfer` deposit |
-| Master CANNOT involuntarily backstop | A sub's blowup is the sub's, full stop |
-| Master can liquidate **out of** a sub | Withdraw via `sub_account_transfer` (only if the sub stays in the Safe tier after the transfer) |
+| A sub-account loss cannot drain the master | The sub-account liquidates against its own balance. The master sees only the transfer ledger. |
+| A sub-account loss cannot drain other sub-accounts | Each sub-account is a first-class isolation boundary. |
+| The master can choose to backstop a losing sub-account | A voluntary `sub_account_transfer` deposit. |
+| The master cannot be forced to backstop | A sub-account blowup stays in the sub-account. |
+| The master can withdraw out of a sub-account | A `sub_account_transfer`, only if the sub-account stays in the Safe tier after the transfer. |
 
 ## Creating {#creating}
 
@@ -102,8 +90,8 @@ Anyone can compute a sub's address without on-chain state. The derivation is con
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string ≤ 64 chars | Bookkeeping label |
-| `explicit_index` | uint32 \| null | Specific slot to claim; `null` → next free |
-| `shared_stp_group` | bool | **Required. There is no default** — a body without this field fails admission with a missing-field error. `true` puts the sub in the master's [self-trade-prevention](./order-types.md#self-trade-prevention) group, so the book refuses a match between master and sub. `false` leaves the sub out of the group, so the two CAN match each other. |
+| `explicit_index` | uint32 \| null | The slot to claim. `null` takes the next free slot. |
+| `shared_stp_group` | bool | Required. There is no default: a body without this field fails admission with a missing-field error. `true` puts the sub-account in the master's [self-trade-prevention](./order-types.md#self-trade-prevention) group, so the book refuses a match between master and sub-account. `false` leaves it out of the group, so the two can match each other. |
 
 Response:
 
@@ -118,7 +106,7 @@ Response:
 }
 ```
 
-**Indices are monotonic** — once allocated, they never get reused, even after the sub is emptied and abandoned. Use `explicit_index` carefully.
+Indices only increase. An allocated index is never reused, even after the sub-account is emptied and abandoned. Use `explicit_index` with care.
 
 ## Funding {#funding}
 
@@ -129,38 +117,27 @@ Response:
 }
 ```
 
-`amount` in USDC base units (6 decimals). `deposit: true` is master → sub; `false` is sub → master.
+`amount` is in USDC base units (6 decimals). `deposit: true` moves funds from the master to the sub-account. `deposit: false` moves them back.
 
-For spot assets use `sub_account_spot_transfer` (adds an `asset` field).
+For spot assets, use `sub_account_spot_transfer`. It adds an `asset` field.
 
-**Transfer must leave the sub in Safe tier** — a withdrawal that would push the sub into T0+ is rejected with `MARGIN_INSUFFICIENT`. Add margin first, then withdraw the excess.
+A transfer must leave the sub-account in the Safe tier. A withdrawal that would push it into T0 or worse is rejected with `MARGIN_INSUFFICIENT`. Add margin first, then withdraw the excess.
 
 ## Trading from a sub {#trading-from-a-sub}
 
-**A sub cannot trade today.** It holds no key, so it cannot sign an order. See
-the [TL;DR warning](#tldr).
+A sub-account cannot trade today. It holds no key, so it cannot sign an order. See the [summary warning](#tldr).
 
-**An agent does not open a path either, and the attempt fails silently.**
-[`approve_agent`](../api/rest/exchange/account.md#approve_agent) writes the agent under
-the **recovered signer's** account. Its body carries `agent`, `name` and
-`expires_at_ms` — there is no owner field and no delegation field. So a master
-that signs `approve_agent` "for" a sub approves an agent on the **master**. The
-action is accepted, the sub's agent set stays empty, and you get no error to
-read.
+An agent does not open a path either, and the attempt fails silently. [`approve_agent`](../api/rest/exchange/account.md#approve_agent) writes the agent under the recovered signer's account. Its body carries `agent`, `name` and `expires_at_ms`. It has no owner field and no delegation field. So a master that signs `approve_agent` for a sub-account approves an agent on the master. The action is accepted, the agent set of the sub-account stays empty, and no error appears.
 
-The remap that lets a master act on a sub covers three actions only:
-`create_sub_account`, `sub_account_transfer` and `sub_account_spot_transfer`.
-Every other action lands on the signer's own account. So a master can move funds
-in and out of a sub, and nothing else.
+The remap that lets a master act on a sub-account covers three actions only: `create_sub_account`, `sub_account_transfer` and `sub_account_spot_transfer`. Every other action lands on the signer's own account. A master can move funds in and out of a sub-account, and nothing else.
 
-There is no workaround. Run one master account per trading strategy until
-sub-account signing ships.
+There is no workaround. Use one master account per trading strategy until sub-account signing ships.
 
 ## Liquidation isolation {#liquidation-isolation}
 
-A sub's [tiered liquidation](./tiered-liquidation.md) is computed against its **own** account value and maintenance margin. A blowup in `sub_0` does not put `sub_1` or the master at risk.
+The [tiered liquidation](./tiered-liquidation.md) of a sub-account uses its own account value and maintenance margin. A blowup in `sub_0` does not put `sub_1` or the master at risk.
 
-You can also set a sub's margin mode to `StrictIso` per-asset so that asset's positions don't contribute to cross-asset PM even if the master is PM-enrolled.
+You can also set the margin mode of a sub-account to `StrictIso` per asset. The positions in that asset then do not count toward cross-asset portfolio margin, even if the master is enrolled.
 
 ```mermaid
 flowchart LR
@@ -182,11 +159,7 @@ flowchart LR
 ## Per-sub PM enrollment {#per-sub-pm-enrollment}
 
 :::warning
-**Not available.** [`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin)
-enrols the **signing** account. Its body carries only `enroll` — there is no
-target field — and a sub cannot sign. So a sub cannot enrol in
-[portfolio margin](./portfolio-margin.md), and a master cannot enrol one on its
-behalf.
+Not available. [`user_portfolio_margin`](../api/rest/exchange/margin-risk.md#user_portfolio_margin) enrols the signing account. Its body carries only `enroll`. It has no target field, and a sub-account cannot sign. So a sub-account cannot enrol in [portfolio margin](./portfolio-margin.md), and a master cannot enrol one on its behalf.
 
 The master enrols itself:
 
@@ -194,8 +167,7 @@ The master enrols itself:
 { "type": "user_portfolio_margin", "params": { "enroll": true } }
 ```
 
-To run one strategy on portfolio margin and another on classical margin today,
-use two master accounts.
+To run one strategy on portfolio margin and another on classical margin today, use two master accounts.
 :::
 
 ## Querying {#querying}
@@ -205,27 +177,23 @@ curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"account_state","address":"0x<master>","detail":"overview"}'
 ```
 
-Returns the sub list. Each row carries exactly three keys: `index`, `address`
-and `equity`. `equity` is one aggregate number — there is no label field and no
-clearinghouse state on the row. To read a sub's positions, query
-[`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state) with the sub's
-address.
+The response lists the sub-accounts. Each row has exactly three keys: `index`, `address` and `equity`. `equity` is one aggregate number. The row has no label field and no clearinghouse state. To read the positions of a sub-account, query [`clearinghouse_state`](../api/rest/info/account.md#clearinghouse_state) with its address.
 
-Each sub can be **read** as a first-class account via `account_state`, `open_orders`, `user_fills` and the rest, by passing its address as `address`. Reads work; writes do not (see the [TL;DR warning](#tldr)).
+You can read each sub-account as a first-class account. Pass its address as `address` to `account_state`, `open_orders`, `user_fills` and the other reads. Reads work. Writes do not (see the [summary warning](#tldr)).
 
 ## Limits {#limits}
 
 | Limit | Default | Notes |
 |-------|---------|-------|
-| Subs per master | 32 | V2 may expand |
-| Sub-account name length | 64 chars | UTF-8; no validation beyond length |
-| Concurrent transfers in-flight | 8 per master | Mempool cap |
-| Master can withdraw from sub | yes, if sub stays Safe | Otherwise rejected |
-| Sub can withdraw off-chain | no | Must route via master |
-| Sub can have agents | no | `approve_agent` writes under the signer, and a sub cannot sign |
-| Sub can be multi-sig | no | V1 only the master can be multi-sig |
+| Sub-accounts per master | 32 | V2 may raise the limit |
+| Sub-account name length | 64 chars | UTF-8. Length is the only check. |
+| Concurrent transfers in flight | 8 per master | Mempool cap |
+| Master can withdraw from a sub-account | Yes, if it stays Safe | Otherwise rejected |
+| Sub-account can withdraw off-chain | No | The withdrawal must go through the master |
+| Sub-account can have agents | No | `approve_agent` writes under the signer, and a sub-account cannot sign |
+| Sub-account can be multi-sig | No | In V1, only the master can be multi-sig |
 
-## Use-case patterns {#use-case-patterns}
+## Use patterns {#use-case-patterns}
 
 ### Strategy separation {#strategy-separation}
 
@@ -240,7 +208,7 @@ flowchart LR
     master --> sub2
 ```
 
-Each strategy has its own agent key, its own liquidation envelope, its own PnL reporting.
+Each strategy has its own agent key, its own liquidation envelope and its own PnL reporting.
 
 ### Risk firewalling {#risk-firewalling}
 
@@ -251,7 +219,7 @@ flowchart LR
     master --> sub0
 ```
 
-main book gains: full upside; sub_0 blowup is capped to its deposit.
+The main book keeps the full upside. A `sub_0` blowup costs at most its deposit.
 
 ### A/B portfolios {#ab-portfolios}
 
@@ -264,22 +232,22 @@ flowchart LR
     master --> sub1
 ```
 
-Quarterly comparison of NAV per sub determines which gets more allocation.
+A quarterly comparison of NAV per sub-account decides which one gets more allocation.
 
 ## Edge cases {#edge-cases}
 
 <details>
 <summary>Show edge cases</summary>
 
-- **`create_sub_account` takes effect at the next block**, like all state changes. A sub cannot approve an agent or trade, so there is no agent-traffic race to plan for.
-- **Master tries to transfer from sub during sub's T1 liquidation.** Rejected; sub's collateral is being used to defend. Transfer is allowed once sub re-enters Safe.
-- **Master deletes / abandons a sub.** Not in V1. Subs stick around forever in the index. Empty subs have zero state cost; not worth worrying about.
-- **Sub's agent key compromised.** Revoke via the master (master is sub's master, holds delegation authority). Use the same `approve_agent` with `expires_at_ms` in the past.
-- **Sub-of-sub.** Not supported, and not reachable — a sub cannot sign `create_sub_account`.
+- `create_sub_account` takes effect at the next block, like all state changes. A sub-account cannot approve an agent or trade, so no agent-traffic race exists.
+- The master transfers from a sub-account during its T1 liquidation. The transfer is rejected, because the collateral of the sub-account is in use. The transfer is allowed once the sub-account is Safe again.
+- The master deletes or abandons a sub-account. V1 does not support this. A sub-account stays in the index forever. An empty sub-account has no state cost.
+- The agent key of a sub-account is compromised. The master revokes it. The master holds the delegation authority. Use the same `approve_agent` with `expires_at_ms` in the past.
+- A sub-account of a sub-account is not supported, and it is not reachable: a sub-account cannot sign `create_sub_account`.
 
 </details>
 
-## Sequence — full setup {#sequence--full-setup}
+## Full setup sequence {#sequence--full-setup}
 
 ```mermaid
 sequenceDiagram
@@ -297,10 +265,10 @@ sequenceDiagram
 
 ## See also {#see-also}
 
-- [Agent wallets](./agent-wallets.md) — per-sub hot keys
-- [Portfolio margin](./portfolio-margin.md) — interaction with cross-asset PM
-- [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso per sub
-- [`POST /info account_state`](../api/rest/info/account.md#account_state-overview) with `detail: "overview"` — MTF-native query; the sub-account list is one facet of it
+- [Agent wallets](./agent-wallets.md): hot keys for each sub-account.
+- [Portfolio margin](./portfolio-margin.md): how it interacts with cross-asset portfolio margin.
+- [Margin modes](./margin-modes.md): Cross, Isolated and Strict-Iso for each sub-account.
+- [`POST /info account_state`](../api/rest/info/account.md#account_state-overview) with `detail: "overview"`: the native query. The sub-account list is one part of it.
 
 ## FAQ {#faq}
 
@@ -308,15 +276,15 @@ sequenceDiagram
 <summary>Show FAQ</summary>
 
 **Q: Are sub-account fees aggregated with master for tier purposes?**
-A: Yes. The 30-day volume tier rolls up across master + all subs. Trading inside subs counts for the master's tier discount.
+A: Yes. The 30-day volume tier adds up the volume of the master and all its sub-accounts. Trading in a sub-account counts toward the tier discount of the master.
 
 **Q: Can a sub receive funds from another account directly (not via master)?**
-A: Yes — the general account-to-account transfer action (`send_asset`) can target a sub's address just like any account. The funds aren't restricted to flow through master after that point; they're just funds in the sub's balance.
+A: Yes. The general account-to-account transfer action (`send_asset`) can target a sub-account address like any other account. After that, the funds sit in the balance of the sub-account. They do not have to flow through the master.
 
 **Q: Do subs share a nonce space with master?**
-A: No. Each sub has its own nonce sequence. Master's nonces are master's; sub_0's are sub_0's; etc.
+A: No. Each sub-account has its own nonce sequence, separate from the nonces of the master and of `sub_0`.
 
 **Q: Can I convert a sub-account into a master / detach it?**
-A: Not in V1. A sub is permanently a sub. To "detach," create a fresh account at a different address and transfer.
+A: Not in V1. A sub-account stays a sub-account. To detach one, create a new account at a different address and transfer the funds.
 
 </details>

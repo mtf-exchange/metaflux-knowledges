@@ -1,29 +1,22 @@
 ---
-description: What changed on the public wire and when — activation boundaries and migration checklists for an existing client. A new integration does not need this section.
+description: What changed on the public wire and when. Activation boundaries and migration checklists for an existing client. A new integration does not need this section.
 ---
 
 # Changelog
 
-**Building a new client? Skip this section.** Everything here describes how the
-wire USED to behave. The current contract is the
-[API reference](../api/index.md), and it is already correct.
+This section lists what changed on the public wire and at which block.
 
-Read a page here when you have a client written against an older release and it
-started failing, or when you want to know at which block a behaviour changed.
+A new client does not need this section. It describes how the wire used to behave. The [API reference](../api/index.md) holds the current contract.
+
+Read a page here when a client written against an older release fails, or when you need the block at which a behavior changed.
 
 ## How a change reaches the chain {#how-a-change-lands}
 
-One release moves every behaviour at ONE height. The chain gains one boundary
-per release, not one per change, so a page here covers a whole release rather
-than a single field.
+One release moves every behavior at one height. The chain gains one boundary per release, not one per change. A page here covers a whole release, not a single field.
 
-The pin sits one block ABOVE the swap height. The outgoing binary commits the
-swap block and only then halts, so that block still runs the old rules. Pinning
-at the swap height itself would make the live chain and a replay of it disagree
-about that one block.
+The pin sits one block above the swap height. The outgoing binary commits the swap block and then halts, so that block still runs the old rules. A pin at the swap height itself would make the live chain and a replay of it disagree about that block.
 
-`{"type":"account_state","address":"0x…"}` carries the live `height`, so you can
-check where the chain is against any boundary below.
+`{"type":"account_state","address":"0x…"}` returns the live `height`. Use it to compare the chain with any boundary below.
 
 ## Entries {#entries}
 
@@ -31,16 +24,16 @@ check where the chain is against any boundary below.
 |---|---|
 | [Migrations](./migrations.md) | Five breaking changes to the READ surface, newest first, each with a checklist. Signed `/exchange` actions are unchanged by all five. |
 | [Ids and wire shapes](./ids-and-wire-shapes.md) | `oid` and `tid` became decimal-digit strings, `order_status` gained its fill legs and terminal states, a fill labels its fee token, margin and funding moved onto one plane. Two rows corrupt data silently rather than erroring. |
-| [Next release and unverified wire rows](./next-release.md) | No change waits for the next node release. One row in the shipped code that is not yet read on the running chain: the size plane on archive candles. Also five corrections to this reference. |
-| [Block 25,599,540](./block-25599540.md) | Node 0.9.16 and gateway 0.9.16: an open-interest cap on every native perp market, a deployer-set cap, a deficit charged to the markets that produced it, wider ADL reach, a smoothed self-priced index, a bounded delist price, a bridge re-issue and void lane, spot tokens as portfolio-margin collateral, a `node_gov` label for every round, the fill-tape retirement and the reads it moves to the gateway, `user_ledger_updates` removed, referral codes, one claim for both credits, and two EVM receipt fixes and an `order_status` fix. |
+| [Next release and unverified wire rows](./next-release.md) | No change waits for the next node release. One row in the shipped code is not yet read on the running chain: the size plane on archive candles. The page also holds five corrections to this reference. |
+| [Block 25,599,540](./block-25599540.md) | Node 0.9.16 and gateway 0.9.16: an open-interest cap on every native perp market, a deployer-set cap, a deficit charged to the markets that produced it, wider ADL reach, a smoothed self-priced index, a bounded delist price, a bridge re-issue and void lane, spot tokens as portfolio-margin collateral, a `node_gov` label for every round, the fill-tape retirement and the reads it moves to the gateway, `user_ledger_updates` removed, referral codes, one claim for both credits, two EVM receipt fixes and an `order_status` fix. |
 | [Block 17,113,494](./block-17113494.md) | The signed `action` is capped at 1 MiB, and a `batch_cancel` answers and pushes an `order_updates` record for each leg. |
-| [Block 16,450,001](./block-16450001.md) | A multi-sig roster holds at most 16 distinct signers, a `multi_sig` envelope carries at most 16 signatures, and the envelope no longer moves the posting account's nonce window. |
-| [Block 11,550,001](./block-11550001.md) | `vault_modify` signs a new type, every raw-size row states its size plane, one faucet claim per address, a `parked` status, a `NONCE_REPLAYED` verdict, per-leg `cloid` dedup, three silent accepts that become refusals, a spot order refused when unfunded, a split `standard` account with no reservations, a delist that settles every position. Also the gateway rows that shipped the same day: four reads that answer `410`, one snapshot frame per subscribe, a `trades` limit that caps the merged answer. |
+| [Block 16,450,001](./block-16450001.md) | A multi-sig roster holds at most 16 distinct signers, a `multi_sig` envelope carries at most 16 signatures, and the envelope no longer moves the nonce window of the posting account. |
+| [Block 11,550,001](./block-11550001.md) | `vault_modify` signs a new type, every raw-size row states its size plane, one faucet claim per address, a `parked` status, a `NONCE_REPLAYED` verdict, per-leg `cloid` dedup, three silent accepts that become refusals, a spot order refused when unfunded, a split `standard` account with no reservations, a delist that settles every position. The page also covers the gateway rows that shipped the same day: four reads that answer `410`, one snapshot frame per subscribe, a `trades` limit that caps the merged answer. |
 | [Block 5,710,001](./block-5710001.md) | The two-wallet `standard` account, one force-close vote for both legs, `start_position` on the size plane, `reservations` and `split` on `account_state`. |
 | [Block 13,350,001](./block-13350001.md) | A future-nonce refusal, TWAP slices that fill, cancel-all reaching TWAP parents, an isolated extend that posts margin, a bounded EVM block, the buyback drip. |
 | [Block 7,400,000](./block-7400000.md) | An admission rule that refuses over-levered orders, a delist that cancels resting orders, the contract CoreWriter lane, permissionless spot deployment, randomized TWAP slices. |
 
 ## See also {#see-also}
 
-- [Versioning](../versioning.md) — the policy: what counts as breaking, and the notice period
-- [API reference](../api/index.md) — the current contract
+- [Versioning](../versioning.md): what counts as breaking, and the notice period.
+- [API reference](../api/index.md): the current contract.

@@ -1,16 +1,26 @@
 # Risk-watcher pattern
 
+This page describes a risk-watcher: a process that protects an account from liquidation.
+
 :::tip
 **Stable.**
 :::
 
-A risk-watcher is an automated process that monitors your account's health and intervenes — depositing margin, reducing position, or trading defensively — before the protocol's [tiered liquidation](../concepts/tiered-liquidation.md) ladder fires on you.
+A *risk-watcher* is an automated process that monitors your account's health. It acts before the
+protocol's [tiered liquidation](../concepts/tiered-liquidation.md) ladder fires on you. It can
+deposit margin, reduce a position or trade defensively.
 
-Production trading bots that hold positions overnight should run one. The protocol's T0 yellow card buys you exactly one committed block; a risk-watcher uses that block productively. Block cadence is a governed, per-deployment target, not a fixed duration — measure your own deployment's committed-round rate if your reaction budget depends on the wall-clock size of that window.
+Production trading bots that hold positions overnight should run one. The protocol's T0 yellow card
+gives you exactly one committed block. A risk-watcher uses that block to act. Block cadence is a
+governed target per deployment. It is not a fixed duration. If your reaction budget depends on
+the wall-clock size of that window, measure the committed-round rate of your own deployment.
 
-## TL;DR {#tldr}
+## Summary {#tldr}
 
-Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions and [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin values, add margin via `UpdateIsolatedMargin` (Isolated) or `Deposit` (Cross) before the maintenance requirement becomes binding.
+Subscribe to [`notifications`](../api/ws/subscriptions.md#notifications) for tier transitions,
+and to [`account_state`](../api/ws/subscriptions.md#account_state) for the continuous margin
+values. Add margin before the maintenance requirement becomes binding: use
+`UpdateIsolatedMargin` for Isolated, or `Deposit` for Cross.
 
 ## Architecture {#architecture}
 
@@ -24,14 +34,27 @@ flowchart TD
     watcher -->|"submits agent-signed actions"| exchange
 ```
 
-The watcher is a separate logical process even when co-located — its decisions are independent of the trading strategy's decisions. A common failure mode is conflating "should I close this position?" with "should I take this trade?"; risk-watchers answer only the first.
+The watcher is a separate logical process, also when it runs on the same host. Its decisions are
+independent of the trading strategy's decisions. A common failure is to mix two questions: "close
+this position?" and "take this trade?". A risk-watcher answers only the first.
 
 ## Inputs {#inputs}
 
-- [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`) — the immediate signal that a tier changed.
-- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`, `total_raw_usd`, `perp.total_ntl_pos`, `tier`. The account-level `cross_maintenance_margin_used` is NOT on this push — poll `detail: "margin"` for it. Derive your own health ratio from `account_value` and `cross_maintenance_margin_used` — see [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health); the wire `health` field is a signed dollar figure, not this ratio.
-- [`markets`](../api/ws/subscriptions.md#markets) WS push: `mark_px` for forward-looking estimation, and `funding.rate_per_hr` / `funding.next_payment_ts` per market to anticipate the next funding charge before it settles.
-- [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments — one record per settlement, AFTER it applies. This channel cannot anticipate the next charge; use the `markets` row's `funding` block for that.
+- [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions
+  (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`). This is the first
+  signal that a tier changed.
+- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`,
+  `total_raw_usd`, `perp.total_ntl_pos`, `tier`. The account-level
+  `cross_maintenance_margin_used` is not on this push. Poll `detail: "margin"` for it. Derive your
+  own health ratio from `account_value` and `cross_maintenance_margin_used`. See
+  [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health). The wire
+  `health` field is a signed dollar figure, not this ratio.
+- [`markets`](../api/ws/subscriptions.md#markets) WS push: `mark_px` for forward estimates, and
+  `funding.rate_per_hr` / `funding.next_payment_ts` per market. Use them to predict the next
+  funding charge before it settles.
+- [`user_fundings`](../api/ws/subscriptions.md#user_fundings) WS push: realized funding payments,
+  one record per settlement, after it applies. This channel cannot predict the next charge. Use
+  the `funding` block of the `markets` row for that.
 
 ## Reaction rules {#reaction-rules}
 
@@ -39,11 +62,12 @@ The watcher is a separate logical process even when co-located — its decisions
 |---------|--------|-----------|
 | Derived ratio < 1.5 and falling for 5 consecutive samples | Pre-emptive deposit to bring the ratio to 1.8 | Buffer before T0 |
 | `tier transition to T0` | Immediate deposit OR partial close | One block to act before T1 |
-| `tier transition to T1` | Emergency: full close on highest-loss position | Pre-empt the partial close at a worse price |
-| Projected charge from the `markets` row's `funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × `withdrawable` | Pre-pay deposit before settlement | Funding charge can flip you into T0 |
+| `tier transition to T1` | Emergency: full close on highest-loss position | Close before the partial close at a worse price |
+| Projected charge from the `markets` row's `funding` (`rate_per_hr` × position notional, due at `next_payment_ts`) > 0.5 × `withdrawable` | Pre-pay deposit before settlement | A funding charge can move you into T0 |
 | Mark moves > 3× recent-1h sigma in 30s | Snapshot positions + alert operator | Possible regime shift |
 
-Tune thresholds to your strategy. Aggressive market-makers: tighter buffers (ratio 1.3 floor). Conservative books: looser (ratio 1.8 floor).
+Tune the thresholds to your strategy. Aggressive market makers use tighter buffers (ratio 1.3
+floor). Conservative books use looser buffers (ratio 1.8 floor).
 
 ## Implementation sketch (TypeScript) {#implementation-sketch-typescript}
 
@@ -142,13 +166,20 @@ async function emergencyUnwind(c: Client) {
 
 ## Key choices {#key-choices}
 
-- **Separate agent for watcher.** Trader's agent does trading; watcher's agent does margin management. Compromise of trading host doesn't enable margin manipulation.
-- **Watcher's authority.** Agents can submit `UpdateIsolatedMargin` and place / cancel orders. Agents CANNOT withdraw, so the watcher can't move funds off the account — only between sub-buckets. This is desired.
-- **Watcher's nonce space.** Watcher and trader share the master's nonce space (per [agent wallets](../concepts/agent-wallets.md)). Use `Date.now()` on both — collision risk is sub-millisecond.
+- **A separate agent for the watcher.** The trader's agent trades. The watcher's agent manages
+  margin. A compromised trading host therefore cannot manipulate margin.
+- **Watcher authority.** Agents can submit `UpdateIsolatedMargin` and place or cancel orders.
+  Agents cannot withdraw. The watcher therefore cannot move funds off the account, only between
+  sub-buckets. This limit is intended.
+- **Watcher nonce space.** The watcher and the trader share the master's nonce space, as
+  [agent wallets](../concepts/agent-wallets.md) describes. Use `Date.now()` on both. The
+  collision risk is below one millisecond.
 
 ## Pre-deposit math {#pre-deposit-math}
 
-To bring your derived ratio from H₀ to target H₁ (H here is the ratio from [two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health), not the wire `health` field):
+This formula moves your derived ratio from H₀ to a target H₁. H here is the ratio from
+[two meanings of health](../concepts/tiered-liquidation.md#two-meanings-of-health). It is not
+the wire `health` field.
 
 ```
 needed_deposit = (H₁ - H₀) × cross_maintenance_margin_used
@@ -157,9 +188,11 @@ needed_deposit = (H₁ - H₀) × cross_maintenance_margin_used
 Example: maintenance = 10 USDC, current health 1.0, target 1.5.
 needed = (1.5 - 1.0) × 10 = 5 USDC.
 
-Cap your watcher's per-block deposit to avoid spending too much on a transient regime. Aggressive default: 1× position notional reserved for top-ups; once exhausted, escalate to operator.
+Cap the watcher's deposit per block, so that it does not spend too much on a short regime. An
+aggressive default reserves 1× position notional for these deposits. When the reserve is used
+up, escalate to the operator.
 
-## Sequence — pre-emptive top-up {#sequence--pre-emptive-top-up}
+## Pre-emptive deposit sequence {#sequence--pre-emptive-top-up}
 
 ```mermaid
 sequenceDiagram
@@ -178,23 +211,33 @@ sequenceDiagram
 
 ## Failure modes {#failure-modes}
 
-- **Watcher and trader race.** Trader submits a new position; watcher reacts to the in-flight position. Resolve: only react after commit (margin events fire on commit, so this is already the case).
-- **Watcher's own agent expired.** Mid-stress, watcher can't act. Mitigation: tight rotation cadence, monitoring of agent expiry, never < 24h to expiry.
-- **Mempool full during stress.** Watcher's deposit gets 503'd. Backoff with exponential jitter; submit at most every 100ms.
-- **Deposit succeeds but oracle stays bad.** The deposit raises account_value; if maint also rose (mark moved against you), health may not improve enough. Loop: re-evaluate after commit; deposit again or unwind.
+- **Watcher and trader race.** The trader submits a new position, and the watcher reacts to the
+  in-flight position. Fix: react only after commit. Margin events fire on commit, so this is
+  already the case.
+- **The watcher's own agent expired.** Under stress, the watcher cannot act. Mitigation: a short
+  rotation cadence, monitoring of agent expiry, and never less than 24h to expiry.
+- **Mempool full under stress.** The watcher's deposit gets a 503. Back off with exponential
+  jitter. Submit at most once every 100ms.
+- **The deposit succeeds, but the oracle stays bad.** The deposit raises `account_value`. If the
+  maintenance requirement also rose because the mark moved against you, health can stay too low.
+  Loop: re-evaluate after commit, then deposit again or unwind.
 
-## When NOT to deploy a risk-watcher {#when-not-to-deploy-a-risk-watcher}
+## Cases that need no risk-watcher {#when-not-to-deploy-a-risk-watcher}
 
-- Very short-lived positions (open and close within a single block) — health doesn't matter.
-- Pure spot trading with no margin — no liquidation ladder applies.
-- Fully isolated single-position bots where you've explicitly accepted the bucket loss limit — automating top-ups defeats the firewalling.
+- Very short-lived positions that open and close within one block. Health does not matter.
+- Pure spot trading with no margin. No liquidation ladder applies.
+- Fully isolated single-position bots where you accept the bucket loss limit on purpose.
+  Automated deposits defeat the isolation.
 
 ## See also {#see-also}
 
-- [Tiered liquidation](../concepts/tiered-liquidation.md) — the ladder you're defending against
-- [`notifications` WS](../api/ws/subscriptions.md#notifications) — tier transitions ride this channel
-- [`account_state` WS](../api/ws/subscriptions.md#account_state) — continuous margin values
-- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state) — the position rows an unwind needs
+- [Tiered liquidation](../concepts/tiered-liquidation.md): the ladder the watcher defends
+  against
+- [`notifications` WS](../api/ws/subscriptions.md#notifications): tier transitions arrive on this
+  channel
+- [`account_state` WS](../api/ws/subscriptions.md#account_state): continuous margin values
+- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state): the position rows
+  that an unwind needs
 - [`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin)
-- [Agent wallets](../concepts/agent-wallets.md) — watcher needs its own approved agent
-- [Error handling](./error-handling.md) — for the deposit submission retry logic
+- [Agent wallets](../concepts/agent-wallets.md): the watcher needs its own approved agent
+- [Error handling](./error-handling.md): the retry logic for the deposit submission

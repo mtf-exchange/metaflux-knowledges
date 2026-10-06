@@ -1,10 +1,12 @@
 # TypeScript SDK
 
+The `@metaflux-dex/client` package is the TypeScript client for the MetaFlux API.
+
 :::info
-**Preview.** The `@metaflux-dex/client` package ships before mainnet; the API shape below is committed.
+**Preview.** The `@metaflux-dex/client` package ships before mainnet. The API shape below is committed.
 :::
 
-## TL;DR {#tldr}
+## Summary {#tldr}
 
 ```bash
 npm install @metaflux-dex/client
@@ -35,7 +37,11 @@ await client.placeOrder({
 });
 ```
 
-The class is exported as `Client` (not `MetaFluxClient`). It has no `.exchange` or `.info` sub-object for writes — trading and account actions are flat methods directly on `Client` (`client.placeOrder`, `client.submitOrderNative`, `client.approveAgent`, …). Reads live under `client.info` (`client.info.markets()`, `client.info.accountState()`, …), and the WebSocket feed opens via `client.connectWs()`.
+The package exports the class as `Client` (not `MetaFluxClient`). It has no `.exchange` or
+`.info` sub-object for writes. Trading and account actions are flat methods on `Client`
+(`client.placeOrder`, `client.submitOrderNative`, `client.approveAgent`, …). Reads are under
+`client.info` (`client.info.markets()`, `client.info.accountState()`, …). `client.connectWs()`
+opens the WebSocket feed.
 
 ## Constructor {#constructor}
 
@@ -45,14 +51,16 @@ new Client(opts: ClientOpts)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `baseUrl` | string | yes | Gateway front door (`https://api.<net>.mtf.exchange`). The SDK speaks MTF-native, served by the gateway at `/info` · `/exchange` · `/ws`. Running the node yourself? Point at `http://localhost:8080`. See [networks](../networks.md). |
-| `privateKey` | `Uint8Array` (32 bytes) | optional | secp256k1 private key. Required for any signing method (every `/exchange` write). Without it, `client.info.*` reads still work — `client.canSign` reads `false`. |
-| `chainId` | number | optional | Legacy constructor field, kept for backward compatibility. It does **not** drive signing — every typed action signs against `MTF_CHAIN_ID` (testnet `114514`; mainnet `8964`), overridable per call via `opts.chainId` on the method itself. |
-| `expiresAfterMs` | `bigint` | optional | Default action-expiry (unix-ms) folded into every typed action this client signs. `0n` / absent = never expires. Only accepted once the network activates the field — leave unset until then. |
+| `baseUrl` | string | yes | Gateway entry point (`https://api.<net>.mtf.exchange`). The SDK uses the MTF-native surface, which the gateway serves at `/info` · `/exchange` · `/ws`. If you run the node yourself, point it at `http://localhost:8080`. See [networks](../networks.md). |
+| `privateKey` | `Uint8Array` (32 bytes) | optional | secp256k1 private key. Required for any signing method (every `/exchange` write). Without it, `client.info.*` reads still work, and `client.canSign` reads `false`. |
+| `chainId` | number | optional | Legacy constructor field, kept for backward compatibility. It does not drive signing. Every typed action signs against `MTF_CHAIN_ID` (testnet `114514`; mainnet `8964`). To override it per call, pass `opts.chainId` on the method itself. |
+| `expiresAfterMs` | `bigint` | optional | Default action expiry (unix-ms), added to every typed action this client signs. `0n` / absent means it never expires. The network accepts it only when it activates the field. Leave it unset until then. |
 
-There is no `signer` / `senderAddress` field. External signing and the agent-wallet pattern work differently — see [Signing externally](#signing-externally) and [Agent-signing pattern](#agent-signing-pattern) below.
+There is no `signer` / `senderAddress` field. External signing and the agent-wallet pattern work
+differently. See [Signing externally](#signing-externally) and
+[Agent-signing pattern](#agent-signing-pattern) below.
 
-## Reads: `client.info` {#reads-client-info}
+## Reads with `client.info` {#reads-client-info}
 
 Every `POST /info` query is a method on `client.info`. It needs no private key.
 
@@ -74,11 +82,14 @@ await client.info.agents(address);            // approved agents for `address`
 await client.info.spotClearinghouseState(address);
 ```
 
-Market reads key by `coin` (the symbol, e.g. `"BTC"`); account reads key by `0x address`. `client.info.raw({ type, ...params })` is a typed escape hatch for any `/info` query without a dedicated wrapper.
+Market reads key by `coin` (the symbol, for example `"BTC"`). Account reads key by `0x address`.
+For an `/info` query with no dedicated wrapper, use the typed escape hatch
+`client.info.raw({ type, ...params })`.
 
-## Writes: flat methods on `Client` {#writes-flat-methods}
+## Writes with flat methods on `Client` {#writes-flat-methods}
 
-Every `POST /exchange` action is a method directly on `Client`, not under a sub-object. A representative set:
+Every `POST /exchange` action is a method directly on `Client`, not under a sub-object. A
+representative set:
 
 ```typescript
 // Orders
@@ -117,11 +128,18 @@ await client.vaultWithdraw({ vault_id, shares });
 await client.mbWithdraw({ chain: 'Base', asset: 0, amount, dst_addr });
 ```
 
-Each method takes an optional `{ nonce?, chainId? }` (or `{ nonce?, chainId?, owner? }` where the action supports agent authorization) and returns a `NativeExchangeAck` (`{ statuses?, action_hash?, error? }`). The full surface — every `buildNative*Action` builder, spot orders, TWAP, RFQ/FBA, spot-margin/Earn — is listed in [`POST /exchange`](../api/rest/exchange.md) and exported from the package for out-of-band signing.
+Each method takes an optional `{ nonce?, chainId? }`. Where the action supports agent
+authorization, it takes `{ nonce?, chainId?, owner? }`. Each method returns a
+`NativeExchangeAck` (`{ statuses?, action_hash?, error? }`). [`POST /exchange`](../api/rest/exchange.md)
+lists the full surface: every `buildNative*Action` builder, spot orders, TWAP, RFQ/FBA and
+spot-margin/Earn. The package exports the builders for out-of-band signing.
 
-### `placeOrder`: one entry point for orders {#placeorder}
+### `placeOrder` {#placeorder}
 
-`placeOrder` tags each order with a `venue` and picks the wire action for you: any number of `venue: 'perp'` legs collapse into one `batch_order`; `venue: 'spot'` legs each become their own `spot_order` (the wire cannot batch spot). Mixing venues in one call is rejected.
+`placeOrder` is one entry point for orders. It tags each order with a `venue` and picks the wire
+action for you. Any number of `venue: 'perp'` legs become one `batch_order`. Each
+`venue: 'spot'` leg becomes its own `spot_order`, because the wire cannot batch spot. The SDK
+rejects a call that mixes venues.
 
 ```typescript
 const result = await client.placeOrder([
@@ -159,13 +177,21 @@ await ws.subscribeTrades('BTC');
 await ws.subscribe({ type: 'order_updates', user: '0x17c5185167401ed00cf5f5b2fc97d9bbfdb7d025' });
 ```
 
-`connectWs()` derives the `ws(s)://` URL from `baseUrl`, connects, and — if this `Client` holds a private key — seeds the returned `WsClient` with a signer so it can also POST signed actions over the socket (`ws.submitOrder` / `ws.cancelOrder` / `ws.postAction`). A read-only client's `WsClient` can still subscribe and call `ws.postInfo`.
+`connectWs()` derives the `ws(s)://` URL from `baseUrl` and connects. If this `Client` holds a
+private key, it gives the returned `WsClient` a signer. The `WsClient` can then also POST signed
+actions over the socket (`ws.submitOrder` / `ws.cancelOrder` / `ws.postAction`). The `WsClient` of
+a read-only client can still subscribe and call `ws.postInfo`.
 
-`isChannelFrame(frame, channel)` narrows an inbound frame and types its `data` — use it instead of trusting `frame.channel` by hand. The WS client reconnects automatically and replays active subscriptions; there is no separate `.on('open'|'close', …)` event API — inspect `ws.isOpen` or handle a `subscriptionResponse` frame instead.
+`isChannelFrame(frame, channel)` narrows an inbound frame and types its `data`. Use it, and do not
+trust `frame.channel` by hand. The WS client reconnects automatically and replays active
+subscriptions. There is no separate `.on('open'|'close', …)` event API. Inspect `ws.isOpen`, or
+handle a `subscriptionResponse` frame.
 
 ## Error handling {#error-handling}
 
-The SDK throws **one** error class, `MetaFluxApiError`, for any non-2xx `/exchange` or `/info` response. It is not split into `RateLimitError` / `AuthError` / `CommitError` / `NetworkError` — branch on `.status` yourself:
+The SDK throws one error class, `MetaFluxApiError`, for any non-2xx `/exchange` or `/info`
+response. There is no split into `RateLimitError` / `AuthError` / `CommitError` /
+`NetworkError`. Branch on `.status` yourself:
 
 ```typescript
 import { MetaFluxApiError } from '@metaflux-dex/client';
@@ -185,13 +211,17 @@ try {
 }
 ```
 
-`MetaFluxApiError` carries `status` (HTTP status), `bodyText` (raw response body) and `message`. A network drop (no response at all) is a plain `fetch` failure, not a wrapped SDK type — catch it as the `else` branch above.
+`MetaFluxApiError` carries `status` (HTTP status), `bodyText` (raw response body) and `message`.
+A network drop (no response at all) is a plain `fetch` failure, not a wrapped SDK type. Catch it
+in the `else` branch above.
 
-See [error handling](./error-handling.md) for the full admission/commit/network decision tree.
+See [error handling](./error-handling.md) for the full decision tree for admission, commit and
+network errors.
 
 ## Signing externally {#signing-externally}
 
-There is no pluggable `Signer` interface. For an HSM or a wallet popup, build the typed payload without signing, hand it off, then POST the result:
+There is no pluggable `Signer` interface. For an HSM or a wallet popup, build the typed payload
+without a signature, give it to the signer, then POST the result:
 
 ```typescript
 const built = client.typedData('approve_agent', {
@@ -212,11 +242,15 @@ await client.postTyped({
 });
 ```
 
-`client.typedData(actionType, payload, opts?)` builds the EIP-712 struct and the canonical action JSON without touching a key. `client.postTyped(signed)` posts an already-signed envelope. This is the same pair a wallet integration (`eth_signTypedData_v4`) uses.
+`client.typedData(actionType, payload, opts?)` builds the EIP-712 struct and the canonical action
+JSON without a key. `client.postTyped(signed)` posts an envelope that is already signed. A wallet
+integration (`eth_signTypedData_v4`) uses the same pair.
 
 ## Agent-signing pattern {#agent-signing-pattern}
 
-For the [agent-wallets pattern](./agent-wallets-howto.md): there is no `senderAddress` / `signerAddress` constructor option. Instead, construct a **separate `Client`** with the agent's own key, and set the action's `owner` field to the master's address:
+For the [agent-wallets pattern](./agent-wallets-howto.md), there is no `senderAddress` /
+`signerAddress` constructor option. Construct a separate `Client` with the agent's own key, and
+set the action's `owner` field to the master's address:
 
 ```typescript
 const master = new Client({ baseUrl, privateKey: masterKey });
@@ -236,11 +270,13 @@ await agent.submitOrderNative({
 });
 ```
 
-Before the request leaves the process, the agent `Client` recovers its own signer and — since it differs from `owner` — reads the owner's approved agents from `/info` and rejects an unrelated address locally, before it ever reaches the chain.
+Before the request leaves the process, the agent `Client` recovers its own signer. The signer
+differs from `owner`, so the client reads the owner's approved agents from `/info`. It rejects an
+unrelated address locally, before the request reaches the chain.
 
 ## Common patterns {#common-patterns}
 
-### Place + confirm {#place--confirm}
+### Place and confirm {#place--confirm}
 
 ```typescript
 const cloid = '0x' + randomBytes(16).toString('hex');
@@ -289,7 +325,10 @@ await ws.subscribe({ type: 'fills', user: owner });
 
 ## Numeric handling {#numeric-handling}
 
-`/info` reads answer in canonical **decimal strings** (e.g. `account_value: "10000"`) — exact, no `f64` precision loss. `/exchange` writes take plain integers on fixed-point planes: `limit_px` on the 1e8 book plane, `size` scaled by the market's `sz_decimals`. The package exports conversion helpers so you never hand-roll the scaling:
+`/info` reads answer in canonical decimal strings (for example `account_value: "10000"`). They
+are exact, with no `f64` precision loss. `/exchange` writes take plain integers on fixed-point
+planes: `limit_px` on the 1e8 book plane, and `size` scaled by the market's `sz_decimals`. The
+package exports conversion helpers, so you do not write the scaling yourself:
 
 ```typescript
 import { pxToWire, szToWire, wireToPx, wireToSz } from '@metaflux-dex/client';
@@ -300,14 +339,15 @@ const size = szToWire('0.5', 6);      // -> 500000n at sz_decimals = 6
 console.log(wireToPx(limitPx), wireToSz(size, 6)); // round-trip for display
 ```
 
-`snapPxToWire` / `snapSizeToWire` / `roundOrderToGrid` additionally snap a human price/size onto a market's tick/lot grid before you build an order — the node rejects an off-grid value.
+`snapPxToWire` / `snapSizeToWire` / `roundOrderToGrid` also snap a human price or size onto a
+market's tick or lot grid before you build an order. The node rejects an off-grid value.
 
 ## See also {#see-also}
 
-- [Quickstart](./quickstart.md) — 5-minute end-to-end
+- [Quickstart](./quickstart.md): a 5-minute run, end to end
 - [Agent wallets howto](./agent-wallets-howto.md)
-- [`POST /exchange`](../api/rest/exchange.md) — full action surface
-- [WS subscriptions](../api/ws/subscriptions.md) — channel catalog
+- [`POST /exchange`](../api/rest/exchange.md): the full action surface
+- [WS subscriptions](../api/ws/subscriptions.md): the channel catalog
 - [Rust SDK](./rust-sdk.md)
 
 ## FAQ {#faq}
@@ -316,12 +356,12 @@ console.log(wireToPx(limitPx), wireToSz(size, 6)); // round-trip for display
 <summary>Show FAQ</summary>
 
 **Q: Does the SDK support browsers?**
-A: The crypto layer is a `wasm-pack --target web` build, so it is meant to run directly in a browser as well as Node (≥ 20). There is no separate `@metaflux-dex/client/browser` entry point today — a bundler that handles WASM + ESM targets both.
+A: The crypto layer is a `wasm-pack --target web` build, so it is meant to run directly in a browser and in Node (≥ 20). There is no separate `@metaflux-dex/client/browser` entry point today. A bundler that handles WASM and ESM targets both.
 
-**Q: What's the dependency tree?**
-A: No runtime dependencies. Signing (secp256k1, keccak256, EIP-712 hashing, msgpack encoding) runs in the bundled WASM module; HTTP and WebSocket use the platform `fetch` / `WebSocket`.
+**Q: What is the dependency tree?**
+A: There are no runtime dependencies. Signing (secp256k1, keccak256, EIP-712 hashing, msgpack encoding) runs in the bundled WASM module. HTTP and WebSocket use the platform `fetch` / `WebSocket`.
 
 **Q: Can I plug in my own HTTP transport (axios, undici)?**
-A: No — the SDK calls the platform `fetch` directly and has no transport override hook. Use [signing externally](#signing-externally) if you need to route the signed envelope through your own HTTP stack.
+A: No. The SDK calls the platform `fetch` directly and has no transport override hook. To send the signed envelope through your own HTTP stack, use [signing externally](#signing-externally).
 
 </details>

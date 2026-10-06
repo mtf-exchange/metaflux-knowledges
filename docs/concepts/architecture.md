@@ -1,36 +1,38 @@
 ---
-description: A map of MetaFlux Core — the components inside the L1 (clearinghouse, matching engine, pricing, risk, economics, consensus, and the EVM/bridge extensions) and what each one does, each linking to its deep-dive page.
+description: A map of the components inside MetaFlux Core, the L1 (clearinghouse, matching engine, pricing, risk, economics, consensus, and the EVM and bridge extensions), with what each one does and a link to its own page.
 ---
 
 # Architecture
 
+This page is a map of the components inside MetaFlux Core and how they connect.
+
 :::info
-**Orientation map.** This page names each major component inside **MetaFlux
-Core** — the L1 — says in a sentence or two what it does, and links to the page
-that explains it in full. It is the fastest way to build a mental model of how
-the protocol is put together. Per-component status (stable / preview / planned)
-lives on each linked page.
+This page names each major component inside MetaFlux Core, the L1. For each one,
+it gives a short description and a link to the page that explains it in full.
+Each linked page shows the status of its component (stable / preview / planned).
 :::
 
-## TL;DR {#tldr}
+## Summary {#tldr}
 
-MetaFlux Core is a single deterministic state machine that runs a fully on-chain
-exchange. Every participant submits an action; [consensus](./consensus.md) fixes
-one canonical order for those actions; then every node runs the **same** state
-transition over that order. That state machine is not one monolith — it is a set
-of cooperating components: a **matching engine** that runs the order books, a
-**clearinghouse** that keeps the accounting, a **pricing** layer (oracle, mark,
-funding), a **risk** layer (margin, liquidation), an **economics** layer (fees,
-staking, token supply), and **extension** layers (vaults, permissionless market
-deploy, an inline EVM, and a cross-chain bridge). This page is the map of those
-components.
+MetaFlux Core is one deterministic state machine that runs a fully on-chain
+exchange. Every participant sends actions. [Consensus](./consensus.md) puts those
+actions in one canonical order. Then every node runs the same state transition
+over that order. The state machine is a set of components that work together:
 
-## How the pieces fit together {#how-the-pieces-fit-together}
+- a *matching engine* that runs the order books;
+- a *clearinghouse* that keeps the accounts;
+- a *pricing* layer: oracle, mark and funding;
+- a *risk* layer: margin and liquidation;
+- an *economics* layer: fees, staking and token supply;
+- *extension* layers: vaults, permissionless market deploy, an inline EVM and a
+  cross-chain bridge.
 
-Everything sits on top of consensus. Consensus decides *what happened and in what
-order*; the trading core decides *what that means for balances and positions*;
-the pricing and risk layers value and protect those positions; and the extension
-layers add markets, programmability, and cross-chain value.
+## Component layers {#how-the-pieces-fit-together}
+
+All layers sit on top of consensus. Consensus decides what happened and in what
+order. The trading core decides what that means for balances and positions. The
+pricing and risk layers value and protect those positions. The extension layers
+add markets, programmability and cross-chain value.
 
 ```mermaid
 flowchart TB
@@ -68,81 +70,82 @@ flowchart TB
 
 ## Trading core {#trading-core}
 
-The heart of the exchange: the books that match orders and the ledger that
+The trading core is the order books that match orders and the ledger that
 settles them.
 
 | Component | What it does | Learn more |
 |---|---|---|
-| **Clearinghouse** | The accounting core. Tracks every account's balances, open positions, collateral, realized and unrealized PnL, and margin usage across perps and spot. Every fill, funding payment, and liquidation is a write against this ledger. | [Perpetuals](../products/perpetuals.md) · [Spot](../products/spot.md) |
-| **Matching engine (on-chain CLOB)** | The central-limit order book and its deterministic matching. Resting limit orders, market and IOC/FOK fills, post-only, and other time-in-force rules all match against the single consensus-ordered stream, so the same inputs always produce the same fills. | [Order types](./order-types.md) · [FBA](./fba.md) |
-| **Order types & trading features** | The order and account tooling built on top of matching: TWAP and scale orders, TP/SL trigger orders, reduce-only, hedge (two-way) mode, sub-accounts, delegated agent wallets, and institutional multi-sig accounts. | [Order types](./order-types.md) · [Hedge mode](./hedge-mode.md) · [Sub-accounts](./sub-accounts.md) · [Agent wallets](./agent-wallets.md) · [Multi-sig](./multi-sig.md) · [RFQ](./rfq.md) |
+| **Clearinghouse** | The accounting core. It tracks the balances, open positions, collateral, realized and unrealized PnL, and margin usage of every account, across perps and spot. Every fill, funding payment and liquidation is a write to this ledger. | [Perpetuals](../products/perpetuals.md) · [Spot](../products/spot.md) |
+| **Matching engine (on-chain CLOB)** | The central limit order book and its deterministic matching. Resting limit orders, market and IOC/FOK fills, post-only and the other time-in-force rules all match against one stream in consensus order. The same inputs always produce the same fills. | [Order types](./order-types.md) · [FBA](./fba.md) |
+| **Order types and trading features** | The order and account tools on top of matching: TWAP and scale orders, TP/SL trigger orders, reduce-only, hedge (two-way) mode, sub-accounts, agent wallets and multi-sig accounts for institutions. | [Order types](./order-types.md) · [Hedge mode](./hedge-mode.md) · [Sub-accounts](./sub-accounts.md) · [Agent wallets](./agent-wallets.md) · [Multi-sig](./multi-sig.md) · [RFQ](./rfq.md) |
 
-## Pricing & risk {#pricing--risk}
+## Pricing and risk {#pricing--risk}
 
-How positions are valued and how the protocol keeps accounts solvent.
+These components value positions and keep accounts solvent.
 
 | Component | What it does | Learn more |
 |---|---|---|
-| **Oracle price feed** | The per-asset reference price the protocol trusts for each market — a validator-aggregated spot price, resistant to any single source. It anchors the mark price and feeds risk calculations. | [Oracle prices](./oracle-prices.md) |
-| **Mark price + funding** | The mark price is the manipulation-resistant value used for margin, liquidation, and triggers — composed from the oracle, the book, and external references, not the last trade. Funding is the periodic long/short payment that tethers each perp to its underlying, paid directly between traders. | [Mark prices](./mark-prices.md) · [Funding rates](./funding-rates.md) |
-| **Margin system** | Decides how much collateral each position requires and how collateral is shared or walled off: cross vs. isolated margin, cross-asset portfolio (SPAN-style) margin for large accounts, and spot-margin borrowing supplied by the Earn lending pool. | [Margin modes](./margin-modes.md) · [Portfolio margin](./portfolio-margin.md) · [Spot margin](../products/spot-margin.md) · [Earn](./earn.md) |
-| **Liquidation** | Protects solvency when a position's margin runs out. A gradual, tiered ladder unwinds positions in steps — an early warning and partial reductions rather than a single wipeout — with an auto-deleverage backstop as the final line of defense. | [Tiered liquidation](./tiered-liquidation.md) · [ADL](./adl.md) |
+| **Oracle price feed** | The reference price per asset that the protocol uses for each market. It is a spot price that validators aggregate, so no single source controls it. It anchors the mark price and is an input to risk calculations. | [Oracle prices](./oracle-prices.md) |
+| **Mark price + funding** | The mark price is the value for margin, liquidation and triggers. It resists manipulation. It is built from the oracle, the book and external references, not from the last trade. Funding is the periodic payment between longs and shorts that keeps each perp near its underlying. Traders pay it directly to each other. | [Mark prices](./mark-prices.md) · [Funding rates](./funding-rates.md) |
+| **Margin system** | Sets how much collateral each position needs, and whether collateral is shared or kept separate. It covers cross and isolated margin, cross-asset portfolio margin (SPAN-style) for large accounts, and spot-margin borrowing that the Earn lending pool supplies. | [Margin modes](./margin-modes.md) · [Portfolio margin](./portfolio-margin.md) · [Spot margin](../products/spot-margin.md) · [Earn](./earn.md) |
+| **Liquidation** | Keeps accounts solvent when the margin of a position runs out. A tiered ladder unwinds positions in steps: first a warning, then partial reductions, not one full close. Auto-deleverage is the last backstop. | [Tiered liquidation](./tiered-liquidation.md) · [ADL](./adl.md) |
 
 ## Economics {#economics}
 
-The fee mechanics and the token that ties incentives together.
+These components are the fee mechanics and the token.
 
 | Component | What it does | Learn more |
 |---|---|---|
-| **Fee engine** | Computes the fee on every fill: volume-based maker/taker tiers, maker rebates, staking discounts, plus builder and referrer credits and separate spot and liquidation fees. Determines where collected fees flow. | [Fees](./fees.md) · [Fee schedule](./fee-schedule.md) |
-| **Tokenomics** | The MTF token: supply, emissions, the fee-funded buyback and burn, and how value accrues. Staking rewards and governance weight both draw on this. | [Tokenomics](./tokenomics.md) |
+| **Fee engine** | Computes the fee on every fill: maker/taker tiers by volume, maker rebates, staking discounts, builder and referrer credits, and separate spot and liquidation fees. It also sets where collected fees go. | [Fees](./fees.md) · [Fee schedule](./fee-schedule.md) |
+| **Tokenomics** | The MTF token: supply, emissions, the buyback and burn that fees fund, and how value accrues. Staking rewards and governance weight both depend on it. | [Tokenomics](./tokenomics.md) |
 
-## Consensus & governance {#consensus--governance}
+## Consensus and governance {#consensus--governance}
 
-The foundation every other component executes on, and how its parameters change.
+Consensus is the base that every other component runs on. Governance changes its
+parameters.
 
 | Component | What it does | Learn more |
 |---|---|---|
-| **Consensus (MetaFluxBFT)** | The Byzantine-fault-tolerant Proof-of-Stake engine that orders every transaction into one canonical chain with instant, deterministic finality. This total ordering is what makes fair on-chain matching possible — no reorgs, no probabilistic confirmations. | [Consensus](./consensus.md) |
-| **Staking** | The Proof-of-Stake layer: delegate MTF to back validators, earn rewards, and share in slashing/jailing risk. Stake determines the validator set and each validator's voting power. | [Staking](./staking.md) |
-| **Governance** | How protocol parameters are changed. Adjustments — such as fee, risk, and market parameters, and new market listings — are enacted by stake-weighted validator vote rather than by any single operator, and committed through the chain like any other state change. | [Consensus](./consensus.md) · [Improvement proposals](../mip/index.md) |
+| **Consensus (MetaFluxBFT)** | The Byzantine-fault-tolerant Proof-of-Stake protocol. It puts every transaction into one canonical chain. A committed block is final, with no reorgs and no probabilistic confirmations. This total order makes fair on-chain matching possible. | [Consensus](./consensus.md) |
+| **Staking** | The Proof-of-Stake layer. Delegators stake MTF to back validators, earn rewards, and share the slashing and jailing risk. Stake sets the validator set and the voting power of each validator. | [Staking](./staking.md) |
+| **Governance** | Changes protocol parameters, such as fee, risk and market parameters, and new market listings. A stake-weighted validator vote enacts each change, not a single operator. The change commits through the chain like any other state change. | [Consensus](./consensus.md) · [Improvement proposals](../mip/index.md) |
 
 ## Extensibility {#extensibility}
 
-Ways the protocol grows: pooled strategies and new markets.
+These components add pooled strategies and new markets.
 
 | Component | What it does | Learn more |
 |---|---|---|
-| **Vaults (metaliquidity)** | Depositor-funded vaults with a whitelisted operator. The protocol's own vault acts as the insurance/backstop pool; community vaults let depositors pool capital into a strategy that a designated operator runs, sharing profit and loss pro-rata by shares. | [Vaults](./vaults.md) · [MIP-2 metaliquidity](../mip/mip-2.md) |
-| **Permissionless market deploy** | Anyone meeting the requirements can list new markets — spot tokens and pairs, and builder-deployed perp markets — without gatekeeper approval, subject to on-chain safeguards. | [MIP-3 permissionless perp deploy](../mip/mip-3.md) · [MIP-1 spot deploy](../mip/mip-1.md) |
+| **Vaults (metaliquidity)** | Vaults that depositors fund and a whitelisted operator runs. The protocol's own vault is the insurance and backstop pool. In a community vault, depositors pool capital into a strategy that a designated operator runs. They share profit and loss pro-rata by shares. | [Vaults](./vaults.md) · [MIP-2 metaliquidity](../mip/mip-2.md) |
+| **Permissionless market deploy** | Anyone who meets the requirements can list new markets: spot tokens and pairs, and builder-deployed perp markets. No gatekeeper approves them. On-chain safeguards apply. | [MIP-3 permissionless perp deploy](../mip/mip-3.md) · [MIP-1 spot deploy](../mip/mip-1.md) |
 
-## Cross-chain & EVM {#cross-chain--evm}
+## Cross-chain and EVM {#cross-chain--evm}
 
-Programmability and moving value in and out of Core.
+These components add programmability and move value into and out of Core.
 
 | Component | What it does | Learn more |
 |---|---|---|
-| **EVM execution layer** | An inline EVM that runs ordinary Solidity contracts as part of every consensus block, sharing the same finality as Core. Contracts can read Core state through system precompiles and submit Core actions through a system contract, and value moves between Core and the EVM through dedicated transfer paths. | [EVM overview](../evm/index.md) · [Execution model](../evm/execution-model.md) · [Interacting with Core](../evm/interacting-with-core.md) · [Core ↔ EVM transfers](../evm/core-evm-transfers.md) |
-| **MetaBridge** | The validator-cosigned custody bridge for deposits and withdrawals across chains (Base first, then more). A source-chain contract holds custody; a two-thirds stake-weighted validator co-signature releases funds behind a dispute window — the same trust assumption as the chain itself, with no admin key. | [Bridge](../bridge/index.md) |
+| **EVM execution layer** | An inline EVM that runs ordinary Solidity contracts as part of every consensus block, with the same finality as Core. Contracts read Core state through system precompiles and send Core actions through a system contract. Value moves between Core and the EVM through dedicated transfer paths. | [EVM overview](../evm/index.md) · [Execution model](../evm/execution-model.md) · [Interacting with Core](../evm/interacting-with-core.md) · [Core ↔ EVM transfers](../evm/core-evm-transfers.md) |
+| **MetaBridge** | The custody bridge that validators co-sign, for deposits and withdrawals across chains (Base first, then more). A contract on the source chain holds custody. A co-signature from validators with two-thirds of the stake releases funds after a dispute window. The trust assumption is the same as the chain's, and there is no admin key. | [Bridge](../bridge/index.md) |
 
-## Following an order through Core {#following-an-order-through-core}
+## An order through Core {#following-an-order-through-core}
 
-To see how the components chain together, trace one perp order:
+This trace shows how the components connect for one perp order:
 
-1. You submit a signed order (directly, or via an [agent wallet](./agent-wallets.md)).
-2. [Consensus](./consensus.md) places it at a fixed position in the canonical order.
-3. The [matching engine](./order-types.md) matches it against the book, producing fills.
+1. You send a signed order, directly or through an [agent wallet](./agent-wallets.md).
+2. [Consensus](./consensus.md) gives it a fixed position in the canonical order.
+3. The [matching engine](./order-types.md) matches it against the book and produces fills.
 4. The [clearinghouse](../products/perpetuals.md) updates your position and balance, and the [fee engine](./fees.md) charges the fill.
-5. From then on, your position is valued against the [mark price](./mark-prices.md), pays or receives [funding](./funding-rates.md), and consumes [margin](./margin-modes.md).
-6. If margin runs out, [tiered liquidation](./tiered-liquidation.md) steps in, with [ADL](./adl.md) as the backstop.
+5. After that, the [mark price](./mark-prices.md) values your position. The position pays or receives [funding](./funding-rates.md) and uses [margin](./margin-modes.md).
+6. If the margin runs out, [tiered liquidation](./tiered-liquidation.md) starts, with [ADL](./adl.md) as the backstop.
 
-Every node runs steps 3–6 identically over the same ordered input, which is why
-the on-chain exchange stays in exact agreement without trusting any single node.
+Every node runs steps 3–6 in the same way over the same ordered input. Thus the
+exchange stays in exact agreement without trust in any single node.
 
 ## See also {#see-also}
 
-- [Start here](../start-here.md) — a plain-language introduction for newcomers
-- [Products](../products/index.md) — the tradeable markets (perpetuals, spot, spot margin)
-- [Concepts](./index.md) — the full set of deep-dive mechanism pages
-- [Consensus (MetaFluxBFT)](./consensus.md) — the ordering-and-finality foundation
-- [Glossary](./glossary.md) — every protocol-specific term defined
+- [Start here](../start-here.md): an introduction for new users.
+- [Products](../products/index.md): the tradeable markets (perpetuals, spot, spot margin).
+- [Concepts](./index.md): all the mechanism pages.
+- [Consensus (MetaFluxBFT)](./consensus.md): the base for order and finality.
+- [Glossary](./glossary.md): a definition of every protocol-specific term.

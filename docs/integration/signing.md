@@ -1,28 +1,28 @@
 # Signing walkthrough
 
-:::info
-**This page has moved.** `/exchange` actions are signed with **structured
-EIP-712 typed data** (`eth_signTypedData_v4`). That is the single signing scheme.
-The end-to-end walkthrough — domain, per-action type strings, digest, worked
-examples, and local verification — now lives in
-[**typed-data signing**](./typed-data-signing.md).
+This page points to the signing reference, which now lives on another page.
+
+:::info This page has moved
+`/exchange` actions are signed with structured EIP-712 typed data (`eth_signTypedData_v4`).
+That is the one signing scheme. The end-to-end walkthrough now lives in
+[typed-data signing](./typed-data-signing.md). It covers the domain, the type string per action,
+the digest, worked examples and local verification.
 :::
 
-Every `/exchange` request is an EIP-712 typed-data signature: the wallet renders
-each action field by name, the server reconstructs the typed struct from
-`action.type` + `action.params`, recomputes the digest, and recovers the signer
-(the account, or an approved [agent](../concepts/agent-wallets.md) of it). There
-is no second scheme to choose between.
+Every `/exchange` request carries an EIP-712 typed-data signature. The wallet shows each action
+field by name. The server rebuilds the typed struct from `action.type` and `action.params`,
+recomputes the digest, and recovers the signer. The signer is the account, or an approved
+[agent](../concepts/agent-wallets.md) of the account. There is no second scheme.
 
-Go to [**typed-data signing**](./typed-data-signing.md) for the full
-specification and copy-pasteable TypeScript / Python examples.
+[Typed-data signing](./typed-data-signing.md) has the full specification and TypeScript and
+Python examples.
 
 ## See also {#see-also}
 
-- [Typed-data signing](./typed-data-signing.md) — the signing scheme, end to end
-  (including the optional [action `expiresAfter`](./typed-data-signing.md#action-expiry-expiresafter) expiry)
-- [`POST /exchange`](../api/rest/exchange.md) — the endpoint
-- [Agent wallets](../concepts/agent-wallets.md) — multi-signer setup
-- [Idempotency](./idempotency.md) — nonce strategy + retry
-- [Errors](../api/errors.md) — every error you might hit during signing rollout
-- [Networks](../networks.md) — chainId per network
+- [Typed-data signing](./typed-data-signing.md): the signing scheme, end to end, including the
+  optional [action `expiresAfter`](./typed-data-signing.md#action-expiry-expiresafter) expiry
+- [`POST /exchange`](../api/rest/exchange.md): the endpoint
+- [Agent wallets](../concepts/agent-wallets.md): setup with more than one signer
+- [Idempotency](./idempotency.md): nonce strategy and retry
+- [Errors](../api/errors.md): the errors you can get while you roll out signing
+- [Networks](../networks.md): the chainId of each network

@@ -1,187 +1,187 @@
 # Glossary
 
-:::tip
-**Stable.** New terms added with each protocol expansion.
-:::
+This page defines the terms that the docs use. Each term links to its own page where one exists.
 
-Defined terms used throughout the docs. Cross-linked where the topic has its own page.
+:::tip
+**Stable.** New terms are added with each protocol expansion.
+:::
 
 ## A {#a}
 
-**ADL — Auto-deleverage.** Loss-mutualisation mechanism that claws back unrealised PnL from profitable counter-parties when the insurance pool can't cover a T3 liquidation shortfall. See [ADL](./adl.md).
+**ADL (auto-deleverage).** A loss-mutualization mechanism. When the insurance pool cannot cover a T3 liquidation shortfall, it takes back unrealized PnL from profitable counter-parties. See [ADL](./adl.md).
 
-**Agent wallet.** A signing key approved by a master account to act on its behalf, **without** withdrawal authority. See [agent wallets](./agent-wallets.md).
+**Agent wallet.** A signing key that a master account approves to act for it. It has no withdrawal authority. See [agent wallets](./agent-wallets.md).
 
-**ALO — Add-Limit-Only.** Order TIF that rejects the order entirely if any portion would cross the book. Guaranteed maker. See [order types](./order-types.md#time-in-force).
+**ALO (add-limit-only).** A TIF that rejects the whole order if any portion would cross the book. The order is always a maker. See [order types](./order-types.md#time-in-force).
 
-**Asset ID.** A market's canonical integer identifier. On the wire the field is `signing_id`, on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta). It carries that name because it is the value a signed action puts in `market` (perp) or `pair` (spot). There is no `asset_id` field. Ids differ across networks, so read them at start-up.
+**Asset ID.** The canonical integer identifier of a market. On the wire, the field is `signing_id`, on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta). It has that name because it is the value that a signed action puts in `market` (perp) or `pair` (spot). There is no `asset_id` field. Ids are different on each network, so read them at start-up.
 
-**Action.** A state-mutating call to `POST /exchange`. Tagged variant union with about 30 types. See [exchange.md](../api/rest/exchange.md#action-catalog).
+**Action.** A state-mutating call to `POST /exchange`. It is a tagged variant union with about 30 types. See [exchange.md](../api/rest/exchange.md#action-catalog).
 
 ## B {#b}
 
-**Backstop (T3).** Liquidation tier where the protocol seizes a sub-threshold account's position into the insurance pool. See [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark).
+**Backstop (T3).** The liquidation tier in which the protocol moves the position of an account below the threshold into the insurance pool. See [tiered liquidation](./tiered-liquidation.md#t3-backstop--netting-at-mark).
 
-**Band, mark-price.** Per-block clamp on how far the mark price can move. Defends against oracle/mid manipulation. See [mark prices](./mark-prices.md#sanity-bands).
+**Band, mark-price.** A per-block clamp on how far the mark price can move. It protects against manipulation of the oracle or the mid. See [mark prices](./mark-prices.md#sanity-bands).
 
-**Batch ID.** Auction batch identifier for FBA markets. See [FBA](./fba.md).
+**Batch ID.** The identifier of an auction batch on an FBA market. See [FBA](./fba.md).
 
-**bps — Basis point.** 0.01% (= `1e-4`). Fee rates are denominated in bps; `5 bps` = 0.05%.
+**bps (basis point).** 0.01% (= `1e-4`). Fee rates are in bps: `5 bps` = 0.05%.
 
-**Broker credit.** Extra fee charged on top of the taker fee and paid to the address that originated an order (front-end, aggregator, automation service). See [fees](./fees.md#broker-credit) and [broker codes](./broker-codes.md).
+**Broker credit.** An extra fee on top of the taker fee. It goes to the address that originated the order (a front end, an aggregator or an automation service). See [fees](./fees.md#broker-credit) and [broker codes](./broker-codes.md).
 
 ## C {#c}
 
-**CCTP — Cross-Chain Transfer Protocol.** Circle's Cross-Chain Transfer Protocol. MetaFlux does **not** use CCTP; instead USDC is bridged via [MetaBridge](../bridge/) (a validator-signed custody bridge).
+**CCTP (Cross-Chain Transfer Protocol).** The cross-chain transfer protocol of Circle. MetaFlux does not use CCTP. USDC moves through [MetaBridge](../bridge/), a custody bridge that validators sign.
 
-**chainId.** EIP-712 domain field selecting the network. `31337` a node you run yourself, `114514` testnet, `8964` mainnet. See [networks](../networks.md).
+**chainId.** The EIP-712 domain field that selects the network: `31337` for a node you run yourself, `114514` for testnet, `8964` for mainnet. See [networks](../networks.md).
 
-**Cloid — Client Order ID.** 16-byte identifier set by the client; enables `cancel_by_cloid` and order idempotency. See [exchange.md `submit_order`](../api/rest/exchange/orders.md#submit_order).
+**Cloid (client order ID).** A 16-byte identifier that the client sets. It enables `cancel_by_cloid` and order idempotency. See [exchange.md `submit_order`](../api/rest/exchange/orders.md#submit_order).
 
 **Clearing price (FBA).** The single uniform price at which an FBA batch settles. See [FBA](./fba.md).
 
-**Cross margin.** Margin mode where all positions share account-wide collateral. Capital-efficient; not isolated. See [margin modes](./margin-modes.md).
+**Cross margin.** A margin mode in which all positions share the collateral of the account. It is capital-efficient and not isolated. See [margin modes](./margin-modes.md).
 
 ## D {#d}
 
-**Delegation (staking).** A delegator's MTF stake assigned to a validator's pool. Earns rewards, exposed to slashing. See [staking](./staking.md).
+**Delegation (staking).** MTF stake that a delegator assigns to the pool of a validator. It earns rewards and is exposed to slashing. See [staking](./staking.md).
 
-**Domain separator.** EIP-712 32-byte constant per network; one of the inputs to the signed hash. See [signing](../integration/signing.md).
+**Domain separator.** A 32-byte EIP-712 constant per network. It is one of the inputs to the signed hash. See [signing](../integration/signing.md).
 
 ## E {#e}
 
-**EIP-712.** Ethereum standard for typed structured signed data. MetaFlux signing uses the EIP-712 envelope (`0x1901 || domain || hash`). See [signing](../integration/signing.md).
+**EIP-712.** The Ethereum standard for typed structured signed data. MetaFlux signing uses the EIP-712 envelope (`0x1901 || domain || hash`). See [signing](../integration/signing.md).
 
-**EMA — Exponential Moving Average.** Used in mid-price smoothing for mark computation. See [mark prices](./mark-prices.md).
+**EMA (exponential moving average).** The smoothing of the mid price in the mark computation. See [mark prices](./mark-prices.md).
 
 ## F {#f}
 
-**FBA — Frequent Batch Auction.** Discrete-time matching alternative to continuous CLOB. See [FBA](./fba.md).
+**FBA (frequent batch auction).** A discrete-time alternative to matching on a continuous CLOB. See [FBA](./fba.md).
 
-**FIFO — First-In-First-Out.** Order matching priority at the same price level on the continuous CLOB.
+**FIFO (first in, first out).** The matching priority at one price level on the continuous CLOB.
 
-**Funding rate.** Per-asset discrete user-to-user payment (default 1h period, governance-configurable per asset) that pegs perp price to underlying oracle. See [funding rates](./funding-rates.md).
+**Funding rate.** A discrete payment between users, per asset, that keeps the perp price near the underlying oracle. The default period is 1h. Governance can configure it per asset. See [funding rates](./funding-rates.md).
 
 ## G {#g}
 
-**Grouping.** `Order` parameter that links legs into an OCO family (`NormalTpsl`) or position-attached braces (`PositionTpsl`). See [order types](./order-types.md#grouping).
+**Grouping.** An `Order` parameter that links legs into an OCO family (`NormalTpsl`) or into braces attached to a position (`PositionTpsl`). See [order types](./order-types.md#grouping).
 
-**GTC — Good-Till-Cancelled.** Default TIF; order rests on the book indefinitely. See [order types](./order-types.md#time-in-force).
+**GTC (good till cancelled).** The default TIF. The order rests on the book until it fills or is cancelled. See [order types](./order-types.md#time-in-force).
 
 ## H {#h}
 
-**Health ratio.** `account_value / cross_maintenance_margin_used`. Drives the [tiered liquidation](./tiered-liquidation.md) ladder. The default [`account_state`](../api/rest/info/account.md#account_state) body gives you the computed `health` but **not** `cross_maintenance_margin_used`; ask for that denominator with `detail: "margin"`.
+**Health ratio.** `account_value / cross_maintenance_margin_used`. It drives the [tiered liquidation](./tiered-liquidation.md) ladder. The default [`account_state`](../api/rest/info/account.md#account_state) body gives the computed `health` but not `cross_maintenance_margin_used`. To get that denominator, ask for `detail: "margin"`.
 
-**High-water mark.** Highest historical share price for a vault, used to gate performance-fee accrual. See [vaults](./vaults.md).
+**High-water mark.** The highest historical share price of a vault. Performance fees accrue only above it. See [vaults](./vaults.md).
 
 ## I {#i}
 
-**IOC — Immediate-Or-Cancel.** TIF; match what's available, cancel any unfilled remainder. See [order types](./order-types.md#time-in-force).
+**IOC (immediate or cancel).** A TIF that matches what is available and cancels any unfilled remainder. See [order types](./order-types.md#time-in-force).
 
-**Idempotency.** Property whereby retrying a request causes the same observable effect. See [idempotency](../integration/idempotency.md).
+**Idempotency.** The property that a retried request has the same observable effect. See [idempotency](../integration/idempotency.md).
 
-**Insurance pool.** Subset of the Metaliquidity vault reserved for T3 backstop coverage. See [vaults](./vaults.md#insurance-pool).
+**Insurance pool.** The part of the Metaliquidity vault that is reserved for T3 backstop coverage. See [vaults](./vaults.md#insurance-pool).
 
-**Isolated margin.** Margin mode where a per-asset bucket caps the loss on that asset. See [margin modes](./margin-modes.md).
+**Isolated margin.** A margin mode in which a per-asset bucket caps the loss on that asset. See [margin modes](./margin-modes.md).
 
 ## L {#l}
 
-**L2 book.** The order book at a given depth (top-N levels per side). See [`l2_book` info](../api/rest/info/perpetuals.md#l2_book).
+**L2 book.** The order book at a given depth (top N levels per side). See [`l2_book` info](../api/rest/info/perpetuals.md#l2_book).
 
-**Liquidation tier.** Stage in the [tiered ladder](./tiered-liquidation.md): T0 yellow card, T1 partial, T2 full, T3 backstop, T4 ADL.
+**Liquidation tier.** A stage in the [tiered ladder](./tiered-liquidation.md): T0 yellow card, T1 partial, T2 full, T3 backstop, T4 ADL.
 
-**Lock-up (staking / vault).** Time required between unstake/withdraw signal and funds availability. See [staking](./staking.md), [vaults](./vaults.md).
+**Lock-up (staking / vault).** The time between an unstake or withdraw request and the moment the funds are available. See [staking](./staking.md) and [vaults](./vaults.md).
 
 ## M {#m}
 
-**Maintenance margin.** Minimum collateral required to keep a position open. Health = `account_value / cross_maintenance_margin_used`. The account-level field covers the CROSS bucket only; an isolated leg carries its own `maint_margin` on its position row. Read `cross_maintenance_margin_used` from [`account_state`](../api/rest/info/account.md#account_state) with `detail: "margin"` — the default body omits it. See [margin modes](./margin-modes.md).
+**Maintenance margin.** The minimum collateral to keep a position open. Health = `account_value / cross_maintenance_margin_used`. The account-level field covers the cross bucket only. An isolated leg has its own `maint_margin` on its position row. Read `cross_maintenance_margin_used` from [`account_state`](../api/rest/info/account.md#account_state) with `detail: "margin"`. The default body omits it. See [margin modes](./margin-modes.md).
 
-**Maker / Taker.** Maker provides liquidity (resting order); taker removes it (crossing order). Different fee rates. See [fees](./fees.md).
+**Maker / Taker.** A maker provides liquidity with a resting order. A taker removes it with a crossing order. They have different fee rates. See [fees](./fees.md).
 
-**Mark price.** Protocol's authoritative price for margin/liquidation. Median composition of mid + oracle + EMA. See [mark prices](./mark-prices.md).
+**Mark price.** The authoritative price of the protocol for margin and liquidation. It is a median of the mid, the oracle and the EMA. See [mark prices](./mark-prices.md).
 
-**Master account.** The account whose state is mutated by actions; can be signed by itself or by an approved agent. See [agent wallets](./agent-wallets.md).
+**Master account.** The account whose state an action changes. The account itself or an approved agent can sign. See [agent wallets](./agent-wallets.md).
 
-**Metaliquidity vault.** Protocol-operated insurance + market-making pool (vault `kind: "Metaliquidity"`). See [vaults](./vaults.md#metaliquidity-vault).
+**Metaliquidity vault.** The insurance and market-making pool that the protocol operates (vault `kind: "Metaliquidity"`). See [vaults](./vaults.md#metaliquidity-vault).
 
-**MIP — Market Improvement Proposal.** Numbered protocol improvement (analogous to the improvement-proposal schemes used by established on-chain perp protocols). See [MIP](../mip/).
+**MIP (Market Improvement Proposal).** A numbered protocol improvement. It is similar to the improvement-proposal schemes of established on-chain perp protocols. See [MIP](../mip/).
 
 **Action JSON.** An action goes on the wire as JSON. The signature covers the EIP-712 typed-data digest of the action, not the JSON bytes. The JSON bytes are hashed separately for the `action_hash` correlation key. See [signing](../integration/signing.md).
 
-**MTF.** The MetaFlux protocol token. Used for gas, staking, governance, and the fee buyback.
+**MTF.** The MetaFlux protocol token. It is used for gas, staking, governance and the fee buyback.
 
-**Multi-sig.** M-of-N signature requirement for an account. See [multi-sig](./multi-sig.md).
+**Multi-sig.** An M-of-N signature requirement for an account. See [multi-sig](./multi-sig.md).
 
 ## N {#n}
 
-**Nonce.** Per-sender strictly-monotonic uint64 included in every action; replay protection. See [idempotency](../integration/idempotency.md).
+**Nonce.** A strictly monotonic uint64 per sender, included in every action for replay protection. See [idempotency](../integration/idempotency.md).
 
 ## O {#o}
 
-**Oid — Order ID.** Server-assigned uint64; returned in the `Order` response and on the [`order_updates`](../api/ws/subscriptions.md#order_updates) / [`fills`](../api/ws/subscriptions.md#fills) / [`open_orders`](../api/ws/subscriptions.md#open_orders) WS channels. See [exchange.md](../api/rest/exchange.md).
+**Oid (order ID).** A uint64 that the server assigns. The `Order` response returns it, and so do the [`order_updates`](../api/ws/subscriptions.md#order_updates), [`fills`](../api/ws/subscriptions.md#fills) and [`open_orders`](../api/ws/subscriptions.md#open_orders) WS channels. See [exchange.md](../api/rest/exchange.md).
 
-**Oracle.** External price feed composed from CEX prices via TWA. Input to mark price + funding. See [mark prices](./mark-prices.md#the-oracle-c1-anchor).
+**Oracle.** An external price feed built from CEX prices with a TWA. It is an input to the mark price and funding. See [mark prices](./mark-prices.md#the-oracle-c1-anchor).
 
 ## P {#p}
 
-**PnL.** Profit-and-loss. Unrealised (mark-to-market on open position) vs realised (closed at exit fill).
+**PnL.** Profit and loss. Unrealized PnL is mark-to-market on an open position. Realized PnL is fixed at the exit fill.
 
-**Portfolio margin (PM).** Cross-asset scenario-based margin model; capital-efficient for hedged books. See [portfolio margin](./portfolio-margin.md).
+**Portfolio margin (PM).** A cross-asset margin model based on scenarios. It is capital-efficient for hedged books. See [portfolio margin](./portfolio-margin.md).
 
-**Premium index.** EMA of `mid - oracle`; input to funding. See [funding rates](./funding-rates.md).
+**Premium index.** The EMA of `mid - oracle`. It is an input to funding. See [funding rates](./funding-rates.md).
 
 ## R {#r}
 
-**Reduce-only.** Order flag that rejects the order at admission if it would grow position size. See [order types](./order-types.md#reduce-only).
+**Reduce-only.** An order flag. Admission rejects the order if it would increase the position size. See [order types](./order-types.md#reduce-only).
 
-**RFQ — Request for Quote.** The option trade path: a taker asks makers for a premium on one option series, and accepts one quote. It refuses every market that is not a live option series. See [RFQ](./rfq.md).
+**RFQ (request for quote).** The trade path for options. A taker asks makers for a premium on one option series and accepts one quote. RFQ refuses every market that is not a live option series. See [RFQ](./rfq.md).
 
 ## S {#s}
 
-**Sender.** The address whose state mutates on a `POST /exchange` request. May be signed by itself or by an approved agent.
+**Sender.** The address whose state a `POST /exchange` request changes. The address itself or an approved agent can sign.
 
-**Share (vault).** Unit of vault participation; minted at deposit at the current `share_price`, burned at withdrawal at the current `share_price`. See [vaults](./vaults.md).
+**Share (vault).** The unit of vault participation. It is minted at deposit and burned at withdrawal, at the current `share_price`. See [vaults](./vaults.md).
 
-**Slashing.** Validator punishment for double-signing or downtime; reduces validator (and delegator) stake. See [staking](./staking.md#slashing).
+**Slashing.** A penalty on a validator for double-signing or downtime. It reduces validator and delegator stake. See [staking](./staking.md#slashing).
 
-**STP — Self-Trade Prevention.** Order parameter selecting what happens when your new order would match your own resting order. See [order types](./order-types.md#self-trade-prevention).
+**STP (self-trade prevention).** An order parameter that selects what happens when your new order would match your own resting order. See [order types](./order-types.md#self-trade-prevention).
 
-**Strict-Iso.** Margin mode like Isolated, with the additional property that the position is excluded from any portfolio-margin netting. See [margin modes](./margin-modes.md).
+**Strict-Iso.** A margin mode like Isolated. In addition, the position is excluded from any portfolio-margin netting. See [margin modes](./margin-modes.md).
 
-**Sub-account.** Derived account under a master; isolated positions and orders, shares deposit/withdraw with master only. See [sub-accounts](./sub-accounts.md).
+**Sub-account.** A derived account under a master. It has isolated positions and orders. It moves deposits and withdrawals only to and from its master. See [sub-accounts](./sub-accounts.md).
 
 ## T {#t}
 
-**Taker.** Liquidity remover; the side of a fill that crosses the book.
+**Taker.** The side of a fill that crosses the book and removes liquidity.
 
-**Tick size.** Minimum price increment for a market. Orders must align.
+**Tick size.** The minimum price increment of a market. Order prices must align to it.
 
-**TIF — Time-In-Force.** Order parameter: GTC / IOC / ALO. There is no FOK (fill-or-kill) or all-or-none value. See [order types](./order-types.md#time-in-force).
+**TIF (time in force).** An order parameter: GTC, IOC or ALO. There is no FOK (fill-or-kill) or all-or-none value. See [order types](./order-types.md#time-in-force).
 
-**TPSL — Take-Profit / Stop-Loss.** Trigger-order grouping for protective braces. See [order types](./order-types.md#triggers).
+**TPSL (take-profit / stop-loss).** A trigger-order grouping for protective braces. See [order types](./order-types.md#triggers).
 
-**TVL — Total Value Locked.** Sum of vault NAV across all depositors.
+**TVL (total value locked).** The sum of vault NAV across all depositors.
 
-**TWAP — Time-Weighted Average Price.** Order primitive that slices a large order over time. See [order types](./order-types.md#twap).
+**TWAP (time-weighted average price).** An order primitive that splits a large order over time. See [order types](./order-types.md#twap).
 
 ## U {#u}
 
-**Universe.** The active list of markets (perp + spot) on the protocol. Read [`markets`](../api/rest/info/perpetuals.md#markets) for the dynamic figures, or [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) for the static grids and ids. There is no `meta` read; it answers `UNKNOWN_TYPE`.
+**Universe.** The active list of markets (perp and spot) on the protocol. Read [`markets`](../api/rest/info/perpetuals.md#markets) for the dynamic figures, or [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) for the static grids and ids. There is no `meta` read. It answers `UNKNOWN_TYPE`.
 
-**Unrealised PnL.** Mark-to-market profit/loss on open positions. Not yet realised by closing.
+**Unrealized PnL.** Mark-to-market profit or loss on open positions, before a close realizes it.
 
-**USDC.** The quote currency for MetaFlux markets; bridged in/out via [MetaBridge](../bridge/).
+**USDC.** The quote currency for MetaFlux markets. It moves in and out through [MetaBridge](../bridge/).
 
 ## V {#v}
 
-**Validator.** Consensus participant; proposes blocks and votes. Earns commission on delegator rewards; subject to slashing.
+**Validator.** A consensus participant. It proposes blocks and votes. It earns commission on delegator rewards and is subject to slashing.
 
-**Vault.** Pool of USDC under a manager's signing authority, with mint/burn share semantics. See [vaults](./vaults.md).
+**Vault.** A pool of USDC under the signing authority of a manager, with shares that are minted and burned. See [vaults](./vaults.md).
 
 ## W {#w}
 
-**Withdrawable.** Free balance that can leave the account (not held as margin against open positions, not in an isolated bucket, not vault-locked).
+**Withdrawable.** The free balance that can leave the account. It excludes margin held against open positions, isolated buckets and vault lock-ups.
 
 ## Y {#y}
 
-**Yellow card (T0).** First liquidation tier. ALO orders cancelled; positions untouched; client notified. See [tiered liquidation](./tiered-liquidation.md#why-a-yellow-card).
+**Yellow card (T0).** The first liquidation tier. The engine cancels ALO orders and notifies the client. Positions do not change. See [tiered liquidation](./tiered-liquidation.md#why-a-yellow-card).

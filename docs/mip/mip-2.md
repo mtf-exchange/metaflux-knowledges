@@ -1,70 +1,65 @@
-# MIP-2 — Metaliquidity
+# MIP-2: Metaliquidity
 
-:::info
-**In progress.** On-chain vault landing; market-making strategy runs off-chain.
+MIP-2 defines Metaliquidity, the protocol liquidity-provider vault.
+
+:::info In progress
+The on-chain vault is landing. The market-making strategy runs off-chain.
 :::
 
-Metaliquidity is MetaFlux's protocol/community **liquidity-provider vault** — the
-native-liquidity backbone, analogous to the automated liquidity-provision
-proposal on established on-chain venues. Liquidity providers deposit USDC into the
-vault and share in the PnL of a market-making strategy that quotes on the order
-books. It provides the resting liquidity that takers trade against, so markets are
-not dependent solely on external market makers from day one.
+Metaliquidity is the protocol and community *liquidity-provider vault* of MetaFlux. It supplies
+native liquidity. It is the analogue of the automated liquidity-provision proposal on
+established on-chain venues. Liquidity providers deposit USDC into the vault. They share in the
+PnL of a market-making strategy that quotes on the order books. The vault provides resting
+liquidity for takers, so markets do not depend only on external market makers from day one.
 
-## What's on-chain vs off-chain {#whats-on-chain-vs-off-chain}
+## On-chain and off-chain parts {#whats-on-chain-vs-off-chain}
 
-A deliberate split keeps the consensus surface small:
+The design splits the parts on purpose, to keep the consensus surface small:
 
-- **On-chain — the vault only.** Pooled LP capital, share accounting, NAV
-  (marked-to-market against the oracle), a withdrawal lock, and a whitelist of
-  recognised provider addresses.
-- **Off-chain — the strategy.** The market-making logic (quoting, inventory
-  management) runs as an ordinary MTF-native client: a whitelisted strategy key
-  signs orders **on behalf of the vault account** and submits them through the
-  normal signed-order path. No strategy logic is baked into consensus.
+- **On-chain: the vault only.** Pooled LP capital, share accounting, NAV marked to market against
+  the oracle, a withdrawal lock, and a whitelist of recognised provider addresses.
+- **Off-chain: the strategy.** The market-making logic (quoting, inventory management) runs as a
+  normal MTF-native client. A whitelisted strategy key signs orders for the vault account. It
+  submits them through the normal signed-order path. Consensus contains no strategy logic.
 
 ## Scope {#scope}
 
 The vault trades core markets only. It never takes the risk of a
-[deployer market](./mip-3.md): a market a builder deployed, with an asset id at
-or above 1000.
+[deployer market](./mip-3.md). A deployer market is a market that a builder deployed, with an
+asset id of 1000 or more.
 
-- **Orders.** The chain refuses a vault order that opens or extends a position
-  on a deployer market, or flips one. The error is `PRECONDITION_FAILED`, with
-  the message
-  `metaliquidity vault cannot open or extend a position on a MIP-3 market`. An
-  order that only closes a position passes.
-- **Backstop.** The vault never absorbs a deployer market's liquidation. This
-  is live. See [Liquidation on a deployed market](./mip-3.md#liquidation).
-- **Strategy.** The reference market maker refuses to start when its list
-  names a deployer market.
+- **Orders.** The chain refuses a vault order that opens, extends or flips a position on a
+  deployer market. The error is `PRECONDITION_FAILED`, with the message
+  `metaliquidity vault cannot open or extend a position on a MIP-3 market`. An order that only
+  closes a position passes.
+- **Backstop.** The vault never absorbs the liquidation of a deployer market. This is live. See
+  [Liquidation on a deployed market](./mip-3.md#liquidation).
+- **Strategy.** The reference market maker refuses to start when its list names a deployer
+  market.
 
-**Why.** A deployer market prices from its own deployer, and its deployer sets
-its open-interest cap. Neither is under protocol control. Liquidity providers
-did not deposit to carry that risk.
+**Reason.** A deployer market gets its price from its own deployer, and its deployer sets its
+open-interest cap. The protocol controls neither. Liquidity providers did not deposit to carry
+that risk.
 
-## For liquidity providers {#for-liquidity-providers}
+## Liquidity providers {#for-liquidity-providers}
 
-- **Deposit** USDC, permissionlessly, and receive vault shares priced at the
-  current NAV (`cash + mark-to-market of the vault's open positions`).
-- **Withdraw** by redeeming shares for their NAV share, subject to a **7-day**
-  withdrawal lock from your most recent deposit.
-- Your shares appreciate or depreciate with the strategy's realised and
-  unrealised PnL — there is market risk; this is not a yield guarantee.
+- **Deposit** USDC without permission. You receive vault shares priced at the current NAV
+  (`cash + mark-to-market of the vault's open positions`).
+- **Withdraw** by redeeming shares for their part of the NAV. A 7-day withdrawal lock applies
+  from your most recent deposit.
+- Your shares gain or lose value with the strategy's realised and unrealised PnL. There is
+  market risk. The vault does not guarantee a yield.
 
 ## Provider whitelist {#provider-whitelist}
 
-The recognised Metaliquidity provider addresses are a **list**, seeded at genesis
-and mutable by governance. Only a whitelisted address may operate a Metaliquidity
-vault and be authorised to trade its pooled capital; deposits remain open to
-anyone.
+The recognised Metaliquidity provider addresses are a list. Genesis seeds the list, and
+governance can change it. Only a whitelisted address can operate a Metaliquidity vault and trade
+its pooled capital. Deposits stay open to anyone.
 
-## Status & history {#status--history}
+## Status and history {#status--history}
 
-Metaliquidity supplies the native order-book liquidity that a protocol-owned
-provider is meant to bootstrap. The equivalent protocol-owned vault on
-established on-chain venues was originally deferred post-launch (to V2) in
-favour of external market makers; it has been pulled forward because native
-resting liquidity is needed earlier than that plan assumed. The on-chain vault
-is landing now; the off-chain strategy and provider whitelist seed in alongside
-it.
+Metaliquidity supplies the native order-book liquidity that a protocol-owned provider is meant
+to bootstrap. On established on-chain venues, the equivalent protocol-owned vault was first
+deferred until after launch (to V2), in favour of external market makers. MetaFlux moved it
+earlier, because native resting liquidity is needed sooner than that plan assumed. The on-chain
+vault is landing now. The off-chain strategy and the provider whitelist seed arrive with it.

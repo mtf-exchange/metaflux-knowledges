@@ -1,25 +1,27 @@
 # Request-for-quote (RFQ)
 
-## TL;DR {#tldr}
+Request for quote (RFQ) is the trade path for options. This page describes the three actions, what a fill settles, and how to read open sessions.
 
-RFQ is the **option trade path**. A taker asks for a quote on one
-[option series](../products/options.md), makers answer with a premium, and the
+## Summary {#tldr}
+
+RFQ is the trade path for options. A taker asks for a quote on one
+[option series](../products/options.md). Makers answer with a premium, and the
 taker accepts one quote. The fill settles directly between the two accounts.
 
-**RFQ clears options and nothing else.** All three actions refuse any market that
-is not a live option series. There is no RFQ on perpetuals and none on spot.
+RFQ clears options and nothing else. All three actions refuse any market that is
+not a live option series. There is no RFQ on perpetuals and none on spot.
 
-## Why the lane is options-only {#why-rfq}
+## Options only {#why-rfq}
 
-A request-for-quote lane beside a public order book is not fair to that book: it
-lets size trade away from the price everyone else is posting against. MetaFlux
-therefore offers RFQ only where there is no continuous book to undercut.
+A request-for-quote path next to a public order book is not fair to that book.
+It lets size trade away from the price that everyone else posts against.
+MetaFlux thus offers RFQ only where there is no continuous book to undercut.
 
-Options have no book. The chain never prices an option and never needs an implied
-volatility, so the premium has to come from a negotiation between two accounts.
-RFQ is that negotiation.
+Options have no book. The chain never prices an option and never needs an
+implied volatility, so the premium must come from a negotiation between two
+accounts. RFQ is that negotiation.
 
-The refusal on every other market is exact:
+The refusal on every other market is exactly:
 
 ```
 precondition failed: rfq is options-only: market <n> is not an option series
@@ -42,12 +44,11 @@ sequenceDiagram
 
 ## Action flow {#action-flow}
 
-The three actions are fully specified in the
-[`/exchange` action catalog](../api/rest/exchange/rfq-utility.md) —
-this section is a conceptual walkthrough. Follow the links for the full field
-tables and the EIP-712 typed-data primary types.
+The [`/exchange` action catalog](../api/rest/exchange/rfq-utility.md) fully
+specifies the three actions. This section explains the concepts. The links give
+the full field tables and the EIP-712 typed-data primary types.
 
-### Taker — request a quote {#taker--request-an-rfq}
+### Request a quote (taker) {#taker--request-an-rfq}
 
 [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request):
 
@@ -65,25 +66,26 @@ tables and the EIP-712 typed-data primary types.
 ```
 
 `market` is the `signing_id` of a live series, from
-[`option_series`](../api/rest/info/options.md#option_series). **Serve it, never compute
-it** — the encoding behind the number is internal.
+[`option_series`](../api/rest/info/options.md#option_series). Read it from the
+server. Never compute it, because the encoding behind the number is internal.
 
-`size` / `limit_px` are raw `u64` **numbers**, not decimal strings. `size` is on
-the series' `10^sz_decimals` plane; `limit_px` is a premium per whole unit on the
-1e8 plane. `side` is `"Bid"` / `"Ask"`, capitalized — unlike a perp order body's
-lowercase `"bid"` / `"ask"`. `"Bid"` buys the option; `"Ask"` writes it.
+`size` and `limit_px` are raw `u64` numbers, not decimal strings. `size` is on
+the `10^sz_decimals` plane of the series. `limit_px` is a premium per whole unit
+on the 1e8 plane. `side` is `"Bid"` / `"Ask"`, capitalized. This is different
+from the lowercase `"bid"` / `"ask"` of a perp order body. `"Bid"` buys the
+option. `"Ask"` writes it.
 
-`limit_px` is optional. When it is present the chain proves at once that the
-taker can carry the worst case, and refuses with `insufficient free collateral
-for the request` when it cannot. `expiry_ms` is an absolute consensus-ms stamp,
-not a duration.
+`limit_px` is optional. When it is present, the chain checks at once that the
+taker can carry the worst case. If it cannot, the chain refuses with
+`insufficient free collateral for the request`. `expiry_ms` is an absolute
+consensus timestamp in ms, not a duration.
 
 This action returns the standard
 [`202 Accepted`](../api/rest/exchange.md#202-accepted--non-order-admission)
-admission envelope. The assigned `rfq_id` is **not** in that response. It is a
-committed effect: read it back from [`rfq_user`](#querying-open-rfqs).
+admission envelope. The assigned `rfq_id` is not in that response. It is a
+committed effect. Read it from [`rfq_user`](#querying-open-rfqs).
 
-### Maker — submit a quote {#maker--submit-a-quote}
+### Submit a quote (maker) {#maker--submit-a-quote}
 
 [`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote):
 
@@ -99,21 +101,21 @@ committed effect: read it back from [`rfq_user`](#querying-open-rfqs).
 }
 ```
 
-**`valid_until_ms` may not exceed the request's own `expiry_ms`.** A quote that
-outlives its session is refused with `invalid parameters: valid_until_ms exceeds
-request expiry`. Read the session's `expiry` from
-[`rfq_open`](#querying-open-rfqs) and use that number. Do NOT compute the
-validity from a second local clock reading: the request round-trip sits between
-the two reads, and the chain stamps the request on its own clock, so two
-"now + 60s" values taken seconds apart are not the same ceiling.
+`valid_until_ms` must not be later than the `expiry_ms` of the request. The
+chain refuses a quote that outlives its session with `invalid parameters:
+valid_until_ms exceeds request expiry`. Read the `expiry` of the session from
+[`rfq_open`](#querying-open-rfqs) and use that number. Do not compute the
+validity from a second local clock reading. The request round trip is between
+the two readings, and the chain stamps the request on its own clock. Two
+"now + 60s" values taken seconds apart are thus not the same ceiling.
 
 `price` is the premium per whole unit. `rfq_id` is the numeric session id from
-[`rfq_open`](#querying-open-rfqs) — not a hex string. A maker can submit several
-quotes over the session's life; each is appended to the session's quote list and
-is identified only by its **position in that list** (`quote_idx`). There is no
+[`rfq_open`](#querying-open-rfqs), not a hex string. A maker can send several
+quotes during the session. Each one is appended to the quote list of the
+session. Only its position in that list (`quote_idx`) identifies it. There is no
 separate quote id, and there is no cancel-quote action.
 
-### Taker — accept {#taker--accept}
+### Accept a quote (taker) {#taker--accept}
 
 [`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept):
 
@@ -124,8 +126,8 @@ separate quote id, and there is no cancel-quote action.
 }
 ```
 
-`size` lets the taker accept less than the quote's `max_size`. The accept is
-honored only for the account that opened the session.
+With `size`, the taker can accept less than the `max_size` of the quote. The
+chain honors the accept only from the account that opened the session.
 
 ## What a fill settles {#settlement-semantics}
 
@@ -133,90 +135,91 @@ An option fill moves three amounts and nothing else.
 
 | Property | RFQ option fill |
 |----------|-----------------|
-| Premium | Quoted `price` × whole units, from the buyer to the writer, **in USDC on both kinds**, truncated toward zero to micro-USDC |
-| Escrow | [`escrow_per_unit`](../api/rest/info/options.md#option_series) × whole units, from the writer's balance into the series pot, **in the row's [`settle_asset`](../api/rest/info/options.md#option_series)** |
-| Closing | A closing writer's escrow leaves the pot **exactly**. Each account's own legs net first |
-| Counter-party | One maker only — the chosen quote's signer |
+| Premium | Quoted `price` × whole units, from the buyer to the writer, in USDC on both kinds, truncated toward zero to micro-USDC |
+| Escrow | [`escrow_per_unit`](../api/rest/info/options.md#option_series) × whole units, from the writer's balance into the series pot, in the row's [`settle_asset`](../api/rest/info/options.md#option_series) |
+| Closing | The escrow of a closing writer leaves the pot exactly. The legs of each account net first |
+| Counter-party | One maker only: the signer of the chosen quote |
 | Book impact | None. The trade matches against no resting order |
-| Fees | The TAKER pays, in USDC; the quoting maker has no fee leg. See [the option fee](../products/options.md#option-fee) |
-| Margin | **None.** The buyer paid the premium; the writer locked the worst case |
-| Liquidation | **Impossible.** Both sides are fully funded at the fill |
+| Fees | The taker pays, in USDC. The quoting maker has no fee leg. See [the option fee](../products/options.md#option-fee) |
+| Margin | None. The buyer paid the premium, and the writer locked the worst case |
+| Liquidation | Not possible. Both sides are fully funded at the fill |
 | Public visibility | None. It is not on the public trade tape or `fills` |
 
 ### The escrow rule {#the-escrow-rule}
 
-**A put writer escrows USDC. A call writer escrows the underlying COIN — one coin
-per whole unit, whatever the strike.** The currency is on the series row as
+A put writer escrows USDC. A call writer escrows the underlying coin: one coin
+per whole unit, at any strike. The series row shows the currency as
 [`settle_asset`](../api/rest/info/options.md#option_series).
 
-The call's denomination is forced, not chosen. A cash call pays `max(S* − K, 0)`,
-the price has no ceiling, so no finite cash escrow covers it. Read in the coin the
-same payoff is `max(1 − K / S*, 0)`, which is below one at every price. One coin
-per contract therefore funds the worst case — which is why nothing on this lane
-needs margin or liquidation. See
+The denomination of a call is forced, not chosen. A cash call pays
+`max(S* − K, 0)`. The price has no ceiling, so no finite cash escrow covers it.
+In the coin, the same payoff is `max(1 − K / S*, 0)`, which is below one at
+every price. One coin per contract thus funds the worst case. This is why
+nothing in this path needs margin or liquidation. See
 [why a call escrows one coin](../products/options.md#why-a-call-escrows-one-coin).
 
-Two consequences a maker must plan for:
+A maker must plan for two results:
 
-- **A call writer must hold the coin on its spot balance.** The escrow leaves that
-  balance, and a spot balance cannot go negative, so holding the coin IS the whole
-  collateral test. Short of it, the quote's accept is refused with `insufficient
-  underlying balance for the escrow` — and `rfq_request` refuses the same way up
-  front when the taker writes with a `limit_px`.
-- **The coin escrow cannot net the USDC premium.** On a put the incoming premium
-  reduces the escrow the writer must fund, so one net number is checked. On a call
-  the two are different assets, so the coin and the USDC fee are checked
-  separately. A call writer holding every coin it needs can still be refused with
-  `insufficient free collateral for the fee`.
+- A call writer must hold the coin on its spot balance. The escrow leaves that
+  balance, and a spot balance cannot go negative. To hold the coin is thus the
+  full collateral test. Without enough of it, the chain refuses the accept of
+  the quote with `insufficient underlying balance for the escrow`. `rfq_request`
+  refuses in the same way at the start when the taker writes with a `limit_px`.
+- The coin escrow cannot net the USDC premium. On a put, the incoming premium
+  reduces the escrow that the writer must fund, so the chain checks one net
+  number. On a call, the two are different assets, so the chain checks the coin
+  and the USDC fee separately. A call writer that holds every coin it needs can
+  still be refused with `insufficient free collateral for the fee`.
 
-At expiry the chain settles the series from a price window and pays from the
-series pot, **in `settle_asset`** — USDC to the account balance on a put, coin to
-the spot balance on a call. Settlement can defer, and past a bound it can
-abandon — read [settlement](../products/options.md#settlement) before writing an
-option.
+At expiry, the chain settles the series from a price window and pays from the
+series pot, in `settle_asset`: USDC to the account balance on a put, the coin to
+the spot balance on a call. Settlement can defer, and after a bound it can
+abandon. Read [settlement](../products/options.md#settlement) before you write
+an option.
 
-## Expiry of a session {#auto-expire}
+## Session expiry {#auto-expire}
 
-There is **no expiry sweep**. An expired request is not removed and not
-announced. Expiry is enforced lazily: an `rfq_quote` or `rfq_accept` against a
-session past its `expiry_ms` is refused with `precondition failed: request
-expired`, and a quote past its own `valid_until_ms` with `precondition failed:
-quote expired`. Nothing is charged either way. A stale session stays visible on
-[`rfq_open`](#querying-open-rfqs) until the open-request cap evicts it.
+There is no expiry sweep. The chain does not remove or announce an expired
+request. It enforces expiry lazily. It refuses an `rfq_quote` or `rfq_accept`
+against a session past its `expiry_ms` with `precondition failed: request
+expired`. It refuses a quote past its own `valid_until_ms` with
+`precondition failed: quote expired`. Nothing is charged in either case. A stale
+session stays visible on [`rfq_open`](#querying-open-rfqs) until the
+open-request cap evicts it.
 
 ## Maker registration {#maker-registration}
 
-There is **no maker-registration action**. `rfq_quote` needs no opt-in and no
+There is no maker-registration action. `rfq_quote` needs no opt-in and no
 per-series eligibility check. Any account can append a quote to any open session
-it can see.
+that it can see.
 
 ## What RFQ does not do {#what-rfq-doesnt-do}
 
-- **It does not trade perpetuals or spot.** Every non-option market is refused.
-- **It does not appear on the public tape.** An RFQ fill carries no trade-tape
+- **It does not trade perpetuals or spot.** The chain refuses every non-option market.
+- **It does not appear on the public tape.** An RFQ fill has no trade-tape
   record and no `fills` event.
-- **It is not a Dutch auction.** Quotes do not decay. Makers post fixed premiums
+- **It is not a Dutch auction.** Quotes do not decay. Makers post fixed premiums,
   and the taker picks one.
-- **It is not a multi-maker fill.** One accept takes one maker's quote. To split
-  across makers, run several sessions.
+- **It is not a multi-maker fill.** One accept takes the quote of one maker. To
+  split across makers, run several sessions.
 
 ## Querying open sessions {#querying-open-rfqs}
 
-The RFQ engine state is on the node `/info` read path as two query types,
+The node `/info` read path returns the RFQ engine state as two query types,
 `rfq_open` and `rfq_user`.
 
-Both are public. **No WS channel carries an RFQ event**, so a taker polls for
-its quotes and a maker polls for requests to answer.
+Both are public. No WS channel sends an RFQ event, so a taker polls for its
+quotes and a maker polls for requests to answer.
 
-Unlike the write actions, `sz` / `price` / `max_size` / `limit_px` on these reads
-are **decimal strings**, not the raw plane the actions take, and the sizes render
-on the series' own scale — whole units, already divided.
+On these reads, `sz`, `price`, `max_size` and `limit_px` are decimal strings.
+This is different from the raw plane that the write actions take. The sizes are
+on the scale of the series: whole units, already divided.
 
-Each row carries `signing_id`, the number an action puts in `market`, and
-`underlying`, the symbol the series settles against. There is no `coin` field: a
-session names an option series, and a series is not a coin.
+Each row has `signing_id`, the number that an action puts in `market`, and
+`underlying`, the symbol that the series settles against. There is no `coin`
+field. A session names an option series, and a series is not a coin.
 
-`rfq_open` takes **no parameters** and returns every open session joined to its
+`rfq_open` takes no parameters. It returns every open session, joined to its
 quotes:
 
 ```bash
@@ -250,16 +253,16 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `rfq_id` | uint64 | Session id. This is the number `rfq_quote` and `rfq_accept` take |
+| `rfq_id` | uint64 | Session id. `rfq_quote` and `rfq_accept` take this number |
 | `signing_id` | uint32 | The option series, from [`option_series`](../api/rest/info/options.md#option_series) |
-| `side` | `"B"` / `"A"` | **The READ token, not the one you sent.** `rfq_request` takes `"Bid"` / `"Ask"`; this read answers `"B"` / `"A"`, the same token every other read uses for a side |
-| `sz` | Decimal string | Requested size in whole underlying units. The action takes a RAW `u64` on the series' `sz_decimals` plane; this read serves the human number |
-| `limit_px` | Decimal string \| null | The taker's worst acceptable price, `null` when it sent none |
-| `created_at` | uint64 | Consensus ms the session opened |
-| `expiry` | uint64 | Consensus ms the session closes. **This is the ceiling for a quote's `valid_until_ms`** |
-| `quotes` | array | Quotes posted so far, in the order that fixes each one's `quote_idx` |
+| `side` | `"B"` / `"A"` | The read token, not the one you sent. `rfq_request` takes `"Bid"` / `"Ask"`. This read answers `"B"` / `"A"`, the same token that every other read uses for a side |
+| `sz` | Decimal string | Requested size in whole underlying units. The action takes a raw `u64` on the series' `sz_decimals` plane. This read returns the human number |
+| `limit_px` | Decimal string \| null | The worst price that the taker accepts. `null` when it sent none |
+| `created_at` | uint64 | Consensus ms at which the session opened |
+| `expiry` | uint64 | Consensus ms at which the session closes. This is the ceiling for the `valid_until_ms` of a quote |
+| `quotes` | array | Quotes posted so far, in the order that sets the `quote_idx` of each one |
 
-`rfq_user` takes `address` (0x hex) and splits the result into `requested`
+`rfq_user` takes `address` (0x hex). It splits the result into `requested`
 (sessions the account opened) and `quoted` (sessions it quoted on):
 
 ```bash
@@ -268,7 +271,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
   -d '{"type":"rfq_user","address":"0x..."}'
 ```
 
-An account party to nothing returns a 200 with both lists empty.
+An account that is party to nothing returns a 200 with both lists empty.
 
 ## Edge cases {#edge-cases}
 
@@ -276,22 +279,22 @@ An account party to nothing returns a 200 with both lists empty.
 <summary>Show edge cases</summary>
 
 - **Several quotes from one maker.** Allowed. The taker picks one.
-- **A quote arrives after the accept.** The session is closed, so the quote is
-  refused.
-- **The session expires while the taker signs.** The accept is refused with
-  `precondition failed: request expired`. Open a fresh session.
+- **A quote arrives after the accept.** The session is closed, so the chain
+  refuses the quote.
+- **The session expires while the taker signs.** The chain refuses the accept
+  with `precondition failed: request expired`. Open a new session.
 - **The premium truncates to zero.** Refused with `precondition failed: premium
-  truncates to zero`. Raise the size or the premium.
+  truncates to zero`. Increase the size or the premium.
 - **Either side is short of collateral at accept time.** Refused with
   `insufficient free collateral for premium` (buyer) or `insufficient free
   collateral for escrow` (writer on a USDC series). Nothing moves, and the other
   quotes stay open.
 - **A call writer is short of the coin.** Refused with `insufficient underlying
-  balance for the escrow`. The escrow is one coin per unit and it leaves the
+  balance for the escrow`. The escrow is one coin per unit, and it leaves the
   writer's spot balance.
 - **A call writer cannot pay the USDC fee.** Refused with `insufficient free
-  collateral for the fee`, even with every coin the escrow needs. The coin escrow
-  and the USDC fee are checked as separate assets.
+  collateral for the fee`, even with every coin that the escrow needs. The chain
+  checks the coin escrow and the USDC fee as separate assets.
 - **Maker and taker are the same account, or share an STP group.** Refused with
   `precondition failed: self-trade blocked`.
 
@@ -299,10 +302,10 @@ An account party to nothing returns a 200 with both lists empty.
 
 ## See also {#see-also}
 
-- [Options](../products/options.md) — the product RFQ clears
-- [`option_series`](../api/rest/info/options.md#option_series) — the series registry, and the `signing_id` to sign
-- [`option_state`](../api/rest/info/options.md#option_state) — the units and escrow a fill leaves behind
-- [`/exchange` action catalog](../api/rest/exchange/rfq-utility.md) — the full parameter tables and typed-data primary types
+- [Options](../products/options.md): the product that RFQ clears.
+- [`option_series`](../api/rest/info/options.md#option_series): the series registry, and the `signing_id` to sign.
+- [`option_state`](../api/rest/info/options.md#option_state): the units and escrow that a fill leaves.
+- [`/exchange` action catalog](../api/rest/exchange/rfq-utility.md): the full parameter tables and typed-data primary types.
 
 ## FAQ {#faq}
 
@@ -310,24 +313,24 @@ An account party to nothing returns a 200 with both lists empty.
 <summary>Show FAQ</summary>
 
 **Q: Can I use RFQ on a perpetual to hide size?**
-A: No. Every market that is not a live option series is refused.
+A: No. The chain refuses every market that is not a live option series.
 
 **Q: Can RFQ quotes be cancelled?**
-A: No. There is no cancel-quote action — quotes are append-only for the life of
-the session. A quote lapses on its own `valid_until_ms`, or when the session
+A: No. There is no cancel-quote action. Quotes are append-only for the life of
+the session. A quote lapses at its own `valid_until_ms`, or when the session
 closes.
 
 **Q: Which matching algorithm runs?**
-A: None. Once the taker accepts, the fill is direct between the taker and the
+A: None. When the taker accepts, the fill is direct between the taker and the
 chosen maker. The CLOB engine is not involved.
 
 **Q: What does a fill cost?**
-A: The premium in USDC, plus the escrow if you are the writer, plus a taker fee in
-USDC if you sent the request. The maker who quoted you pays nothing. On a call the
-escrow is ONE COIN per unit, not dollars — read
-[`settle_asset`](../api/rest/info/options.md#option_series). The fee is the smaller of a
-rate on the option's strike face (`strike` x `size`) and a fraction of the
-premium — see [the option fee](../products/options.md#option-fee). Both rates
-start unset, which charges nothing.
+A: The premium in USDC, plus the escrow if you are the writer, plus a taker fee
+in USDC if you sent the request. The maker who quoted you pays nothing. On a
+call, the escrow is one coin per unit, not dollars. Read
+[`settle_asset`](../api/rest/info/options.md#option_series). The fee is the
+smaller of a rate on the strike face of the option (`strike` x `size`) and a
+fraction of the premium. See [the option fee](../products/options.md#option-fee).
+Both rates start unset, which charges nothing.
 
 </details>

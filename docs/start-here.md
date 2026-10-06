@@ -1,146 +1,76 @@
 ---
-description: A plain-language introduction to MetaFlux for newcomers — what it is, what you can do, and the handful of ideas worth knowing before you trade.
+description: "A plain-language introduction to MetaFlux for newcomers: what it is, what you can do, and the ideas to know before you trade."
 ---
 
-# MetaFlux 101 — Start here
+# MetaFlux 101 {#metaflux-101--start-here}
 
-:::info
-**New to MetaFlux?** This page assumes no prior knowledge of crypto or
-derivatives. By the end you will understand what MetaFlux is, what you can do on
-it today, and the few concepts worth knowing before your first trade.
-:::
+This page introduces MetaFlux. It assumes no prior knowledge of crypto or derivatives.
 
 ## What MetaFlux is {#what-metaflux-is}
 
-MetaFlux is an **open, on-chain exchange** — a marketplace where you can trade,
-running entirely on a public network rather than inside one company's private
-servers. Think of a traditional exchange as a single building with a locked back
-office: you have to trust whoever holds the keys. MetaFlux is more like a public
-ledger that everyone can read and that no single party controls. The rules are
-fixed in software, every trade is recorded in the open, and you keep custody of
-your own funds.
+MetaFlux is an open, on-chain exchange. It runs on a public network, not on the private servers of one company. The rules are fixed in software. Every trade is recorded in the open. You keep custody of your own funds.
 
-Because it lives on-chain, MetaFlux is **transparent** (anyone can verify what
-happened), **open** (anyone can connect, build on it, or list a market), and
-**always on** (it is run by many independent operators, not one company that can
-flip a switch). You connect with a crypto wallet, deposit funds, and trade —
-no account application, no gatekeeper.
+Because it runs on-chain, MetaFlux has three properties:
+
+- Transparent: anyone can verify what happened.
+- Open: anyone can connect, build on it or list a market.
+- Always on: many independent operators run it, and no single company can stop it.
+
+You connect with a crypto wallet, deposit funds and trade. There is no account application.
 
 ## What you can do today {#what-you-can-do-today}
 
-- **Trade perpetual futures.** Take a position on whether an asset's price will
-  go up or down, with optional leverage, without ever holding the asset itself.
-  (More on what "perpetual" means below.)
-- **Trade spot.** Buy and sell the assets themselves, settled against your
-  balance (balance-only — no leverage yet).
-- **Hold two-way (hedge) positions** — keep a long and a short position open in
-  the same market at the same time. See [hedge mode](concepts/hedge-mode.md).
+- Trade perpetual futures. You take a position on whether the price of an asset goes up or down. Leverage is optional, and you never hold the asset. See the definition of "perpetual" below.
+- Trade spot. You buy and sell the assets themselves, settled against your balance. Spot is balance-only and has no leverage yet.
+- Hold two-way (hedge) positions. You keep a long and a short position open in the same market at the same time. See [hedge mode](concepts/hedge-mode.md).
 
 Also in preview on testnet:
 
-- **Supply idle USDC** to [Earn](concepts/earn.md), a lending pool that pays the
-  interest spot-margin borrowers owe. **It pays zero today** — the borrow rate is
-  `0` and no pair is calibrated for borrowing, so a redemption returns the
-  principal. Two governance votes change that.
-- **Leveraged spot trading** (spot margin), funded by Earn. See
-  [spot margin](products/spot-margin.md).
+- Supply idle USDC to [Earn](concepts/earn.md). Earn is a lending pool that pays the interest that spot-margin borrowers owe. It pays zero today: the borrow rate is `0` and no pair is calibrated for borrowing, so a redemption returns the principal. Two governance votes change that.
+- Trade spot with leverage (spot margin), funded by Earn. See [spot margin](products/spot-margin.md).
 
-For the full list of trading products and their status — perpetuals, spot, spot
-margin, options, and the planned CDS track — see [Products](products/index.md).
+For the full list of trading products and their status, see [Products](products/index.md). It covers perpetuals, spot, spot margin, options and the planned CDS track.
 
-## The handful of concepts to know {#the-handful-of-concepts-to-know}
+## Core concepts {#the-handful-of-concepts-to-know}
 
-You do not need to be an expert to start, but a few ideas will make everything
-else click. Each links to a fuller explanation.
+Each concept links to a fuller explanation.
 
-**Perpetual vs. spot.** *Spot* is the straightforward kind of trade: you swap one
-asset for another and own the result. A *perpetual future* ("perp") is a contract
-that tracks an asset's price so you can profit from its moves — up or down —
-without owning it, and with no expiry date, so the position stays open as long as
-you keep it healthy. Perps are how most leveraged trading happens on MetaFlux.
+Perpetual and spot. A *spot* trade swaps one asset for another, and you own the result. A *perpetual future* (perp) is a contract that tracks the price of an asset. You profit from price moves up or down without owning the asset. A perp has no expiry date, so the position stays open while it stays healthy. Most leveraged trading on MetaFlux uses perps.
 
-**The order book.** This is the live list of everyone's buy and sell offers for a
-market, sorted by price. When your buy offer meets someone's sell offer at the
-same price, a trade happens. A *market order* takes the best price available now;
-a *limit order* waits at a price you set. MetaFlux supports many
-[order types](concepts/order-types.md) on top of these basics.
+The order book. The order book is the live list of all buy and sell offers for a market, sorted by price. A trade happens when a buy offer meets a sell offer at the same price. A *market order* takes the best price available now. A *limit order* waits at a price you set. MetaFlux supports many [order types](concepts/order-types.md) on top of these two.
 
-**Leverage & margin.** *Margin* is the collateral you put up to back a position.
-*Leverage* lets that collateral control a larger position — 10x leverage means a
-$100 deposit can hold a $1,000 position. Leverage amplifies gains **and** losses,
-so it raises both in equal measure. How your collateral is shared or
-walled off between positions is your *margin mode* — see
-[margin modes](concepts/margin-modes.md).
+Leverage and margin. *Margin* is the collateral that backs a position. *Leverage* lets that collateral control a larger position: with 10x leverage, a $100 deposit holds a $1,000 position. Leverage amplifies gains and losses equally. Your *margin mode* sets how collateral is shared or separated between positions. See [margin modes](concepts/margin-modes.md).
 
-**Liquidation.** If a leveraged position moves against you far enough that your
-collateral can no longer cover it, the position is closed automatically to stop
-the loss from going further. This is *liquidation*. MetaFlux uses a gradual,
-[tiered liquidation](concepts/tiered-liquidation.md) process — an early warning
-and partial steps rather than a single sudden wipeout — to give positions room to
-recover.
+Liquidation. A leveraged position can move against you until your collateral no longer covers it. The system then closes the position to stop further loss. This is *liquidation*. MetaFlux uses a gradual process with early warning and partial steps, not one sudden close. See [tiered liquidation](concepts/tiered-liquidation.md).
 
-**Funding rates.** A perpetual has no expiry, so a small periodic payment keeps
-its price tethered to the real market price. When more traders are long, longs
-pay shorts; when more are short, shorts pay longs. This is the
-[funding rate](concepts/funding-rates.md), and it is paid directly between
-traders, not to the exchange.
+Funding rates. A perpetual has no expiry, so a small periodic payment keeps its price close to the market price. When more traders are long, longs pay shorts. When more traders are short, shorts pay longs. Traders pay each other. The exchange does not receive the payment. See [funding rates](concepts/funding-rates.md).
 
-**Mark price.** Rather than trusting the last trade — which a single large or
-stray order could distort — MetaFlux values your positions against a
-manipulation-resistant reference called the [mark price](concepts/mark-prices.md).
-It is what drives your margin, your liquidation level, and your unrealized profit
-and loss.
+Mark price. One large or stray order can distort the last trade price. MetaFlux values your positions against a reference price that resists manipulation, the [mark price](concepts/mark-prices.md). The mark price drives your margin, your liquidation level and your unrealized profit and loss.
 
 :::tip
-**The short version:** put up *margin*, optionally use *leverage* to size up,
-watch your position's health against the *mark price*, and avoid
-*liquidation*. The [glossary](concepts/glossary.md) defines every term you will
-meet.
+In short: put up margin, optionally use leverage to size up, watch the health of your position against the mark price, and avoid liquidation. The [glossary](concepts/glossary.md) defines every term.
 :::
 
 ## What makes MetaFlux distinctive {#what-makes-metaflux-distinctive}
 
-- **Fully on-chain and transparent.** Every order, trade, and liquidation is
-  recorded on a public ledger that anyone can verify. There is no hidden matching
-  and no privileged view of the book — the same rules apply to everyone.
-- **Open and permissionless.** Anyone can connect a wallet and trade, build tools
-  and applications on top, or even list a new market — no approval required. See
-  [permissionless market deploy](mip/mip-3.md).
-- **Resilient by design.** MetaFlux is validated by a distributed set of
-  independent operators rather than a single company. There is no one switch to
-  flip, no single point of failure, and no operator who can freeze your funds.
-- **Fast.** MetaFlux is engineered for high throughput and low latency, so
-  trading feels responsive even under heavy load.
+- On-chain and transparent. Every order, trade and liquidation is on a public ledger that anyone can verify. There is no hidden matching and no privileged view of the book.
+- Open and permissionless. Anyone can connect a wallet and trade, build tools and applications, or list a new market without approval. See [permissionless market deploy](mip/mip-3.md).
+- Resilient. A distributed set of independent operators validates MetaFlux, not one company. No single switch stops it, and no operator can freeze your funds.
+- Fast. MetaFlux is built for high throughput and low latency.
 
-The deeper edge is *capability*, not price: MetaFlux invests in advanced market
-microstructure, sophisticated risk and margin models, and a high-performance
-execution layer — so the platform can support strategies and protections that
-simpler venues cannot. You will see this throughout the [concepts](concepts/)
-section.
+The main advantage is capability, not price. MetaFlux invests in advanced market microstructure, risk and margin models, and a high-performance execution layer. The [concepts](concepts/) section shows each of these.
 
-## How to get started {#how-to-get-started}
+## Get started {#how-to-get-started}
 
-:::info
-**Just want to trade?** Connect a supported wallet and start from the
-[networks & chain IDs](networks.md) page to point your wallet at the right
-network and endpoints.
-:::
+To trade, connect a supported wallet. Use the [networks and chain IDs](networks.md) page to point your wallet at the right network and endpoints.
 
-- **Pick a network.** [Networks & chain IDs](networks.md) lists the testnet
-  and mainnet endpoints and their chain IDs. Start on testnet if
-  you want to practice with no real funds at risk.
-- **Building or running a bot?** The developer
-  [integration quickstart](integration/quickstart.md) walks you from deposit to
-  trade to withdraw in a few minutes.
-- **Pick an SDK.** Ready-made clients in
-  [TypeScript](integration/typescript-sdk.md) and
-  [Rust](integration/rust-sdk.md) handle signing and the wire format for you.
+- Pick a network. [Networks and chain IDs](networks.md) lists the testnet and mainnet endpoints and their chain IDs. Start on testnet to practice with no real funds at risk.
+- To build or run a bot, follow the [integration quickstart](integration/quickstart.md). It covers a deposit, a trade and a withdrawal.
+- Pick an SDK. The [TypeScript](integration/typescript-sdk.md) and [Rust](integration/rust-sdk.md) clients handle signing and the wire format.
 
-## Where to next {#where-to-next}
+## Next steps {#where-to-next}
 
-- Want the big picture first? The [Architecture map](concepts/architecture.md)
-  names every component inside MetaFlux Core and links each to its deep dive.
-- Browse the [Concepts](concepts/) section for plain-language explanations of
-  every core mechanism.
-- New to derivatives terms? The [Glossary](concepts/glossary.md) defines them all.
-- Ready to build? Head to the [Integration](integration/) guides.
+- Read the [architecture map](concepts/architecture.md). It names every component inside MetaFlux Core and links each to its page.
+- Browse the [concepts](concepts/) section for an explanation of each core mechanism.
+- Look up derivatives terms in the [glossary](concepts/glossary.md).
+- To build, go to the [integration](integration/) guides.

@@ -1,25 +1,26 @@
 # Interacting with Core
 
+This page describes how an EVM contract reads from Core and writes to Core.
+
 :::tip
-**Live on testnet.** CoreWriter actions are operational, as are the stateless MTF
-derivatives precompiles (`0x0900`–`0x0904`). Core-state-backed read precompiles —
-querying the chain's own positions / book directly — are upcoming. The bridge
-([Bridge](../bridge/)) is live.
+**Live on testnet.** CoreWriter actions work. The stateless MTF derivatives precompiles
+(`0x0900`–`0x0904`) also work. Read precompiles backed by Core state, which query the
+positions and books of the chain directly, are upcoming. The [bridge](../bridge/) is live.
 :::
 
-A contract on the MetaFlux EVM talks to **Core** (the L1 perps clearinghouse +
-on-chain CLOB) in two directions:
+A contract on the MetaFlux EVM talks to Core (the L1 perps clearinghouse and on-chain
+CLOB) in two directions:
 
-- **Read** — `staticcall` a system **precompile** to get a Core-derived value.
-- **Write** — call the **CoreWriter** system contract to submit an L1 action.
+- **Read.** A `staticcall` to a system precompile gets a value derived from Core.
+- **Write.** A call to the CoreWriter system contract submits an L1 action.
 
-The read-precompile / write-contract split lets an EVM contract compose directly
-with live L1 state — quote against the chain's own formulas, then act on the
-clearinghouse — without leaving the VM.
+With read precompiles and a write contract, an EVM contract composes directly with live L1
+state. It can quote against the formulas of the chain and then act on the clearinghouse,
+without a step outside the VM.
 
-## Writing to Core — CoreWriter {#writing-to-core--corewriter}
+## Writing to Core with CoreWriter {#writing-to-core--corewriter}
 
-Submit an L1 action by calling **CoreWriter** at
+To submit an L1 action, call CoreWriter at
 `0x3333333333333333333333333333333333333333`:
 
 ```solidity
@@ -32,7 +33,7 @@ interface ICoreWriter {
 }
 ```
 
-`data` is a version- and id-prefixed payload:
+`data` is a payload with a version prefix and an id prefix:
 
 ```
 data = abi.encodePacked(
@@ -42,157 +43,157 @@ data = abi.encodePacked(
 );
 ```
 
-The acting account is `msg.sender` (the calling contract). After a short
-action-delay the L1 dispatches the decoded action.
+The acting account is `msg.sender`, the calling contract. After a short action delay, the L1
+dispatches the decoded action.
 
 :::info
-**Atomicity.** A `sendRawAction` call only burns gas and emits `RawAction`. Any
-L1-side failure **after** that is silent — there is **no EVM revert**. A contract
-must self-recover and treat the `RawAction` event as the only causal link between
-the EVM call and the L1 outcome.
+**Atomicity.** A `sendRawAction` call only burns gas and emits `RawAction`. Any failure on
+the L1 side after that is silent. There is no EVM revert. A contract must recover on
+its own. It must treat the `RawAction` event as the only causal link between the EVM call and
+the L1 outcome.
 :::
 
 ### Actions {#actions}
 
-CoreWriter exposes 22 L1 actions (id, big-endian, in the `uint24` slot above):
+CoreWriter exposes 22 L1 actions. The id goes big-endian in the `uint24` slot above:
 
 | id | Action | Purpose |
 |---:|--------|---------|
-| 1 | `LimitOrder` | Place a limit order on a perp / spot market. **A fill on placement is recorded nowhere** — see [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills) |
-| 2 | `VaultTransfer` | Deposit to / withdraw from a vault |
-| 3 | `TokenDelegate` | Delegate stake to a validator. **MTF takes an optional 4th word, the lock tier** — see [below](#action-3-lock-tier) |
-| 4 | `StakingDeposit` | Move tokens into the staking balance |
-| 5 | `StakingWithdraw` | Move tokens out of the staking balance |
-| 6 | `SpotSend` | Transfer a spot token to another account |
-| 7 | `UsdClassTransfer` | Move USDC between the perp and spot class accounts |
-| 8 | `FinalizeEvmContract` | Link an EVM contract to its Core token / contract id |
-| 9 | `AddApiWallet` | Authorise a sub-key (agent wallet) for trading |
-| 10 | `CancelByOid` | Cancel an order by server order id |
-| 11 | `CancelByCloid` | Cancel an order by client order id |
-| 12 | `ApproveBuilderFee` | Authorise a builder to charge a (capped) fee |
-| 13 | `SendAsset` | Generic asset transfer (perp / spot / vault) |
-| 14 | `ReflectEvmSupplyChange` | Sync an EVM-side ERC-20 supply change to Core |
-| 15 | `BorrowLend` | Open / close a borrow-lend position |
-| 16 | `PortfolioMarginEnroll` | Opt the sender in / out of cross-asset portfolio margin |
-| 17 | `RfqSubmit` | Submit an RFQ quote (id, market, side, size, limit price) |
-| 18 | `FbaConfigure` | Per-market frequent-batch-auction config |
-| 19 | `CrossChainSend` | Chain-agnostic cross-chain transfer (queues into [MetaBridge](../bridge/)) |
-| 20 | `EncryptedOrderSubmit` | Threshold-encrypted order (commitment + ciphertext) |
-| 21 | `RfqQuote` | Maker quotes against an open RFQ request |
-| 22 | `RfqAccept` | Taker accepts a quote, settling the RFQ off-book |
+| 1 | `LimitOrder` | Places a limit order on a perp or spot market. No record of a fill on placement exists. See [unrecorded fills](../api/rest/info/orders-fills.md#unrecorded-fills). |
+| 2 | `VaultTransfer` | Deposits to or withdraws from a vault. |
+| 3 | `TokenDelegate` | Delegates stake to a validator. MTF takes an optional fourth word, the lock tier. See [below](#action-3-lock-tier). |
+| 4 | `StakingDeposit` | Moves tokens into the staking balance. |
+| 5 | `StakingWithdraw` | Moves tokens out of the staking balance. |
+| 6 | `SpotSend` | Transfers a spot token to another account. |
+| 7 | `UsdClassTransfer` | Moves USDC between the perp and spot class accounts. |
+| 8 | `FinalizeEvmContract` | Links an EVM contract to its Core token or contract id. |
+| 9 | `AddApiWallet` | Authorises a sub-key (agent wallet) for trading. |
+| 10 | `CancelByOid` | Cancels an order by server order id. |
+| 11 | `CancelByCloid` | Cancels an order by client order id. |
+| 12 | `ApproveBuilderFee` | Authorises a builder to charge a fee, up to a cap. |
+| 13 | `SendAsset` | Generic asset transfer (perp, spot or vault). |
+| 14 | `ReflectEvmSupplyChange` | Syncs a supply change of an ERC-20 on the EVM side to Core. |
+| 15 | `BorrowLend` | Opens or closes a borrow-lend position. |
+| 16 | `PortfolioMarginEnroll` | Opts the sender in to or out of cross-asset portfolio margin. |
+| 17 | `RfqSubmit` | Submits an RFQ quote (id, market, side, size, limit price). |
+| 18 | `FbaConfigure` | Sets the frequent-batch-auction configuration of a market. |
+| 19 | `CrossChainSend` | Chain-agnostic cross-chain transfer. It goes into the queue of [MetaBridge](../bridge/). |
+| 20 | `EncryptedOrderSubmit` | Threshold-encrypted order (commitment and ciphertext). |
+| 21 | `RfqQuote` | A maker quotes against an open RFQ request. |
+| 22 | `RfqAccept` | A taker accepts a quote, and the RFQ settles off the book. |
 
-The typed parameter structs and a ready-to-use Solidity caller live in the public
-[`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo;
-the on-chain CoreWriter at `0x3333…` is the production target (in tests a
-deterministic Solidity stand-in emits the same `RawAction` payload).
+The typed parameter structs and a Solidity caller are in the public
+[`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo. The on-chain
+CoreWriter at `0x3333…` is the production target. In tests, a deterministic Solidity stand-in
+emits the same `RawAction` payload.
 
-### Action 3 carries a lock tier — a superset of HL's {#action-3-lock-tier}
+### Lock tier on action 3 {#action-3-lock-tier}
 
-**Do not assume Hyperliquid parity here.** HL's action 3 encodes three words:
-`validator`, `wei`, `isUndelegate`. MTF accepts an **optional fourth 32-byte
-word**, `lockMonths`. A three-word call stays legal and means tier `0`, so an
-HL-shaped encoder keeps working unchanged.
+Do not assume parity with Hyperliquid here. Action 3 on HL encodes three words:
+`validator`, `wei` and `isUndelegate`. MTF accepts an optional fourth 32-byte word,
+`lockMonths`. A three-word call stays legal and means tier `0`, so an encoder in the HL shape
+works with no change.
 
-**Why the word exists: tier `0` earns no revenue share.** MTF splits the
-validator fee share by `amount × lock multiplier`, and the multiplier is `0×` at
-tier `0` — see [the fee schedule](../concepts/fee-schedule.md#3-staking-discount-tiers-mtf-staked) and
-[staking rewards](../concepts/staking.md#reward-sources). Without the fourth
-word every EVM-originated delegation is flexible, so a contract can bond stake
-and be paid nothing from the fee split. It still earns the Tier 1 fee discount.
+The reason for the word: tier `0` earns no revenue share. MTF splits the validator fee
+share by `amount × lock multiplier`, and the multiplier is `0×` at tier `0`. See
+[the fee schedule](../concepts/fee-schedule.md#3-staking-discount-tiers-mtf-staked) and
+[staking rewards](../concepts/staking.md#reward-sources). Without the fourth word, every
+delegation from the EVM is flexible. A contract can then bond stake and get nothing from the
+fee split. It still earns the Tier 1 fee discount.
 
 | `lockMonths` | Meaning |
 |---:|---|
 | absent (3-word call) | tier `0` |
-| `0` | Flexible. No revenue share. Undelegate any time. |
+| `0` | Flexible. No revenue share. Undelegate at any time. |
 | `1` / `6` / `24` | Locked. Draws a revenue share. Cannot start unbonding until the lock matures. |
 
-Any other value is **refused**. So are two cases a locked tier reaches: a
-validator not on the governance allowlist for locked stake, and a top-up onto an
-existing row that holds a **different** tier.
+Core refuses any other value. It also refuses two cases that a locked tier can reach: a
+validator that is not on the governance allowlist for locked stake, and an addition to an
+existing row that holds a different tier.
 
 :::danger
-**A refusal is silent, and the EVM receipt still says Success.** Every refusal
-above is a deterministic no-op on Core — no funds move, no delegation row
-appears, the free staking pool is untouched. The `sendRawAction` call itself only
-burns gas and emits `RawAction`, so it cannot revert on an L1 outcome (see the
-**Atomicity** note above). Read
-[`staking_state`](../api/rest/info/vaults-staking.md#staking_state) after the action delay to
-confirm the tier the ledger actually stored. **Do not read the receipt status as
-proof the delegation landed.**
+A refusal is silent, and the EVM receipt still says Success. Each refusal above is a
+deterministic no-op on Core. No funds move, no delegation row appears and the free staking
+pool does not change. The `sendRawAction` call itself only burns gas and emits `RawAction`,
+so it cannot revert on an L1 outcome (see the Atomicity note above). After the action
+delay, read [`staking_state`](../api/rest/info/vaults-staking.md#staking_state) to confirm the
+tier that the ledger stored. Do not read the receipt status as proof that the delegation
+landed.
 :::
 
-**Send exactly three words or at least four.** The fourth word selects the lock
-tier. A params section between 97 and 127 bytes is refused as `params section
-truncated` — that is a four-word call whose declared length is short. Bytes past
-the fourth word stay ignored, as with every other action.
+Send exactly three words, or four or more. The fourth word selects the lock tier. Core
+refuses a params section between 97 and 127 bytes as `params section
+truncated`. That is a four-word call with a short declared length. Core ignores bytes past
+the fourth word, as for every other action.
 
-`encodeTokenDelegate` in the reference `Encoders` helper still emits three words
-and keeps its pinned byte vector, so it stays a tier-`0` encoder. A separate
-`encodeTokenDelegateLocked` takes the tier. If you are not using the helper,
-build the payload as `abi.encodePacked(uint8(1), uint24(3), abi.encode(validator,
+`encodeTokenDelegate` in the reference `Encoders` helper still emits three words and keeps its
+pinned byte vector, so it stays a tier-`0` encoder. A separate `encodeTokenDelegateLocked`
+takes the tier. If you do not use the helper, build the payload as
+`abi.encodePacked(uint8(1), uint24(3), abi.encode(validator,
 wei_, isUndelegate, lockMonths))`.
 
-## Reading Core — precompiles {#reading-core--precompiles}
+## Reading Core with precompiles {#reading-core--precompiles}
 
-Each precompile is a `staticcall` to a fixed address with a hand-rolled,
-big-endian **packed** input (not Solidity ABI). Sizes and prices are on the
-**1e8 fixed-point** plane (`px_e8`, `size_e8`); USDC margins are **1e6**.
+Each precompile is a `staticcall` to a fixed address. The input is a hand-rolled, big-endian
+packed encoding. It is not the Solidity ABI. Sizes and prices are on the 1e8
+fixed-point plane (`px_e8`, `size_e8`). USDC margins are 1e6.
 
 | Address | Precompile | Returns |
 |---------|------------|---------|
-| `0x0900` | `portfolio_margin_eval` | SPAN-like required maintenance margin, worst-case scenario index, concentration penalty |
-| `0x0901` | `vault_nav` | Vault total NAV, total shares, NAV-per-share, unrealised PnL |
-| `0x0902` | `adl_pro_rata_price` | VWAP an ADL of a given size clears at, walking the queue in side priority |
-| `0x0903` | `mark_settle` | Per-position PnL delta, new accumulated funding, unrealised PnL at a mark |
-| `0x0904` | `rfq_book_depth` | RFQ book depth (filtered by side, capped depth) |
-| `0x0906` | `clob_bbo` | Best bid / best ask price + size (top of book) |
-| `0x0907` | `clob_l2_depth` | Top-N aggregated `(price, size)` levels per side |
-| `0x0908` | `inventory_risk` | Net / gross notional, concentration, risk-cap gate |
+| `0x0900` | `portfolio_margin_eval` | Required maintenance margin in the style of SPAN, the index of the worst-case scenario, and the concentration penalty. |
+| `0x0901` | `vault_nav` | Total NAV of the vault, total shares, NAV per share and unrealised PnL. |
+| `0x0902` | `adl_pro_rata_price` | The VWAP at which an ADL of a given size clears, with a walk of the queue in side priority. |
+| `0x0903` | `mark_settle` | PnL delta for each position, new accumulated funding and unrealised PnL at a mark. |
+| `0x0904` | `rfq_book_depth` | RFQ book depth, filtered by side, with a capped depth. |
+| `0x0906` | `clob_bbo` | Best bid and best ask price and size (top of book). |
+| `0x0907` | `clob_l2_depth` | The top N aggregated `(price, size)` levels on each side. |
+| `0x0908` | `inventory_risk` | Net and gross notional, concentration and the risk-cap gate. |
 
-These are **stateless quoting** precompiles today: the caller passes the inputs
-(positions, queue levels, quotes, …) and the precompile returns the computed
-result, so a contract can reproduce a Core calculation off the chain's own
-formulas. **Live Core-state-backed reads** (querying the chain's own positions /
-book directly) are upcoming.
+Today these are stateless quoting precompiles. The caller passes the inputs (positions,
+queue levels, quotes, …), and the precompile returns the result. A contract can therefore
+reproduce a Core calculation with the formulas of the chain. Reads backed by live Core
+state, which query the positions and books of the chain directly, are upcoming.
 
 ### `portfolio_margin_eval` (v1 ABI) {#portfolio_margin_eval-v1-abi}
 
-The `0x0900` margin precompile delegates to the **same SPAN engine** that margins
-live accounts (see [portfolio margin](../concepts/portfolio-margin.md)), so an
-off-chain quote matches on-chain maintenance exactly — there is no second copy of
-the math. Its v1 input adds a per-position **implied-vol** field and a **full-grid**
-flag bit (run the complete scenario sweep, vs a faster subset); prices and sizes are
-packed on the 1e8 plane and converted to the engine's internal USD cents at the
-boundary. The return mirrors the engine result in **USD cents** — required
-maintenance margin, the worst-case scenario index, the concentration penalty, and
-the `100 000` USDC enrollment-equity floor the engine applies. The typed
-calldata/return layout ships with the Solidity precompile interface in the public
+The `0x0900` margin precompile uses the same SPAN engine that margins live accounts (see
+[portfolio margin](../concepts/portfolio-margin.md)). An off-chain quote therefore matches
+on-chain maintenance exactly. There is no second copy of the math.
+
+Its v1 input adds an implied-vol field for each position and a full-grid flag bit. The
+flag runs the complete scenario sweep instead of a faster subset. Prices and sizes are packed
+on the 1e8 plane and converted to the internal USD cents of the engine at the boundary.
+
+The return gives the engine result in USD cents: the required maintenance margin, the
+index of the worst-case scenario, the concentration penalty, and the `100 000` USDC
+enrollment-equity floor that the engine applies. The typed calldata and return layout ship
+with the Solidity precompile interface in the public
 [`metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts) repo.
 
 ### Disabling a precompile (governance) {#disabling-a-precompile-governance}
 
-Governance can switch an individual MTF precompile **off** (and later back **on**)
-by a stake-weighted validator vote. A disabled precompile address stops returning a
-Core-derived value until a subsequent vote re-enables it; the set of disabled
-addresses is part of committed chain state, so every node agrees deterministically.
+Governance can turn an MTF precompile off, and later back on, by a stake-weighted
+validator vote. A disabled precompile address returns no value derived from Core until a
+later vote enables it again. The set of disabled addresses is part of committed chain state,
+so every node agrees deterministically.
 
-The vote is **range-guarded**: the standard Ethereum precompiles (`0x01`–`0x0a` —
-`ecrecover`, `sha256`, `ripemd160`, `identity`, `modexp`, the bn256 / blake2f group)
-**cannot** be disabled — a vote targeting them is rejected at both proposal and
-enactment, so core EVM functionality can never be bricked. Only the MTF-specific
-precompiles (the `0x09xx` range above) are eligible. This is a validator-governed
-control, not a user action; it never appears on the `/exchange` path.
+The vote has a range guard. The standard Ethereum precompiles (`0x01`–`0x0a`:
+`ecrecover`, `sha256`, `ripemd160`, `identity`, `modexp`, the bn256 and blake2f group)
+cannot be disabled. The chain rejects a vote that targets them at both proposal and
+enactment, so core EVM functions can never be disabled. Only the MTF precompiles (the `0x09xx`
+range above) are eligible. This is a control for validator governance. It is not a user
+action, and it never appears on the `/exchange` path.
 
 ## Core ↔ EVM value transfers {#core--evm-value-transfers}
 
-- **Into Core** from an EVM contract: `SpotSend` / `SendAsset` / `UsdClassTransfer`
-  / `VaultTransfer` via CoreWriter (above).
-- **Across chains**: `CrossChainSend` queues into the
-  [MetaBridge custody bridge](../bridge/), which releases on the destination chain
-  on a ⅔ validator co-signature.
+- Into Core from an EVM contract: `SpotSend`, `SendAsset`, `UsdClassTransfer` or
+  `VaultTransfer` through CoreWriter (above).
+- Across chains: `CrossChainSend` goes into the queue of the
+  [MetaBridge custody bridge](../bridge/). The bridge releases on the destination chain on a
+  ⅔ validator co-signature.
 
 ## See also {#see-also}
 
-- [Bridge](../bridge/) — cross-chain custody (the `CrossChainSend` destination)
-- [Mark prices](../concepts/mark-prices.md) — the 1e8 fixed-point price plane the precompiles use
-- [Portfolio margin](../concepts/portfolio-margin.md) / [ADL](../concepts/adl.md) — the Core math the `0x0900` / `0x0902` precompiles quote
+- [Bridge](../bridge/): cross-chain custody, the destination of `CrossChainSend`.
+- [Mark prices](../concepts/mark-prices.md): the 1e8 fixed-point price plane that the precompiles use.
+- [Portfolio margin](../concepts/portfolio-margin.md) and [ADL](../concepts/adl.md): the Core math that the `0x0900` and `0x0902` precompiles quote.

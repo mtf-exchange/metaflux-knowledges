@@ -1,20 +1,22 @@
 # Agent wallets in practice
 
+This page shows the code for an agent wallet, end to end: approval, trading and rotation.
+
 :::tip
 **Stable.**
 :::
 
-Concrete code, end-to-end, walking through approval, trading, and rotation. For the conceptual background see [agent wallets](../concepts/agent-wallets.md).
+For the concepts, see [agent wallets](../concepts/agent-wallets.md).
 
-## TL;DR {#tldr}
+## Summary {#tldr}
 
 1. Generate an agent keypair locally.
 2. From the master account, submit `approve_agent { agent, expires_at_ms }`.
 3. Wait one block.
-4. Sign every action with the agent key; submit with `sender = master_addr`.
-5. Before expiry, repeat with a new agent and let the old expire.
+4. Sign every action with the agent key. Submit with `sender = master_addr`.
+5. Before expiry, repeat with a new agent and let the old agent expire.
 
-## Step 1 — generate an agent key {#step-1--generate-an-agent-key}
+## 1. Generate an agent key {#step-1--generate-an-agent-key}
 
 ```typescript
 import { randomBytes } from 'crypto';
@@ -26,7 +28,8 @@ const agentAddress    = publicKeyToEvmAddress(agentPublicKey);
 console.log('agent address:', agentAddress);
 ```
 
-Store the agent's private key in your bot's host (env var, secret manager, HSM — your call). Never log it.
+Store the agent's private key on your bot's host: an env var, a secret manager or an HSM. Never
+log it.
 
 ```python
 import secrets
@@ -40,9 +43,9 @@ agent_addr = to_checksum_address('0x' + sha3.keccak_256(agent_pk).hexdigest()[-4
 print('agent address:', agent_addr)
 ```
 
-## Step 2 — approve from master {#step-2--approve-from-master}
+## 2. Approve from the master {#step-2--approve-from-master}
 
-The master must sign this — it's the **only time** the master signs (per session).
+The master signs this action. It is the only time per session that the master signs.
 
 ```typescript
 import { Client } from '@metaflux-dex/client';
@@ -78,9 +81,10 @@ In raw curl, the action body is:
 }
 ```
 
-## Step 3 — wait one block {#step-3--wait-one-block}
+## 3. Wait one block {#step-3--wait-one-block}
 
-Agent approvals are effective **one block after commit**. Submit your first agent-signed request after the approval block commits.
+An agent approval takes effect one block after commit. Submit your first agent-signed request
+after the approval block commits.
 
 ```typescript
 // confirm the approval is on-chain
@@ -96,11 +100,14 @@ async function waitForApproval(c: Client, masterAddr: string, agentAddr: string)
 await waitForApproval(master, masterAddress, agentAddress);
 ```
 
-There is no live push event for an agent approval landing — polling `/info agents` (above) is the only way to observe it today.
+No live push event reports a landed agent approval. A poll of `/info agents`, as above, is the
+only way to see it today.
 
-## Step 4 — trade from the agent {#step-4--trade-from-the-agent}
+## 4. Trade from the agent {#step-4--trade-from-the-agent}
 
-There is no `signerAddress` / `senderAddress` constructor option. A **separate `Client`** signs with the agent's own key; the action's `owner` field (not a client option) routes it to the master's account:
+There is no `signerAddress` / `senderAddress` constructor option. A separate `Client` signs with
+the agent's own key. The action's `owner` field routes the action to the master's account. It is
+an action field, not a client option:
 
 ```typescript
 // A separate Client, signing with the agent's key.
@@ -120,9 +127,10 @@ await agent.submitOrderNative({
 });
 ```
 
-For manual, SDK-free signing — build the EIP-712 digest yourself and POST the raw envelope — see [typed-data signing](./typed-data-signing.md).
+To sign without the SDK, build the EIP-712 digest yourself and POST the raw envelope. See
+[typed-data signing](./typed-data-signing.md).
 
-## Step 5 — rotation {#step-5--rotation}
+## 5. Rotation {#step-5--rotation}
 
 Before the old agent expires, stage a new one:
 
@@ -156,11 +164,13 @@ async function rotateAgent(
 }
 ```
 
-Schedule rotation daily / weekly via a cron / systemd timer. Multi-host fleets: rotate one host at a time, gated on health checks.
+Schedule the rotation daily or weekly with a cron job or a systemd timer. In a fleet with many
+hosts, rotate one host at a time, and gate each step on health checks.
 
 ## Multi-host fleet {#multi-host-fleet}
 
-Each host has its own agent. They can submit concurrently because they share the master's nonce space and use `Date.now()`:
+Each host has its own agent. The hosts can submit at the same time, because they share the
+master's nonce space and use `Date.now()`:
 
 ```
 master account (0xMASTER)
@@ -175,34 +185,36 @@ each host runs:
    ... places orders concurrently ...
 ```
 
-Nonces collide rarely (sub-millisecond resolution) and the colliding request gets `nonce_too_small`; the bot bumps and retries. For very high throughput per host, use a shared monotonic counter (Redis `INCR`) keyed on the master.
+Nonces collide rarely, because the resolution is below one millisecond. The colliding request
+gets `nonce_too_small`, and the bot increments and retries. For very high throughput per host,
+use a shared monotonic counter (Redis `INCR`) keyed on the master.
 
 ## Detect compromise {#detect-compromise}
 
 | Signal | Likely cause | Action |
 |--------|--------------|--------|
-| Unexpected orders from your master | A leaked agent key (or master key) | Tighten old agent's expiry to past; investigate |
-| 401s from an agent that should be valid | Approval expired or revoked; or wrong agent key | Verify via `/info agents`; re-approve if needed |
-| Sudden burst of orders you didn't authorise | Compromised agent | Immediately submit `approve_agent { agent: X, expires_at_ms: 0 }` to retire X; do this signed by master from cold storage |
+| Unexpected orders from your master | A leaked agent key (or master key) | Set the old agent's expiry in the past, then investigate |
+| 401s from an agent that should be valid | The approval expired or was revoked, or the agent key is wrong | Verify through `/info agents`, and re-approve if needed |
+| A sudden burst of orders you did not authorise | Compromised agent | Submit `approve_agent { agent: X, expires_at_ms: 0 }` at once to retire X. Sign it with the master from cold storage |
 
-The chain stores every approval, every expiry, every action's recovered signer. Forensics post-incident is mechanical.
+The chain stores every approval, every expiry, and the recovered signer of every action. Forensics
+after an incident is therefore mechanical.
 
 ## Sub-account agents {#sub-account-agents}
 
-:::warning
-**Not available today.** A sub-account has no private key — its address is a
-hash of the master address and its index — and its approved-agent set is
-always empty: `approve_agent` authorizes an agent of the **signer's** account,
-only the sub could approve an agent of itself, and the sub cannot sign. There
-is no SDK method for this pattern (no `asSubAccount()` helper) because the
-protocol has no signing path for it yet. See the
-[sub-accounts warning](../concepts/sub-accounts.md#tldr) for the current state.
+:::warning Not available today
+A sub-account has no private key. Its address is a hash of the master address and its index. Its
+approved-agent set is always empty. `approve_agent` authorizes an agent of the signer's account,
+so only the sub-account could approve an agent of itself, and the sub-account cannot sign. No SDK
+method exists for this pattern (no `asSubAccount()` helper), because the protocol has no signing
+path for it yet. See the [sub-accounts warning](../concepts/sub-accounts.md#tldr) for the current
+state.
 :::
 
-Until sub-account signing ships, run one master account per trading strategy
-instead of per-sub agents.
+Until sub-account signing ships, run one master account per trading strategy, and not agents per
+sub-account.
 
-## Sequence — full setup {#sequence--full-setup}
+## Full setup sequence {#sequence--full-setup}
 
 ```
 T=0    generate agent keypair on host
@@ -221,12 +233,12 @@ T+29d+1h  old agent expires; bot has fully migrated
 
 ## See also {#see-also}
 
-- [Agent wallets](../concepts/agent-wallets.md) — concepts
+- [Agent wallets](../concepts/agent-wallets.md): concepts
 - [`POST /exchange approve_agent`](../api/rest/exchange/account.md#approve_agent)
-- [Signing walkthrough](./signing.md) — what the SDK does internally
-- [Idempotency](./idempotency.md) — nonce semantics for concurrent agents
-- [Sub-accounts](../concepts/sub-accounts.md) — sub-level agent setup
-- [Risk-watcher](./risk-watcher.md) — typical use of a dedicated watcher agent
+- [Signing walkthrough](./signing.md): what the SDK does internally
+- [Idempotency](./idempotency.md): nonce semantics for concurrent agents
+- [Sub-accounts](../concepts/sub-accounts.md): agent setup for a sub-account
+- [Risk-watcher](./risk-watcher.md): a typical use of a dedicated watcher agent
 
 ## FAQ {#faq}
 
@@ -234,15 +246,15 @@ T+29d+1h  old agent expires; bot has fully migrated
 <summary>Show FAQ</summary>
 
 **Q: Can an agent approve another agent?**
-A: No. `approve_agent` is master-only. This prevents key proliferation cascades.
+A: No. Only the master can send `approve_agent`. This stops a chain of keys that approve more keys.
 
 **Q: How do I rotate the master itself?**
-A: V1 doesn't have a master-rotation primitive. The supported pattern: convert to multi-sig with the new key included, then update the multi-sig set to drop the old key. See [multi-sig](../concepts/multi-sig.md).
+A: V1 has no master-rotation primitive. The supported pattern: convert to multi-sig with the new key included, then update the multi-sig set to remove the old key. See [multi-sig](../concepts/multi-sig.md).
 
-**Q: What if an agent's host crashes mid-flight?**
-A: The pending request either committed (visible on `order_updates` / `open_orders`) or didn't (no event). Use the [reconcile pattern](./error-handling.md#reconciliation-pattern) on host restart.
+**Q: What if an agent's host crashes during a request?**
+A: The pending request committed (visible on `order_updates` / `open_orders`), or it did not (no event). Use the [reconcile pattern](./error-handling.md#reconciliation-pattern) when the host restarts.
 
 **Q: Can different agents trade different markets?**
-A: Not via the protocol. The protocol authorises an agent for the master's full trading-action surface. If you need per-market separation, use sub-accounts (each sub has its own agent set).
+A: Not through the protocol. The protocol authorises an agent for the master's full set of trading actions. For separation per market, use sub-accounts. Each sub-account has its own agent set.
 
 </details>

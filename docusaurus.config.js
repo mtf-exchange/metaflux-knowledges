@@ -23,12 +23,9 @@ const codeTheme = (p) => ({
   ],
 });
 
-const prismLight = codeTheme({
-  card: '#f4f5f7', ink: '#0b0c0e', ink2: '#2a2d33', ink3: '#5b616c', str: '#474c55',
-  ins: '#0f9b67', del: '#d93f45',
-});
-const prismDark = codeTheme({
-  card: '#14161a', ink: '#f3f4f6', ink2: '#d4d7dc', ink3: '#9aa1ac', str: '#b8bdc6',
+// Code panels stay dark in both colour modes.
+const prismCode = codeTheme({
+  card: '#17191d', ink: '#ffffff', ink2: '#e8e9eb', ink3: '#9aa1ac', str: '#c3c7ce',
   ins: '#3dd68c', del: '#ff6b70',
 });
 
@@ -81,8 +78,17 @@ const config = {
     },
   },
 
+  stylesheets: [
+    'https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400..800&family=Geist+Mono:wght@400;500&display=swap',
+  ],
+
   // SEO: JSON-LD structured data (Organization + WebSite with sitelinks search).
   headTags: [
+    {tagName: 'link', attributes: {rel: 'preconnect', href: 'https://fonts.googleapis.com'}},
+    {
+      tagName: 'link',
+      attributes: {rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: 'anonymous'},
+    },
     {
       tagName: 'script',
       attributes: {type: 'application/ld+json'},
@@ -122,6 +128,7 @@ const config = {
           routeBasePath: '/',
           sidebarPath: './sidebars.js',
           editUrl: 'https://github.com/mtf-exchange/metaflux-knowledges/edit/main/',
+          showLastUpdateTime: false,
         },
         blog: false,
         theme: {
@@ -174,10 +181,8 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       image: 'img/og.png',
-      // Light-first, following the OS — the same default the app resolves to
-      // (app.html stamps `theme: 'system'` pre-paint).
       colorMode: {
-        defaultMode: 'light',
+        defaultMode: 'dark',
         disableSwitch: false,
         respectPrefersColorScheme: true,
       },
@@ -206,74 +211,47 @@ const config = {
         },
       }),
       navbar: {
-        title: 'MetaFlux',
-        style: 'dark',
-        // The mono mark draws in currentColor, which an <img> resolves to black; CSS turns it white.
+        title: 'MetaFlux Docs',
+        // The mono mark draws in currentColor, which an <img> resolves to black; CSS inverts it in dark mode.
         logo: {
           src: 'brand/metaflux-mark-mono.svg',
           href: '/',
         },
+        // The tab row. Each tab claims its own paths; Docs takes the rest.
         items: [
-          {type: 'docSidebar', sidebarId: 'docsSidebar', position: 'left', label: 'Docs'},
-          {to: '/integration/quickstart', label: 'Quickstart', position: 'left'},
-          {to: '/api', label: 'API', position: 'left'},
           {
-            type: 'dropdown',
+            to: '/',
+            label: 'Docs',
+            activeBaseRegex: '^/(?!api(/|$)|integration/(typescript|rust)-sdk$|changelog(/|$)|search$)',
+          },
+          {to: '/api', label: 'API', activeBaseRegex: '^/api(/|$)'},
+          {
+            to: '/integration/typescript-sdk',
             label: 'SDKs',
-            position: 'left',
-            items: [
-              {to: '/integration/typescript-sdk', label: 'TypeScript SDK'},
-              {to: '/integration/rust-sdk', label: 'Rust SDK'},
-            ],
+            activeBaseRegex: '^/integration/(typescript|rust)-sdk$',
           },
-          {href: 'https://mtf.exchange/', label: 'Site', position: 'right'},
-          {
-            href: 'https://github.com/mtf-exchange/metaflux-knowledges',
-            label: 'GitHub',
-            position: 'right',
-          },
+          {to: '/changelog', label: 'Changelog', activeBaseRegex: '^/changelog(/|$)'},
         ],
       },
       footer: {
-        style: 'dark',
         links: [
-          {
-            title: 'Trade',
-            items: [
-              {label: 'Launch app', href: 'https://app.mtf.exchange/'},
-              {label: 'Points', href: 'https://mtf.exchange/tge.html'},
-              {label: 'Faucet', href: 'https://app.mtf.exchange/faucet'},
-            ],
-          },
-          {
-            title: 'Build',
-            items: [
-              {label: 'Quickstart', to: '/integration/quickstart'},
-              {label: 'API reference', to: '/api'},
-              {label: 'TypeScript SDK', to: '/integration/typescript-sdk'},
-              {label: 'Rust SDK', to: '/integration/rust-sdk'},
-            ],
-          },
-          {
-            title: 'Foundation',
-            items: [
-              {label: 'Whitepaper', href: 'https://mtf.exchange/whitepaper.html'},
-              {label: 'X / Twitter', href: 'https://x.com/MetaFluxDex'},
-              {label: 'Terms', href: 'https://mtf.exchange/terms.html'},
-              {label: 'Privacy', href: 'https://mtf.exchange/privacy.html'},
-            ],
-          },
+          {label: 'Launch app', href: 'https://app.mtf.exchange/'},
+          {label: 'mtf.exchange', href: 'https://mtf.exchange/'},
+          {label: 'Whitepaper', href: 'https://mtf.exchange/whitepaper.html'},
+          {label: 'GitHub', href: 'https://github.com/mtf-exchange/metaflux-knowledges'},
+          {label: 'X', href: 'https://x.com/MetaFluxDex'},
+          {label: 'Terms', href: 'https://mtf.exchange/terms.html'},
+          {label: 'Privacy', href: 'https://mtf.exchange/privacy.html'},
         ],
         copyright: '© 2026 MetaFlux Foundation',
       },
       prism: {
-        theme: prismLight,
-        darkTheme: prismDark,
+        theme: prismCode,
+        darkTheme: prismCode,
         additionalLanguages: ['rust', 'bash', 'json', 'typescript', 'solidity'],
       },
       docs: {
         sidebar: {
-          hideable: true,
           autoCollapseCategories: false,
         },
       },

@@ -1,5 +1,5 @@
 ---
-description: The protocol's reserved system addresses — the null address, the protocol-operated system senders, the treasury, the buyback fund, the reserved burn sink, and the legacy spot-fee address — every one a keyless constant.
+description: "The reserved system addresses of the protocol: the null address, the system senders, the treasury, the buyback fund, the burn sink and the spot backstop. Every one is a keyless constant."
 ---
 
 # System addresses
@@ -8,113 +8,98 @@ description: The protocol's reserved system addresses — the null address, the 
 **Stable.** These are fixed protocol constants. They do not change between releases.
 :::
 
-## TL;DR {#tldr}
+This page lists the reserved system addresses of MetaFlux and says what each one is.
 
-MetaFlux reserves a small set of **well-known addresses** with special protocol meaning — the null address, the senders the protocol itself writes as, the treasury, the buyback fund, and a reserved burn sink. Integrators and explorers will see these on-chain; this page says what each one is.
+## Summary {#tldr}
 
-**Every address on this page is keyless.** Each is a hand-picked constant (mostly a repeated-nibble "vanity" pattern like `0x7777…7777`), **not** derived from any public key. A normal MetaFlux address is the last 20 bytes of the keccak-256 hash of an account's public key — exactly the derivation every EVM chain uses. Because these constants were never produced that way, **no private key maps to any of them**: finding one would mean inverting keccak-256 onto a chosen 20-byte target, which is cryptographically infeasible. So none of these addresses can sign a transaction. Where value moves in or out of them, it is the **protocol itself** doing it under system authority — never a user with a key.
+MetaFlux reserves a small set of well-known addresses with a special meaning. They are the null address, the senders the protocol writes as, the treasury, the buyback fund and a reserved burn sink. Integrators and explorers see these addresses on-chain.
+
+Every address on this page is keyless. Each is a hand-picked constant, mostly a repeated-nibble pattern such as `0x7777…7777`. None is derived from a public key. A normal MetaFlux address is the last 20 bytes of the keccak-256 hash of a public key, as on every EVM chain. These constants were not made that way, so no private key maps to any of them. To find one, you would have to invert keccak-256 onto a chosen 20-byte target. That is cryptographically infeasible. So none of these addresses can sign a transaction. When value moves in or out of them, the protocol moves it under system authority. A user with a key never does.
 
 ## The addresses {#the-addresses}
 
 | Address | Name | Purpose | Operated by |
 |---|---|---|---|
-| `0x0000000000000000000000000000000000000000` | Null | The zero / null address — an unset or absent value | Nobody (sentinel) |
+| `0x0000000000000000000000000000000000000000` | Null | The zero address. It stands for an unset or absent value. | Nobody (sentinel) |
 | `0x2222222222222222222222222222222222222222` | System | Generic protocol/system-authority sender for internal writes | Protocol |
 | `0x3333333333333333333333333333333333333333` | Oracle feeder | The system sender that publishes oracle price updates | Protocol |
 | `0x5555555555555555555555555555555555555555` | Faucet | Testnet faucet that funds test accounts | Protocol (test networks only) |
-| `0x7777777777777777777777777777777777777777` | Treasury | Protocol treasury — holds the treasury fee share and buyback MTF; the mint / burn point for supply changes | Protocol |
+| `0x7777777777777777777777777777777777777777` | Treasury | Protocol treasury. It holds the treasury fee share and the buyback MTF. It is the mint and burn point for supply changes. | Protocol |
 | `0x8888888888888888888888888888888888888888` | Assistance fund | Holds collected fee USDC destined for buyback and executes the on-market MTF buy | Protocol |
-| `0x000000000000000000000000000000000000dead` | Burn | Reserved, provably-unspendable sink | Nobody — spends **from** it are always rejected |
-| `0x0000000000000000000000000000000000005b07` | Spot backstop | Custody sink for collateral the protocol takes in on a liquidation: base bought off a starved book, and portfolio-margin collateral seized to cover a USDC deficit | Nobody — a keyless reserved address |
+| `0x000000000000000000000000000000000000dead` | Burn | Reserved, provably-unspendable sink | Nobody. A spend from it is always rejected. |
+| `0x0000000000000000000000000000000000005b07` | Spot backstop | Custody sink for collateral the protocol takes in on a liquidation: base bought off a starved book, and portfolio-margin collateral seized to cover a USDC deficit | Nobody (keyless reserved address) |
 
-All hex is shown in canonical lowercase, `0x`-prefixed, 40 characters — the exact form an explorer displays.
+All hex is in canonical lowercase, `0x`-prefixed, 40 characters. This is the form an explorer displays.
 
 ## What each one is {#what-each-one-is}
 
-### Null — `0x0000…0000` {#null--0x00000000}
+### Null (`0x0000…0000`) {#null--0x00000000}
 
-The all-zero address. It is a **sentinel**, not an account: it stands for "unset", "absent", or "no address here" in protocol data. Nothing is meant to hold a balance at the null address, and no one operates it. Keyless.
+The all-zero address. It is a sentinel, not an account. In protocol data it means "unset", "absent" or "no address here". Nothing is meant to hold a balance at the null address, and no one operates it. It is keyless.
 
-### System — `0x2222…2222` {#system--0x22222222}
+### System (`0x2222…2222`) {#system--0x22222222}
 
-The generic **protocol/system-authority sender**. When the protocol needs to make an internal state write that is not attributable to any single user or more specific role, it writes as this address. It is keyless and operated only by the protocol — there is no user behind it.
+The generic system-authority sender. The protocol writes as this address when it makes an internal state write that no single user or more specific role owns. The address is keyless and only the protocol operates it. No user stands behind it.
 
-### Oracle feeder — `0x3333…3333` {#oracle-feeder--0x33333333}
+### Oracle feeder (`0x3333…3333`) {#oracle-feeder--0x33333333}
 
-The **oracle price feeder**. The protocol's oracle updates — the per-block reference prices described on the [Oracle prices](./oracle-prices.md) page — are published from this system sender. Keyless; operated by the protocol as part of consensus. You cannot submit oracle prices by "sending from" this address.
+The oracle price feeder. The oracle updates are the per-block reference prices described in [Oracle prices](./oracle-prices.md). The protocol publishes them from this system sender. The address is keyless and the protocol operates it as part of consensus. You cannot submit oracle prices by sending from this address.
 
-### Faucet — `0x5555…5555` {#faucet--0x55555555}
+### Faucet (`0x5555…5555`) {#faucet--0x55555555}
 
-The **test-network faucet**. On testnet it funds test accounts so integrators can exercise the API without real funds. It is keyless and protocol-operated. **On mainnet the faucet does not dispense** — there is no free mint of real assets.
+The test-network faucet. On testnet it funds test accounts, so integrators can use the API without real funds. The address is keyless and the protocol operates it. On mainnet the faucet does not dispense. Real assets have no free mint.
 
-This address is also the faucet's **reserve**: a claim TRANSFERS out of the balance held here, and creates nothing. The address is keyless, so the reserve accepts a pre-fund but no signer can spend it. An empty reserve refuses every claim — read its `account_state` to see whether the faucet can pay. See [`POST /faucet`](../api/rest/faucet.md#reserve).
+This address is also the reserve of the faucet. A claim transfers out of the balance held here and creates nothing. The address is keyless, so the reserve accepts a pre-fund, but no signer can spend it. An empty reserve refuses every claim. Read its `account_state` to see whether the faucet can pay. See [`POST /faucet`](../api/rest/faucet.md#reserve).
 
-### Treasury — `0x7777…7777` {#treasury--0x77777777}
+### Treasury (`0x7777…7777`) {#treasury--0x77777777}
 
-The **protocol treasury**. It holds the treasury's share of collected fees and the MTF accumulated by the [buyback](./tokenomics.md#value-accrual--flywheel). On testnet, an operator vote mints MTF into or burns MTF from the treasury balance. Mainnet has no such vote, and its total supply is fixed ([Total supply](./tokenomics.md#total-supply)). Keyless; operated by the protocol under governance. See [Tokenomics](./tokenomics.md) for the economic model and [Fees](./fees.md) for where fees go.
+The protocol treasury. It holds the treasury's share of collected fees and the MTF accumulated by the [buyback](./tokenomics.md#value-accrual--flywheel). On testnet, an operator vote mints MTF into or burns MTF from the treasury balance. Mainnet has no such vote, and its total supply is fixed ([Total supply](./tokenomics.md#total-supply)). The address is keyless and the protocol operates it under governance. See [Tokenomics](./tokenomics.md) for the economic model and [Fees](./fees.md) for where fees go.
 
-### Assistance fund — `0x8888…8888` {#assistance-fund--0xafafafaf}
+### Assistance fund (`0x8888…8888`) {#assistance-fund--0xafafafaf}
 
-The **buyback operational fund**. Fee revenue destined for buyback is collected here as a real, explorer-visible USDC balance, and the protocol spends it on the open MTF/USDC market to execute the buyback. It is keyless — there is no key that can move its funds — but it is **protocol-operated**: the buy is a protocol action, not a user transaction. The bought-back MTF then flows to the treasury and the buyback split described in [Tokenomics](./tokenomics.md#value-accrual--flywheel).
+The buyback operational fund. Fee revenue for the buyback collects here as a real USDC balance that an explorer shows. The protocol spends it on the open MTF/USDC market to run the buyback. No key can move its funds, but the protocol operates it. The buy is a protocol action, not a user transaction. The bought-back MTF then goes to the treasury and the buyback split described in [Tokenomics](./tokenomics.md#value-accrual--flywheel).
 
 :::warning
-**This address ACCEPTS an ordinary transfer, and nothing comes back.** It is
-guarded as a transfer *source*, not as a destination, so a spot transfer to it
-succeeds. There is no key to return it and the protocol's only spend path is
-buying MTF, so USDC sent here is a permanent donation to the buyback. Check the
-destination before you sign.
+This address accepts an ordinary transfer, and nothing comes back. The protocol guards it as a transfer *source*, not as a destination, so a spot transfer to it succeeds. No key can return the funds, and the only spend path of the protocol is buying MTF. USDC sent here is a permanent donation to the buyback. Check the destination before you sign.
 
-USDC sent here does count toward the buyback's next fire. **No read reports that
-balance** — see [deleted reads](../api/rest/info.md#retired-reads).
-What it cannot do is keep an already-started drain running below the governed
-trigger — only the buyback's own schedule does that. See
-[Fees](./fees.md#buyback-drip).
+USDC sent here does count toward the next buyback fire. No read reports that balance. See [deleted reads](../api/rest/info.md#retired-reads). The USDC cannot keep an already-started drain running below the governed trigger. Only the buyback schedule does that. See [Fees](./fees.md#buyback-drip).
 :::
 
-### Burn — `0x0000…dEaD` {#burn--0x0000dead}
+### Burn (`0x0000…dEaD`) {#burn--0x0000dead}
 
-The canonical EVM **burn sink**. It is keyless and, uniquely on this page, **provably unspendable**: the protocol rejects every attempted transfer whose source is the burn address, under any path. Nothing can ever move value out of it.
+The canonical EVM burn sink. It is keyless. It is also the only address on this page that is provably unspendable. The protocol rejects every transfer whose source is the burn address, on any path. Nothing can ever move value out of it.
 
-The address is **reserved**. No burn path routes through this address. On testnet, an operator vote reduces supply by **decreasing the treasury balance**, not by sending tokens here.
+The address is reserved. No burn path routes through it. On testnet, an operator vote reduces supply by decreasing the treasury balance. It does not send tokens here.
 
-### Spot backstop — `0x0000…5b07` {#spot-backstop--0x00005b07}
+### Spot backstop (`0x0000…5b07`) {#spot-backstop--0x00005b07}
 
-Custody sink for collateral the protocol takes in when it settles a liquidation.
-Two paths park tokens here, both as ordinary token balances:
+This address is the custody sink for collateral that the protocol takes in when it settles a liquidation. Two paths park tokens here, both as ordinary token balances:
 
-- **The forced spot-margin liquidation waterfall.** When the book is too thin to
+- The forced spot-margin liquidation waterfall. When the book is too thin to
   absorb a forced close, the insurance fund buys the base and parks it here.
-- **A portfolio-margin collateral seizure.** When a PM account ends a liquidation
+- A portfolio-margin collateral seizure. When a PM account ends a liquidation
   in a USDC deficit and holds eligible non-USDC collateral, the protocol takes
   that collateral at its haircut-valued mark and settles that much of the USDC
   debt. The seized units land here.
 
-So a balance at this address is not one product's residue. Read it as "collateral
-the protocol now holds and has not yet disposed of".
+A balance at this address is not the residue of one product. Read it as collateral that the protocol now holds and has not yet disposed of.
 
-It is NOT the treasury. The treasury also holds unissued MTF supply, and a
-testnet supply-cut vote burns from that row — so collateral standing behind a settled
-debt must not sit there.
+This address is not the treasury. The treasury also holds unissued MTF supply, and a testnet supply-cut vote burns from that row. Collateral that stands behind a settled debt must not sit there.
 
-Keyless, and provably so: landing on this fixed image of eighteen zero bytes
-followed by `0x5b07` would take a `2^160` preimage search, so no signer can ever
-act as it.
+The address is keyless, and provably so. To land on this fixed image of eighteen zero bytes followed by `0x5b07`, a signer would need a `2^160` preimage search. So no signer can ever act as it.
 
 :::warning
-The portfolio-margin seizure path needs a governance vote that sets a collateral
-haircut. No such vote has ever been enacted on either running chain (measured
-2026-09-03 over the full archive), so only the spot-margin waterfall credits this
-address.
+The portfolio-margin seizure path needs a governance vote that sets a collateral haircut. No such vote has been enacted on either running chain (measured 2026-09-03 over the full archive). So only the spot-margin waterfall credits this address.
 :::
 
 ## Two categories {#two-categories}
 
-Every address here is keyless, but they split into two kinds:
+Every address here is keyless, but they form two groups:
 
-- **Protocol-operated (system authority).** System, Oracle feeder, Faucet, Treasury, and Assistance fund. No key signs for them, but the **protocol** writes to or from them as part of its own operation (oracle publication, faucet credits on test networks, testnet treasury supply changes, buyback execution). The legacy Spot fee sink was in this group and is now inert.
-- **Never-spendable.** The Burn address. No key and no protocol path can ever move value out of it.
+- Protocol-operated (system authority): System, Oracle feeder, Faucet, Treasury and Assistance fund. No key signs for them, but the protocol writes to or from them as part of its own operation. Examples are oracle publication, faucet credits on test networks, testnet treasury supply changes and buyback execution. The legacy Spot fee sink was in this group and is now inert.
+- Never spendable: the Burn address. No key and no protocol path can ever move value out of it.
 
-The Null address is neither — it is a sentinel value, not an account anyone acts on.
+The Null address is in neither group. It is a sentinel value, not an account that anyone acts on.
 
 ## FAQ {#faq}
 
@@ -122,22 +107,22 @@ The Null address is neither — it is a sentinel value, not an account anyone ac
 <summary>Show FAQ</summary>
 
 **Q: Could someone find the private key to the treasury or the burn address?**
-A: No. These are not derived from any public key; they are fixed constants. Recovering a key for one would require inverting keccak-256 onto a specific 20-byte target, which is infeasible. There is no key to find.
+A: No. These addresses are fixed constants, not derived from any public key. To recover a key for one, you would have to invert keccak-256 onto a specific 20-byte target. That is infeasible. There is no key to find.
 
 **Q: Can I send tokens to the burn address to destroy them?**
-A: No. The burn address is reserved and no supply path uses it. Mainnet supply is fixed. On testnet, an operator vote reduces the treasury balance instead. Treat the burn address as reserved.
+A: No. The burn address is reserved and no supply path uses it. Mainnet supply is fixed. On testnet, an operator vote reduces the treasury balance instead.
 
 **Q: The faucet gave me funds on testnet. Will it on mainnet?**
 A: No. The faucet only credits on test networks. On mainnet there is no faucet dispense.
 
-**Q: I see a balance at the assistance fund on the explorer — whose is it?**
-A: Mostly fee revenue the protocol has collected for buyback and will spend on the open market to buy MTF. No user controls it; the protocol operates it. The balance may also include USDC a user sent to the address by mistake — that transfer is accepted and is not reversible, so it becomes part of the buyback budget.
+**Q: I see a balance at the assistance fund on the explorer, and whose is it?**
+A: Mostly fee revenue that the protocol collected for the buyback. The protocol spends it on the open market to buy MTF. No user controls it. The balance may also include USDC that a user sent by mistake. The protocol accepts that transfer and it is not reversible, so it joins the buyback budget.
 
 </details>
 
 ## See also {#see-also}
 
-- [Tokenomics](./tokenomics.md) — treasury, buyback, and supply model
-- [Fees](./fees.md) — how collected fees are routed
-- [Oracle prices](./oracle-prices.md) — what the oracle feeder publishes
-- [Glossary](./glossary.md) — protocol terms
+- [Tokenomics](./tokenomics.md): the treasury, the buyback and the supply model.
+- [Fees](./fees.md): how collected fees are routed.
+- [Oracle prices](./oracle-prices.md): what the oracle feeder publishes.
+- [Glossary](./glossary.md): protocol terms.

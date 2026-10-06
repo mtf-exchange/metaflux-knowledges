@@ -1,129 +1,134 @@
 ---
-description: POST /info read queries for the MetaFlux custody bridge — the per-entry status of a user's pending withdrawals, and the deployment rotation that moves their message ids.
+description: POST /info reads for the MetaFlux custody bridge. They give the status of each pending withdrawal of a user, and describe the deployment rotation that moves its message id.
 ---
 
-# `POST /info` — bridge
+# Bridge reads {#post-info--bridge}
 
-Read queries for the **custody bridge**. Same `POST /info` endpoint, envelope,
-and conventions as the [base page](../info.md) — this page carries the
-bridge-specific `type`s.
+This page describes the `POST /info` read for the custody bridge.
 
-## TL;DR {#tldr}
+The read uses the same `POST /info` endpoint, envelope and conventions as the
+[base page](../info.md). This page lists the bridge `type`s.
 
-One public query:
+## Summary {#tldr}
 
-- [`bridge_withdrawal_history`](#bridge_withdrawal_history) — your own pending
+There is one public query:
+
+- [`bridge_withdrawal_history`](#bridge_withdrawal_history): your own pending
   withdrawals, each with a status.
 
 Two older names are retired: `bridge_chain_configs` and `bridge_user_outbox`.
 Both answer `410` with `code: "UNKNOWN_TYPE"`, and `details.use` names
 `bridge_withdrawal_history`.
 
-## The withdrawal lifecycle {#why}
+## Withdrawal lifecycle {#why}
 
 A bridge withdrawal moves through the outbox. Validators co-sign it. At a
 two-thirds stake quorum, the co-signatures become a releasable multisig. A
 relay submits that multisig to the destination chain.
 
-## The message id moves {#message-id}
+## Message id rotation {#message-id}
 
-A withdrawal has **two** 32-byte ids.
+A withdrawal has two 32-byte ids.
 
 | Id | What it is | Moves on rotation? |
 |---|---|---|
-| `message_id` | The **signing digest**. Validators co-sign this, and the destination contract verifies it. | **Yes** |
-| `economic_id` | An internal **dedup key**. Not a signature digest, never co-signed. | No |
+| `message_id` | The *signing digest*. Validators co-sign it, and the destination contract verifies it. | **Yes** |
+| `economic_id` | An internal *dedup key*. It is not a signature digest, and validators never co-sign it. | No |
 
-`message_id` folds the deployment context — `evm_chain_id`,
-`evm_contract_address` and `validator_set_epoch` from the chain's committed
-**deployment row**. Governance can rotate that row. When it does, **the same
-withdrawal gets a new `message_id`**.
+`message_id` includes the deployment context: `evm_chain_id`,
+`evm_contract_address` and `validator_set_epoch` from the committed
+*deployment row* of the chain. Governance can rotate that row. When it does,
+**the same withdrawal gets a new `message_id`**.
 
-The deployment row is not part of this read. A node publishes the full row on
+This read does not include the deployment row. A node publishes the full row on
 its [`node_bridge_outbox`](../../../nodes/data-streams.md#node_bridge_outbox-configs)
-stream, and the custody address for each chain is in the
+stream. The custody address for each chain is in the
 [Deployments](../../../bridge/index.md#deployments) table. The row rotates, so
-never hardcode an address or an epoch: a stale value computes a `message_id` no
-validator signs, and points a deposit at a retired custody contract.
+never hardcode an address or an epoch. A stale value computes a `message_id`
+that no validator signs, and it points a deposit at a retired custody contract.
 
-Every `message_id` on this read is the id under the **current** row. It is the
-only id a caller should ever act on. `economic_id` appears on the node stream
-only, labeled for what it is.
+Every `message_id` on this read is the id under the current row. It is the only
+id that a caller should act on. `economic_id` appears only on the node stream,
+with a label that says what it is.
 
 ## Withdrawal status {#status}
 
-Every outbox entry carries exactly one `status`. The four values below, and what
-each means for the user. A fifth value, [`voided`](#voided), appears only on a
-finished entry in [`bridge_withdrawal_history`](#bridge_withdrawal_history).
+Every outbox entry has exactly one `status`. The four values below show what
+each status means for the user. A fifth value, [`voided`](#voided), appears
+only on a finished entry in
+[`bridge_withdrawal_history`](#bridge_withdrawal_history).
 
 ### `awaiting_cosignatures`
 
-Validators are still co-signing. **Normal, and it survives a deployment
-rotation** — the relay re-derives the new `message_id` and re-signs under it.
-Only partial-signature progress resets; the withdrawal itself is not at risk.
+Validators are still co-signing. This status is normal, and it survives a
+deployment rotation. The relay derives the new `message_id` and signs again
+under it. Only the partial-signature progress resets. The withdrawal is not at
+risk.
 
 `pending_cosigner_count` reports how many validators have signed so far.
 
-While withdrawals are halted, validators sign nothing, so a queued withdrawal
-stays here until the halt lifts. The halt exists so that governance can still [void](#voided) a
-withdrawal before any signature exists.
+While withdrawals are halted, validators sign nothing. A queued withdrawal
+stays in this status until the halt ends. The halt exists so that governance
+can still [void](#voided) a withdrawal before any signature exists.
 
 ### `ready_to_release`
 
 A releasable two-thirds multisig exists under the current deployment. The relay
 can submit it now.
 
-**This is the only status a rotation can break.** A deployment rotation retires
-the domain the multisig was signed under, so the entry moves to
-`stranded_on_retired_domain` and no releasable multisig ever appears again. The
-withdrawal stays unpaid until governance [re-issues](#reissue) it. A withdrawal
-below quorum is safe: it re-signs under the new domain by itself.
+**A rotation can break this status only.** A deployment rotation retires the
+domain that the multisig was signed under. The entry then moves to
+`stranded_on_retired_domain`, and a releasable multisig never appears again.
+The withdrawal stays unpaid until governance [re-issues](#reissue) it. A
+withdrawal below quorum is safe: it signs again under the new domain without
+help.
 
 ### `stranded_on_retired_domain`
 
-Quorum was reached under a deployment that has since been **retired**. The
-outbound replay guard keys on the `economic_id`, which does not move, so the
-chain deliberately refuses to re-finalize this withdrawal under the new
-deployment. That refusal is what prevents a double release — but it also means
-**no releasable multisig can ever appear for this entry**.
+Quorum was reached under a deployment that governance has since retired. The
+outbound replay guard keys on the `economic_id`, which does not move. The chain
+therefore refuses on purpose to finalize this withdrawal again under the new
+deployment. That refusal prevents a double release. It also means that **no
+releasable multisig can ever appear for this entry**.
 
 :::danger
-**`stranded_on_retired_domain` is terminal, and it covers TWO states with
-opposite outcomes.** Waiting does not clear either, and no relay action can.
+**`stranded_on_retired_domain` is terminal, and it covers two states with
+opposite outcomes.** Waiting does not clear either state, and no relay action
+can.
 
 1. The withdrawal was never paid. Governance can [re-issue](#reissue) it.
-2. The withdrawal was **already paid**, and its deployment was then rotated
-   inside the retention window. The funds are on the destination chain already.
+2. The withdrawal was **already paid**, and then its deployment was rotated
+   inside the retention window. The funds are already on the destination chain.
 
-**Confirm which one it is on the destination chain BEFORE any re-issue.** A
+**Confirm which state it is on the destination chain before any re-issue.** A
 re-issue against state 2 pays the same withdrawal twice.
 
-Contact the operators; do not re-submit the withdrawal.
+Contact the operators. Do not submit the withdrawal again.
 :::
 
-**Do not try to tell the two apart by message id.** A payment made before a
-rotation was recorded under the OLD deployment's id, and `message_id` on this
-read is always the CURRENT one, so an id lookup answers "not paid" for a paid
-entry. Check whether `dst_addr` actually received the amount on the destination
-chain instead.
+**Do not use the message id to tell the two states apart.** A payment made
+before a rotation was recorded under the id of the old deployment. `message_id`
+on this read is always the current one, so an id lookup answers "not paid" for
+a paid entry. Instead, check if `dst_addr` received the amount on the
+destination chain.
 
 ### `released`
 
-The destination-chain release is quorum-confirmed. The entry is retained for the
-chain's release-retention window so that a destination-chain reorg can be
-re-relayed with the same authorization. It leaves the outbox when that window
-elapses. `released_at_ms` carries the
-release timestamp; it is `null` for every other status.
+A quorum confirms the release on the destination chain. The chain keeps the
+entry for its release-retention window. A reorg on the destination chain can
+then be relayed again with the same authorization. The entry leaves the outbox
+when that window ends. `released_at_ms` has the release timestamp. It is `null`
+for every other status.
 
 ## Re-issue of a withdrawal {#reissue}
 
 Governance can re-issue a stranded withdrawal under the current deployment. The
-re-issue carries the original withdrawal's fields and a new nonce.
+re-issue has the fields of the original withdrawal and a new nonce.
 
 After a re-issue, [`bridge_withdrawal_history`](#bridge_withdrawal_history)
 shows two entries for the withdrawal:
 
-- A NEW entry. It has the same `amount_units` and `dst_addr`, a higher `nonce`,
+- A new entry. It has the same `amount_units` and `dst_addr`, a higher `nonce`,
   and the status `awaiting_cosignatures`. It then moves through the normal
   lifecycle.
 - The stranded entry. It leaves the outbox, and its last status stays
@@ -133,12 +138,11 @@ The new nonce gives the new entry a new `message_id`. Act on the new entry only.
 
 The re-issue moves no exchange balance:
 
-- The user is never debited twice. The original withdrawal carries the only
-  debit.
+- The user is never debited twice. The original withdrawal has the only debit.
 - The user is never credited on the exchange. The funds go to `dst_addr` on the
   destination chain.
-- Governance re-issues a withdrawal once. A second re-issue of the same
-  withdrawal is refused.
+- Governance re-issues a withdrawal once. The chain refuses a second re-issue of
+  the same withdrawal.
 
 ### `voided` {#voided}
 
@@ -146,18 +150,19 @@ Governance removed the withdrawal before any validator signed it, and refunded
 the user on the exchange in the same step. The entry is finished: `open` is
 `false`.
 
-- The refund is the full amount the withdrawal debited, including the bridge
-  fee. The fee is returned because the relay it paid for never happens.
+- The refund is the full amount that the withdrawal debited, including the
+  bridge fee. The fee comes back because the relay that it paid for never
+  happens.
 - Nothing pays the withdrawal on the destination chain. The chain refuses every
   later signature for it, under any deployment.
-- A withdrawal that has any validator signature cannot be voided.
+- A withdrawal that has a validator signature cannot be voided.
 
-The refund appears in the account's exchange balance, but the ledger has no
-refund row. The withdrawal row keeps its debit, and its joined outbox entry
+The refund appears in the exchange balance of the account, but the ledger has
+no refund row. The withdrawal row keeps its debit, and its joined outbox entry
 reads `voided`. Add the refund yourself when you rebuild a balance from the
 ledger.
 
-### A disputed withdrawal {#disputed}
+### Disputed withdrawal {#disputed}
 
 A validator can dispute a withdrawal on the destination contract. The dispute
 makes that `message_id` permanently unpayable. The exchange can still read
@@ -167,34 +172,36 @@ dispute stops the payment.
 The same governed re-issue restores a disputed withdrawal. A new entry with a
 new nonce appears, as for a stranded withdrawal.
 
-To learn whether a `released` withdrawal was paid, check that `dst_addr`
-received the amount on the destination chain.
+To learn if a `released` withdrawal was paid, check that `dst_addr` received
+the amount on the destination chain.
 
 ## Conventions {#conventions}
 
-- `amount_units` is in the destination chain's **base units**, not whole coins.
-  USDC has 6 decimals, so `"1000000"` is 1.0 USDC. It is a **string**: the value
-  is a `u128` and does not fit a JSON number.
+- `amount_units` is in the base units of the destination chain, not whole
+  coins. USDC has 6 decimals, so `"1000000"` is 1.0 USDC. It is a string,
+  because the value is a `u128` and does not fit a JSON number.
 - `chain` is `1` (Base) or `2` (Arbitrum). No other value exists.
 - 32-byte values (`message_id`, `economic_id`, `dst_addr`, `contract_address`)
-  render as `0x` plus 64 hex characters. Addresses render as `0x` plus 40.
+  render as `0x` and 64 hex characters. Addresses render as `0x` and 40.
 - Timestamps and nonces are JSON numbers.
 - Entries keep queue order, oldest first.
 
-## A user's pending bridge withdrawals {#bridge_withdrawal_history}
+## Bridge withdrawal history {#bridge_withdrawal_history}
 
-One account's bridge withdrawals, served by the archive rather than a validator.
+This read returns the bridge withdrawals of one account. The archive serves it,
+not a validator.
 
-**This read is the whole answer**, in flight and finished alike. The archive
-serves it for exactly that reason: a validator prunes an entry once its
-retention window expires after release, so a validator can only say what is
-moving right now, never where a withdrawal went.
+**This read is the full answer**, for withdrawals in flight and finished ones.
+That is the reason the archive serves it. A validator prunes an entry when its
+retention window after release ends. A validator can only say what is moving
+now. It cannot say where a withdrawal went.
 
-Read `open` to tell the two apart. `released_at_ms` cannot do it alone — an entry
-pruned by retention also leaves the queue and carries no release stamp.
+Read `open` to tell the two apart. `released_at_ms` alone cannot do it,
+because an entry that retention pruned also leaves the queue and has no release
+stamp.
 
-This read does not carry `economic_id`. It is not a signing digest — do not pair
-it with `message_id`.
+This read does not include `economic_id`. That id is not a signing digest. Do
+not pair it with `message_id`.
 
 **Request**
 
@@ -205,7 +212,7 @@ it with `message_id`.
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `address` | string | yes | The withdrawing account. |
-| `chain` | number | no | Restrict `entries` to `1` or `2`. Any other value is a `400` — see Errors below. |
+| `chain` | number | no | Limit `entries` to `1` or `2`. Any other value is a `400`. See Errors below. |
 
 **Response**
 
@@ -236,41 +243,41 @@ it with `message_id`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `address` | string | The account you asked for, echoed back |
-| `entries[*].chain` | number | Chain id, `1` (Base) or `2` (Arbitrum) — see [Conventions](#conventions) |
+| `address` | string | The account that you asked for |
+| `entries[*].chain` | number | Chain id, `1` (Base) or `2` (Arbitrum). See [Conventions](#conventions) |
 | `entries[*].token` | string | Asset symbol, resolved at admission |
-| `entries[*].amount_units` | Decimal string | Amount in the destination chain's base units — see [Conventions](#conventions) |
+| `entries[*].amount_units` | Decimal string | Amount in the base units of the destination chain. See [Conventions](#conventions) |
 | `entries[*].dst_addr` | string | Destination address, 32-byte, left-padded |
-| `entries[*].nonce` | number | Per-entry nonce |
-| `entries[*].ts_ms` | number | When the entry was recorded, consensus ms |
-| `entries[*].message_id` | string | The current signing digest for this withdrawal — see [The message id moves](#message-id) |
-| `entries[*].status` | enum | One of the four values, or `voided` on a finished entry — see [Withdrawal status](#status) |
+| `entries[*].nonce` | number | Nonce of the entry |
+| `entries[*].ts_ms` | number | When the entry was recorded, in consensus ms |
+| `entries[*].message_id` | string | The current signing digest for this withdrawal. See [Message id rotation](#message-id) |
+| `entries[*].status` | enum | One of the four values, or `voided` on a finished entry. See [Withdrawal status](#status) |
 | `entries[*].pending_cosigner_count` | number | How many validators have signed so far |
 | `entries[*].released_at_ms` | number \| null | Release timestamp. `null` for every status except `released` |
-| `entries[*].open` | bool | Whether the entry is still moving — see [Conventions](#conventions) |
-| `truncated` | bool | Whether `entries` was cut short — see Rules |
+| `entries[*].open` | bool | Whether the entry is still moving. See [Conventions](#conventions) |
+| `truncated` | bool | Whether `entries` was cut short. See Rules |
 
 **Rules**
 
-- `entries[*].token` is a symbol string, resolved at admission — the entry
-  carries no numeric `asset` id. Resolving at admission means a later token
-  rename never rewrites what you asked for.
-- `entries[*].message_id` is computed from the chain's deployment triple
-  (`evm_chain_id`, `evm_contract_address`, `validator_set_epoch` — see
-  [The message id moves](#message-id)). The id alone cannot tell you whether it
-  is still current: compare it against the deployment row in force.
-- `entries` is capped at 256, which is also the per-user admission cap, so
+- `entries[*].token` is a symbol string, resolved at admission. The entry has
+  no numeric `asset` id. Because the symbol is resolved at admission, a later
+  token rename never rewrites what you asked for.
+- The chain computes `entries[*].message_id` from the deployment triple of the
+  chain: `evm_chain_id`, `evm_contract_address` and `validator_set_epoch` (see
+  [Message id rotation](#message-id)). The id alone cannot tell you if it is
+  still current. Compare it against the deployment row in force.
+- The cap on `entries` is 256. That is also the per-user admission cap, so
   `truncated` is `false` in practice.
-- An empty `entries` array means this account has no pending withdrawal. It
-  does **not** mean a past withdrawal failed — a completed withdrawal leaves
-  the outbox once its retention window elapses.
+- An empty `entries` array means that this account has no pending withdrawal.
+  It does not mean that a past withdrawal failed. A completed withdrawal leaves
+  the outbox when its retention window ends.
 
 **Errors**
 
-- **A `chain` outside `1` / `2` is a `400`** that names both accepted values.
-  Only `1` (Base) and `2` (Arbitrum) carry withdrawals. The refusal keeps a bad
-  `chain` apart from an account with no pending withdrawal: both would otherwise
-  answer the same empty `entries` list.
-- Archive unreachable → `503`. This read never answers an empty `entries` list
-  for that case — "no archive" and "no withdrawal in flight" are different
-  facts, and only one of them is about your money.
+- **A `chain` other than `1` or `2` is a `400`.** The error names both
+  accepted values. Only `1` (Base) and `2` (Arbitrum) have withdrawals. The
+  refusal keeps a bad `chain` separate from an account with no pending
+  withdrawal. Without it, both would answer the same empty `entries` list.
+- If the archive is unreachable, the read answers `503`. It never answers an
+  empty `entries` list in that case. "No archive" and "no withdrawal in flight"
+  are different facts, and only one of them is about your money.

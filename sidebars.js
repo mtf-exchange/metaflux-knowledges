@@ -1,9 +1,9 @@
 // @ts-check
-// Mirrors the curated order/grouping of the former GitBook SUMMARY.md.
 
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
-  docsSidebar: [
+  protocolSidebar: [
+    {type: 'html', value: 'Protocol', className: 'sidebar-label'},
     {type: 'doc', id: 'index', label: 'Overview'},
 
     {
@@ -93,6 +93,12 @@ const sidebars = {
       items: ['mip/mip-1', 'mip/mip-2', 'mip/mip-3', 'mip/mip-4', 'mip/mip-5', 'mip/mip-6'],
     },
 
+    {type: 'doc', id: 'brand', label: 'Brand'},
+
+  ],
+
+  developersSidebar: [
+    {type: 'html', value: 'For developers', className: 'sidebar-label'},
     {
       type: 'category',
       label: 'API',
@@ -155,20 +161,6 @@ const sidebars = {
       ],
     },
 
-    {type: 'doc', id: 'nodes/data-streams', label: 'Node data streams'},
-
-    {
-      type: 'category',
-      label: 'EVM',
-      link: {type: 'doc', id: 'evm/index'},
-      items: [
-        'evm/execution-model',
-        'evm/interacting-with-core',
-        'evm/core-evm-transfers',
-        'evm/interaction-timings',
-      ],
-    },
-
     {
       type: 'category',
       label: 'Integration',
@@ -185,13 +177,28 @@ const sidebars = {
         'integration/market-maker-performance',
         'integration/latency',
         'integration/migrating-from-hl',
-        {
-          type: 'category',
-          label: 'SDKs',
-          items: ['integration/typescript-sdk', 'integration/rust-sdk'],
-        },
       ],
     },
+
+    {
+      type: 'category',
+      label: 'SDKs',
+      items: ['integration/typescript-sdk', 'integration/rust-sdk'],
+    },
+
+    {
+      type: 'category',
+      label: 'EVM',
+      link: {type: 'doc', id: 'evm/index'},
+      items: [
+        'evm/execution-model',
+        'evm/interacting-with-core',
+        'evm/core-evm-transfers',
+        'evm/interaction-timings',
+      ],
+    },
+
+    {type: 'doc', id: 'nodes/data-streams', label: 'Node data streams'},
 
     {
       type: 'category',
@@ -210,8 +217,6 @@ const sidebars = {
         'changelog/block-7400000',
       ],
     },
-
-    {type: 'doc', id: 'brand', label: 'Brand'},
   ],
 };
 

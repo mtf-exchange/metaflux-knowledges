@@ -1,29 +1,32 @@
 ---
-description: "Node-scoped snapshots: peers, sync state and the figures an operator reads off a running node."
+description: "Node-scoped snapshots: peers, sync state and the figures an operator reads from a running node."
 ---
 
 # Node snapshot reads
 
-Read queries on [`POST /info`](../info.md). The endpoint, the request
-envelope, the number planes and the error shape are on that page and apply
-to every query here.
+These reads return exchange status, account helpers, vault and validator summaries, and the peer roster.
+
+They are read queries on [`POST /info`](../info.md). That page describes the
+endpoint, the request envelope, the number planes and the error shape. These
+apply to every query here.
 
 ## Node snapshot query types {#node-snapshot-query-types}
 
-These reads answer from the node's committed state, over the same
-`{type, data}` envelope and the same conventions as every read above: money as
-decimal strings, addresses as `0x`-hex, asset ids as unsigned integers, map
-keys in sorted order. Each is a keyed lookup, not a scan, except where the set
-is inherently small (markets, vaults, validators).
+These reads answer from the committed state of the node. They use the same
+`{type, data}` envelope and the same conventions as every other read: money as
+decimal strings, addresses as `0x`-hex, asset ids as unsigned integers, and map
+keys in sorted order. Each read is a keyed lookup, not a scan, except where the
+set is small by nature (markets, vaults, validators).
 
 Perpetual market reads are on the [perpetual queries](../info/perpetuals.md)
-page, and spot, spot-margin and Earn reads on the
-[spot & margin queries](../info/spot.md) page. The reads below are the ones
-that belong to no single product: exchange status, open-order helpers,
-liquidation, rate limits, vaults, validators and multi-sig.
+page. Spot, spot-margin and Earn reads are on the
+[spot & margin queries](../info/spot.md) page. The reads below belong to no
+single product: exchange status, open-order helpers, liquidation, rate limits,
+vaults, validators and multi-sig.
+
 ### Global exchange trading status {#exchange_status}
 
-Global trading status. No parameters.
+This read returns the global trading status. It takes no parameters.
 
 ```json
 { "type": "exchange_status" }
@@ -47,38 +50,42 @@ Global trading status. No parameters.
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `chain_identity` | string | Which chain answered. See [chain identity](#chain-identity) below |
-| `spot_disabled` | bool | Spot trading globally disabled |
-| `post_only` | bool | A post-only window is in force — new orders must be maker-only |
+| `chain_identity` | string | The chain that answered. See [chain identity](#chain-identity) below |
+| `spot_disabled` | bool | Spot trading is disabled globally |
+| `post_only` | bool | A post-only window is in force. New orders must be maker-only |
 | `frozen` | bool | The chain is in a pending upgrade halt |
-| `timestamp` | uint64 | Consensus block time, ms — the "as of" for every field above |
-| `mip3_enabled` | bool | `true` once any MIP-3 market/pair spec is registered |
+| `timestamp` | uint64 | Consensus block time, in ms. It is the "as of" time for every field above |
+| `mip3_enabled` | bool | `true` when any MIP-3 market or pair spec is registered |
 
 :::info
-This reports current status only. It does not return the pending upgrade
-height or the node's replay progress. `frozen` shows a halt is coming; it does
-not give a date.
+This read reports the current status only. It does not return the pending
+upgrade height or the replay progress of the node. `frozen` shows that a halt
+is coming. It does not give a date.
 :::
 
 #### Chain identity {#chain-identity}
 
 **A `chain_id` does not identify a chain.** Two chains can run the same
-`chain_id`, and everything else that is stable about them — the endpoint shape,
-the validator addresses, the `eth_chainId` answer — can be identical too. Only
-the moving state differs, and moving state cannot be asserted on.
+`chain_id`. All their other stable properties can also be identical: the
+endpoint shape, the validator addresses and the `eth_chainId` answer. Only the
+moving state differs, and a client cannot assert on moving state.
 
-`chain_identity` is the value that does identify one. It reads
+`chain_identity` is the value that identifies one chain. It reads
 `c<chain_id>-t<chain start, ms>-g<first 16 hex of the genesis hash>`. The
-genesis hash folds the validator set, the epoch length and the initial state
-root, so two chains that agree on all three parts are the same chain.
+genesis hash includes the validator set, the epoch length and the initial state
+root. Two chains that agree on all three parts are the same chain.
 
-**Assert it at startup and refuse to run on a mismatch.** Put the expected value
-in your configuration next to the endpoint URL, read `exchange_status` before
-your first write, compare the two strings, and exit on a difference. Requiring
-the URL to be configured is not enough on its own: that stops a default endpoint
-from being used, not a wrong one. Rows written against the wrong chain are
-byte-identical in shape to correct rows and carry a colliding `chain_id` as
-their only provenance, so the mistake cannot be found afterwards.
+**Assert it at startup, and refuse to run on a mismatch.**
+
+1. Put the expected value in your configuration next to the endpoint URL.
+2. Read `exchange_status` before your first write.
+3. Compare the two strings.
+4. Exit if they differ.
+
+A required URL setting alone is not sufficient. It stops the use of a default
+endpoint, not of a wrong one. Rows written against the wrong chain have the
+same shape as correct rows. Their only provenance is a `chain_id` that
+collides, so nobody can find the mistake later.
 
 | Value | Meaning | What to do |
 |-------|---------|------------|
@@ -86,32 +93,35 @@ their only provenance, so the mistake cannot be found afterwards.
 | `underivable` | The node proves no genesis | Treat as a mismatch. Never as a match |
 | absent | A node older than the field | Treat as a mismatch |
 
-`underivable` can never collide with a real chain's value, because a derived
-identity always starts `c` and a digit.
+`underivable` can never collide with the value of a real chain, because a
+derived identity always starts with `c` and a digit.
 
-**What it changes on.** Only a re-genesis of the chain you are reading. It
-survives a node restart, a release, a node upgrade and a validator-set change,
-and a re-genesis of a DIFFERENT chain does not move it. So cache it for the life
-of your process, and re-read it on every reconnect to a new endpoint.
+**When it changes.** Only a re-genesis of the chain that you read changes it.
+It survives a node restart, a release, a node upgrade and a validator-set
+change. A re-genesis of a different chain does not change it. Cache it for the
+life of your process, and read it again on every reconnect to a new endpoint.
 
-It also survives any config edit the node still boots on. Two edits are not in
-that set: removing the genesis file turns the value to `underivable`, and
-changing the genesis timestamp under a genesis file stops the boot. Neither can
-produce a false match — one refuses, the other never starts.
+It also survives any config edit that the node still boots with. Two edits are
+not in that set. If you remove the genesis file, the value becomes
+`underivable`. If you change the genesis timestamp under a genesis file, the
+node does not boot. Neither edit can produce a false match: one refuses, and
+the other never starts.
 
 :::warning
 `frontend_open_orders` is removed (folded into `open_orders`, wire-v2 phase 2).
 A request now returns `400 UNKNOWN_TYPE`.
-The TIF / `cloid` / trigger detail it used to carry is on every
-[`open_orders`](./orders-fills.md#open_orders) row already — see that entry.
+Every [`open_orders`](./orders-fills.md#open_orders) row already has the TIF,
+`cloid` and trigger detail that it used to return. See that entry.
 :::
 
 ### Active TWAP parents for an account {#user_twaps}
 
-The account's active TWAP parent orders: the live slice schedulers, with total
-size versus executed size. A completed or cancelled TWAP leaves this set — it
-is the live set, not history. For slice-fill history, use
-[`user_twap_slice_fills`](./account-history.md#user_twap_slice_fills). Required: `address` (0x hex).
+This read returns the active TWAP parent orders of the account. These are the
+running slice schedulers, with the total size and the executed size. A TWAP
+that completes or is cancelled leaves this set. The set holds current TWAPs
+only, not history. For the history of slice fills, use
+[`user_twap_slice_fills`](./account-history.md#user_twap_slice_fills).
+Required: `address` (0x hex).
 
 ```json
 { "type": "user_twaps", "address": "0x<addr>" }
@@ -144,24 +154,23 @@ is the live set, not history. For slice-fill history, use
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `twaps[*].twap_id` | uint64 | Parent TWAP id (pass to [`twap_cancel`](../exchange/orders.md#twap_cancel)) |
+| `twaps[*].twap_id` | uint64 | Parent TWAP id (pass it to [`twap_cancel`](../exchange/orders.md#twap_cancel)) |
 | `twaps[*].coin` | string | Market symbol |
-| `twaps[*].side` | `"B"` / `"A"` | Side token — the same `"B"`/`"A"` form as [`user_fills`](./orders-fills.md#user_fills) |
-| `twaps[*].sz` | Decimal string | Parent total size (whole units) |
-| `twaps[*].executed_sz` | Decimal string | Size already filled by fired slices (whole units) |
-| `twaps[*].slices_total` | uint32 | Slice count the parent was scheduled with |
+| `twaps[*].side` | `"B"` / `"A"` | Side token. It uses the same `"B"`/`"A"` form as [`user_fills`](./orders-fills.md#user_fills) |
+| `twaps[*].sz` | Decimal string | Total size of the parent (whole units) |
+| `twaps[*].executed_sz` | Decimal string | The size that fired slices already filled (whole units) |
+| `twaps[*].slices_total` | uint32 | The slice count of the parent schedule |
 | `twaps[*].slices_done` | uint32 | Slices fired so far |
-| `twaps[*].delay_ms` | uint64 | Inter-slice delay (ms) |
-| `twaps[*].last_fire_ts` | uint64 | Last slice fire timestamp (consensus ms) |
-| `twaps[*].reduce_only` | bool | Parent is reduce-only |
+| `twaps[*].delay_ms` | uint64 | Delay between slices (ms) |
+| `twaps[*].last_fire_ts` | uint64 | Timestamp of the last slice fire (consensus ms) |
+| `twaps[*].reduce_only` | bool | The parent is reduce-only |
 
-Rows are listed in ascending `twap_id` order. There is no `duration` field:
-compute it as `slices_total × delay_ms`. The wire carries only the independent
-values.
+Rows are in ascending `twap_id` order. There is no `duration` field. Calculate
+it as `slices_total × delay_ms`. The wire has only the independent values.
 
-### Summary of all vaults {#vault_summaries}
+### All vault summaries {#vault_summaries}
 
-All vaults summary. No parameters.
+This read returns a summary of all vaults. It takes no parameters.
 
 ```json
 { "type": "vault_summaries" }
@@ -183,22 +192,24 @@ All vaults summary. No parameters.
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `vaults[*].id` | uint64 | Vault id |
-| `vaults[*].address` / `leader` | hex address | Vault on-chain address / leader |
+| `vaults[*].address` / `leader` | hex address | On-chain address of the vault, and its leader |
 | `vaults[*].name` | string | Display name of the vault. Present on every row |
-| `vaults[*].tvl` | decimal string | Mark-to-market NAV, whole-USDC — same figure as [`vault_state.tvl`](./vaults-staking.md#vault_state) |
+| `vaults[*].tvl` | decimal string | Mark-to-market NAV, in whole USDC. It is the same figure as [`vault_state.tvl`](./vaults-staking.md#vault_state) |
 | `vaults[*].follower_count` | uint64 | Number of share holders |
 | `vaults[*].kind` | `"user" \| "metaliquidity"` | Vault kind |
 
-Every vault appears, and each row names its `leader`. To list the vaults led
-by one address, filter these rows on `leader` — there is no per-leader read.
+Every vault appears, and each row names its `leader`. To list the vaults that
+one address leads, filter these rows on `leader`. There is no read for each
+leader.
 
-### A user's action stats {#user_rate_limit}
+### User action counters {#user_rate_limit}
 
-A user's action counters. Required: `address` (0x hex).
+This read returns the action counters of a user. Required: `address` (0x hex).
 
-**Despite the name, this does not report a rate-limit budget.** It returns
-nonce and action counters only, not bucket state. No read exposes remaining
-budget — track your own spend against [rate limits](../../rate-limits.md).
+**This read does not report a rate-limit budget, although its name suggests
+it.** It returns only nonce and action counters, not bucket state. No read
+shows the remaining budget. Track your own spend against
+[rate limits](../../rate-limits.md).
 
 ```json
 { "type": "user_rate_limit", "address": "0x<addr>" }
@@ -215,17 +226,17 @@ budget — track your own spend against [rate limits](../../rate-limits.md).
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `last_nonce` | uint64 | Last accepted action nonce |
-| `pending_count` | uint32 | Pending (in-flight) action count |
-| `lifetime_count` | uint64 | Lifetime actions submitted |
+| `pending_count` | uint32 | Count of pending (in-flight) actions |
+| `lifetime_count` | uint64 | Actions submitted over the lifetime of the account |
 
 An address with no record reads as all zeros.
 
-### All approved broker-fee grants {#approved_brokers}
+### Approved broker-fee grants {#approved_brokers}
 
-Every builder-fee grant an account has approved, and the bps ceiling on each.
-Required: `address` (0x hex). To check one `(address, builder)` pair, look the
-builder up in this list — an address that is absent is not approved, which is
-the same answer as a `"0"` ceiling.
+This read returns every builder-fee grant that an account has approved, and the
+bps ceiling of each. Required: `address` (0x hex). To check one
+`(address, builder)` pair, find the builder in this list. An address that is
+absent is not approved. That is the same answer as a `"0"` ceiling.
 
 ```json
 { "type": "approved_brokers", "address": "0x<addr>" }
@@ -249,14 +260,14 @@ the same answer as a `"0"` ceiling.
 | Field | Type | Meaning |
 |-------|------|-------------|
 | `builders[*].builder` | hex address | Approved builder address |
-| `builders[*].max_fee_bps` | string | Approved bps ceiling as a decimal string of whole basis points |
+| `builders[*].max_fee_bps` | string | Approved bps ceiling, as a decimal string of whole basis points |
 
-Builders list in ascending address order; an account with no approvals returns
+Builders are in ascending address order. An account with no approvals returns
 an empty array.
 
-### Current per-validator oracle vote metadata {#validator_l1_votes}
+### Validator oracle vote metadata {#validator_l1_votes}
 
-Current validator L1 votes. No parameters.
+This read returns the current validator L1 votes. It takes no parameters.
 
 ```json
 { "type": "validator_l1_votes" }
@@ -276,21 +287,22 @@ Current validator L1 votes. No parameters.
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `latest_round` | uint64 | **A governance proposal-id counter. It is NOT the latest vote round, and it is not the maximum `round` in `votes`.** The governance proposal path increments it; nothing derives it from the votes. On a chain that has opened no proposal it stays `0` while `votes[*].round` runs into the millions. Never use it to page or to date the votes |
+| `latest_round` | uint64 | **A governance proposal-id counter. It is not the latest vote round, and it is not the maximum `round` in `votes`.** The governance proposal path increments it. Nothing derives it from the votes. On a chain that has opened no proposal, it stays `0` while `votes[*].round` goes into the millions. Never use it to page or to date the votes |
 | `votes[*].round` | uint64 | Vote round |
 | `votes[*].validator` | hex address | Casting validator |
 | `votes[*].submitted_at` | uint64 | Submission timestamp (consensus ms) |
 
-The vote payload is opaque oracle bytes, decoded internally. This read reports
-metadata only, not the raw payload.
+The vote payload is opaque oracle bytes that the node decodes internally. This
+read reports metadata only, not the raw payload.
 
-### Per-validator stake and status snapshot {#validator_summaries}
+### Validator stake and status {#validator_summaries}
 
-Per-validator snapshot: stake, status, and delegation for every validator in
-the active validator registry (a small, bounded set), in ascending key order.
+This read returns a snapshot for every validator in the active validator
+registry: stake, status and delegation. The registry is a small, bounded set.
+Rows are in ascending key order.
 
-Optional: `address` (0x hex). Naming an address adds that caller's own stake
-to every row; it changes nothing else.
+Optional: `address` (0x hex). If you name an address, every row includes the
+stake of that caller. It changes nothing else.
 
 ```json
 { "type": "validator_summaries", "address": "0x<addr>" }
@@ -322,49 +334,51 @@ to every row; it changes nothing else.
 |-------|------|-------------|
 | `total_stake` | decimal string | Σ stake across all validators |
 | `n_active` | uint64 | Size of the active set |
-| `validators[*].validator` | 0x address | Validator primary address |
+| `validators[*].validator` | 0x address | Primary address of the validator |
 | `validators[*].signer` | 0x address | Operational signer (hot key) |
 | `validators[*].validator_index` | uint32 | Consensus index |
-| `validators[*].display_name` | string \| null | The operator's chosen handle (`set_display_name`), or `null` when it set none |
-| `validators[*].stake` | decimal string | Total stake: self plus everyone else's |
-| `validators[*].self_stake` | decimal string | Validator's own contribution |
-| `validators[*].delegated_stake` | decimal string | `stake − self_stake`: everything staked by someone OTHER than the validator |
-| `validators[*].your_stake` | decimal string \| null | The stake the REQUESTING address has delegated to this validator |
+| `validators[*].display_name` | string \| null | The handle that the operator chose (`set_display_name`), or `null` when it set none |
+| `validators[*].stake` | decimal string | Total stake: the self stake and the stake of all others |
+| `validators[*].self_stake` | decimal string | The contribution of the validator |
+| `validators[*].delegated_stake` | decimal string | `stake − self_stake`: all stake from accounts other than the validator |
+| `validators[*].your_stake` | decimal string \| null | The stake that the requesting address has delegated to this validator |
 | `validators[*].commission_bps` | string | Commission in whole basis points, as a decimal string |
 | `validators[*].is_active` | bool | In the active set this epoch |
-| `validators[*].is_jailed` | bool | Currently jailed |
+| `validators[*].is_jailed` | bool | Jailed now |
 | `validators[*].jailed_at` | uint64 \| null | Jail start ts (null if not jailed) |
 | `validators[*].unjail_at` | uint64 \| null | Earliest unjail ts (null if not jailed) |
-| `validators[*].first_active_epoch` | uint64 | First epoch the validator was active |
+| `validators[*].first_active_epoch` | uint64 | The first epoch in which the validator was active |
 
-**`display_name` of `null` means UNSET, never "unknown".** Fall back to the
-address. Do not invent a name, and do not treat `null` as a node that predates
-the field.
+**A `display_name` of `null` means unset, never "unknown".** Use the address
+instead. Do not invent a name, and do not read `null` as a node older than the
+field.
 
-**`your_stake` distinguishes two different blanks.** `"0"` means the request
-named an address and that address has delegated nothing to THIS validator.
-`null` means the request named **no** address, so the field is about nobody —
-render the column as empty, not as a zero balance.
+**`your_stake` has two different blank values.** `"0"` means that the request
+named an address, and that address has delegated nothing to this validator.
+`null` means that the request named no address, so the field is about nobody.
+Show the column as empty, not as a zero balance.
 
-**`delegated_stake` is derived, not stored.** It is exactly `stake − self_stake`,
-so it can never drift from the two figures beside it. Do not sum it across rows
-to get `total_stake`: that sum excludes every validator's self-stake.
+**`delegated_stake` is derived, not stored.** It is exactly
+`stake − self_stake`, so it always agrees with the two figures next to it. Do
+not sum it across rows to get `total_stake`. That sum excludes the self stake
+of every validator.
 
-**There is no `epoch` key**, and there was never a live one. The chain's
-current-epoch counter has no production writer, so any value served would be a
-constant rather than the chain's real epoch. Read `first_active_epoch` per
+**There is no `epoch` key, and there never was one in use.** No production code
+writes the current-epoch counter of the chain. Any value served would be a
+constant, not the real epoch of the chain. Read `first_active_epoch` for each
 validator instead.
 
-`n_recent_blocks` is not tracked on-chain — omitted rather than fabricated.
+The chain does not track `n_recent_blocks`. The read omits it and does not
+invent a value.
 
 ### Advertised peer roster {#gossip_root_ips}
 
-The nodes this deployment advertises for peer discovery. No parameters. Network
-topology, **not** committed state.
+This read returns the nodes that this deployment advertises for peer discovery.
+It takes no parameters. It reports network topology, not committed state.
 
 :::info Live
-A live node answers the `peers` shape below. The previous shape,
-`{ "root_ips": ["host:port", ...] }`, is removed — there is no `root_ips` key.
+A live node answers with the `peers` shape below. The previous shape,
+`{ "root_ips": ["host:port", ...] }`, is removed. There is no `root_ips` key.
 :::
 
 ```json
@@ -392,26 +406,26 @@ A live node answers the `peers` shape below. The previous shape,
 
 | Field | Type | Meaning |
 |-------|------|-------------|
-| `peers` | object[] | One row per advertised node. Empty when the deployment advertises nothing. |
-| `peers[*].id` | uint16 | The node's numeric id |
+| `peers` | object[] | One row for each advertised node. Empty when the deployment advertises nothing. |
+| `peers[*].id` | uint16 | The numeric id of the node |
 | `peers[*].gossip` | string | Public gossip endpoint, `host:port` |
 | `peers[*].peer_rpc` | string | Public peer-RPC endpoint, `host:port` |
 | `peers[*].auth` | string | Public auth endpoint, `host:port` |
-| `peers[*].pubkey_hex` | string (optional) | Compressed secp256k1 public key for the peer's TCP auth. The key is **absent** when the operator did not publish it. |
+| `peers[*].pubkey_hex` | string (optional) | Compressed secp256k1 public key for the TCP auth of the peer. The key is **absent** when the operator did not publish it. |
 
-**Why a row holds all three ports.** A row is a copy-shaped peer config: the
-five fields map one-to-one onto a joining node's own peer entry, so you paste
-a row and dial it.
+**Row shape.** A row has the shape of a peer config entry. The five fields map
+one-to-one onto the peer entry of a joining node, so you can paste a row and
+dial it.
 
-**Where the rows come from.** Each node serves an operator-curated roster from
-its own config. The roster states public reachability. It is **not** the
-node's internal dial list, and no address from that dial list can appear here.
+**Row source.** Each node serves a roster that the operator curates in its own
+config. The roster states public reachability. It is not the internal dial list
+of the node, and no address from that dial list can appear here.
 
 **A node that advertises nothing is absent from the rows.** There is no
-fallback. A validator can run, vote and serve while publishing no address — it
-does not appear. An empty `peers` array is therefore the honest answer
-for a deployment that advertises nothing, not an error and not a sign of an
-unhealthy node.
+fallback. A validator can run, vote and serve while it publishes no address.
+Such a validator does not appear. An empty `peers` array is therefore the
+correct answer for a deployment that advertises nothing. It is not an error,
+and it does not show an unhealthy node.
 
-The roster reflects node config published at startup. It is not committed
-state and is not folded into the AppHash.
+The roster shows the node config published at startup. It is not committed
+state, and it is not part of the AppHash.

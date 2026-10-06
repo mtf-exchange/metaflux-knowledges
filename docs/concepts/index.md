@@ -1,58 +1,50 @@
 ---
-description: Core mechanisms — agent wallets, margin, liquidation, order types, vaults, fees, and the glossary.
+description: Core mechanisms of MetaFlux, including agent wallets, margin, liquidation, order types, vaults, fees and the glossary.
 ---
 
 # Concepts
 
-Plain-language explanations of MetaFlux's core mechanisms — what they do, how to use them, and what to expect under stress.
+This section explains the core mechanisms of MetaFlux: what each one does, how to use it, and how it behaves under stress.
 
-:::tip
-**New here?** Start with the [Architecture map](./architecture.md) — a one-page
-overview of every component inside MetaFlux Core and how they fit together, each
-linking to its deep-dive page below.
-:::
+The [architecture map](./architecture.md) gives a one-page overview of every component inside MetaFlux Core. Each component links to its own page.
 
 ## Read order for integrators {#read-order-for-integrators}
 
-1. [Agent wallets](./agent-wallets.md) — hot-key delegation, the standard market-maker setup
-2. [Order types](./order-types.md) — TIF, STP, triggers, TWAP, scale
-3. [Margin modes](./margin-modes.md) — Cross / Isolated / Strict-Iso
-4. [Mark prices](./mark-prices.md) — what drives margin, liquidation, triggers
-5. [Tiered liquidation](./tiered-liquidation.md) — T0 yellow card → T4 ADL
-6. [Funding rates](./funding-rates.md) — per-asset discrete user-to-user payment
-7. [Fees](./fees.md) — maker/taker tiers + burn
-8. [Fee schedule](./fee-schedule.md) — volume, maker-rebate, and staking discount tiers
-9. [Broker codes](./broker-codes.md) — charge your own fee on orders you route
-10. [Priority fees](./priority-fees.md) — pay for ordering inside a block, and how that differs from a broker fee
-11. [Sub-accounts](./sub-accounts.md) — strategy / risk isolation
-12. [Portfolio margin](./portfolio-margin.md) — cross-asset SPAN-like margin
+1. [Agent wallets](./agent-wallets.md): hot-key delegation, the standard market-maker setup.
+2. [Order types](./order-types.md): TIF, STP, triggers, TWAP and scale orders.
+3. [Margin modes](./margin-modes.md): Cross, Isolated and Strict-Iso.
+4. [Mark prices](./mark-prices.md): the price that drives margin, liquidation and triggers.
+5. [Tiered liquidation](./tiered-liquidation.md): the tiers from T0 (yellow card) to T4 (ADL).
+6. [Funding rates](./funding-rates.md): a discrete payment between users, per asset.
+7. [Fees](./fees.md): maker and taker tiers, and the burn.
+8. [Fee schedule](./fee-schedule.md): volume, maker-rebate and staking discount tiers.
+9. [Broker codes](./broker-codes.md): charge your own fee on the orders you route.
+10. [Priority fees](./priority-fees.md): pay for a position inside a block. The page also compares a priority fee with a broker fee.
+11. [Sub-accounts](./sub-accounts.md): isolate a strategy or its risk.
+12. [Portfolio margin](./portfolio-margin.md): cross-asset margin in the style of SPAN.
 
-## Earn & related products {#earn--related-products}
+## Earn and related products {#earn--related-products}
 
-The tradeable markets now live under [Products](../products/index.md) — see
-[Perpetuals](../products/perpetuals.md), [Spot](../products/spot.md), and
-[Spot margin](../products/spot-margin.md). The lending pool that funds spot-margin
-borrows is a concept:
+The tradeable markets are under [Products](../products/index.md): [Perpetuals](../products/perpetuals.md), [Spot](../products/spot.md) and [Spot margin](../products/spot-margin.md). The lending pool that funds spot-margin borrows is a concept.
 
-- [Earn](./earn.md) — **testnet preview**: USDC lending pool that funds spot-margin borrows
-- [Spot](../products/spot.md) — **live**: token-for-token CLOB, reserved-balance escrow, no leverage
-- [Spot margin](../products/spot-margin.md) — **testnet preview**: leveraged spot funded by the Earn pool
+- [Earn](./earn.md): **testnet preview**. A USDC lending pool that funds spot-margin borrows.
+- [Spot](../products/spot.md): **live**. A token-for-token CLOB with reserved-balance escrow and no leverage.
+- [Spot margin](../products/spot-margin.md): **testnet preview**. Leveraged spot that the Earn pool funds.
 
 :::info
-**Non-leveraged spot is the one Sharia-compliant product** — see
-[Sharia compliance](../products/index.md#sharia).
+Non-leveraged spot is the one Sharia-compliant product. See [Sharia compliance](../products/index.md#sharia).
 :::
 
 ## Advanced {#advanced}
 
-- [ADL](./adl.md) — T4 auto-deleverage math
-- [Multi-sig](./multi-sig.md) — institutional M-of-N
-- [Vaults](./vaults.md) — MFlux Vault + user vaults
-- [Staking](./staking.md) — delegate MTF, earn rewards
-- [RFQ](./rfq.md) — request-for-quote, the option trade path
-- [FBA](./fba.md) — frequent batch auction matching
+- [ADL](./adl.md): the T4 auto-deleverage math.
+- [Multi-sig](./multi-sig.md): M-of-N control for institutions.
+- [Vaults](./vaults.md): the MFlux Vault and user vaults.
+- [Staking](./staking.md): delegate MTF and earn rewards.
+- [RFQ](./rfq.md): request for quote, the trade path for options.
+- [FBA](./fba.md): frequent batch auction matching.
 
 ## Reference {#reference}
 
-- [System addresses](./system-addresses.md) — the protocol's reserved keyless addresses
-- [Glossary](./glossary.md) — every protocol-specific term defined
+- [System addresses](./system-addresses.md): the reserved keyless addresses of the protocol.
+- [Glossary](./glossary.md): a definition of every protocol-specific term.
