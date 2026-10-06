@@ -100,7 +100,7 @@ async function waitForApproval(c: Client, masterAddr: string, agentAddr: string)
 await waitForApproval(master, masterAddress, agentAddress);
 ```
 
-No live push event reports a landed agent approval. A poll of `/info agents`, as above, is the
+No real-time push event reports a landed agent approval. A poll of `/info agents`, as above, is the
 only way to see it today.
 
 ## 4. Trade from the agent {#step-4--trade-from-the-agent}

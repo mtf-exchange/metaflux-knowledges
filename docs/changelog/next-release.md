@@ -7,7 +7,7 @@ description: "No change waits for the next node release. One wire row is in the 
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-No change on this page waits for the next node release. Every section it staged for node 0.9.16 is live, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply went live at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
+No change on this page waits for the next node release. Every section it staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
 
 This page now waits for a measurement. The row below is in the shipped code, but nobody has read it on the running chain. The row says what settles it.
 
@@ -18,7 +18,7 @@ The page also keeps [five corrections](#corrections) to this reference. They are
 
 Status: unverified on the running chain.
 
-The candle archive records the size plane that each trade bar was folded on. The [`candle`](../api/rest/info/perpetuals.md#candle_snapshot) read divides the volume of the bar by that plane. For a bar that states no plane, it falls back to the current precision of the market. The gateway half is live. See [block 11,550,001](./block-11550001.md#read-side). The archive half ships separately, and the date it went live is not confirmed.
+The candle archive records the size plane that each trade bar was folded on. The [`candle`](../api/rest/info/perpetuals.md#candle_snapshot) read divides the volume of the bar by that plane. For a bar that states no plane, it falls back to the current precision of the market. The gateway half is active. See [block 11,550,001](./block-11550001.md#read-side). The archive half ships separately, and the date it took effect is not confirmed.
 
 Bars folded before the archive recorded the plane state none. A backfill to stamp them has not run.
 

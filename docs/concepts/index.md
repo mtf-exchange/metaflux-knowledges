@@ -28,7 +28,7 @@ The [architecture map](./architecture.md) gives a one-page overview of every com
 The tradeable markets are under [Products](../products/index.md): [Perpetuals](../products/perpetuals.md), [Spot](../products/spot.md) and [Spot margin](../products/spot-margin.md). The lending pool that funds spot-margin borrows is a concept.
 
 - [Earn](./earn.md): **testnet preview**. A USDC lending pool that funds spot-margin borrows.
-- [Spot](../products/spot.md): **live**. A token-for-token CLOB with reserved-balance escrow and no leverage.
+- [Spot](../products/spot.md): **active**. A token-for-token CLOB with reserved-balance escrow and no leverage.
 - [Spot margin](../products/spot-margin.md): **testnet preview**. Leveraged spot that the Earn pool funds.
 
 :::info

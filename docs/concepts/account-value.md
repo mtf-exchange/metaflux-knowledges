@@ -145,7 +145,7 @@ The result can look alarming, but it is correct:
 > have `withdrawable` of exactly **0**.
 
 This occurs when open profit funds the margin. The example below uses real
-figures from a live account. The figures are full precision, not rounded to
+figures from a real account. The figures are full precision, not rounded to
 cents. If you round them first, the sums miss by a cent:
 
 | | |

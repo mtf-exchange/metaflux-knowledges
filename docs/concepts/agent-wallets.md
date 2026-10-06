@@ -250,7 +250,7 @@ Practices for a fleet of agent keys in production:
 | Agent name encodes the host + start time | Gives a clear audit trail: `mm-host-3 / 2026-Q2` |
 | Rotation script: pre-stage new agent before old expires | Send `approve_agent` for the new key 24h before the old expiry, move the traffic, and let the old key expire |
 | Compromise drill: revoke + rotate runbook tested quarterly | When a key leaks, the steps must run without thought |
-| Poll `/info` `account_state` with `detail: "overview"` after every approval / rotation | Confirms that the chain state matches what you expect. No live event reports a change to an agent approval |
+| Poll `/info` `account_state` with `detail: "overview"` after every approval / rotation | Confirms that the chain state matches what you expect. No real-time event reports a change to an agent approval |
 | Use a different agent for cancel-only vs full trading | A cancel-only key is safer in a semi-trusted environment |
 
 ### Rotation pattern {#rotation-pattern}

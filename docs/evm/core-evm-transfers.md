@@ -3,10 +3,10 @@
 This page describes how value moves between Core and the EVM, and which assets can move.
 
 :::tip
-**Live on testnet.** The value-transfer actions from the EVM to Core work and are tested.
+**Active on testnet.** The value-transfer actions from the EVM to Core work and are tested.
 These are `SpotSend`, `SendAsset`, `UsdClassTransfer` and `VaultTransfer` through CoreWriter.
 Credits from Core to the EVM also work and are tested. The [bridge](../bridge/) (cross-chain
-custody) is live.
+custody) is active.
 :::
 
 Value moves between Core (the L1 clearinghouse and spot ledger) and the EVM side in
@@ -132,10 +132,10 @@ reach the same queue and land the same credit:
 
 | Action | Field shape | Debits | Availability |
 |---|---|---|---|
-| [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | MTF-native | the perp collateral pool for `asset: 0`, else the spot ledger | live at every height |
-| [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | live |
+| [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) | MTF-native | the perp collateral pool for `asset: 0`, else the spot ledger | active at every height |
+| [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) | Hyperliquid-compatible | the spot ledger, always | active |
 
-Use `core_evm_transfer` if you have a choice. Both actions are live. Only `core_evm_transfer`
+Use `core_evm_transfer` if you have a choice. Both actions are active. Only `core_evm_transfer`
 can move USDC out of the perp collateral pool, which is the balance that `account_value` and
 `withdrawable` report. Use `send_to_evm_with_data` to port a client that already builds the
 Hyperliquid field shape. For the full comparison, see

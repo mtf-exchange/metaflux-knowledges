@@ -21,7 +21,7 @@ number is on the wire as [`markets_meta[*].signing_id`](#markets_meta). See
 
 ## Perpetual query types {#perpetual-query-types}
 
-### Live market state {#markets}
+### Current market state {#markets}
 
 Returns the *dynamic* state of every registered market, and the spot pair and
 token registry. Dynamic fields change every commit: the mark, oracle and mid
@@ -128,7 +128,7 @@ This response is cut to one entry per list:
 | `perp[*].halted` | bool | `true`: a governance delist stopped the market. An order that opens or extends a position is refused: `market delisted — only reduce-only / closing orders allowed`. A settled market also reads `true` |
 | `perp[*].settled` | bool \| absent | `true`: the market is permanently closed. A delist closed every position on it. Every order is refused, reduce-only orders included: `market settled — trading closed`. The key is absent on every other market. It is never `false`. See [Delisting a perp market](../../../products/perpetuals.md#delisting) |
 | `perp[*].settled_px` | Decimal string \| absent | Whole-USDC price at which every position closed. It is the price that the delist vote named, cut to 8 decimals, or the risk mark when the vote named none. Absent when no position was open at the delist, and on every market that is not settled |
-| `spot.pairs` | array | Spot pair registry. The same rows as [the spot registry](./spot.md#spot_meta) `pairs`, plus live `mark_px` / `mid_px` / `day_ntl_vlm` |
+| `spot.pairs` | array | Spot pair registry. The same rows as [the spot registry](./spot.md#spot_meta) `pairs`, plus current `mark_px` / `mid_px` / `day_ntl_vlm` |
 | `spot.tokens` | array | Spot token registry. The same rows as [the spot registry](./spot.md#spot_meta) `tokens` |
 
 **Rules**
@@ -142,7 +142,7 @@ This response is cut to one entry per list:
 - Each `perp` row is the dynamic half of a market. The static half is on
   [`markets_meta`](#markets_meta), joined on `(coin, kind)`. A row omits
   `mid_px` when the book is one-sided. It never sends `mid_px` as `null`. The
-  live WS [`markets`](../../ws/subscriptions.md#markets) channel streams the same
+  real-time WS [`markets`](../../ws/subscriptions.md#markets) channel streams the same
   dynamic rows: a full snapshot on subscribe, then deltas for changed rows.
 - The static per-market fields are not on this read: `sz_decimals`,
   `tick_size`, `step_size`, `min_order`, `max_leverage`, `maint_margin_ratio`,
@@ -280,7 +280,7 @@ This response cuts `perp` to one entry. The `spot` section is identical to
 | `perp[*].oi_cap_usd` | Decimal string | USDC value of `oi_cap` at the committed risk mark: the mark clamped to the oracle band. Omitted with `oi_cap`, and when the market has no mark |
 | `perp[*].oi_cap_bound` | `"voted"` \| `"capacity"` \| `"floor"` \| `"ceiling"` \| `"deployer"` | The source that set `oi_cap`. `"voted"`: the governance-set cap. `"capacity"`, `"floor"` and `"ceiling"` are the capacity cap: the capacity result, the floor or the ceiling. `"deployer"`: a deployer market, with the cap that its deployer set or the governance default that it started at. A deployer market never reads another value. Omitted with `oi_cap` |
 | `perp[*].max_market_order_ntl` | Decimal string \| null | Remaining open-interest headroom on the whole market, in the size units of the market: `oi_cap − open_interest`, floored at `0`. `null`: the market is uncapped. `"0"`: the market is at its cap. The value is a size. The name says notional, but it is not a notional. An order whose new exposure is larger than this headroom takes the [at-cap rules](#oi-cap-capacity). See below |
-| `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source. It follows the committed mark mode. `"oracle_median"`: the default live 3-component median. `"sync_oracle"`: the mark follows the oracle price directly. `"custom"`: the mark is frozen at a governance-set custom price |
+| `perp[*].mark_source` | `"oracle_median"` \| `"sync_oracle"` \| `"custom"` | Mark-price source. It follows the committed mark mode. `"oracle_median"`: the default 3-component median. `"sync_oracle"`: the mark follows the oracle price directly. `"custom"`: the mark is frozen at a governance-set custom price |
 | `perp[*].fba_enabled` | bool | Frequent batch auction is enabled for this market |
 | `perp[*].signing_id` | uint32 | The number that you put in the EIP-712 `market` field when you sign an order for this market. It has no other meaning on the read plane. Do not use it as a sort key, a join key or a market identity. See below |
 | `perp[*].risk_override` | object \| null | The governance risk override in force on this market, or `null` when the market runs on the defaults. See below |
@@ -294,7 +294,7 @@ This response cuts `perp` to one entry. The `spot` section is identical to
   change every commit appear here: `mark_px`, `oracle_px`, `mid_px`,
   `impact_pxs`, `premium`, `funding`, `open_interest`, `day_ntl_vlm`,
   `prev_day_px`, `change_24h`, `halted`, `settled` and `settled_px`.
-- The open-interest fields move. `max_market_order_ntl` is derived from live
+- The open-interest fields move. `max_market_order_ntl` is derived from current
   open interest, so it changes on every fill. On a native perp market, `oi_cap`,
   `oi_cap_usd` and `oi_cap_bound` follow the
   [capacity cap](#oi-cap-capacity), which the chain recomputes every block. On
@@ -335,7 +335,7 @@ The two never differ.
 #### Capacity cap {#oi-cap-capacity}
 
 :::info
-**Live since block 25,599,540.** Before that block, `oi_cap` was the
+**In effect since block 25,599,540.** Before that block, `oi_cap` was the
 governance-set cap only. No market had one, so every market was uncapped. See
 [the release notice](../../../changelog/block-25599540.md#oi-cap-capacity).
 :::
@@ -605,7 +605,7 @@ unknown or empty market returns empty `bids` / `asks` arrays.
 - The gateway also applies the `n_levels` depth cap, counted over the
   aggregated levels.
 - The gateway forwards a request without grouping or depth arguments unchanged,
-  and the read returns the live book as it is.
+  and the read returns the current book as it is.
 - A bare node ignores the grouping and depth arguments. It returns full depth
   in both cases.
 
@@ -704,7 +704,7 @@ window serves:
 |-------|----------------------------|
 | `hash` | Absent. The key is omitted on purpose. On a node print, `""` is a real value: it says that there was no signed taker action. The trade table of the archive and the gateway window store no trace hash, which is a different fact. A `""` would report an unknown as a known. Treat a missing `hash` as "not recorded", and a `""` as "recorded, and there was none". A gateway-window row also has no `block` key |
 | `last_trade` | The newest print in this answer. It is not the newest print of the market of all time |
-| `time` at the live edge | The archive reads the node stream on a poll interval (default 5 s), so the newest prints reach it late. A window that runs up to now can stop a few seconds before the true end of the tape. Ask again, or read the live [`trades` WS channel](../../ws/subscriptions.md#trades) for a sub-block tape |
+| `time` at the leading edge | The archive reads the node stream on a poll interval (default 5 s), so the newest prints reach it late. A window that runs up to now can stop a few seconds before the true end of the tape. Ask again, or read the real-time [`trades` WS channel](../../ws/subscriptions.md#trades) for a sub-block tape |
 
 A deployment with no archive has no history. On such a deployment, a ranged
 request answers `"trades": []`, because the node keeps no trade ring.
@@ -715,7 +715,7 @@ request answers `"trades": []`, because the node keeps no trade ring.
 Returns historical price bars for `(coin, candle_type, interval)`. It is the
 only candle query. The standalone `candle` type is removed. The archive serves
 the bars when one is wired. Otherwise the read falls back to bars folded from
-the live price stream. It is the REST companion of the live
+the real-time price stream. It is the REST companion of the real-time
 [`candles`](../../ws/subscriptions.md#candles) WS channel.
 
 `candle_type` selects the price series:
@@ -799,7 +799,7 @@ something that does not exist" is an error. "Nothing happened there" is data.
 |-------|------|-------------|
 | `coverage.start` | uint64 \| null | Open time of the oldest bar in this answer. `null` when `candles` is empty |
 | `coverage.end` | uint64 \| null | Open time of the newest bar in this answer. `null` when `candles` is empty |
-| `coverage.reaches_newest` | bool | `true`: the answer runs to the newest bar that the store holds. `false`: newer bars exist that this answer does not include. The read proves it against the newest bar in the store, never against the `end_time` that you asked for. So a page that fully answers a past window still reads `false`. This makes "page until `reaches_newest`" stop at the live edge and not at your own window |
+| `coverage.reaches_newest` | bool | `true`: the answer runs to the newest bar that the store holds. `false`: newer bars exist that this answer does not include. The read proves it against the newest bar in the store, never against the `end_time` that you asked for. So a page that fully answers a past window still reads `false`. This makes "page until `reaches_newest`" stop at the leading edge and not at your own window |
 | `t` | uint64 | Bar open timestamp (ms, bucket-aligned) |
 | `T` | uint64 | Bar close timestamp (ms). Always `t + interval − 1`, on every bar from every source |
 | `s` | string | Market symbol |
@@ -814,7 +814,7 @@ something that does not exist" is an error. "Nothing happened there" is data.
 cut. Read `reaches_newest: false` as "keep paging forward". Never read it as
 "the market stopped". With no folded coverage for a coin, the gateway can prove
 nothing, so the flag stays `false`. The answer then reads as short, not as
-current, and a stale chart never passes as live. `coverage.start` and
+current, and a stale chart never passes as current. `coverage.start` and
 `coverage.end` are both `null` when `candles` is empty.
 
 #### Trade volume on price bars {#candle_snapshot-volume-join}
@@ -829,11 +829,11 @@ volume, from the same bucket.
 
 #### Absent volume keys {#candle_snapshot-volume}
 
-A bar folded from the live price and trade streams carries all three keys.
+A bar folded from the real-time price and trade streams carries all three keys.
 
 For a `trade` bar, durable history carries its own volume. The read serves `v`,
 `q` and `n` for the whole range that the durable store covers, not only for the
-recent window that the live fold holds. Deep history and volume come together.
+recent window that the real-time fold holds. Deep history and volume come together.
 
 For a `mark` or `oracle` bar, the read joins the volume from the trade bucket
 of the same open. A durable bar outside that join omits all three keys, because
@@ -870,7 +870,7 @@ Read `v`, `q` and `n`. Treat any other key that looks like volume as absent.
 
 **Rules**
 
-- `trade` is accepted. All three tokens in the table above are live.
+- `trade` is accepted. All three tokens in the table above are active.
 - Bars are in oldest-first order by `t` (open time). The newest element is the
   forming bar. A bar needs no trade. A price exists at all times, so the series
   covers every window that the samples cover. A market that never traded still
@@ -904,7 +904,7 @@ wider `interval` reaches further per request.
 :::warning
 These bars come from a sampled price series. They do not follow the continuous
 price path. The archived history samples each market price every 5 seconds of
-block time. The live fallback folds one sample per price push.
+block time. The real-time fallback folds one sample per price push.
 
 - `o` and `c` are the first and last sample of the window.
 - `h` and `l` are the highest and lowest sample of the window.
@@ -961,7 +961,7 @@ Returns the funding premium samples of one market, from the premium ring.
 |-------|------|-------------|
 | `coin` | string | Echoed market symbol |
 | `source` | string | The store that answered. `"archive"` for durable history. `"live_ring"` for the in-memory premium ring of the node |
-| `range_honored` | bool | Whether the answer applied your `start_time` / `end_time`. `false`: the read ignored the window and returned the live ring |
+| `range_honored` | bool | Whether the answer applied your `start_time` / `end_time`. `false`: the read ignored the window and returned the current ring |
 | `coverage.start` | uint64 | Timestamp of the oldest sample in this answer |
 | `coverage.end` | uint64 | Timestamp of the newest sample in this answer |
 | `coverage.reaches_oldest` | bool | `true`: the answer reaches the oldest sample that the store holds. `false`: older samples exist that this answer does not include |
@@ -976,7 +976,7 @@ These three fields show it. A caller that charts funding must read them.
 
 - `range_honored: false` means that the read did not apply your window. A
   window that the archive cannot answer does not come back empty. It falls back
-  to the live ring, so the body holds samples at "now" and `source` reads
+  to the current ring, so the body holds samples at "now" and `source` reads
   `"live_ring"`. Ask for a window years in the past, and you still get 64
   samples from the last few minutes. A chart of them against your own axis puts
   recent samples in a historical slot. Check `range_honored` before you plot.

@@ -38,7 +38,7 @@ rate above either cap before the order rests. The order does not fill and then
 get a refund.
 
 :::info
-The node reads both ceilings live, on every order. If governance lowers the
+The node reads both ceilings at run time, on every order. If governance lowers the
 protocol cap below a rate that a trader already approved, the lower cap applies
 at once. The stored approval does not change.
 :::

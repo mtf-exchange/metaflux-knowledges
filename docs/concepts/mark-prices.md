@@ -226,7 +226,7 @@ The defence is structural. To move the median, an adversary must move at least t
 A: With a mark from the oracle only, the oracle operators could liquidate the book by manipulating the feed. A median of three spreads the trust across sources.
 
 **Q: Can I see what the band did in the past?**
-A: Mark history with the band state will be available when the `mark` WS channel ships (roadmap), and through archive indexer responses. It is not on the live read surface yet.
+A: Mark history with the band state will be available when the `mark` WS channel ships (roadmap), and through archive indexer responses. It is not on the current read surface yet.
 
 **Q: Will the band cause unfair liquidations?**
 A: The band slows the mark relative to the underlying. During a real crash, your maintenance can stay healthy about 1 second longer than at a venue that uses the last trade. The reverse is also true: the mark unwinds slowly. The net effect is that liquidation behaviour is more deterministic and harder to abuse.

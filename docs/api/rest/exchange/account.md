@@ -471,7 +471,7 @@ A pooled account admits nothing that its reservations do not cover. An unset res
 
 A split account has no reservations. The node admits its perp and option orders against the free collateral of the perp wallet, and its spot orders against the spot wallet, with no cap. The node refuses kinds 1–3 on a split account, whatever the value.
 
-A mode change needs a flat account. Every perp leg, spot order, spot-margin position, option position, live TWAP, parked trigger and open RFQ must be gone. The rejection names the first surface that the node found. A reservation change does not need a flat account. But if you lower a reservation below what the account has already committed, nothing is released. It only stops further commitment. On a pooled account, lowering a reservation is always allowed, even when your equity has fallen below the total that is already reserved.
+A mode change needs a flat account. Every perp leg, spot order, spot-margin position, option position, running TWAP, parked trigger and open RFQ must be gone. The rejection names the first surface that the node found. A reservation change does not need a flat account. But if you lower a reservation below what the account has already committed, nothing is released. It only stops further commitment. On a pooled account, lowering a reservation is always allowed, even when your equity has fallen below the total that is already reserved.
 
 `standard` and `portfolio` are mutually exclusive. Each refuses the other, in both directions.
 

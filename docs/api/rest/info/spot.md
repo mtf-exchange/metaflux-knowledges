@@ -84,7 +84,7 @@ Two encodings used to hide the rule. Both are fixed:
   meant "the schedule applies". It is now `null`.
 
 So `null` sends you to `fee_schedule`. A `"0"`, if you see one, is a real
-zero-rate override. Measured live before the fix: a pair served `"5"` while
+zero-rate override. Measured on the running chain before the fix: a pair served `"5"` while
 `fee_schedule` said `"3.5"`, and nothing on either read explained which one
 charged. See
 [Ids and wire shapes](../../../changelog/ids-and-wire-shapes.md#spot-taker-fee).
@@ -216,7 +216,7 @@ Spot margin is cross-collateralized. This read serves leveraged [spot margin](..
 This read returns every Earn lending pool, plus the stake of one account when `user` is supplied.
 
 :::info
-Live on testnet. This read serves the [Earn](../../../concepts/earn.md) lending pools. The pool list is empty until the first deposit creates one.
+Active on testnet. This read serves the [Earn](../../../concepts/earn.md) lending pools. The pool list is empty until the first deposit creates one.
 :::
 
 **Request**
@@ -267,7 +267,7 @@ Live on testnet. This read serves the [Earn](../../../concepts/earn.md) lending 
 | `pools[*].share_value` | Decimal string | `total_supplied / shares_total` (`0` when no shares) |
 | `pools[*].borrow_index` | Decimal string | Cumulative borrow index (debt-accrual basis) |
 | `pools[*].reserve_factor_bps` | bps string | Protocol cut of borrow interest, whole bps. It is a string, not a number |
-| `pools[*].borrow_rate_bps_annual` | bps string | Annualised borrow rate, whole bps. It is a string, not a number. `"0"` on every live pool today. See Rules |
+| `pools[*].borrow_rate_bps_annual` | bps string | Annualised borrow rate, whole bps. It is a string, not a number. `"0"` on every active pool today. See Rules |
 | `pools[*].reserve_accrued` | Decimal string | Protocol reserve accumulated from interest |
 | `pools[*].user_shares` | Decimal string | Only with `user`: shares the account holds in the pool |
 | `pools[*].user_value` | Decimal string | Only with `user`: `user_shares × share_value` |
@@ -374,7 +374,7 @@ So build an "Interest" view on this read, not on
 This read returns the MIP-1 gas-auction state for spot-pair deploys.
 
 :::info
-`spot_deploy_auction` is the live name. `spot_deploy_state` is removed. The
+`spot_deploy_auction` is the current name. `spot_deploy_state` is removed. The
 old name answers `400` with `error.code` `UNKNOWN_TYPE`.
 :::
 

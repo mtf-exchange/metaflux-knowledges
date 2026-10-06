@@ -7,7 +7,7 @@ description: The MTF points program. Testnet trading volume earns points each we
 The points program pays points each week for testnet trading volume. Points convert to MTF at the TGE.
 
 :::caution
-**The weekly table and its three reads are not live yet.** The reads
+**The weekly table and its three reads are not active yet.** The reads
 [`points_weeks`](../api/rest/info.md#points_weeks),
 [`points_leaderboard`](../api/rest/info.md#points_leaderboard) and
 [`points_user`](../api/rest/info.md#points_user) ship with the next archive and
@@ -31,7 +31,7 @@ claim at the TGE is named *Gimle*.
 
 | Season | Name | Window (UTC) | Weeks | MTF ceiling |
 |---:|---|---|---:|---|
-| 1 | Ginnungagap | Testnet genesis to the first Wednesday cut after the TGE page goes live | 5 or more | At most 5,000,000 |
+| 1 | Ginnungagap | Testnet genesis to the first Wednesday cut after the TGE page goes up | 5 or more | At most 5,000,000 |
 | 2 | Yggdrasil | Season 1 end, plus 8 weeks | 8 | At most 10,000,000 |
 | 3 | Bifrost | Season 2 end, plus 8 weeks | 8 | Set at season start |
 | 4 | Ragnarok | Season 3 end to the TGE snapshot | the rest | Set at season start |
@@ -191,7 +191,7 @@ that is at most 0.025 MTF per $1.
 
 ## How to check {#how-to-check}
 
-Not live yet. The three reads below answer `UNKNOWN_TYPE` until the next archive
+Not active yet. The three reads below answer `UNKNOWN_TYPE` until the next archive
 and gateway release.
 
 | You want | Read |

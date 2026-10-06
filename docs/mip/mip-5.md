@@ -2,7 +2,7 @@
 
 MIP-5 defines Earn, the lending pool on the supply side of spot margin.
 
-:::info Live on testnet, and paying zero
+:::info Active on testnet, and paying zero
 MIP-5 gives the reserved slot to Earn. Earn is a lending pool: depositors supply assets and earn
 yield from the interest that spot-margin borrowers pay. Deposit and redeem work today. The yield
 does not. A pool auto-creates at a borrow rate of zero, and no spot pair is calibrated for
@@ -41,7 +41,7 @@ that borrowers pay is the yield that lenders earn.
 
 ## Status {#status}
 
-Live on testnet, and paying zero. Deposit and redeem run today. Two governance votes, each at
+Active on testnet, and paying zero. Deposit and redeem run today. Two governance votes, each at
 two-thirds stake, stand between a deposit and any yield. One vote sets a non-zero borrow rate on
 the quote asset. The other calibrates a spot pair for borrowing. Until both land, the share
 price stays at its deposit value, and a redemption returns the principal. The utilisation curve

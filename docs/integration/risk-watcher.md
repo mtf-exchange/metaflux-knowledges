@@ -43,7 +43,7 @@ this position?" and "take this trade?". A risk-watcher answers only the first.
 - [`notifications`](../api/ws/subscriptions.md#notifications) WS push: tier transitions
   (`yellow_card` / `forced_close_tier` / `tier_cleared` / `forced_close`). This is the first
   signal that a tier changed.
-- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: live `account_value`,
+- [`account_state`](../api/ws/subscriptions.md#account_state) WS push: current `account_value`,
   `total_raw_usd`, `perp.total_ntl_pos`, `tier`. The account-level
   `cross_maintenance_margin_used` is not on this push. Poll `detail: "margin"` for it. Derive your
   own health ratio from `account_value` and `cross_maintenance_margin_used`. See
@@ -141,7 +141,7 @@ async function deposit(c: Client, usdcDelta: string) {
 }
 
 async function emergencyUnwind(c: Client) {
-  // Positions live on their own read now, not inside accountState. Never mix a
+  // Positions sit on their own read now, not inside accountState. Never mix a
   // number from this frame with one from an accountState frame: the two can be
   // rendered a commit apart. Compare `height` if you must combine them.
   const state = await c.info.clearinghouseState(traderAddr);

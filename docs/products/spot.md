@@ -7,7 +7,7 @@ description: The spot CLOB of MetaFlux. Spot swaps one token for another, holds 
 This page describes the spot market: pairs, escrow, matching, fees, order rules and limits.
 
 :::tip
-**Live.** Spot trading is shipped. It is a token-for-token order book, separate from perps,
+**Active.** Spot trading is shipped. It is a token-for-token order book, separate from perps,
 with no leverage and no positions. Leveraged spot is the separate, planned
 [spot-margin](./spot-margin.md) track.
 :::

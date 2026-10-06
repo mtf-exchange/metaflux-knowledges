@@ -89,7 +89,7 @@ share it across tasks, clone it. You do not need an `Arc`.
 ```rust
 let info = client.rest().info();
 
-info.markets().await?;                          // Vec<MarketDynamic> — live px/funding/OI
+info.markets().await?;                          // Vec<MarketDynamic> — current px/funding/OI
 info.markets_meta().await?;                      // Vec<MarketInfo> — precision grids, leverage ladders
 info.l2_book("BTC", None).await?;
 info.account_state(wallet.address()).await?;     // collateral + margin health, four lane summaries

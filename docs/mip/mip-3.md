@@ -2,7 +2,7 @@
 
 MIP-3 lets any builder deploy a perpetual market on MetaFlux.
 
-:::info The lane is live and in use
+:::info The lane is active and in use
 Markets are deployed through it today. A deployed market carries the deployer's dex prefix in
 its `coin`. A market named `GRAD:USDCNY` therefore belongs to the `GRAD` dex and not to the
 primary market set.
@@ -140,7 +140,7 @@ carrier of *deployer price risk*. This risk is the reason the market is isolated
 the bond is slashable.
 
 :::warning Two corrections to an earlier version of this page
-1. **The push is gated per chain.** It is not live on every chain. The action sits behind the
+1. **The push is gated per chain.** It is not active on every chain. The action sits behind the
    `mip3_deployer_oracle` protocol feature. The feature is active from genesis on a chain that
    started fresh. On any other chain it is dormant until a two-thirds stake `ArmFeatures` vote
    arms it. While it is dormant, the chain refuses a push with
@@ -182,7 +182,7 @@ own push cadence.
    risk staleness window `risk_oracle_staleness_ms`, default 60,000 ms, governable in
    [10,000 ms, 300,000 ms]. The refresh window must stay at or below the staleness window. The
    two move together, so the chain never judges a market risk-stale before its own mark refresh
-   had a chance to fire. Confirm the live values before you size a cadence. Do not assume the
+   had a chance to fire. Confirm the current values before you size a cadence. Do not assume the
    defaults.
 
 5. **Know the cost of a stale feed.** After the window, the market becomes reduce-only for
@@ -201,7 +201,7 @@ The staleness window is a risk bound. It is not a trading calendar. If your unde
 hours, your feed stops when the venue closes, and the market becomes reduce-only for the closure.
 A wider window that spans a weekend does not fix this. It lets anyone open positions all weekend
 against a stale Friday price. That is the exact gap risk the reduce-only change exists to stop.
-To keep the market open through a closure, publish a live derived price at all hours and stay
+To keep the market open through a closure, publish a current derived price at all hours and stay
 inside the window.
 :::
 
@@ -213,7 +213,7 @@ signing type and the full rejection table.
 ## Limits {#limits}
 
 Governance sets the bounds for a deployed market. The defaults below are the shipped values.
-They are not a promise about the live network. Governance can move any of them. Confirm the
+They are not a promise about the running network. Governance can move any of them. Confirm the
 current value through [validator governance](../api/rest/info/governance.md) before you rely on
 it:
 
@@ -228,7 +228,7 @@ it:
 
 :::warning A `0` limit means uncapped
 A `0` limit does not block anything. `mip3_fee_ceiling_bps` and `mip3_max_deploys_per_epoch` are
-`0` on the live network today, and `max_oi_per_second` defaults to `0`. A `0` leaves each of them
+`0` on the network today, and `max_oi_per_second` defaults to `0`. A `0` leaves each of them
 fully open. These are rate controls. The off-switch is `mip3_enabled`, a separate governance flag
 that closes the whole lane. Never read a `0` cap as "deployment is closed".
 
@@ -245,7 +245,7 @@ deci-bps, tenths of a basis point. The two differ by a factor of 10.
 
 Four more fields appear in the configuration, but they are reserved and unused:
 `max_active_markets`, `min_self_stake`, `bid_increment`, and a second `min_deploy_stake`.
-Nothing reads them. The live staking bond is `mip3_deploy_min_stake`. Do not build against the
+Nothing reads them. The current staking bond is `mip3_deploy_min_stake`. Do not build against the
 four reserved fields.
 
 ## Liquidation on a deployed market {#liquidation}
@@ -271,7 +271,7 @@ wire encoding is name-based.
 :::
 
 :::warning The Metaliquidity vault does not backstop a deployed market
-The vault backstop is live on the core markets since 2026-08-18. There it takes over a failing
+The vault backstop is active on the core markets since 2026-08-18. There it takes over a failing
 position ahead of the netting, and it pays deficit ahead of ADL. The chain refuses a deployed
 market at both entry points, whether or not it prices from its own oracle. Its bad debt can
 therefore never reach the vault's liquidity providers.
@@ -294,7 +294,7 @@ order that opens or extends a position on a deployer market.
 ## MIP-4 {#mip-4}
 
 A market deployed here can be the *underlying* of an [option series](../products/options.md), if
-it has a live price feed. The option lane keeps its own collateral. It does not share the margin
+it has a real-time price feed. The option lane keeps its own collateral. It does not share the margin
 account of the perpetual. See [MIP-4 — Options](mip-4.md).
 
 ## See also {#see-also}

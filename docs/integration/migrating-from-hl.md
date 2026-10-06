@@ -281,7 +281,7 @@ MTF supports agent management, PM enrollment and margin modes per sub-account.
 | `modify` / `batchModify` | [`modify`](../api/rest/exchange/orders.md#modify) / [`batch_modify`](../api/rest/exchange/orders.md#batch_modify) |
 | `usdSend` / spot transfers | native spot transfer actions |
 | `withdraw3` | [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) |
-| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) (same field names), or [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer). Both are live. Read the note below. |
+| `sendToEvmWithData` | [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data) (same field names), or [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer). Both are active. Read the note below. |
 | `approveAgent` | [`approve_agent`](../api/rest/exchange/account.md#approve_agent) |
 | `updateLeverage` / `updateIsolatedMargin` | [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) / [`update_isolated_margin`](../api/rest/exchange/margin-risk.md#update_isolated_margin) |
 | `convertToMultiSigUser` | [`convert_to_multi_sig_user`](../api/rest/exchange/account.md#convert_to_multi_sig_user) |
@@ -303,10 +303,10 @@ MTF refuses. You will hit the first one:
 
 Check two more things before you port it:
 
-- **The action is live.** An earlier version of this page said that the network refused it, and
+- **The action is active.** An earlier version of this page said that the network refused it, and
   told you to port to `core_evm_transfer`. That is no longer true.
 - **It debits the spot ledger only.** It cannot move USDC held as perp collateral.
-  [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) can, and it is live
+  [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer) can, and it is active
   now. It is therefore the better target for most ports.
 
 Full rules: [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data).

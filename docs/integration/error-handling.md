@@ -131,7 +131,7 @@ this failure.
 | `evicted_under_cap_pressure` | Admitted but evicted from mempool before block | YES (with backoff) |
 | `liquidation_pre_empted` | Account moved to T1+ between admit and dispatch | NO. Fix margin first |
 
-Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates), the live order-lifecycle
+Subscribe to [`order_updates`](../api/ws/subscriptions.md#order_updates), the real-time order-lifecycle
 channel for each account, and dispatch on `status`:
 
 ```typescript
@@ -323,10 +323,10 @@ async function submit(order: NativeOrder) {
 - **The gateway returns 5xx, but the action committed.** This happens when the gateway's reply
   after admission is lost. Treat it as a network drop: reconcile through cloid or action_hash.
 - **The WS feed is behind the real state.** The resume buffer can evict events while you
-  reconnect. Poll `/info` again on resume to anchor, then use WS for the live tail.
+  reconnect. Poll `/info` again on resume to anchor, then use WS for the streaming tail.
 - **The same nonce is submitted twice, and one succeeds.** The server enforces nonce
   monotonicity. The second attempt gets `nonce_too_small`, and you learn that the first one is
-  live. Use this signal.
+  running. Use this signal.
 - **Delayed logical errors.** A `Trigger` order admits today but never fires, because its
   trigger condition never holds. There is no error, only a resting order that stays. Reconcile
   your open-order set against your bot's expected set at regular intervals.

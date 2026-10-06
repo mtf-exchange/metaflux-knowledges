@@ -1,5 +1,5 @@
 ---
-description: Options on MetaFlux are standard European puts and calls. They are fully collateralized and trade through RFQ only. A put settles in USDC and a call settles in the underlying coin. This page covers the live series, the escrow rules, settlement and the reads.
+description: Options on MetaFlux are standard European puts and calls. They are fully collateralized and trade through RFQ only. A put settles in USDC and a call settles in the underlying coin. This page covers the active series, the escrow rules, settlement and the reads.
 ---
 
 # Options
@@ -21,7 +21,7 @@ underlying. It trades through [RFQ](../concepts/rfq.md) only. There is no option
 - The chain never computes an option price and never needs an implied volatility. The
   premium is the price on which two accounts agree in an RFQ.
 
-Read the live series from [`option_series`](../api/rest/info/options.md#option_series).
+Read the active series from [`option_series`](../api/rest/info/options.md#option_series).
 Trade them with [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request),
 [`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote) and
 [`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept).
@@ -258,7 +258,7 @@ series on a thinly fed underlying has a different risk from a series on a busy o
 A validator vote of ⅔ of stake lists a series. A user action cannot list one, and there
 is no permissionless deploy. The vote checks three things:
 
-- The underlying is a live market with a fresh price feed.
+- The underlying is an active market with a fresh price feed.
 - The expiry is at least one hour ahead.
 - The strike is on the escrow grid.
 
@@ -272,7 +272,7 @@ The chain caps how much of the lane one series or the whole registry can hold.
 
 | Cap | Value |
 |---|---|
-| Live series | 1,024 |
+| Active series | 1,024 |
 | Position rows per series | 2,048 |
 | Position rows chain-wide | 32,768 |
 
@@ -285,7 +285,7 @@ Two public reads cover the lane.
 
 | Read | Answers |
 |---|---|
-| [`option_series`](../api/rest/info/options.md#option_series) | The live series, the `signing_id` to sign against, the `settle_asset`, and the `escrow_per_unit` that a writer locks |
+| [`option_series`](../api/rest/info/options.md#option_series) | The active series, the `signing_id` to sign against, the `settle_asset`, and the `escrow_per_unit` that a writer locks |
 | [`option_state`](../api/rest/info/options.md#option_state) | The holdings of one account: units long, units written, and the escrow it has locked |
 
 A fill writes no ledger row of its own. Between the fill and expiry,
@@ -326,12 +326,12 @@ chain can express a call spread any more.
 | A call writer needed USDC | A call writer needs the coin |
 
 No series is converted. The last bounded-call series settled and retired before the change,
-so no live position crosses the boundary.
+so no open position crosses the boundary.
 
 ## See also {#see-also}
 
 - [RFQ](../concepts/rfq.md): the only way to trade an option.
-- [`option_series`](../api/rest/info/options.md#option_series): the registry of live series.
+- [`option_series`](../api/rest/info/options.md#option_series): the registry of active series.
 - [`option_state`](../api/rest/info/options.md#option_state): the holdings of one account in a series.
 - [`/exchange` RFQ actions](../api/rest/exchange/rfq-utility.md): the field tables and the typed-data primary types.
 - [Oracle prices](../concepts/oracle-prices.md): the price source that settlement reads.

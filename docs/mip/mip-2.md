@@ -32,7 +32,7 @@ asset id of 1000 or more.
   deployer market. The error is `PRECONDITION_FAILED`, with the message
   `metaliquidity vault cannot open or extend a position on a MIP-3 market`. An order that only
   closes a position passes.
-- **Backstop.** The vault never absorbs the liquidation of a deployer market. This is live. See
+- **Backstop.** The vault never absorbs the liquidation of a deployer market. This is active. See
   [Liquidation on a deployed market](./mip-3.md#liquidation).
 - **Strategy.** The reference market maker refuses to start when its list names a deployer
   market.

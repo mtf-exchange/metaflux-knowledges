@@ -4,10 +4,10 @@ The MetaFlux EVM runs Solidity contracts and gives them access to MetaFlux Core.
 covers its differences from a standard EVM, its system addresses and its JSON-RPC.
 
 :::tip
-**Live on testnet.** EVM execution and CoreWriter actions work. The stateless MTF
+**Active on testnet.** EVM execution and CoreWriter actions work. The stateless MTF
 derivatives precompiles (`0x0900`–`0x0904`) also work. Read precompiles backed by Core
 state, which query the positions and books of the chain directly, are upcoming. The
-[bridge](../bridge/) is live.
+[bridge](../bridge/) is active.
 :::
 
 The MetaFlux EVM is a sidechain based on [revm](https://github.com/bluealloy/revm). It
@@ -324,7 +324,7 @@ same logs as one wide query, because a committed block never reorgs.
 
 #### Log ordering {#log-ordering}
 
-A log now carries its real position in its block. This changes what the live chain returns
+A log now carries its real position in its block. This changes what the running chain returns
 today.
 
 | Field | Was | Is |

@@ -10,8 +10,8 @@ These queries read account state through [`POST /info`](../info.md). That page d
 
 This read returns one snapshot of one account. The top level holds the cross-account money figures. Then one summary per lane follows: `perp`, `spot`, `margin` and `option`.
 
-:::info The lane split is live
-A live node answers the lane shape on this page. The top level no longer
+:::info The lane split is active
+A running node answers the lane shape on this page. The top level no longer
 carries `maint_margin` or `mode`. `position_mode` replaces `mode`, and
 `cross_maintenance_margin_used` is served only at `detail: "margin"`. The perp
 position table moved to [`clearinghouse_state`](#clearinghouse_state) and the
@@ -220,7 +220,7 @@ Top level: the cross-account figures.
 | `tier` | enum string | `"Safe"`, `"T0"`, `"T1"`, `"T2"`, `"T3"` (the BOLE band of `account_value / cross_maintenance_margin_used`; `"Safe"` when there is no maintenance margin). See [tiered liquidation](../../../concepts/tiered-liquidation.md). It is a string, never a number |
 | `abstraction` | enum | `"unified"` (default cross-collateral account), `"standard"` (two USDC wallets, see [account modes](../../../concepts/account-modes.md#standard)) or `"portfolio"` (portfolio-margin enrolled). Derive PM enrolment as `abstraction == "portfolio"`. A caller that switches on this field must handle all three values |
 | `reservations` | object \| absent | The per-product reservation ledger. Present only when `abstraction` is `"standard"` and `split` is `false`. See [`reservations`](#account-state-reservations) below. A 0.9.6 node omits it in every mode |
-| `split` | bool \| absent | Present only when `abstraction` is `"standard"`. `true` = the account holds two USDC wallets (it entered `standard` under the live split gate); `false` = one pooled balance, the posture of an account that entered before the arm. When `true`, `account_value` and `withdrawable` are the perp wallet, the USDC row of `spot.balances` is the spot wallet, and `reservations` is absent. Read it before you interpret the USDC row. See [the standard-mode split](../../../concepts/usdc.md#standard-split). Served from node 0.9.7; an older node omits the key in every mode |
+| `split` | bool \| absent | Present only when `abstraction` is `"standard"`. `true` = the account holds two USDC wallets (it entered `standard` under the active split gate); `false` = one pooled balance, the posture of an account that entered before the arm. When `true`, `account_value` and `withdrawable` are the perp wallet, the USDC row of `spot.balances` is the spot wallet, and `reservations` is absent. Read it before you interpret the USDC row. See [the standard-mode split](../../../concepts/usdc.md#standard-split). Served from node 0.9.7; an older node omits the key in every mode |
 | `pm_net_value` | Decimal string | PM engine's net scenario value, whole-USDC; `"0"` when not PM-enrolled. Account-scoped, so it is not under `perp`. See the warning above |
 | `position_mode` | enum | `"one_way"` (single net position per asset) or `"hedge"` (separate long/short legs). See [hedge mode](../../../concepts/hedge-mode.md) |
 | `height` | uint64 | Committed block height this snapshot reflects. A bare integer, not a Decimal string. Advances on every commit, even when nothing else in the record changed |
@@ -308,7 +308,7 @@ The chain never prices an option, so this lane carries no mark-priced figure. Se
 
 #### The `reservations` ledger {#account-state-reservations}
 
-Live from node 0.9.7. A 0.9.6 node omits the field in every mode.
+In effect from node 0.9.7. A 0.9.6 node omits the field in every mode.
 
 Present only when `abstraction` is `"standard"` and `split` is `false`: an
 account that entered `standard` before block 5,710,001 and still holds one USDC
@@ -535,8 +535,8 @@ keys present.
 
 This read returns the perp position detail of one account, keyed by dex. The table used to sit inside `account_state`. The row shape is unchanged.
 
-:::info Live
-This read and its WS channel are live. The response is keyed by dex, and
+:::info Active
+This read and its WS channel are active. The response is keyed by dex, and
 `detail: "adl"` widens the rows. The row shape is the one
 [`account_state`](#account_state) used to carry.
 :::

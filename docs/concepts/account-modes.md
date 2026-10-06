@@ -177,7 +177,7 @@ two are separate: a mode value and an enrolment row. The field reports
 Send `user_set_abstraction` kind 0 with value `1` (standard) or `0` (unified).
 
 The account must be flat on every surface. The node refuses the change while any
-of these exists: a perp position, a resting perp order, a parked trigger, a live
+of these exists: a perp position, a resting perp order, a parked trigger, an open
 TWAP, a resting spot order, a spot TWAP, a spot-margin position, an option
 position, or an open RFQ quote. The rejection names what it found.
 

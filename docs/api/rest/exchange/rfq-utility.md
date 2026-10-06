@@ -10,7 +10,7 @@ That page defines the request envelope, the EIP-712 signing rules, the number pl
 
 This page covers [RFQ](../../../concepts/rfq.md) block trading, the [FBA](../../../concepts/fba.md) frequent-batch-auction entry and the deliberate no-op. All five actions return the [`202 Accepted`](../exchange.md#202-accepted--non-order-admission) admission envelope. So a commit-time refusal comes back as a `200` with an `error` body. Read [`accepted` is not `committed`](../exchange.md#accepted-is-not-committed).
 
-RFQ is the option trade path. It clears [option series](../../../products/options.md) and nothing else. The market that a request names is the `signing_id` of a live series, from [`option_series`](../info/options.md#option_series).
+RFQ is the option trade path. It clears [option series](../../../products/options.md) and nothing else. The market that a request names is the `signing_id` of an active series, from [`option_series`](../info/options.md#option_series).
 
 :::note[The session is read by polling, not by a feed]
 [`rfq_open`](../../../concepts/rfq.md#querying-open-rfqs) lists every open session and its quotes. [`rfq_user`](../../../concepts/rfq.md#querying-open-rfqs) lists the sessions that one account requested or quoted on. Both are public. No WS channel carries an RFQ event. So a taker polls for its quotes, and a maker polls for requests to answer.
@@ -25,7 +25,7 @@ Each RFQ action takes an optional `owner` (0x hex). With it, an approved [agent]
 ### Open an RFQ session {#rfq_request}
 
 :::danger[`market` is an option series, and nothing else]
-`market` takes the `signing_id` of a live option series, from [`option_series`](../info/options.md#option_series). The node refuses every other market, on all three actions:
+`market` takes the `signing_id` of an active option series, from [`option_series`](../info/options.md#option_series). The node refuses every other market, on all three actions:
 
 ```
 precondition failed: rfq is options-only: market <n> is not an option series
@@ -57,7 +57,7 @@ The lane is options-only for a reason. A request-for-quote lane beside a public 
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `owner` | hex address \| omitted | 40 hex chars | Optional. Open the RFQ as this master or vault (approved agents only). The digest binds it. See above |
-| `market` | uint32 | a live option series | The [`option_series`](../info/options.md#option_series) `signing_id`. The node refuses any other market |
+| `market` | uint32 | an active option series | The [`option_series`](../info/options.md#option_series) `signing_id`. The node refuses any other market |
 | `side` | enum | `"Bid"` / `"Ask"` | The side that the requester wants to take. `"Bid"` buys the option and pays the premium. `"Ask"` writes it and locks the escrow |
 | `size` | uint64 | `> 0` | The requested size, on the `10^sz_decimals` plane of the series (widened to `u128`) |
 | `limit_px` | uint64 \| null | — | An optional taker limit price, on the 1e8 plane. `null` or omitted means none |
@@ -184,7 +184,7 @@ The column below is `error.message`. Its `code` is `PRECONDITION_FAILED`, `AUTH_
 
 | `error.message` | Cause |
 |---|---|
-| `precondition failed: rfq is options-only: market <n> is not an option series` | The market of the session is not a live series |
+| `precondition failed: rfq is options-only: market <n> is not an option series` | The market of the session is not an active series |
 | `precondition failed: option series expired` | The series is at or past its `expiry` |
 | `precondition failed: request expired` / `quote expired` | The session or the quote is past its own deadline |
 | `precondition failed: quote idx <n> not found on rfq RfqId(<n>)` | No quote at that index |
@@ -205,7 +205,7 @@ The column below is `error.message`. Its `code` is `PRECONDITION_FAILED`, `AUTH_
 
 ### Submit into a frequent-batch auction {#fba_submit}
 
-`fba_submit` submits an order into the live [FBA](../../../concepts/fba.md) window of the market. The order clears at the uniform price of the batch on the next settle boundary.
+`fba_submit` submits an order into the open [FBA](../../../concepts/fba.md) window of the market. The order clears at the uniform price of the batch on the next settle boundary.
 
 ```json
 {

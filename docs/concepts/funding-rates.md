@@ -43,7 +43,7 @@ governance can configure it per asset.
 Two effects run the cycle:
 
 - Rate update. Each begin-block, it folds the latest premium sample into the per-asset
-  premium-index EMA. It then derives and clamps the rate. A live, smoothed rate is therefore
+  premium-index EMA. It then derives and clamps the rate. A current, smoothed rate is therefore
   available for display at any time.
 - Settlement. At each funding-period boundary of an asset, it settles every open position in that
   market against the cumulative funding index. It moves the full period's accrued funding between
@@ -159,7 +159,7 @@ Funding settles discretely, once for each funding period of an asset. The defaul
 governance can configure it per asset. For example, BTC can use 8 h and a meme market 1 h. Funding
 is not continuous, and it does not run on one network-wide hourly clock. Each settlement charges
 the funding accrued over the whole period, capped at a per-asset ±2% default. The EMA `decay` is
-0.5. The chain refreshes the rate continuously, so a live value is always available for display.
+0.5. The chain refreshes the rate continuously, so a current value is always available for display.
 :::
 
 ## Settlement cadence {#settlement-cadence}

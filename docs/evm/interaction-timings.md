@@ -4,7 +4,7 @@ This page gives the time that each interaction between the EVM and Core takes, s
 plan for confirmation windows.
 
 :::tip
-**Live on testnet.** Block cadence and interaction timings work as described. This includes
+**Active on testnet.** Block cadence and interaction timings work as described. This includes
 CoreWriter action delays and the time for a credit from Core to appear on the EVM. Cadence
 and budgets can still change before launch.
 :::
@@ -40,7 +40,7 @@ visible in the block that triggered it. Expect it within a small number of block
 
 A `staticcall` precompile read returns inside the calling block. Today the read precompiles
 are stateless quoting helpers. They compute over inputs that the caller supplies. Reads
-backed by live Core state, which query the positions and books of the chain directly, are
+backed by current Core state, which query the positions and books of the chain directly, are
 upcoming. A read will then show Core as of the calling block.
 
 ## See also {#see-also}

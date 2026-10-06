@@ -17,7 +17,7 @@ returns `200` with the empty shape, the zeroed-default convention that this refe
 elsewhere.
 
 [`user_funding`](#user_funding), [`historical_orders`](#historical_orders) and
-[`user_twap_slice_fills`](#user_twap_slice_fills) are live and populated.
+[`user_twap_slice_fills`](#user_twap_slice_fills) are active and populated.
 
 An empty array alone does not show which case applies. An account with
 no matching history also reads `[]`, and a node-local retention window is empty
@@ -34,7 +34,7 @@ could only answer `[]` is deleted, not documented. See
 
 Realized funding payments for an account, over an optional time window.
 
-This read is live and populated. For a push feed of the same payments,
+This read is active and populated. For a push feed of the same payments,
 subscribe to the
 [`user_fundings` WS channel](../../ws/subscriptions.md#user_fundings).
 
@@ -414,7 +414,7 @@ every other `/info` read. The lane differs in its rejection shape only. See
 - Every key above is present on every record. The optional ones hold `null`.
   None of them is omitted. The one exception is `px`, which is absent when the
   record has neither an average nor a limit price.
-- Live resting orders and parked triggers are also readable from
+- Resting orders and parked triggers are also readable from
   [`open_orders`](./orders-fills.md#open_orders) or [`order_status`](./orders-fills.md#order_status), which carry
   the current book state and not a transition history.
 
@@ -455,7 +455,7 @@ second call times out like the first. Read state again instead.
 
 This read returns the fill history of individual TWAP order slices. These are the executions of one TWAP
 parent, so a caller can attribute fills to the order that produced them. The
-active TWAP parents of the account are on [`user_twaps`](./node.md#user_twaps). Live slices
+active TWAP parents of the account are on [`user_twaps`](./node.md#user_twaps). Active slices
 also stream on the `user_twap_slice_fills`
 [WS channel](../../ws/subscriptions.md#user_twap_slice_fills).
 
@@ -494,7 +494,7 @@ No parameters beyond `address`, which is required (hex address).
 
 ### Per-validator staking reward accruals {#delegator_rewards}
 
-This read returns the live per-validator reward accruals of a delegator, plus the total that a
+This read returns the current per-validator reward accruals of a delegator, plus the total that a
 claim-all pays now.
 
 **Request**
@@ -525,7 +525,7 @@ No parameters beyond `address`, which is required (hex address).
 |-------|------|---------|
 | `claimable_rewards` | Decimal string | What a claim-all ([`claim_rewards`](../exchange/staking.md#claim_rewards) without `validator`) pays the delegator now: the sum of every row's `unclaimed`, plus the account's legacy reward roll-up bucket, which drains on claim. Delegator side only. The separate validator-commission credit that a claim also pays out is not delegator-claimable and is excluded |
 | `rewards[*].validator` | hex address | Validator the delegation accrues under |
-| `rewards[*].unclaimed` | Decimal string | Live unclaimed reward accrued on this delegation, whole MTF |
+| `rewards[*].unclaimed` | Decimal string | Current unclaimed reward accrued on this delegation, whole MTF |
 | `rewards[*].last_claim_time` | uint64 | Last claim timestamp on this delegation, consensus ms. `0` if never claimed |
 
 **Rules**

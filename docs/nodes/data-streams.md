@@ -217,7 +217,7 @@ only the directories under the stream root never sees them.
 A node that stops uncleanly can leave a partial last line. The node truncates that line
 when it next opens the file, so a stored archive never blocks a reader.
 
-A consumer that tails a live file must still handle a writer in the middle of a write. It
+A consumer that tails an active file must still handle a writer in the middle of a write. It
 must accept only newline-terminated lines. It must never move its read offset past a
 fragment. It must read that fragment again on the next pass.
 
@@ -523,7 +523,7 @@ The first group is the two orders that the node rests by itself:
 The FIRST leg of a chase is not in this group. `chase_order` is a signed action, and its
 opening leg does get a `resting` record. Only the legs that a reprice rests have no
 record. You cannot recover `orig_sz` and `reduce_only` for these two orders. The
-live-book read ([`open_orders`](../api/rest/info/orders-fills.md#open_orders)) serves
+open-book read ([`open_orders`](../api/rest/info/orders-fills.md#open_orders)) serves
 `null` for `orig_sz`, and no action ever submitted a request size for the leg.
 `reduce_only` on that read is a constant `false` on every book row, so it repeats the
 same wrong value. `tif` and `cloid` ARE real there. Take them while the order still
@@ -682,7 +682,7 @@ funding. Do not rebuild an account balance from `node_ledger` alone.
 ## `node_gov` {#node_gov}
 
 One record per governance vote cast, and one record per enactment. This is the only
-durable record of who voted and what an enactment changed. The live tally is transient: a
+durable record of who voted and what an enactment changed. The current tally is transient: a
 quorum drains it and a timeout prunes it.
 
 ```json
@@ -860,7 +860,7 @@ haircut (weight `0`) also clears this field, so `new` reads `null`.
 **Five traps on this stream.**
 
 1. Every cast is recorded, with or without quorum. A vote short of quorum ages out of
-   the live tally, but its `vote_cast` records stay in the archive. There is no
+   the current tally, but its `vote_cast` records stay in the archive. There is no
    "rejected" record. This governance model has a stake threshold and a timeout, and no
    reject vote. The only sign that a vote never passed is the absence of a
    `vote_enacted` on the same `round`.
@@ -988,7 +988,7 @@ get a false rotation on every restart. Compare the rows to decide.
 **Four rules that consumers get wrong.**
 
 1. `economic_id` is the upsert key. `message_id` is not. The message id is the
-   signing digest under the live deployment row, so a rotation moves it. If you fold on
+   signing digest under the current deployment row, so a rotation moves it. If you fold on
    the message id, one withdrawal counts two times across a rotation.
 2. `admission` does not mean "first time ever". The memory of the outbox in the
    recorder is local to the node and is never persisted. A restart therefore emits
@@ -1001,7 +1001,7 @@ get a false rotation on every restart. Compare the rows to decide.
    withdrawal and refunded the user on the exchange. Nothing pays a voided withdrawal on
    the destination chain. In every case, the `economic_id` never returns. A re-issue
    replacement arrives as a new `admission` with its own `economic_id`.
-4. `status` is derived. Do not compute it again. It folds the live deployment row
+4. `status` is derived. Do not compute it again. It folds the current deployment row
    through the own derivation of the node. Only that side can reach
    `"stranded_on_retired_domain"`. A consumer that computes status from `configs` and
    co-signature counts never sees a stranded entry.
@@ -1067,7 +1067,7 @@ the reading before you trust it.
 | The stream root or its hourly files do not exist | The stream was never enabled here, or the data directory is wrong. Not "no withdrawals" |
 | The stream root exists but holds no `cursor` file | No block has been recorded since the stream was turned on. Not "no withdrawals" |
 | `cursor` is far behind the chain's committed height | The view is stale and incomplete. A zero count here proves nothing |
-| The fold finds no entries at all, ever | Suspect the path. A live chain that has served any withdrawal has admissions in the archive |
+| The fold finds no entries at all, ever | Suspect the path. A running chain that has served any withdrawal has admissions in the archive |
 | `cursor` is at the committed height, entries exist, and none reads `ready_to_release` | The real all-clear |
 
 The control is the fourth row. First confirm that your fold sees entries in some state.
@@ -1093,7 +1093,7 @@ so a catch-up replay reports no hole. But the node compares state only on the bl
 owns it. A withdrawal can move through several statuses fully inside a replayed range. It
 then appears as one `admission`, at the status that it holds when the node catches up.
 The node does not record the intermediate moves. This happens across a restart, never in
-normal live operation.
+normal operation.
 :::
 
 ## `node_equity_snapshots` {#node_equity_snapshots}

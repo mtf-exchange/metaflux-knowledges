@@ -283,7 +283,7 @@ answers. Each link opens the request fields and the response schema of that type
 | **[Governance](./info/governance.md)**<br/>proposals, votes and the parameter set | [`validator_votes`](./info/governance.md#validator_votes) · [`gov_state`](./info/governance.md#gov_state) · [`gov_proposals`](./info/governance.md#gov_proposals) · [`gov_history`](./info/governance.md#gov_history) |
 | **[Chain activity](./info/chain.md)**<br/>recent blocks, and one action's outcome | [`recent_blocks`](./info/chain.md#recent_blocks) · [`recent_transactions`](./info/chain.md#recent_transactions) |
 | **[Node snapshots](./info/node.md)**<br/>peers, sync state and node-scoped figures | [`exchange_status`](./info/node.md#exchange_status) · [`user_twaps`](./info/node.md#user_twaps) · [`vault_summaries`](./info/node.md#vault_summaries) · [`user_rate_limit`](./info/node.md#user_rate_limit) · [`approved_brokers`](./info/node.md#approved_brokers) · [`validator_l1_votes`](./info/node.md#validator_l1_votes) · [`validator_summaries`](./info/node.md#validator_summaries) · [`gossip_root_ips`](./info/node.md#gossip_root_ips) |
-| **[Points](#points-reads)** (not live yet)<br/>the weekly points table | [`points_weeks`](#points_weeks) · [`points_leaderboard`](#points_leaderboard) · [`points_user`](#points_user) |
+| **[Points](#points-reads)** (not active yet)<br/>the weekly points table | [`points_weeks`](#points_weeks) · [`points_leaderboard`](#points_leaderboard) · [`points_user`](#points_user) |
 
 ## Removed reads {#retired-reads}
 
@@ -363,7 +363,7 @@ day that its capability becomes reachable.
 ## Points reads {#points-reads}
 
 :::caution
-**Not live yet.** These three reads ship with the next archive and gateway
+**Not active yet.** These three reads ship with the next archive and gateway
 release. Until then, each one answers `400` `UNKNOWN_TYPE`, the same answer
 that a misspelled type gets. Points still count from genesis. When publication
 starts after the release, the archive publishes every past week.
@@ -621,7 +621,7 @@ everywhere. The signed `/exchange` write path still uses the numeric `asset`.
 That field is consensus-frozen, and it is not related to these read arguments.
 
 **Q: Do `user_fills` / `trades` need an external indexer?**
-A: No. On the gateway, since [block 25,599,540](../../changelog/block-25599540.md#tape-retirement-reads), the node keeps no committed fill ring and no trade ring. The gateway answers both reads from the archive and from its own 24-hour trade window. A bare node answers `trades` with `"trades": []`. For a continuous live feed, subscribe to the [WS channels](../ws/subscriptions.md). See [deep history past the ring](./info/perpetuals.md#trades-archive).
+A: No. On the gateway, since [block 25,599,540](../../changelog/block-25599540.md#tape-retirement-reads), the node keeps no committed fill ring and no trade ring. The gateway answers both reads from the archive and from its own 24-hour trade window. A bare node answers `trades` with `"trades": []`. For a continuous real-time feed, subscribe to the [WS channels](../ws/subscriptions.md). See [deep history past the ring](./info/perpetuals.md#trades-archive).
 
 **Q: Is the response deterministic across nodes?**
 A: Yes. Every honest node returns identical responses for the same query at the same committed height. Nodes at different commit heights can differ. Compare the `height` / `time` stamp that [`account_state`](./info/account.md#account_state) carries before you call two answers inconsistent. `gossip_root_ips` is the one field that is not consensus state. It reads the config of each node. Nodes that carry the same roster answer identically, and nodes that do not can differ.

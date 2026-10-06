@@ -87,7 +87,7 @@ The server replies with two frames, in this order:
 }
 ```
 
-2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2_book` and `bbo`, this is a snapshot of the latest committed book. A channel with no live source yet sends an empty body that is still valid.
+2. An initial snapshot frame on the subscribed channel (see each channel in [subscriptions](./subscriptions.md)). For `l2_book` and `bbo`, this is a snapshot of the latest committed book. A channel with no current source yet sends an empty body that is still valid.
 
 The server ignores a duplicate subscribe to the same `(type, coin)`. It sends no second ack and no error. Hyperliquid behaves the same way.
 
@@ -141,7 +141,7 @@ The client can correct the frame and retry on the same socket.
 
 ### Push messages {#push-messages}
 
-All live data frames use one envelope:
+All real-time data frames use one envelope:
 
 ```json
 { "channel": "<channel>", "data": { /* channel-specific */ }, "is_snapshot": false }
@@ -294,7 +294,7 @@ An account frame gains less than a book frame, because the public dictionary kno
 
 The fanout hub uses the key `(channel, coin)`. For the per-market channels `l2_book` and `bbo`, this has two effects:
 
-- `coin` is required. Without it, you land in the coinless `(channel, None)` bucket. The per-market book publisher never writes to that bucket, so you receive only the initial empty snapshot and no live updates.
+- `coin` is required. Without it, you land in the coinless `(channel, None)` bucket. The per-market book publisher never writes to that bucket, so you receive only the initial empty snapshot and no streaming updates.
 - A `BTC` subscriber receives only `BTC` frames. An ETH commit never reaches a BTC subscription, and the reverse is also true.
 
 The node converts `coin` to an asset-id string before it builds the key. Three forms resolve to the same bucket:
@@ -303,7 +303,7 @@ The node converts `coin` to an asset-id string before it builds the key. Three f
 - A symbol, for example `"BTC"`, resolves against the committed universe (`mip3_market_specs`, matching on `symbol` or `asset_name`) to its asset id.
 - A spot pair name, for example `"BTC/USDC"`, resolves against the registered spot pairs to its pair id. Then `l2_book` and `bbo` stream spot depth for the pair, in the tick and size planes of the pair.
 
-A subscriber keyed by `"BTC"` and one keyed by the numeric id `"0"` (if BTC is asset 0) share the same routing bucket for the publish on each commit. A coin that is neither numeric nor a known universe symbol stays as its own bucket. You get the ack and an empty snapshot but never live frames. This reports an unknown market and does not invent a mapping.
+A subscriber keyed by `"BTC"` and one keyed by the numeric id `"0"` (if BTC is asset 0) share the same routing bucket for the publish on each commit. A coin that is neither numeric nor a known universe symbol stays as its own bucket. You get the ack and an empty snapshot but never streaming frames. This reports an unknown market and does not invent a mapping.
 
 ## Per-subscriber push {#per-subscriber-push}
 
@@ -328,7 +328,7 @@ On this signal, subscribe again. You get a fresh snapshot. The node never skips 
 
 The public market channels (`l2_book`, `bbo`, `trades`, `markets`) need no authentication.
 
-The account channels (`fills`, `order_updates`) are live and route by the 0x `user` address. They have no authentication gate yet. Any connection can subscribe to the feed of any address. The data is the same public committed fills, keyed by account. An authentication envelope at subscribe time, so that a connection sees only its own account, is planned. For authenticated reads and writes today, use the `post` channel. It serves info reads, and it checks signed actions with the same EIP-712 verification as `POST /exchange`. See [subscriptions](./subscriptions.md).
+The account channels (`fills`, `order_updates`) are active and route by the 0x `user` address. They have no authentication gate yet. Any connection can subscribe to the feed of any address. The data is the same public committed fills, keyed by account. An authentication envelope at subscribe time, so that a connection sees only its own account, is planned. For authenticated reads and writes today, use the `post` channel. It serves info reads, and it checks signed actions with the same EIP-712 verification as `POST /exchange`. See [subscriptions](./subscriptions.md).
 
 ## Multiplexing {#multiplexing}
 

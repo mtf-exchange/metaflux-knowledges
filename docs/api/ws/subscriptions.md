@@ -141,7 +141,7 @@ See [Ids and wire shapes](../../changelog/ids-and-wire-shapes.md#explorer-channe
 
 ---
 
-## Live channels {#live-channels}
+## Real-time channels {#live-channels}
 
 ### Aggregated L2 order book for one market {#l2_book}
 
@@ -252,7 +252,7 @@ window holds no print for the market.
 ] }
 ```
 
-Live pushes (`is_snapshot: false`) carry the new prints of the block that just committed. The `users` field of each row holds the aggressor only:
+Real-time pushes (`is_snapshot: false`) carry the new prints of the block that just committed. The `users` field of each row holds the aggressor only:
 
 ```json
 { "channel": "trades", "is_snapshot": false, "data": [
@@ -264,7 +264,7 @@ Live pushes (`is_snapshot: false`) carry the new prints of the block that just c
 
 ### Global dynamic state for all markets {#markets}
 
-This channel streams the dynamic state of every market, one row for each market. A row holds the live mark, oracle and mid price, the funding premium, open interest, the 24h ticker and the halted flag. The channel is global. It takes no `coin` and no `user`. The rows use the same builder as the REST [`markets`](../rest/info/perpetuals.md#markets) dynamic state, so the WS feed and the REST read never drift.
+This channel streams the dynamic state of every market, one row for each market. A row holds the current mark, oracle and mid price, the funding premium, open interest, the 24h ticker and the halted flag. The channel is global. It takes no `coin` and no `user`. The rows use the same builder as the REST [`markets`](../rest/info/perpetuals.md#markets) dynamic state, so the WS feed and the REST read never drift.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "markets" } }
@@ -394,7 +394,7 @@ The series has no gaps. An interval with no sample emits a flat bar that carries
 :::warning
 These bars come from a sampled price series, not from the continuous price path. `o` and `c` are the first and last sample of the window. `h` and `l` are the highest and lowest sample. They are the extremes of the samples and not the true extremes of the price. A spike that starts and ends between two samples leaves no trace in the bar.
 
-Do not build wick analysis, liquidation-trigger reconstruction or any "did the price touch X?" test on these bars. For the live price of one market, subscribe to [`markets`](#markets) and read the row of that market. The REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read has the same warning and the sample grid.
+Do not build wick analysis, liquidation-trigger reconstruction or any "did the price touch X?" test on these bars. For the current price of one market, subscribe to [`markets`](#markets) and read the row of that market. The REST [`candle_snapshot`](../rest/info/perpetuals.md#candle_snapshot) read has the same warning and the sample grid.
 :::
 
 By default, the gateway ring holds 1000 bars for each `(coin, interval, candle_type)` series. It holds a deeper ring for sub-minute intervals. A subscribe snapshot serves at most the newest 5000 bars of that ring.
@@ -420,7 +420,7 @@ This channel streams the order lifecycle of one account. It requires `user` (the
 - `order.oid` is a decimal-digit string, or `null` on a rejected placement.
 - On a `filled` record, `order.sz` is the filled size and `order.orig_sz` is the original order size, so `sz / orig_sz` is the fill fraction. A taker also carries the cumulative `filled_sz` and `avg_px`. A maker leg reports the `filled_sz` of each match, and `status` stays `open` while any size rests.
 - `limit_px`, `sz`, `orig_sz` and `avg_px` are human decimal strings. The price is tick-snapped in whole USDC. The size uses the `sz_decimals` plane of the market. Neither is raw 1e8. `time` is consensus ms. Unknown fields are `null`.
-- `batch_cancel` pushes one `canceled` record for each leg that removed its order. A refused leg pushes nothing, because it changed nothing. Its reason is in the [`batch_cancel` reply](../rest/exchange/orders.md#batch_cancel-reply). This is live since [block 17,113,494](../../changelog/block-17113494.md#batch-cancel-legs).
+- `batch_cancel` pushes one `canceled` record for each leg that removed its order. A refused leg pushes nothing, because it changed nothing. Its reason is in the [`batch_cancel` reply](../rest/exchange/orders.md#batch_cancel-reply). This is in effect since [block 17,113,494](../../changelog/block-17113494.md#batch-cancel-legs).
 - The channel does not emit these events today: `modify`, `batchModify`, `scheduleCancel`, `cancelAllOrders`, TWAP transitions and cancels that the engine starts (BOLE T0). The dispatch observation for these is an opaque ok or err with no payload for each order.
 
 ### Per-account resting order snapshot {#open_orders}
@@ -499,7 +499,7 @@ This channel streams the money movement of one account, labeled with its cause. 
 
 #### Two more record sources {#ledger_updates-incoming}
 
-> The two records below are live. A client that rejects an unknown `kind` must
+> The two records below are active. A client that rejects an unknown `kind` must
 > accept them.
 
 Both close a gap that the bullet above names. Neither renames or removes an existing
@@ -518,14 +518,14 @@ Field rules for the two new kinds:
 - `liquidation.cause` is `forced_close_partial`, `forced_close_full`, `forced_close_isolated` or `forced_close_governance`. These are the same values that `user_fills` carries. It can also be `delist_settlement`.
 - `delist_settlement` is a delist and not a liquidation. A delist closed the leg at the settlement price by ledger entry. It charges no fee and writes no fill, so `user_fills` never carries this value. `mark_px` is the settlement price. See [Delisting a perp market](../../products/perpetuals.md#delisting).
 - `forced_close_governance` is a forced close that is not a liquidation. A `force_close_position` from the validator quorum settles against the book like the ladder does, and it writes the same record. It charges no liquidation fee and does not raise a liquidation counter. Read the `cause` before you add the record to a liquidation total.
-- One vote closes both legs. This is live from node 0.9.7. One vote closes each leg that the account holds, and a hedge account gets two `liquidation` records for each vote, one for each leg. An older node closed only the long leg, so a hedge account kept its short. The `max_size` of the vote caps each leg on its own. The outcome summary of the action reads `forceClosePosition partial (quorum met): residual stays open` when any leg keeps size. It read `accepted` before. The vote payload does not change.
+- One vote closes both legs. This is active from node 0.9.7. One vote closes each leg that the account holds, and a hedge account gets two `liquidation` records for each vote, one for each leg. An older node closed only the long leg, so a hedge account kept its short. The `max_size` of the vote caps each leg on its own. The outcome summary of the action reads `forceClosePosition partial (quorum met): residual stays open` when any leg keeps size. It read `accepted` before. The vote payload does not change.
 - `liquidation.mark_px` is the whole-USDC mark from which the slice was priced. The key is absent when the market had no usable mark at the slice.
 - ADL and backstop takeovers settle outside the measured slice and emit no `liquidation` record. They are not silent, though. An ADL haircut writes its own `adl_haircut` ledger row, so read that value and do not conclude that the deleverage left no record. A Core credit that arrives from the EVM side writes `evm_to_core_credit` the same way. Both reach this channel.
 - Treat an unknown `kind` as data, not as an error. Show the `amount` and the `time`, and label the cause from the `kind` string. This rule keeps a client working across every later addition.
 
 ### Trading context for one account and market {#active_asset_data}
 
-This channel streams the trading context of one account on one market: leverage, margin mode and the current ceiling for the maximum trade size. It requires both `user` (0x) and `coin`. The initial snapshot is the live context, with default zeroed config when the account has no position. It is not an empty array. A push re-emits the context only when it changes.
+This channel streams the trading context of one account on one market: leverage, margin mode and the current ceiling for the maximum trade size. It requires both `user` (0x) and `coin`. The initial snapshot is the current context, with default zeroed config when the account has no position. It is not an empty array. A push re-emits the context only when it changes.
 
 The channel serves a registered perp market. A spot pair, an unknown coin or a coin that names no perp fails with `{"channel":"error","data":{"error":"market not found"}}`, and the node creates no subscription. The [REST read](../rest/info/perpetuals.md#active_asset_data) answers the same case with `404`. An unparseable `user` fails with ``invalid `user` address``. There is no zeroed fallback snapshot.
 
@@ -547,9 +547,9 @@ The channel serves a registered perp market. A spot pair, an unknown coin or a c
 
 ### Per-account collateral and margin health {#account_state}
 
-This channel streams the collateral and margin health of one account: the cross-account money figures and the four lane summaries. The node pushes a frame when they change. The channel requires `user` (the 0x address). It does not take a `coin`. `address` is not an alias here. A subscribe that carries `address` fails with ``{"channel":"error","data":{"error":"`account_state` requires `user`"}}``, the same answer as a subscribe with no key. The two surfaces differ: the WS subscription takes `user`, and the REST [`account_state`](../rest/info/account.md#account_state) read takes `address`. The body comes from the same builder as the REST [`account_state`](../rest/info/account.md#account_state) read, so a push never drifts from that read. The initial snapshot is the live state, zeroed for an account with no funds. It is not an empty array.
+This channel streams the collateral and margin health of one account: the cross-account money figures and the four lane summaries. The node pushes a frame when they change. The channel requires `user` (the 0x address). It does not take a `coin`. `address` is not an alias here. A subscribe that carries `address` fails with ``{"channel":"error","data":{"error":"`account_state` requires `user`"}}``, the same answer as a subscribe with no key. The two surfaces differ: the WS subscription takes `user`, and the REST [`account_state`](../rest/info/account.md#account_state) read takes `address`. The body comes from the same builder as the REST [`account_state`](../rest/info/account.md#account_state) read, so a push never drifts from that read. The initial snapshot is the current state, zeroed for an account with no funds. It is not an empty array.
 
-This four-lane frame is the live shape. The earlier flat body, with the position table and the balance array inside the frame, is gone from the wire. Parse the lanes. See [where every field went](../rest/info/account.md#account-state-lane-split).
+This four-lane frame is the current shape. The earlier flat body, with the position table and the balance array inside the frame, is gone from the wire. Parse the lanes. See [where every field went](../rest/info/account.md#account-state-lane-split).
 
 ```json
 { "method": "subscribe", "subscription": { "type": "account_state", "user": "0x<address>" } }
@@ -588,10 +588,10 @@ This four-lane frame is the live shape. The earlier flat body, with the position
 - `height` and `time` are the as-of stamp. `height` is the committed block height against which the node rendered the frame. `time` is the consensus block time in ms. Both are bare integers, not Decimal strings. They advance on every commit, even when nothing else in the record moved. The values are identical to the REST read. The change gate below excludes them. The advance of the stamp never triggers a push by itself. A client can use them to tell a quiet account from a stalled feed.
 
 :::warning
-A zero stamp means "no view yet". It does not mean "an account worth nothing". If the serving layer has no body for your account when you subscribe, the first frame is a placeholder. Every figure is zero, `spot.balances` is empty, and `height` and `time` are both `0`. A real account never reads that way, because the USDC row is unconditional and the stamp is a live block height. Test `height != 0` before you render or store the first frame, and wait for the next push. The same rule holds on [`clearinghouse_state`](#clearinghouse_state) and [`option_state`](#option_state).
+A zero stamp means "no view yet". It does not mean "an account worth nothing". If the serving layer has no body for your account when you subscribe, the first frame is a placeholder. Every figure is zero, `spot.balances` is empty, and `height` and `time` are both `0`. A real account never reads that way, because the USDC row is unconditional and the stamp is a current block height. Test `height != 0` before you render or store the first frame, and wait for the next push. The same rule holds on [`clearinghouse_state`](#clearinghouse_state) and [`option_state`](#option_state).
 :::
 
-Frequency: the channel sends a frame when the state of the account changes since the last commit. It also sends a liveness heartbeat. The current full snapshot (unchanged body, only a fresh `height` and `time` stamp) is re-sent every 4 committed blocks, even when nothing changed. The interval counts commits and does not use a wall clock. The block cadence is a governed target for each deployment, so 4 commits cover a different real-time span on different deployments. Read the advance rate of the `height` field if you need a wall-clock estimate. The heartbeat lets a client confirm that the feed is live and tell a quiet account from a stalled connection.
+Frequency: the channel sends a frame when the state of the account changes since the last commit. It also sends a liveness heartbeat. The current full snapshot (unchanged body, only a fresh `height` and `time` stamp) is re-sent every 4 committed blocks, even when nothing changed. The interval counts commits and does not use a wall clock. The block cadence is a governed target for each deployment, so 4 commits cover a different real-time span on different deployments. Read the advance rate of the `height` field if you need a wall-clock estimate. The heartbeat lets a client confirm that the feed is running and tell a quiet account from a stalled connection.
 
 :::warning
 `account_state` is per-account data, but it has no authentication today. Any connection can subscribe to any address. Do not treat it as private until the authentication gate at subscribe time lands. The same holds for [`clearinghouse_state`](#clearinghouse_state) and [`option_state`](#option_state).
@@ -678,7 +678,7 @@ Frequency: the channel sends a frame on change, plus the same 4-commit liveness 
 
 ### Per-account spot-margin positions {#spot_margin_state}
 
-This channel streams the spot-margin positions of one account: its leveraged spot-margin book (see [spot margin](../../products/spot-margin.md)). The node pushes a frame when the book changes. The channel requires `user`. The initial snapshot is the live position set, `[]` for an account with no spot-margin positions. This is not a feed of plain spot token balances. Plain spot balances for each token ride the [`account_state`](#account_state) channel, in its `spot.balances` array.
+This channel streams the spot-margin positions of one account: its leveraged spot-margin book (see [spot margin](../../products/spot-margin.md)). The node pushes a frame when the book changes. The channel requires `user`. The initial snapshot is the current position set, `[]` for an account with no spot-margin positions. This is not a feed of plain spot token balances. Plain spot balances for each token ride the [`account_state`](#account_state) channel, in its `spot.balances` array.
 
 ```json
 { "method": "subscribe", "subscription": { "type": "spot_margin_state", "user": "0x<address>" } }
@@ -707,9 +707,9 @@ This channel streams the spot-margin positions of one account: its leveraged spo
 ```
 
 - `height` and `time` are the as-of stamp, always present, as on [`account_state`](#account_state). `height` is the committed block height against which the node rendered the frame. `time` is the consensus block time in ms. Both are bare integers. They advance on every commit, so they tell a quiet account from a stalled feed.
-- `accounts[]` holds one entry for each open spot-margin position, in pair-id order. It is the same body that the REST [`spot_margin_state`](../rest/info/spot.md#spot_margin_state) read renders, from a single source. `pair` is the symbol of the pair (for example `"MTF/USDC"`), not a numeric id. `collateral` reads `"0"`, because spot margin is cross-collateralized against the unified USDC account. The field stays only for wire-shape compatibility. `current_debt` is `borrowed` accrued to now against the live borrow index of the pool. `params` is `null` when margin is not enabled or calibrated for the pair.
+- `accounts[]` holds one entry for each open spot-margin position, in pair-id order. It is the same body that the REST [`spot_margin_state`](../rest/info/spot.md#spot_margin_state) read renders, from a single source. `pair` is the symbol of the pair (for example `"MTF/USDC"`), not a numeric id. `collateral` reads `"0"`, because spot margin is cross-collateralized against the unified USDC account. The field stays only for wire-shape compatibility. `current_debt` is `borrowed` accrued to now against the current borrow index of the pool. `params` is `null` when margin is not enabled or calibrated for the pair.
 
-Frequency: the channel sends a frame on change, plus a liveness heartbeat, because `current_debt` accrues on every commit even with no trading activity. A frame arrives when the position set changes since the last commit. The current full snapshot (unchanged body) is also re-sent every 4 committed blocks, even when nothing changed. The interval counts commits and does not use a wall clock. The block cadence is a governed target for each deployment, so 4 commits cover a different real-time span on different deployments. Measure the commit rate of your own deployment if you need a wall-clock estimate. The heartbeat lets a client confirm that the feed is live.
+Frequency: the channel sends a frame on change, plus a liveness heartbeat, because `current_debt` accrues on every commit even with no trading activity. A frame arrives when the position set changes since the last commit. The current full snapshot (unchanged body) is also re-sent every 4 committed blocks, even when nothing changed. The interval counts commits and does not use a wall clock. The block cadence is a governed target for each deployment, so 4 commits cover a different real-time span on different deployments. Measure the commit rate of your own deployment if you need a wall-clock estimate. The heartbeat lets a client confirm that the feed is running.
 
 ### Per-account realized funding payments {#user_fundings}
 
@@ -778,7 +778,7 @@ This channel streams the lifecycle of the parent TWAP orders of one account, one
 { "method": "post", "id": 1, "request": { "type": "info", "payload": { "type": "l2_book", "coin": "BTC" } } }
 ```
 
-`post` is live on the public endpoint. One socket carries both subscriptions and request and response calls. You need no second connection, and you do not need to fall back to REST for a read. The request goes to the same `/info` and `/exchange` handlers, so a malformed request returns the field-validation error of that handler, not a transport error. See the [WS overview](./index.md#post-requestresponse-over-ws) for the response envelope and the signing rules.
+`post` is available on the public endpoint. One socket carries both subscriptions and request and response calls. You need no second connection, and you do not need to fall back to REST for a read. The request goes to the same `/info` and `/exchange` handlers, so a malformed request returns the field-validation error of that handler, not a transport error. See the [WS overview](./index.md#post-requestresponse-over-ws) for the response envelope and the signing rules.
 
 ---
 

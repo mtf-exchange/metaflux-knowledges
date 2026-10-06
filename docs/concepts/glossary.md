@@ -134,7 +134,7 @@ This page defines the terms that the docs use. Each term links to its own page w
 
 **Reduce-only.** An order flag. Admission rejects the order if it would increase the position size. See [order types](./order-types.md#reduce-only).
 
-**RFQ (request for quote).** The trade path for options. A taker asks makers for a premium on one option series and accepts one quote. RFQ refuses every market that is not a live option series. See [RFQ](./rfq.md).
+**RFQ (request for quote).** The trade path for options. A taker asks makers for a premium on one option series and accepts one quote. RFQ refuses every market that is not an active option series. See [RFQ](./rfq.md).
 
 ## S {#s}
 

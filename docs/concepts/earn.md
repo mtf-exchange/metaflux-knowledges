@@ -3,7 +3,7 @@
 Earn is a USDC lending pool that pays depositors the interest from spot-margin borrowers.
 
 :::info
-**Live on testnet, and paying zero.** Earn is a USDC lending pool that earns
+**Active on testnet, and paying zero.** Earn is a USDC lending pool that earns
 yield from [spot-margin](../products/spot-margin.md) borrowers. Supply, share
 pricing, redemption bounded by idle liquidity, and the automatic spot-margin
 liquidator that protects the pool all run end to end. See the
@@ -107,7 +107,7 @@ Earn is not risk-free. A [spot-margin](../products/spot-margin.md) position can
 close at a loss that the borrower's collateral cannot cover. Suppliers then
 share the shortfall: the pool's `total_supplied` decreases (floored at zero),
 which lowers `share_value`. The pool's protection is the automatic liquidator
-(live on testnet). Every block, it
+(active on testnet). Every block, it
 [force-closes](../products/spot-margin.md#liquidation) underwater margin
 accounts at the maintenance floor. A position is thus unwound while there is
 normally still enough value to repay the loan. The conservative per-pair

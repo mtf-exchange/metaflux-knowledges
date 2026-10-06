@@ -3,9 +3,9 @@
 This page describes how the MetaFlux EVM forms, executes and commits blocks.
 
 :::tip
-**Live on testnet.** The unified block model is operational and tested. It makes one EVM
+**Active on testnet.** The unified block model is operational and tested. It makes one EVM
 block per fixed period and runs parallel conflict-strata inside each block. Cadence and gas
-values can still change before launch. The [bridge](../bridge/) is live.
+values can still change before launch. The [bridge](../bridge/) is active.
 :::
 
 The MetaFlux EVM makes one unified block per fixed period (1000 ms by default). There are

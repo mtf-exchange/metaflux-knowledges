@@ -339,9 +339,9 @@ do.
 
 | Action | Use it when | Availability |
 |--------|-------------|--------------|
-| [`twap_order`](../api/rest/exchange/orders.md#twap_order) · [`twap_cancel`](../api/rest/exchange/orders.md#twap_cancel) | You spread one large order over time | live for one-way accounts only, see below |
-| [`scale_order`](../api/rest/exchange/orders.md#scale_order) · [`cancel_scale`](../api/rest/exchange/orders.md#cancel_scale) | You want N rungs across a price band from one signature | live |
-| [`chase_order`](../api/rest/exchange/orders.md#chase_order) · [`cancel_chase`](../api/rest/exchange/orders.md#cancel_chase) | You want one post-only leg that the node moves to the touch | live |
+| [`twap_order`](../api/rest/exchange/orders.md#twap_order) · [`twap_cancel`](../api/rest/exchange/orders.md#twap_cancel) | You spread one large order over time | available for one-way accounts only, see below |
+| [`scale_order`](../api/rest/exchange/orders.md#scale_order) · [`cancel_scale`](../api/rest/exchange/orders.md#cancel_scale) | You want N rungs across a price band from one signature | available |
+| [`chase_order`](../api/rest/exchange/orders.md#chase_order) · [`cancel_chase`](../api/rest/exchange/orders.md#cancel_chase) | You want one post-only leg that the node moves to the touch | available |
 
 ## Grid snapping on a synthesized fire {#deferred-fill-notice}
 
@@ -375,7 +375,7 @@ Skip these on a first integration. They are separate venues, not variations on a
 
 | Action | Use it when | Availability |
 |--------|-------------|--------------|
-| [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request) · [`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote) · [`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept) | You negotiate a block trade off the book | live |
+| [`rfq_request`](../api/rest/exchange/rfq-utility.md#rfq_request) · [`rfq_quote`](../api/rest/exchange/rfq-utility.md#rfq_quote) · [`rfq_accept`](../api/rest/exchange/rfq-utility.md#rfq_accept) | You negotiate a block trade off the book | available |
 | [`fba_submit`](../api/rest/exchange/rfq-utility.md#fba_submit) | You want a uniform batch clearing price instead of the book | market must set `fba_enabled` |
 | [`submit_encrypted_order`](../api/rest/exchange/utility.md#submit_encrypted_order) | You hide an order until a target block | testnet preview |
 
@@ -397,7 +397,7 @@ order actions:
 | `401 signer is neither the owner nor an approved agent` | Wrong `chainId`, or the agent approval has not committed | Match `chainId` to the node. Wait one block after `approve_agent` |
 | Order rejected off-grid | `limit_px` not on `tick_size`, or `size` not on `step_size` | Snap on the client before you sign |
 | The price looks `1e8` times too small | A whole-unit price sent as `limit_px` | Multiply by `1e8` before you sign |
-| `400 duplicate cloid` | The same `cloid` was already admitted for this account | The first order is live. Look it up by `cloid` |
+| `400 duplicate cloid` | The same `cloid` was already admitted for this account | The first order is resting. Look it up by `cloid` |
 | `{"pending":…}` on every order | The wait window elapsed before commit | Track by `cloid` on the WS feed. Do not resubmit without a check |
 
 ## See also {#see-also}
@@ -408,4 +408,4 @@ order actions:
 - [Idempotency](./idempotency.md): `cloid` and nonce strategy for safe retry
 - [Error handling](./error-handling.md): admission, commit and network classes
 - [Market-maker performance](./market-maker-performance.md): async confirm and batch quoting
-- [WS subscriptions](../api/ws/subscriptions.md): the live order and fill feeds
+- [WS subscriptions](../api/ws/subscriptions.md): the real-time order and fill feeds

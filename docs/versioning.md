@@ -121,7 +121,7 @@ The protocol layer is wire-versioned. Governance can change these without a vers
 
 These changes do not bump the protocol version. They emit events on the planned `_governance` WS channel. `/info` returns their current values.
 
-A client that computes against current parameter values, such as PM margin, must read the parameters live. Never hard-code them.
+A client that computes against current parameter values, such as PM margin, must read the parameters at run time. Never hard-code them.
 
 ## Client SDK versioning {#client-sdk-versioning}
 

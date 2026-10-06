@@ -3,8 +3,8 @@
 This page describes spot margin: a borrow of USDC to buy spot with leverage.
 
 :::info
-**Preview.** The loop of borrow, leveraged buy and close is live. Automatic
-[forced liquidation](#liquidation) is live. A pair enables only when governance calibrates
+**Preview.** The loop of borrow, leveraged buy and close is active. Automatic
+[forced liquidation](#liquidation) is active. A pair enables only when governance calibrates
 its risk parameters, and no pair is calibrated yet. Do not assume production safety at
 scale.
 :::

@@ -376,8 +376,8 @@ invent a value.
 This read returns the nodes that this deployment advertises for peer discovery.
 It takes no parameters. It reports network topology, not committed state.
 
-:::info Live
-A live node answers with the `peers` shape below. The previous shape,
+:::info Active
+A running node answers with the `peers` shape below. The previous shape,
 `{ "root_ips": ["host:port", ...] }`, is removed. There is no `root_ips` key.
 :::
 

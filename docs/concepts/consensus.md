@@ -7,7 +7,7 @@ description: MetaFluxBFT, the Byzantine-fault-tolerant Proof-of-Stake consensus 
 MetaFluxBFT is the consensus protocol of MetaFlux. This page describes how it orders transactions and what it guarantees.
 
 :::info
-**Live.** MetaFluxBFT is the production consensus protocol of the MetaFlux L1. It
+**Active.** MetaFluxBFT is the production consensus protocol of the MetaFlux L1. It
 puts every transaction in one order: orders, cancels, liquidations, transfers
 and EVM calls. A committed block is final.
 :::

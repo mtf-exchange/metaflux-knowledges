@@ -7,7 +7,7 @@ description: The perpetual-futures market of MetaFlux. A perp is a leveraged lon
 This page describes the perpetual-futures market: positions, trading actions, margin, fees, listing and delisting.
 
 :::tip
-**Live.** Perpetual futures are the main market of MetaFlux and the platform default.
+**Active.** Perpetual futures are the main market of MetaFlux and the platform default.
 The pages on funding rates, mark prices, margin modes and the liquidation ladder describe
 perps unless a page says otherwise.
 :::
@@ -99,7 +99,7 @@ liquidated.
 
 ## Delisting a perp market {#delisting}
 
-The settlement below is live since node 0.9.10. See
+The settlement below is in effect since node 0.9.10. See
 [block 11,550,001](../changelog/block-11550001.md#no-height-pin).
 
 Governance delists a perp market by a validator vote of two-thirds of stake. The vote ends

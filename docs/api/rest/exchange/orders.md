@@ -39,8 +39,8 @@ The actions on this page act on a perp `market` id and use the shared CLOB. The 
 | `owner` | hex address | 40 hex chars | The claimed account. It must equal the recovered signer or an approved agent of it. It is wire-only, and the node drops it on lowering |
 | `market` | uint32 | `[0, market_count)` | Asset/market id (identity-mapped to `AssetId`) |
 | `side` | enum | `"bid"` / `"ask"` | — |
-| `kind` | enum | `"limit"` / `"market"` / `"stop_loss"` / `"take_profit"` | `limit` and `market` place a live order. `stop_loss` and `take_profit` are accepted only when a `trigger` block is also present. That pair parks one reduce-only TP/SL leg (see [trigger orders](#trigger-orders-stop_loss--take_profit)). A `stop_loss` or `take_profit` without a `trigger` block is rejected (`unsupported order kind`) |
-| `trigger` | object \| null | — | An optional [trigger block](#trigger-orders-stop_loss--take_profit). If it is present on any `kind`, the `submit_order` parks one reduce-only TP/SL leg and places no live order. The shape is `{ "trigger_px": <u64>, "is_market": <bool>, "tpsl": "tp" \| "sl" }`. `is_market: true` fires a market (IOC) exit. `is_market: false` rests a limit exit at the order's `limit_px`. See [trigger orders](#trigger-orders-stop_loss--take_profit) |
+| `kind` | enum | `"limit"` / `"market"` / `"stop_loss"` / `"take_profit"` | `limit` and `market` place a resting order. `stop_loss` and `take_profit` are accepted only when a `trigger` block is also present. That pair parks one reduce-only TP/SL leg (see [trigger orders](#trigger-orders-stop_loss--take_profit)). A `stop_loss` or `take_profit` without a `trigger` block is rejected (`unsupported order kind`) |
+| `trigger` | object \| null | — | An optional [trigger block](#trigger-orders-stop_loss--take_profit). If it is present on any `kind`, the `submit_order` parks one reduce-only TP/SL leg and places no resting order. The shape is `{ "trigger_px": <u64>, "is_market": <bool>, "tpsl": "tp" \| "sl" }`. `is_market: true` fires a market (IOC) exit. `is_market: false` rests a limit exit at the order's `limit_px`. See [trigger orders](#trigger-orders-stop_loss--take_profit) |
 | `size` | uint64 | `> 0` | Fixed-point tick units (widened to `u128`) |
 | `limit_px` | uint64 | `> 0` | Fixed-point tick units (widened to `i128`) |
 | `tif` | enum | `"gtc"`, `"ioc"`, `"alo"` | `"aon"` is rejected (`unsupported time-in-force`, no core equivalent) |
@@ -168,18 +168,18 @@ This limit-trigger example rests a reduce-only sell at `41000.00` once the mark 
 Trigger semantics:
 
 - Reduce-only is forced. A trigger leg always closes, whatever the `reduce_only` wire value is. It never opens or grows a position.
-- The leg `side` chooses what the leg protects. An `ask` trigger closes a long. A `bid` trigger closes a short. On a [hedge account](#position_side-hedge-mode), carry `position_side` to name the leg, as for a live order.
+- The leg `side` chooses what the leg protects. An `ask` trigger closes a long. A `bid` trigger closes a short. On a [hedge account](#position_side-hedge-mode), carry `position_side` to name the leg, as for a resting order.
 - A fired limit gets a new `oid`. At conversion the parked leg retires, and the node assigns a fresh `oid` to the new resting limit. Afterwards the parked `oid` reads terminal or unknown. The resting limit appears in [`open_orders`](../info/orders-fills.md#open_orders). The node does not carry `cloid` onto the fired order.
 - A fired limit that rests persists until it fills or you cancel it through the normal path.
-- The OCO collapse point differs by variant. A market trigger and its sibling collapse on the first fill. A limit trigger and its sibling collapse at conversion, the instant the node places the resting limit. They do not wait for a fill, because the live limit order is now the protection.
+- The OCO collapse point differs by variant. A market trigger and its sibling collapse on the first fill. A limit trigger and its sibling collapse at conversion, the instant the node places the resting limit. They do not wait for a fill, because the resting limit order is now the protection.
 - A fired limit rests like any closing `gtc` order, and a resting order carries no reduce-only flag. On a one-way account, the position can shrink by other means before the limit fills. The eventual fill can then grow exposure the other way. A manual resting close order behaves the same way.
 
-Admission returns the same per-order status union as a live `submit_order`. A trigger that parks reports through the order path. The eventual fire is a committed effect that you can observe on the [WS feed](../../ws/subscriptions.md) and in `/info`. For entry-plus-protective baskets with several legs, use [`batch_order`](#batch_order) with `grouping: "normalTpsl"` or `"positionTpsl"`.
+Admission returns the same per-order status union as a resting `submit_order`. A trigger that parks reports through the order path. The eventual fire is a committed effect that you can observe on the [WS feed](../../ws/subscriptions.md) and in `/info`. For entry-plus-protective baskets with several legs, use [`batch_order`](#batch_order) with `grouping: "normalTpsl"` or `"positionTpsl"`.
 
 #### Trailing stops {#trailing-stops}
 
 :::tip
-Live. The release that binds `trail_px` has shipped. The frozen EIP-712 type that carries `uint64 trailPx` runs in the node, and admission accepts the field. No fork gate guards either half. The signer picks the type by whether the field is present, so an order without it keeps the older digest unchanged.
+Active. The release that binds `trail_px` has shipped. The frozen EIP-712 type that carries `uint64 trailPx` runs in the node, and admission accepts the field. No fork gate guards either half. The signer picks the type by whether the field is present, so an order without it keeps the older digest unchanged.
 
 The node enforces two rules. Both refuse the request and do not reinterpret it:
 
@@ -291,7 +291,7 @@ The grouped rule exists because the old per-leg behavior could fill the entry le
 
 The ladder is the new shape. Its legs share a `group` handle, the `oid` of the first parked leg of the ladder. Every leg reports it on [`open_orders`](../info/orders-fills.md#open_orders) and [`order_status`](../info/orders-fills.md#order_status). Group the rows by that value to show one ladder as one control. The legs of a ladder are not OCO. A fill of one leg does not cancel the others. That is the point of scaling out of a position in steps.
 
-A ladder retires whole. It parks only against a live position. When that position is gone, by any close path including a liquidation, every leg of the ladder retires together on the next block. You do not cancel the survivors yourself.
+A ladder retires whole. It parks only against an open position. When that position is gone, by any close path including a liquidation, every leg of the ladder retires together on the next block. You do not cancel the survivors yourself.
 
 A tpsl group is not leg-independent. It is grouped, so it is atomic. If one leg cannot park, the node rejects the whole action at the action level and parks nothing. `grouping: "na"` is the opposite: one bad leg leaves the others resting.
 
@@ -651,7 +651,7 @@ One cancel covers both order homes. The id is enough. A [spot parent](#twap_orde
 ### Place a scale ladder {#scale_order}
 
 :::info
-Live on the hosted sandbox and on mainnet. The scale ladder is active from block 0 on chain `114514` and on chain `8964`, with no vote and no activation height. A node that you run yourself under the default chain id `31337` starts with the feature dormant. A validator vote must arm it first. Until then, the node rejects a `scale_order` with `scale_order feature not active`.
+Active on the hosted sandbox and on mainnet. The scale ladder is active from block 0 on chain `114514` and on chain `8964`, with no vote and no activation height. A node that you run yourself under the default chain id `31337` starts with the feature dormant. A validator vote must arm it first. Until then, the node rejects a `scale_order` with `scale_order feature not active`.
 :::
 
 `scale_order` places one scale ladder. It is a compact request that the node expands into `n` resting limit rungs on one perpetual market, spread evenly across `[px_low, px_high]`. You sign the compact request (about ten fields), not the rung array. Every rung shares the one `cloid` that you supply. That `cloid` is the ladder handle for [`cancel_scale`](#cancel_scale). The body sits under `action.params`. `owner` is optional: an approved agent or operator routes for the named account.
@@ -731,7 +731,7 @@ An unfunded rung fails alone. Each rung posts in ladder order and locks its own 
 ### Cancel a scale ladder {#cancel_scale}
 
 :::info
-Live on the hosted sandbox and on mainnet. It has the same gate as [`scale_order`](#scale_order).
+Active on the hosted sandbox and on mainnet. It has the same gate as [`scale_order`](#scale_order).
 :::
 
 `cancel_scale` cancels a whole ladder in one action. It cancels every resting order of yours on `market` that carries `cloid` (cancel-all-by-`cloid`). It needs no `oid` and no read-before-cancel round trip. The body sits under `action.params`. `owner` is optional (agent or operator routing).
@@ -752,7 +752,7 @@ Live on the hosted sandbox and on mainnet. It has the same gate as [`scale_order
 | `cloid` | hex string | `0x` + 32 hex chars (16 bytes), required | The ladder handle to sweep |
 | `owner` | hex address \| null | 40 hex chars | Optional. Cancel as this account (approved agents only). The digest binds it when present |
 
-The action sweeps only resting orders. Rungs that already filled are gone. A ladder with no live rungs left returns `order not found`. The node rejects a cancel from a signer that is not the owner.
+The action sweeps only resting orders. Rungs that already filled are gone. A ladder with no resting rungs left returns `order not found`. The node rejects a cancel from a signer that is not the owner.
 
 A parked trigger that shares the handle survives. `cancel_scale` reaches only the resting book. It does not sweep a parked [TP/SL trigger leg](#trigger-orders-stop_loss--take_profit) that carries the same `cloid`. That leg can later fire into the group after the ladder is gone. Keep trigger legs on their own `cloid`.
 
@@ -761,7 +761,7 @@ A parked trigger that shares the handle survives. `cancel_scale` reaches only th
 ### Place a chase order {#chase_order}
 
 :::info
-Live on the hosted sandbox and on mainnet. The chase order type is active from block 0 on chain `114514` and on chain `8964`, with no vote and no activation height. A node that you run yourself under the default chain id `31337` starts with the feature dormant. A validator vote must arm it first. Until then, the node rejects a `chase_order` with `chase_order feature not active`.
+Active on the hosted sandbox and on mainnet. The chase order type is active from block 0 on chain `114514` and on chain `8964`, with no vote and no activation height. A node that you run yourself under the default chain id `31337` starts with the feature dormant. A validator vote must arm it first. Until then, the node rejects a `chase_order` with `chase_order feature not active`.
 :::
 
 `chase_order` places one chase order. It is a single resting post-only leg that the node re-prices automatically to stay one tick inside the top of the book. You sign one compact request. The node places the leg and re-prices it on every eligible block, so the quote tracks the best price with no client round trip. The leg is post-only: it always rests and never takes liquidity, so it never pays a taker fee. The body sits under `action.params`. `owner` is optional: an approved agent or operator routes for the named account.
@@ -854,7 +854,7 @@ No chase-specific WS channel exists. The initial placement and every reprice app
 ### Cancel a chase order {#cancel_chase}
 
 :::info
-Live on the hosted sandbox and on mainnet. It has the same gate as [`chase_order`](#chase_order).
+Active on the hosted sandbox and on mainnet. It has the same gate as [`chase_order`](#chase_order).
 :::
 
 `cancel_chase` cancels one chase by its handle, the `chase_oid` that [`chase_order`](#chase_order) returned. It cancels the current resting leg of the chase and stops further reprices. The body sits under `action.params`. `owner` is optional (agent or operator routing).
@@ -872,7 +872,7 @@ Live on the hosted sandbox and on mainnet. It has the same gate as [`chase_order
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `market` | uint32 | `[0, market_count)` | The market that the chase runs on: a perp market, or a spot pair (see [the spot lane](#chase_order-spot)). It must match the market of the chase |
-| `chase_oid` | uint64 | a live chase handle | The handle from the `chase_order` response (the cancel key), not the `oid` of the leg. The request signs this field, so it stays a number. The response gives you a decimal-digit string, and you parse it back |
+| `chase_oid` | uint64 | an active chase handle | The handle from the `chase_order` response (the cancel key), not the `oid` of the leg. The request signs this field, so it stays a number. The response gives you a decimal-digit string, and you parse it back |
 | `owner` | hex address \| null | 40 hex chars | Optional. Cancel as this account (approved agents only). The digest binds it when present |
 
 Only the account that owns the chase can cancel it. An unknown handle, a handle of the wrong owner and a handle of the wrong market all return `order not found`. If the leg already filled or something cancelled it out of band, the handle still retires cleanly.

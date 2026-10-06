@@ -243,7 +243,7 @@ complete.
 | Amends | [`modify`](./exchange/orders.md#modify), [`batch_modify`](./exchange/orders.md#batch_modify) |
 | Spot | [`spot_order`](./exchange/spot.md#spot_order), [`spot_cancel`](./exchange/spot.md#spot_cancel) |
 | Margin | [`update_leverage`](./exchange/margin-risk.md#update_leverage), [`update_isolated_margin`](./exchange/margin-risk.md#update_isolated_margin), [`top_up_isolated_only_margin`](./exchange/margin-risk.md#top_up_isolated_only_margin), [`set_position_mode`](./exchange/account.md#set_position_mode) |
-| Specialist venues | [`rfq_request`](./exchange/rfq-utility.md#rfq_request), [`rfq_quote`](./exchange/rfq-utility.md#rfq_quote), [`rfq_accept`](./exchange/rfq-utility.md#rfq_accept), [`fba_submit`](./exchange/rfq-utility.md#fba_submit). The three RFQ actions are the option trade path. They refuse any market that is not a live option series |
+| Specialist venues | [`rfq_request`](./exchange/rfq-utility.md#rfq_request), [`rfq_quote`](./exchange/rfq-utility.md#rfq_quote), [`rfq_accept`](./exchange/rfq-utility.md#rfq_accept), [`fba_submit`](./exchange/rfq-utility.md#fba_submit). The three RFQ actions are the option trade path. They refuse any market that is not an active option series |
 
 Every other action is `master only`. This includes all fund movement:
 withdrawals, transfers, vaults, Earn and staking. It also includes all account
@@ -560,7 +560,7 @@ agent's own account and never the master's.
 | `type` | Purpose | Signed-by |
 |--------|---------|-----------|
 | [`core_evm_transfer`](./exchange/transfers.md#core_evm_transfer) | Move a spot asset from the Core ledger to MetaFluxEVM, optionally with an EVM payload | master only |
-| [`send_to_evm_with_data`](./exchange/transfers.md#send_to_evm_with_data) | The same Core-to-EVM move in the Hyperliquid-compatible field shape. **Live.** It refuses five things that Hyperliquid accepts and ignores. See the section | master only |
+| [`send_to_evm_with_data`](./exchange/transfers.md#send_to_evm_with_data) | The same Core-to-EVM move in the Hyperliquid-compatible field shape. **Active.** It refuses five things that Hyperliquid accepts and ignores. See the section | master only |
 | [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) | Withdraw USDC cross-collateral to an external chain | master only |
 | [`withdraw`](./exchange/transfers.md#withdraw) | **Retired.** The legacy CCTP withdrawal. It is refused at commit, and always has been | master only |
 
@@ -591,12 +591,12 @@ never execute here.
 |-----------|----------------------------|-----------------|
 | `UpdateMarginMode` | — | No native action. Isolation is the `is_isolated` flag on `update_leverage` |
 | `MultiSig` | [`multi_sig`](./exchange/account.md#multi_sig) | **Bridged and executing.** A multi-sig account acts through this collect-and-execute wrapper today. It verifies the roster signatures and runs the inner action. A non-wrapped action from a multi-sig account is still rejected |
-| `RegisterReferrer` | [`register_referral_code`](./exchange/account.md#register_referral_code) | **Bridged and live since [block 25,599,540](../../changelog/block-25599540.md#referral-program).** A referee binds to the code with [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) |
+| `RegisterReferrer` | [`register_referral_code`](./exchange/account.md#register_referral_code) | **Bridged and active since [block 25,599,540](../../changelog/block-25599540.md#referral-program).** A referee binds to the code with [`set_referrer_by_code`](./exchange/account.md#set_referrer_by_code) |
 | `UsdcTransfer` / `SpotTransfer` | — | The user-to-user transfer flows are not bridged |
 | `WithdrawUsdc` | — | Draft name. The external withdrawal is [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) |
 | (legacy CCTP withdraw) | [`withdraw`](./exchange/transfers.md#withdraw) | **Retired.** Admitted, then rejected at every commit since genesis (`"withdraw3 disabled; use bridge_withdraw"`). Use [`bridge_withdraw`](./exchange/transfers.md#bridge_withdraw) |
-| (BOLE pool) | [`borrow_lend`](./exchange/margin-risk.md#borrow_lend) | **Bridged and live.** `params.kind` `"Lend"`, `"UnLend"` and `"Repay"` are open to any account. `"Borrow"` is refused unless the sender is an approved liquidator |
-| (vault distribute) | [`vault_distribute`](./exchange/vaults.md#vault_distribute) | **Bridged and live.** The self-service deposit of a follower. See [vaults](../../concepts/vaults.md#depositing) |
+| (BOLE pool) | [`borrow_lend`](./exchange/margin-risk.md#borrow_lend) | **Bridged and active.** `params.kind` `"Lend"`, `"UnLend"` and `"Repay"` are open to any account. `"Borrow"` is refused unless the sender is an approved liquidator |
+| (vault distribute) | [`vault_distribute`](./exchange/vaults.md#vault_distribute) | **Bridged and active.** The self-service deposit of a follower. See [vaults](../../concepts/vaults.md#depositing) |
 | (PM lifecycle) | `pm_enroll` / [`pm_unenroll`](./exchange/margin-risk.md#pm_unenroll) | `pm_enroll` has no native tag. Enroll with [`user_portfolio_margin`](./exchange/margin-risk.md#user_portfolio_margin). `pm_unenroll` is a bridged alias, with no params, for the `enroll:false` form of the same action. `pm_rebalance` is retired, and it is rejected as an unknown action |
 | (cross-chain) | — | **Not an `/exchange` action.** `cross_chain_send` is not in the action enum. It fails decode and returns `400` `INVALID_REQUEST` (`unknown variant`), the same answer as a misspelt action name. It does not return `ACTION_UNSUPPORTED`. Cross-chain transfer uses a different wire: `CrossChainSend` is [CoreWriter action 19](../../evm/interacting-with-core.md), called from MetaFluxEVM |
 

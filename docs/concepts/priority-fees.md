@@ -11,7 +11,7 @@ front of a block. You send it as its own action, `priority_bid`, before the
 order it applies to.
 
 :::info
-**Status: live.** `priority_bid` has an EIP-712 type string, `/exchange` accepts
+**Status: active.** `priority_bid` has an EIP-712 type string, `/exchange` accepts
 it, and no height gate holds it back. The block-ordering step and the settlement
 charge both run today.
 

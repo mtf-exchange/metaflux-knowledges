@@ -1,7 +1,7 @@
 # Vaults
 
 :::info
-**Live on testnet.** Vault creation, the leader seed transfer, config update, follower share redemption and a third-party self-service deposit are all implemented and exercised on testnet. See [Depositing into a vault](#depositing).
+**Active on testnet.** Vault creation, the leader seed transfer, config update, follower share redemption and a third-party self-service deposit are all implemented and exercised on testnet. See [Depositing into a vault](#depositing).
 :::
 
 A vault pools USDC and trades it under the authority of one leader.
@@ -14,7 +14,7 @@ Two vault kinds share one action set: the protocol-operated Metaliquidity vault 
 
 A vault created with `kind: "Metaliquidity"` is a Metaliquidity vault. Only an MLP-whitelisted leader can create one. It has three roles:
 
-1. Backstop counterparty. The vault takes over a failing position, and any residual loss, before the rest of the ladder runs. This is live on the core markets since 2026-08-18. Each absorption is bounded: 40% of live NAV per takeover and 100,000 USDC per block today, both set by governance. These bounds apply to one episode, not to the lifetime exposure of the vault. The vault refuses a takeover on a [builder-deployed market](../mip/mip-3.md#liquidation). See [T3 backstop](./tiered-liquidation.md#mlp-first-bite) for what a depositor now carries.
+1. Backstop counterparty. The vault takes over a failing position, and any residual loss, before the rest of the ladder runs. This is active on the core markets since 2026-08-18. Each absorption is bounded: 40% of current NAV per takeover and 100,000 USDC per block today, both set by governance. These bounds apply to one episode, not to the lifetime exposure of the vault. The vault refuses a takeover on a [builder-deployed market](../mip/mip-3.md#liquidation). See [T3 backstop](./tiered-liquidation.md#mlp-first-bite) for what a depositor now carries.
 2. Market making (planned). The vault can deploy idle capital into market-making strategies on selected core markets. The vault never quotes a [deployer market](../mip/mip-2.md#scope).
 3. Insurance. The vault holds reserves to socialise small losses without firing T4 ADL.
 
@@ -23,7 +23,7 @@ A vault created with `kind: "Metaliquidity"` is a Metaliquidity vault. Only an M
 Cash moves into a vault in two ways. They are not interchangeable:
 
 - [`vault_transfer`](../api/rest/exchange/vaults.md#vault_transfer): the vault leader moves cash between the main account and the vault, in either direction, with a `deposit: true` or `false` flag. Only the leader can send it. The handler rejects any other sender with `401`.
-- `vault_distribute`: a follower deposits USD from their own account and receives shares at the current NAV. The depositing follower signs it, and it has no `owner` field. It is live on `/exchange` today.
+- `vault_distribute`: a follower deposits USD from their own account and receives shares at the current NAV. The depositing follower signs it, and it has no `owner` field. It is available on `/exchange` today.
 
 ```json
 { "type": "vault_distribute", "params": { "vault_id": 4, "pnl": "250" } }
@@ -48,7 +48,7 @@ Cash moves into a vault in two ways. They are not interchangeable:
 
 ### Withdrawing {#withdrawing}
 
-Any address that holds shares in the vault can redeem them with `vault_withdraw`. This is the exit path of a follower, and it is fully live:
+Any address that holds shares in the vault can redeem them with `vault_withdraw`. This is the exit path of a follower, and it is fully available:
 
 ```json
 {
@@ -61,7 +61,7 @@ The action burns `shares` shares at the current `share_price` and pays the USD p
 
 ### Lock-up {#lock-up}
 
-A withdrawal lock applies from deposit to the first eligible withdrawal. The lock is 4 days for a `User` vault and 7 days for a `Metaliquidity` vault. `lock_period_secs` on [`create_vault`](#deploy) is currently ignored. Every vault gets the protocol-fixed lock of its kind, whatever the request sends. The field stays only for wire-shape stability. A fresh deposit may re-lock the whole balance of the follower or only the new shares. Which one applies depends on a network upgrade gate. Check the live behavior. Do not assume per-share scoping.
+A withdrawal lock applies from deposit to the first eligible withdrawal. The lock is 4 days for a `User` vault and 7 days for a `Metaliquidity` vault. `lock_period_secs` on [`create_vault`](#deploy) is currently ignored. Every vault gets the protocol-fixed lock of its kind, whatever the request sends. The field stays only for wire-shape stability. A fresh deposit may re-lock the whole balance of the follower or only the new shares. Which one applies depends on a network upgrade gate. Check the current behavior. Do not assume per-share scoping.
 
 The lock stops a free rider: capital that deposits right before a known T3 event and withdraws right after the protocol socialises the loss.
 
@@ -191,9 +191,9 @@ The insurance pool is a subset of the Metaliquidity vault. It is a designated re
 <details>
 <summary>Show edge cases</summary>
 
-- Leader rotation. No live action reassigns the `leader` of a vault. The leader address is fixed at [`create_vault`](#deploy).
+- Leader rotation. No active action reassigns the `leader` of a vault. The leader address is fixed at [`create_vault`](#deploy).
 - Leader goes silent. Existing positions stay open and nothing trades automatically. Depositors can still withdraw at the share price, which reflects the mark-to-market of those positions. A liquidation caused by mark moves hits NAV.
-- Paused vault. A leader can set `new_paused: true` with [`vault_modify`](#config). Check the live `vault_state` read, or `account_state` with `detail: "overview"`, for the paused flag before you assume withdrawals are open.
+- Paused vault. A leader can set `new_paused: true` with [`vault_modify`](#config). Check the current `vault_state` read, or `account_state` with `detail: "overview"`, for the paused flag before you assume withdrawals are open.
 - Lock-up. The lock is the fixed duration of the vault kind from [Lock-up](#lock-up). The caller does not choose it.
 
 </details>
@@ -218,7 +218,7 @@ sequenceDiagram
 - [Tiered liquidation](./tiered-liquidation.md): the T3 backstop and the insurance pool.
 - [`POST /info vault_state`](../api/rest/info/vaults-staking.md#vault_state)
 - [`POST /info account_state`](../api/rest/info/account.md#account_state-overview) with `detail: "overview"`: the share holding of one account.
-- [`ledger_updates` WS](../api/ws/subscriptions.md#ledger_updates): a leader `vault_transfer` arrives on this channel (`kind: vault_transfer`). No live event exists today for `vault_distribute`, `vault_withdraw` or fee accrual. Poll [`vault_state`](../api/rest/info/vaults-staking.md#vault_state) for share-price and NAV changes.
+- [`ledger_updates` WS](../api/ws/subscriptions.md#ledger_updates): a leader `vault_transfer` arrives on this channel (`kind: vault_transfer`). No real-time event exists today for `vault_distribute`, `vault_withdraw` or fee accrual. Poll [`vault_state`](../api/rest/info/vaults-staking.md#vault_state) for share-price and NAV changes.
 - [Staking](./staking.md): separate from vaults.
 
 ## FAQ {#faq}

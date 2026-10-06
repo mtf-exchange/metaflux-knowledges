@@ -9,7 +9,7 @@ RFQ is the trade path for options. A taker asks for a quote on one
 taker accepts one quote. The fill settles directly between the two accounts.
 
 RFQ clears options and nothing else. All three actions refuse any market that is
-not a live option series. There is no RFQ on perpetuals and none on spot.
+not an active option series. There is no RFQ on perpetuals and none on spot.
 
 ## Options only {#why-rfq}
 
@@ -34,7 +34,7 @@ sequenceDiagram
     participant taker
     participant makers
     taker->>makers: POST /exchange rfq_request (names an option series)
-    Note over taker,makers: no live broadcast channel — makers poll rfq_open to discover it
+    Note over taker,makers: no real-time broadcast channel — makers poll rfq_open to discover it
     makers->>taker: quote — POST /exchange rfq_quote (per maker)
     makers->>taker: quote
     Note over taker: taker polls rfq_user / rfq_open to see the quotes
@@ -65,7 +65,7 @@ the full field tables and the EIP-712 typed-data primary types.
 }
 ```
 
-`market` is the `signing_id` of a live series, from
+`market` is the `signing_id` of an active series, from
 [`option_series`](../api/rest/info/options.md#option_series). Read it from the
 server. Never compute it, because the encoding behind the number is internal.
 
@@ -313,7 +313,7 @@ An account that is party to nothing returns a 200 with both lists empty.
 <summary>Show FAQ</summary>
 
 **Q: Can I use RFQ on a perpetual to hide size?**
-A: No. The chain refuses every market that is not a live option series.
+A: No. The chain refuses every market that is not an active option series.
 
 **Q: Can RFQ quotes be cancelled?**
 A: No. There is no cancel-quote action. Quotes are append-only for the life of

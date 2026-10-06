@@ -168,7 +168,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 
 The response shows your order with the `oid` from step 2.
 
-You can also subscribe to live updates. This is the preferred method for any real use:
+You can also subscribe to streaming updates. This is the preferred method for any real use:
 
 ```typescript
 const ws = await client.connectWs();
@@ -247,7 +247,7 @@ sequenceDiagram
 - [Agent wallets in practice](./agent-wallets-howto.md): the production hot-key pattern
 - [Order types](../concepts/order-types.md): order types other than plain limit orders
 - [Error handling](./error-handling.md): admission, commit and network errors
-- [WS subscriptions](../api/ws/subscriptions.md): push for live data
+- [WS subscriptions](../api/ws/subscriptions.md): push for real-time data
 - [Migrating from HL](./migrating-from-hl.md): read this first if you have a Hyperliquid bot
 
 ## Troubleshooting {#troubleshooting}

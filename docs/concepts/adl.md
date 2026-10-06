@@ -125,7 +125,7 @@ A keeps the unrealized PnL on its remaining position. A loses only the PnL of th
 No channel has a dedicated ADL event today. There is no
 [`notifications`](../api/ws/subscriptions.md#notifications) kind, no `fills`
 entry and no `ledger_updates` record. The haircut changes state directly. The
-only live signal is the position itself: the position size and unrealized PnL of
+only real-time signal is the position itself: the position size and unrealized PnL of
 the affected account change on the next
 [`clearinghouse_state`](../api/ws/subscriptions.md#clearinghouse_state) push. The
 push is change-driven, so any position or PnL change sends a frame.
@@ -212,7 +212,7 @@ The allocation is capacity pro-rata, not a walk down a score ranking. Every winn
 - [Tiered liquidation](./tiered-liquidation.md): the full ladder.
 - [Insurance pool](./vaults.md#insurance-pool): the T3 mechanism.
 - [Portfolio margin](./portfolio-margin.md): how PM interacts with ADL.
-- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state): the only live signal that an ADL haircut changed your position.
+- [`clearinghouse_state` WS](../api/ws/subscriptions.md#clearinghouse_state): the only real-time signal that an ADL haircut changed your position.
 - [`clearinghouse_state` with `detail: "adl"`](../api/rest/info/account.md#account_state-adl): the `adl_lamps` queue indicator.
 
 ## FAQ {#faq}

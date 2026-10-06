@@ -1,5 +1,5 @@
 ---
-description: The per-contract specification for every MetaFlux perpetual (instrument type, contract unit, margin, mark, oracle, funding, increments and limits) and how to read each field live from the API.
+description: The per-contract specification for every MetaFlux perpetual (instrument type, contract unit, margin, mark, oracle, funding, increments and limits) and how to read each field from the API.
 ---
 
 # Contract specifications
@@ -7,7 +7,7 @@ description: The per-contract specification for every MetaFlux perpetual (instru
 This page lists the specification fields of a MetaFlux perpetual and says where each value comes from.
 
 :::tip
-**Stable.** The API serves every value on this page live, for each market, from
+**Stable.** The API serves every value on this page in real time, for each market, from
 [`POST /info markets`](../api/rest/info/perpetuals.md#markets). The spec is data, not a static
 listing. The shapes below are what an integrator sees.
 :::
@@ -27,7 +27,7 @@ field, follow the link in its row.
 
 ## The spec at a glance {#the-spec-at-a-glance}
 
-| Spec | Value | Live source field |
+| Spec | Value | Source field |
 |------|-------|-------------------|
 | Instrument type | Linear perpetual future (no expiry, USDC-settled) | `kind: "perp"` |
 | Contract unit | 1 unit of the underlying token, quoted and settled in USDC | `name`, `sz_decimals` |
@@ -212,7 +212,7 @@ A settlement works like this:
   [funding rates](../concepts/funding-rates.md). On-chain governance sets the per-asset period and
   formula.
 
-Query the live rate and next boundary for each market with the
+Query the current rate and next boundary for each market with the
 [`markets`](../api/rest/info/perpetuals.md#markets) `funding` block. Query the premium-sample
 history with [`funding_history`](../api/rest/info/perpetuals.md#funding_history).
 
@@ -240,12 +240,12 @@ precision. Submit order `limit_px` on the order-book plane. Submit order `size` 
 :::warning
 `sz_decimals` is per market, and it can change. Read it. Never hard-code it.
 A perp reads `0` until a governance listing vote gives that market a precision. At `0`, only whole
-units trade, so `step_size` is one whole coin. Several live perps read `0` today for this reason.
+units trade, so `step_size` is one whole coin. Several active perps read `0` today for this reason.
 The vote that fixes one moves its `step_size` by orders of magnitude. A client that cached
 `sz_decimals` then sizes every order on that market wrong. Re-read it from `markets_meta` and do
 not store it.
 
-The vote that performs a raise is live since
+The vote that performs a raise is in effect since
 [block 11,550,001](../changelog/block-11550001.md#size-plane). It rides the governance listing
 vote. Encode sizes to the rules below before a raise enacts on a market you trade, not after.
 
@@ -290,7 +290,7 @@ MetaFlux bounds risk by open interest and the margin gate. It sets no fixed per-
   position OI (positions outstanding). It is not the resting depth of the book.
 
 Every native perp market carries the capacity cap. A deployer market carries the cap its deployer
-set. Both are live since [block 25,599,540](../changelog/block-25599540.md#oi-cap-capacity).
+set. Both are in effect since [block 25,599,540](../changelog/block-25599540.md#oi-cap-capacity).
 Before that block, `oi_cap` was the governance-set cap only, no market had one, and every market
 was uncapped.
 
@@ -349,7 +349,7 @@ an [MTF-native API](../integration/migrating-from-hl.md). It is not an HL deploy
 
 ## See also {#see-also}
 
-- [`markets`](../api/rest/info/perpetuals.md#markets) and [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta): the live and static halves of the per-market spec record
+- [`markets`](../api/rest/info/perpetuals.md#markets) and [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta): the current and static halves of the per-market spec record
 - `margin_tiers` and `oi_cap`, inline on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta)
 - [Perpetuals](../products/perpetuals.md): the product overview
 - [Margin modes](../concepts/margin-modes.md), [Portfolio margin](../concepts/portfolio-margin.md) and [Tiered liquidation](../concepts/tiered-liquidation.md)

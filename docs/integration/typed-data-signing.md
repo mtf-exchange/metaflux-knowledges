@@ -138,7 +138,7 @@ Notes on specific fields:
 - `core_evm_transfer`: the envelope you send picks the type string. With neither `data` nor `destination_chain_id`, you sign `CoreEvmTransfer`, byte-identical to the form before those fields existed. With either key, you sign `CoreEvmTransferV2`. Presence selects the type, not emptiness: `"data": []` and `"destination_chain_id": 0` both count as present.
 - `send_to_evm_with_data`: the struct holds two nonces. `transferNonce` is `params.nonce`, and it travels with the transfer. The trailing `nonce` is the ordinary envelope nonce. They are separate signed fields. You may send the same value for both, but you do not have to.
 - `send_to_evm_with_data`: `data` is a `bytes` field, hashed as `keccak256(raw_bytes)`. An empty payload hashes the empty byte string. On the POST it is an array of byte integers, not a hex string.
-- `send_to_evm_with_data` is live. An earlier version of this note said the network refused the action. The lane has since been restored and released. The type string above is frozen. The action refuses five cases: a `source_dex` other than `0`, `to_perp: true`, a `destination_chain_id` that is neither `0` nor the local EVM chain id, `data` over 4096 bytes, and an amount that truncates to a zero EVM credit. See [the action](../api/rest/exchange/transfers.md#send_to_evm_with_data) for each rule.
+- `send_to_evm_with_data` is active. An earlier version of this note said the network refused the action. The lane has since been restored and released. The type string above is frozen. The action refuses five cases: a `source_dex` other than `0`, `to_perp: true`, a `destination_chain_id` that is neither `0` nor the local EVM chain id, `data` over 4096 bytes, and an amount that truncates to a zero EVM credit. See [the action](../api/rest/exchange/transfers.md#send_to_evm_with_data) for each rule.
 
 ### Account, staking & vault {#account-staking--vault}
 
@@ -258,7 +258,7 @@ These are the six [spot deployer](../api/rest/exchange/deploy-spot.md) actions. 
 ### Perp deployer actions {#perp-deployer-actions}
 
 :::warning
-**`PerpSetSubDeployerPerms` is live.** On the public testnet, the node accepts the variant and asks for its `params`. A made-up action name in the same request answers `unknown variant`. That control separates the two answers.
+**`PerpSetSubDeployerPerms` is active.** On the public testnet, the node accepts the variant and asks for its `params`. A made-up action name in the same request answers `unknown variant`. That control separates the two answers.
 
 `PerpRegisterAsset` also changes in a coming release. It gains `string name`, the name of the dex the market joins. The type string below is the new one, so the digest moves. After the upgrade, a signature over the old struct without `name` is invalid. Before the upgrade, a signature over the new struct is invalid.
 :::
@@ -281,7 +281,7 @@ These are the [perp deployer](../api/rest/exchange/deploy-perp.md) actions. Each
 
 In `PerpSetOiCap`, `oiCapUnits` is in whole units of the base asset, and `0` removes the cap. See [`perp_set_oi_cap`](../api/rest/exchange/deploy-perp.md#perp_set_oi_cap).
 
-Both changes below are live.
+Both changes below are in effect.
 
 - `PerpSetSubDeployerPerms` is new. It grants a delegate an exact permission mask instead of every power. `permissions` is in the digest, so one signature binds one (market, delegate, mask) triple. The bit table is on [`perp_set_sub_deployers`](../api/rest/exchange/deploy-perp.md#perp_set_sub_deployers).
 - `PerpSetOracle` is retired. The type string is not deleted, and every committed payload still decodes, but the node refuses the action. Stop signing it. The mask it wrote has no reader.

@@ -2,7 +2,7 @@
 
 MIP-4 defines the MetaFlux options product.
 
-:::info A narrow first release is live
+:::info A narrow first release is active
 The first release has standard European puts and calls. They are fully collateralized and clear
 through [RFQ](../concepts/rfq.md) only. A put settles in USDC. A call settles in the underlying
 coin and escrows one coin per contract. [Options](../products/options.md) describes the product,
@@ -35,7 +35,7 @@ the sum of its legs.
 
 The first release shipped these parts:
 
-- Standard European puts and calls on assets that already have a live MetaFlux price feed. A put
+- Standard European puts and calls on assets that already have a running MetaFlux price feed. A put
   is cash-settled. A call is coin-settled: it escrows and pays one unit of the underlying, so its
   underlying needs a spot token.
 - Full collateralization. The holder pays the premium. The writer escrows the worst case.
@@ -95,7 +95,7 @@ that carries it is an open design question.
 
 ## Current state {#what-exists}
 
-The collateralized lane is live: the series registry, the RFQ trade path, the escrow lifecycle
+The collateralized lane is active: the series registry, the RFQ trade path, the escrow lifecycle
 and the expiry settlement. See [Options](../products/options.md).
 
 Everything that needs an option value is not built: a margined option position, portfolio
@@ -106,7 +106,7 @@ volatility. The three constraints above are open. The shipped lane needs none of
 
 - [MIP-3 — Permissionless perp market deploy](./mip-3.md): the deploy pattern that a
   permissionless options market can follow later
-- [Options](../products/options.md): the live product
+- [Options](../products/options.md): the active product
 - [RFQ](../concepts/rfq.md): the only trade path into it
 - [Perpetuals](../products/perpetuals.md): the other derivative, on its own margin account
 - [MIP-6 — Outcomes / prediction markets](./mip-6.md): the other deferred payoff primitive

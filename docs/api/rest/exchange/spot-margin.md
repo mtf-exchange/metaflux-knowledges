@@ -12,7 +12,7 @@ shape. These apply to every action here.
 
 The page covers leveraged [spot margin](../../../products/spot-margin.md) and
 its [Earn](../../../concepts/earn.md) lending supply side. These actions are
-live on testnet. All of them are sender-authorized and return the
+active on testnet. All of them are sender-authorized and return the
 [`202 Accepted`](../exchange.md#202-accepted--non-order-admission) admission
 envelope.
 
@@ -26,7 +26,7 @@ exactly 0. The principal stays redeemable up to the idle liquidity of the pool.
 ### Open a leveraged spot position {#spot_margin_open}
 
 :::info
-**Live on testnet.** The position is [cross-collateralized](spot-margin.md) against your unified USDC account. Forced liquidation is active (see [Liquidation](../../../products/spot-margin.md#liquidation)). **A pair is enabled only after governance calibrates its risk parameters, and no pair is calibrated yet.** Until then, this action fails with `spot margin not enabled for pair`.
+**Active on testnet.** The position is [cross-collateralized](spot-margin.md) against your unified USDC account. Forced liquidation is active (see [Liquidation](../../../products/spot-margin.md#liquidation)). **A pair is enabled only after governance calibrates its risk parameters, and no pair is calibrated yet.** Until then, this action fails with `spot margin not enabled for pair`.
 :::
 
 This action opens a leveraged long. It borrows `borrow` quote from the Earn pool
@@ -99,7 +99,7 @@ IOC is a committed effect. Read the resulting `borrowed` and `base_held` with
 ### Close a leveraged spot position {#spot_margin_close}
 
 :::info
-**Live on testnet.** See the [Spot margin & Earn](spot-margin.md) overview for the cross-collateralized model.
+**Active on testnet.** See the [Spot margin & Earn](spot-margin.md) overview for the cross-collateralized model.
 :::
 
 This action closes the position. It sends an IOC sell of the held base at no
@@ -157,7 +157,7 @@ longer appears there. The effects on suppliers show on
 ### Supply quote into the Earn pool {#earn_deposit}
 
 :::info
-**Live on testnet.** Yield is zero until governance votes a nonzero borrow rate. See the [Spot margin & Earn](spot-margin.md) overview.
+**Active on testnet.** Yield is zero until governance votes a nonzero borrow rate. See the [Spot margin & Earn](spot-margin.md) overview.
 :::
 
 This action supplies quote into a lending pool. You receive pool shares priced
@@ -200,7 +200,7 @@ envelope. Confirm the minted shares and your stake with
 ### Redeem Earn pool shares {#earn_withdraw}
 
 :::info
-**Live on testnet.** Yield is zero until governance votes a nonzero borrow rate. See the [Spot margin & Earn](spot-margin.md) overview.
+**Active on testnet.** Yield is zero until governance votes a nonzero borrow rate. See the [Spot margin & Earn](spot-margin.md) overview.
 :::
 
 This action redeems pool shares back to quote and pays your spendable balance.

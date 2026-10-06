@@ -1,5 +1,5 @@
 ---
-description: The trading products MetaFlux supports, with the status of each and a link to its mechanics. Perpetuals, spot and options are live; spot margin is a testnet preview; CDS is planned.
+description: The trading products MetaFlux supports, with the status of each and a link to its mechanics. Perpetuals, spot and options are active; spot margin is a testnet preview; CDS is planned.
 ---
 
 # Products
@@ -14,10 +14,10 @@ share, such as order types, margin, liquidation and fees, see [Concepts](../conc
 
 | Product | Description | Status |
 |---|---|---|
-| [Perpetuals](./perpetuals.md) | A leveraged long or short position on the price of an asset. It has no expiry. Funding anchors its price. | Live |
-| [Spot](./spot.md) | A token-for-token CLOB. Trades settle against your balance. There is no leverage. | Live |
+| [Perpetuals](./perpetuals.md) | A leveraged long or short position on the price of an asset. It has no expiry. Funding anchors its price. | Active |
+| [Spot](./spot.md) | A token-for-token CLOB. Trades settle against your balance. There is no leverage. | Active |
 | [Spot margin](./spot-margin.md) | Leveraged spot. The [Earn](../concepts/earn.md) lending pool funds the borrow. | Testnet preview. No pair is calibrated for borrowing yet. |
-| [Options](./options.md) | Standard European puts and calls. They are fully collateralized and trade through [RFQ](../concepts/rfq.md) only. A put settles in USDC. A call settles in the underlying coin. | Live. Validators list each series by vote. |
+| [Options](./options.md) | Standard European puts and calls. They are fully collateralized and trade through [RFQ](../concepts/rfq.md) only. A put settles in USDC. A call settles in the underlying coin. | Active. Validators list each series by vote. |
 | [CDS](./cds.md) | Protection contracts in the style of a credit default swap. | Planned |
 
 ## Sharia compliance {#sharia}

@@ -37,7 +37,7 @@ Each concept links to a fuller explanation.
 
 Perpetual and spot. A *spot* trade swaps one asset for another, and you own the result. A *perpetual future* (perp) is a contract that tracks the price of an asset. You profit from price moves up or down without owning the asset. A perp has no expiry date, so the position stays open while it stays healthy. Most leveraged trading on MetaFlux uses perps.
 
-The order book. The order book is the live list of all buy and sell offers for a market, sorted by price. A trade happens when a buy offer meets a sell offer at the same price. A *market order* takes the best price available now. A *limit order* waits at a price you set. MetaFlux supports many [order types](concepts/order-types.md) on top of these two.
+The order book. The order book is the current list of all buy and sell offers for a market, sorted by price. A trade happens when a buy offer meets a sell offer at the same price. A *market order* takes the best price available now. A *limit order* waits at a price you set. MetaFlux supports many [order types](concepts/order-types.md) on top of these two.
 
 Leverage and margin. *Margin* is the collateral that backs a position. *Leverage* lets that collateral control a larger position: with 10x leverage, a $100 deposit holds a $1,000 position. Leverage amplifies gains and losses equally. Your *margin mode* sets how collateral is shared or separated between positions. See [margin modes](concepts/margin-modes.md).
 

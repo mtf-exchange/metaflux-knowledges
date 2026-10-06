@@ -34,6 +34,6 @@ problem is the reason that on-chain credit products are rare.
 
 ## See also {#see-also}
 
-- [Perpetuals](./perpetuals.md): the leveraged-derivatives market that is live today.
+- [Perpetuals](./perpetuals.md): the leveraged-derivatives market that is available today.
 - [MIP-6](../mip/mip-6.md): the shared problem of on-chain resolution.
 - [Improvement proposals](../mip/index.md): where a new market type gets its specification.

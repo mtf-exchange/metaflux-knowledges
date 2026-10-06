@@ -13,7 +13,7 @@ This page covers five migrations, newest first. None of them changes a signed `/
 ## The account-state lane split {#account-state-lane-split}
 
 :::info
-Live. The node answers the four-lane shape and serves `clearinghouse_state` and `option_state`. A 0.9.6 node does both.
+Active. The node answers the four-lane shape and serves `clearinghouse_state` and `option_state`. A 0.9.6 node does both.
 :::
 
 :::info
@@ -289,12 +289,12 @@ Rows share the un-ranged [`trades`](../api/rest/info/perpetuals.md#trades) shape
   "spot": { "pairs": [ /* … */ ], "tokens": [ /* … */ ] } } }
 ```
 
-Each `perp[]` element carries only the dynamic fields of a market. The static fields (precision grids, leverage and margin ladders, trade-control flags) live separately on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), joined on `(coin, kind)`.
+Each `perp[]` element carries only the dynamic fields of a market. The static fields (precision grids, leverage and margin ladders, trade-control flags) sit separately on [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), joined on `(coin, kind)`.
 
 ## 7. WebSocket changes {#7-websocket-changes}
 
 - The `web_data2` channel is removed. See the replacement above.
-- `trades`: `data` is an array. The on-subscribe frame (`is_snapshot: true`) is a non-empty array of recent prints. It is empty only if the market never traded. Snapshot rows carry `users: null`. Live pushes carry `users: [taker, maker]`.
+- `trades`: `data` is an array. The on-subscribe frame (`is_snapshot: true`) is a non-empty array of recent prints. It is empty only if the market never traded. Snapshot rows carry `users: null`. Real-time pushes carry `users: [taker, maker]`.
 - `user_fundings`: records now carry `{coin, payment, szi, fundingRate, time}`. `payment` is signed whole-USDC: negative means paid, positive means received.
 - `explorer_txs` and `explorer_block` are removed. Read [`recent_transactions`](../api/rest/info/chain.md#recent_transactions) and [`recent_blocks`](../api/rest/info/chain.md#recent_blocks) instead. See [Ids and wire shapes](./ids-and-wire-shapes.md#explorer-channels-removed).
 - `order_updates`: on a `filled` record, `order.sz` is the filled size and `order.orig_sz` is the original order size.

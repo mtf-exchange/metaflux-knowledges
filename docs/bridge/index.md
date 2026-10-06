@@ -193,7 +193,7 @@ The contracts hold Circle's USDC: Base Sepolia `0x036CbD…f3dCF7e`, Arbitrum Se
 - A dual dispute window of 300 s and 150 blocks.
 - Domain-separated, epoch-bound signatures.
 
-The contracts and the deploy runbook live in the
+The contracts and the deploy runbook are in the
 [`mtf-exchange/metaflux-contracts`](https://github.com/mtf-exchange/metaflux-contracts)
 repository. The L1-side co-signature and credit logic stays on the node. These are pre-audit
 testnet contracts. Do not use them for value.

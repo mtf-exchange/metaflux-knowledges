@@ -79,7 +79,7 @@ So an account that reads `withdrawable: "0"` can still have an order rejected. S
 
 `update_leverage` rejects any request above 100×. A market listed through
 [MIP-3](../mip/mip-3.md) has a separate cap of 50× when it is deployed, so most markets are well
-under the 100× ceiling. Read the live value from a market's fields on
+under the 100× ceiling. Read the current value from a market's fields on
 [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta). Do not assume either number.
 
 Rounding is up, so a remainder always tightens the gate. `reduce_only` orders skip the gate,
@@ -89,9 +89,9 @@ because they only reduce exposure.
 open position. This is the same per-position term, with the cushion. Isolated positions are not
 in the sum, because their collateral is the separately posted bucket.
 
-This gate applies to every live order path that can open new exposure: `submit_order` /
+This gate applies to every active order path that can open new exposure: `submit_order` /
 `batch_order` (limit, IOC, ALO), `scale_order`, `chase_order`, `twap_order` and an accepted RFQ
-quote (`rfq_accept`). Frequent batch auctions (FBA) are not a live exposure path today, because no
+quote (`rfq_accept`). Frequent batch auctions (FBA) are not an active exposure path today, because no
 market has FBA armed.
 
 ### Maintenance margin and health {#maintenance-margin--health}
@@ -109,7 +109,7 @@ a health of 9752x.
 
 - `account_value` = `cross_account_value` (free balance ± unrealized PnL), signed.
 - `cross_maintenance_margin_used` = the sum of `|entry_notional| × maint_margin_ratio` over every
-  held cross position leg, derived live from positions. When
+  held cross position leg, derived from current positions. When
   [portfolio margin](./portfolio-margin.md) is enrolled, it is the PM number
   (`last_computed_pm_cents / 100`). An isolated leg is judged against its own bucket and is not in
   this sum.
@@ -119,7 +119,7 @@ a health of 9752x.
 
 The per-asset maintenance ratio is the market's dynamic-risk override, when governance has set
 one. Otherwise it is the protocol's baseline maintenance ratio, a governed parameter
-(`set_risk_base_maint_ratio`). Read the live value from a market's `maint_margin_ratio` field on
+(`set_risk_base_maint_ratio`). Read the current value from a market's `maint_margin_ratio` field on
 [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta), and its `risk_override` when
 governance has set one. Never assume a fixed percentage. The derived forced-close slippage floor
 is half the effective ratio, unless an explicit override sets it.
@@ -129,7 +129,7 @@ maintenance floor before liquidation. The ratio `account_value / cross_maintenan
 picks the band. At or above 1.1 the account is clear. Below that, the
 [liquidation ladder](./tiered-liquidation.md) applies at 1.1 / 1.0 / 0.8 / 0.667. Read those four
 numbers against the ratio, never against the `health` field. The 1.1, 0.8 and 0.667 edges are
-governed values, so read them live. Do not pin them.
+governed values, so read them at run time. Do not pin them.
 
 The arithmetic is exact fixed-point throughout, with no floating point on this path. At extreme
 account values, the tier decision scales both operands down by the same factor before it divides.
@@ -207,7 +207,7 @@ arrives. It never shows up as a held-initial-margin subtrahend, because
 [`held_initial_margin`](#initial-margin-pre-trade-gate) sums cross legs only. If you open the same
 209,950 notional position isolated instead of cross, the account read differs on this leg only:
 
-- `margin` still reads the leg's own bucket balance, not a ceiling recomputed live. If you add to
+- `margin` still reads the leg's own bucket balance, not a ceiling recomputed at run time. If you add to
   the bucket or let it drain, `margin` follows the balance.
 - `maint_margin` is the same `"5248.75"`. The ratio and the notional it applies to do not depend
   on the margin mode.
@@ -330,7 +330,7 @@ user tries to open cross.
 
 The `onlyIsolated` deploy-time flag is fixed once, when a [MIP-3](../mip/mip-3.md) market is
 created. The governance strict-isolated flag is different: a later vote can turn it on or off on a
-live market as its risk profile changes.
+running market as its risk profile changes.
 
 ## Choosing a mode {#when-to-use-each}
 

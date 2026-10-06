@@ -174,7 +174,7 @@ The asset in the transfer and your balance of it are not the cause. If you hold 
 ### Send a token to MetaFluxEVM with a payload {#send_to_evm_with_data}
 
 :::info
-Live. An older version of this notice (2026-08-19) said that the network refused the action and told you to use [`core_evm_transfer`](#core_evm_transfer). That stopped being true when the lane was restored and released. Everything below describes what runs today.
+Active. An older version of this notice (2026-08-19) said that the network refused the action and told you to use [`core_evm_transfer`](#core_evm_transfer). That stopped being true when the lane was restored and released. Everything below describes what runs today.
 :::
 
 `send_to_evm_with_data` moves a token from the Core ledger to MetaFluxEVM. It can also run an EVM payload against the recipient afterwards. It uses the same lane and gives the same credit as [`core_evm_transfer`](#core_evm_transfer). It is that move in the Hyperliquid-compatible field shape.
@@ -255,7 +255,7 @@ Both actions debit the exchange ledger of the sender and queue one credit. The n
 
 | | [`core_evm_transfer`](#core_evm_transfer) | `send_to_evm_with_data` |
 |---|---|---|
-| Availability | live at every height | live |
+| Availability | available at every height | available |
 | Field shape | MTF-native (`asset`, `destination`, `to_evm`) | Hyperliquid-compatible (`token`, `destination_recipient`, `source_dex`, `to_perp`) |
 | Ledger it debits | `asset: 0` debits the perp collateral pool, gated on free collateral. A non-zero `asset` debits the spot ledger | always the spot ledger, `token: 0` included |
 | Can move USDC held as collateral | yes. This is the lane for it | no |
@@ -264,7 +264,7 @@ Both actions debit the exchange ledger of the sender and queue one credit. The n
 | A zero recipient | refused (`zero destination`) | refused (`zero destination`) |
 | The MTF fee | [the same fee](#core-evm-fee), `0` today | [the same fee](#core-evm-fee), `0` today |
 
-Use `core_evm_transfer` unless you port a client that already builds the Hyperliquid field shape. Both are live. `core_evm_transfer` keeps an existing signature byte-identical through its omittable fields. It is also the only one of the two that can move USDC out of the perp collateral pool.
+Use `core_evm_transfer` unless you port a client that already builds the Hyperliquid field shape. Both are active. `core_evm_transfer` keeps an existing signature byte-identical through its omittable fields. It is also the only one of the two that can move USDC out of the perp collateral pool.
 
 This is a non-order action. It returns the [`202 Accepted` admission envelope](../exchange.md#202-accepted--non-order-admission):
 
@@ -399,7 +399,7 @@ Two cautions apply:
 
 The disable height is `0` on both testnet and mainnet. The commit has refused this action since genesis. No height changes this, and no release turns it on.
 
-Use [`bridge_withdraw`](#bridge_withdraw). It is the only live path out of the chain, it carries a real destination address, and it is gated on free collateral.
+Use [`bridge_withdraw`](#bridge_withdraw). It is the only active path out of the chain, it carries a real destination address, and it is gated on free collateral.
 :::
 
 The tag stays on the wire so that old fixtures still decode. Its four fields are `asset`, `amount`, `destination_chain_id` and `use_cctp`. All four are required at decode. This page lists them only so that a reader can identify the action. They are not a shape to build against. Do not implement the signed digest, `MetaFluxTransaction:Withdraw`.
@@ -417,11 +417,11 @@ The draft action names below are not wired on the MTF-native `/exchange` handler
 | `Order` (multi) / `Cancel` (multi) | — | Single and batch are distinct tags | [`submit_order`](./orders.md#submit_order) + [`batch_order`](./orders.md#batch_order); [`cancel_order`](./orders.md#cancel_order) + [`batch_cancel`](./orders.md#batch_cancel) |
 | `UpdateMarginMode` | — | No native action | `is_isolated` flag on [`update_leverage`](./margin-risk.md#update_leverage) |
 | `MultiSig` | `multi_sig` | Bridged and executing. Post it as a normal `multi_sig` envelope | [`multi_sig`](./account.md#multi_sig) acts. [`convert_to_multi_sig_user`](./account.md#convert_to_multi_sig_user) registers the roster |
-| `RegisterReferrer` | `register_referral_code` | Bridged and live since [block 25,599,540](../../../changelog/block-25599540.md#referral-program). Referral codes are on since 2026-10-05 | [`register_referral_code`](./account.md#register_referral_code) registers a code. [`set_referrer_by_code`](./account.md#set_referrer_by_code) binds to it. [`set_referrer`](./account.md#set_referrer) binds by address |
+| `RegisterReferrer` | `register_referral_code` | Bridged and active since [block 25,599,540](../../../changelog/block-25599540.md#referral-program). Referral codes are on since 2026-10-05 | [`register_referral_code`](./account.md#register_referral_code) registers a code. [`set_referrer_by_code`](./account.md#set_referrer_by_code) binds to it. [`set_referrer`](./account.md#set_referrer) binds by address |
 | `UsdcTransfer` / `SpotTransfer` | — | The user-to-user transfer flows are not bridged | — |
 | `WithdrawUsdc` | [`withdraw`](#withdraw) | Retired. The node recognizes and admits it, then rejects it at commit with `"withdraw3 disabled; use bridge_withdraw"`. The disable height is `0`, so it has never succeeded here | [`bridge_withdraw`](#bridge_withdraw) withdraws USDC cross-collateral externally |
-| (BOLE pool) | `borrow_lend` | Bridged and live. `params.kind` `"Lend"`, `"UnLend"` and `"Repay"` are open to any account. The node refuses `"Borrow"` unless the sender is an approved liquidator | — |
-| (vault distribute) | `vault_distribute` | Bridged and live. It is the self-service deposit of a follower | [vaults](../../../concepts/vaults.md#depositing) |
+| (BOLE pool) | `borrow_lend` | Bridged and active. `params.kind` `"Lend"`, `"UnLend"` and `"Repay"` are open to any account. The node refuses `"Borrow"` unless the sender is an approved liquidator | — |
+| (vault distribute) | `vault_distribute` | Bridged and active. It is the self-service deposit of a follower | [vaults](../../../concepts/vaults.md#depositing) |
 | (Earn pool config) | `create_earn_pool` | Validator governance, never a user action. `createEarnPool` (201) is a ⅔-stake vote that goes through node governance. It is the only way for an Earn pool to get a non-zero borrow rate. See [why that matters](../exchange.md#spot-margin--earn) | [`earn_deposit`](./spot-margin.md#earn_deposit) creates a pool at rate `0` |
 | (PM lifecycle) | `pm_enroll` / `pm_unenroll` | `pm_enroll` has no native tag. `pm_unenroll` is a bridged alias (no params) for the `enroll:false` form of the canonical action. `pm_rebalance` is retired, and the node rejects it as an unknown action | [`user_portfolio_margin`](./margin-risk.md#user_portfolio_margin) |
 | (cross-chain) | — | Not an `/exchange` action at all. It is not in the action enum. It fails decode and returns `400` `INVALID_REQUEST` (`unknown variant`), not `ACTION_UNSUPPORTED` | [`CrossChainSend`, CoreWriter action 19](../../../evm/interacting-with-core.md). It is a MetaFluxEVM call, not an `/exchange` post |

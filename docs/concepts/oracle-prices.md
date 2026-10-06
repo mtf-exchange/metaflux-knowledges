@@ -66,11 +66,11 @@ underlying is closed. The protocol supports both answers.
 - **Push through the closed hours**, at the price that your own discovery produces, and the market
   trades continuously. A push must land at least once per staleness window
   (`stale_threshold_ms`; read it from the operator read `mip3_deployer_oracle`; **60 s** on the
-  live chain), for every market that you operate.
+  running chain), for every market that you operate.
 - **Or stop, and let the market freeze.** After the window, the market goes reduce-only, so no one
   can open, and liquidation waits instead of running at a price nobody trusts. Open positions do
   not change until a fresh push arrives. For an instrument that has no price overnight, for example
-  an equity index over a weekend, this is a correct state, not an outage. Several live markets use
+  an equity index over a weekend, this is a correct state, not an outage. Several active markets use
   it.
 
 Do not push a price that you do not believe. The push is bounded, but inside those bounds the

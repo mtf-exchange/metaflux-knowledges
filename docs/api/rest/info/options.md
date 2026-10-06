@@ -15,8 +15,8 @@ apply to every query here.
 This read returns every active [option](../../../products/options.md) series,
 oldest series first.
 
-:::info Live
-The standard European option lane is live. An active series has a `kind` of
+:::info Active
+The standard European option lane is active. An active series has a `kind` of
 `"put"` or `"call"` only, has `settle_asset`, and has no `cap` field. The
 capped-call lane and its third `kind` token are removed. See
 [what changed](../../../products/options.md#what-changed).

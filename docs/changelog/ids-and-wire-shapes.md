@@ -1,5 +1,5 @@
 ---
-description: Every row on this page is live. One release turned every `oid` and `tid` into a decimal-digit string, gave `order_status` all its fill legs and real terminal states, labeled the token a fill's fee is charged in, put margin and funding on one plane, rejected four inputs that used to pass, removed the two explorer WS channels, made EVM receipts and logs survive a restart, and stopped the EVM RPC answering a non-tip block reference with the tip.
+description: Every row on this page is active. One release turned every `oid` and `tid` into a decimal-digit string, gave `order_status` all its fill legs and real terminal states, labeled the token a fill's fee is charged in, put margin and funding on one plane, rejected four inputs that used to pass, removed the two explorer WS channels, made EVM receipts and logs survive a restart, and stopped the EVM RPC answering a non-tip block reference with the tip.
 ---
 
 # Ids and wire shapes
@@ -7,7 +7,7 @@ description: Every row on this page is live. One release turned every `oid` and 
 This page records the changes to ids and wire shapes that one release made, and when.
 
 :::tip
-Every row below is live. Each row was measured on the public testnet after the release landed.
+Every row below is active. Each row was measured on the public testnet after the release landed.
 
 The page is for anyone whose client still assumes the old shapes. If your client reads `tid` as a JSON number, or treats a spot `taker_fee_bps` of `null` as a zero rate, read [Ids become decimal-digit strings](#id-strings) and [The spot taker fee](#spot-taker-fee). These two rows corrupt data silently and raise no error.
 
@@ -21,7 +21,7 @@ One release moves every row below at one boundary. Each row is something that a 
 This row corrupts data today. `tid` is a 64-bit hash-derived value. It is already past 2^53, so a JSON number cannot carry it into JavaScript:
 
 ```
-live wire:         "tid": 16613428288414605024
+current wire:      "tid": 16613428288414605024
 after JSON.parse:         16613428288414605000     <- off by 24
 > MAX_SAFE_INTEGER:       true
 ```
@@ -54,13 +54,13 @@ Two things do not change on purpose:
 
 An `oid` inside a signed action payload is unchanged. The typed digest binds `uint64 oid`, and re-typing it would re-shape signing for every client at once. That is out of scope here.
 
-The residual risk is small. `oid` is a counter, about 32.5 million today, so it is four orders of magnitude below 2^53 and there is no live problem. If it ever approaches that limit, the signed cancel path needs its own decision. That decision is a signing change, not a read change.
+The residual risk is small. `oid` is a counter, about 32.5 million today, so it is four orders of magnitude below 2^53 and there is no current problem. If it ever approaches that limit, the signed cancel path needs its own decision. That decision is a signing change, not a read change.
 
 ## `order_status` reports every fill leg, and real terminal states {#order-status}
 
 The `order_status` read had two defects.
 
-It returned one fill leg and did not mark it as partial. Measured on the live chain: order `32535358` filled `0.62` and then `0.87`. The read served `0.62`. That is wrong by 58%, and nothing in the response said that a second leg existed.
+It returned one fill leg and did not mark it as partial. Measured on the running chain: order `32535358` filled `0.62` and then `0.87`. The read served `0.62`. That is wrong by 58%, and nothing in the response said that a second leg existed.
 
 Five different outcomes also answered identically. Canceled, cancel-rejected, rejected, evicted from the ring and never existed all returned a byte-identical `{"status":"unknown"}`. No integrator can reconcile an order book against that.
 
@@ -111,19 +111,19 @@ Compare `total_filled_sz` with the size of the order to tell a full fill from a 
 | `time` | uint64 | Consensus ms the order reached this state |
 | `reason` | string \| `null` | The refusal text. `null` on a successful cancel. Branch on `status`, never on this string |
 
-The three tokens mean different things. `cancel_rejected` says that the cancel request failed, because the order had already left the live view of this node. `canceled` says that the cancel succeeded. `rejected` says that the chain refused the order at admission.
+The three tokens mean different things. `cancel_rejected` says that the cancel request failed, because the order had already left the open view of this node. `canceled` says that the cancel succeeded. `rejected` says that the chain refused the order at admission.
 
 `expired` does not exist. An earlier draft of this page named it. No node path writes it, so the reference and both SDKs no longer list it. Do not code a branch for it.
 
 `sz`, `filled_sz` and `cloid` are not on `outcome`. An earlier draft listed them. Two rules put them out of reach. A fill resolves before the terminal window, so an order that reaches `outcome` has no fills and `filled_sz` could only read `"0"`. The cancel event that the node records carries the id, the market and the time, not the size.
 
-`outcome` is a separate key from the `order` of a live resting hit on purpose. The two answer different questions, and one name over two field sets is how a caller reads the wrong one.
+`outcome` is a separate key from the `order` of an open resting hit on purpose. The two answer different questions, and one name over two field sets is how a caller reads the wrong one.
 
 An `unknown` answer carries `outcome_coverage`, the count of orders that the terminal window holds. A `0` means that the window is empty after a restart, so the `unknown` says nothing about the order that you asked for.
 
 ### `cloid` keeps resolving after the fill {#order-status-cloid}
 
-A `cloid` lookup used to fail as soon as the write completed. The fill ring is keyed by `oid` and carried no cloid, so a `cloid` stopped resolving when the order filled. The node now carries the cloid into its read-side rings. A `cloid` resolves a filled order and a terminal order as well as a live order.
+A `cloid` lookup used to fail as soon as the write completed. The fill ring is keyed by `oid` and carried no cloid, so a `cloid` stopped resolving when the order filled. The node now carries the cloid into its read-side rings. A `cloid` resolves a filled order and a terminal order as well as an open order.
 
 ### `unknown` means "outside this node's retention view" {#order-status-unknown}
 
@@ -146,7 +146,7 @@ Read it before you sum `fee` across an account. The rule is:
 | A spot SELL (`side: "A"`) | `"USDC"` |
 | A spot BUY (`side: "B"`) | the base token. A `BTC/USDC` buy pays its fee in BTC |
 
-The spot-buy rule has been live since block 6,565,000. Below that height, the chain charged the fee in USDC, so a fill older than the pin carries `"USDC"` on both sides. `fee_token` is derived per record, so an old record and a new one each report the truth for their own height. Nothing committed changes.
+The spot-buy rule has been in effect since block 6,565,000. Below that height, the chain charged the fee in USDC, so a fill older than the pin carries `"USDC"` on both sides. `fee_token` is derived per record, so an old record and a new one each report the truth for their own height. Nothing committed changes.
 
 Without this field, a sum of `fee` over a spot account adds one token to another and produces a meaningless number.
 
@@ -169,7 +169,7 @@ Two things hid this rule. Both change:
 
 ## Margin and funding stop crossing planes {#one-plane}
 
-One response carried the same rung twice, under the same field name, ten thousand times apart. Measured live on BTC:
+One response carried the same rung twice, under the same field name, ten thousand times apart. Measured on BTC:
 
 ```json
 "margin_tiers":    [ { "maint_margin_ratio": "50" } ],
@@ -260,11 +260,11 @@ The read now has data. The record shape is the one that this reference already l
 
 The read serves a node-local retention window, with the same caveat as the terminal order states above. A node restart empties it, and an empty window after a restart is not the same fact as "this account has never run a TWAP". The read carries its coverage envelope so that you can tell the two apart.
 
-The [WS channel](../api/ws/subscriptions.md#user_twap_slice_fills) of the same name is unchanged and remains the live path.
+The [WS channel](../api/ws/subscriptions.md#user_twap_slice_fills) of the same name is unchanged and remains the real-time path.
 
 ## The EVM JSON-RPC keeps receipts, and stops answering the wrong block {#evm-rpc}
 
-This section has three rows. All three are live, and all three were measured again after the release.
+This section has three rows. All three are active, and all three were measured again after the release.
 
 ### Receipts survive a restart, and a release {#evm-receipts-durable}
 

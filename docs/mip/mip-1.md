@@ -56,7 +56,7 @@ refuses a deploy in three cases:
 - The reference price and the last print differ by more than the band.
 - The amount rounds to zero base units.
 
-The price comes from a band-clamped anchor and not from the live book. A trader who lifts the
+The price comes from a band-clamped anchor and not from the current book. A trader who lifts the
 pair for one block therefore cannot buy a cheap listing.
 :::
 

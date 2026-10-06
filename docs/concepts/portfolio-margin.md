@@ -4,7 +4,7 @@ This page explains portfolio margin (PM): how the chain computes it, who can enr
 changes liquidation.
 
 :::info
-**Live on testnet.** The scenario engine is fully operational. Users enroll with the
+**Active on testnet.** The scenario engine is fully operational. Users enroll with the
 `user_portfolio_margin` action. Enrollment is equity-gated, with a default of 100 K USDC or more.
 The SPAN-style scenario grid (±5/10/20 % price × ±20/50 % vol) computes maintenance in real time.
 The action surface and the scenario engine are both shipped and tested on a 4-node consensus run.
@@ -222,7 +222,7 @@ You do not request this per position. No action marks one of your positions stri
 per-market flag that governance sets by a stake-weighted vote. The flag forces every position newly
 opened on that market into strict-iso, whatever the PM enrollment of the trader. See
 [margin modes: governance-imposed strict isolation](./margin-modes.md#governance-imposed-strict-isolation-market-level)
-for the full mechanism. Check the live metadata of a market before you assume your position on it
+for the full mechanism. Check the current metadata of a market before you assume your position on it
 nets inside PM.
 
 ## Liquidation under PM {#liquidation-under-pm}
@@ -367,7 +367,7 @@ yet a surfaced field (see the note above).
 **Q: Do MIP-3 listings get PM credit?**
 A: The engine has no per-pair correlation matrix (see [How PM works](#how-pm-works)). Every
 enrolled position nets through the same scenario grid, unless governance flags its market
-strict-isolated, which excludes it. Check the live `strict_isolated` field of a market on
+strict-isolated, which excludes it. Check the current `strict_isolated` field of a market on
 [`markets_meta`](../api/rest/info/perpetuals.md#markets_meta). New long-tail listings are likely
 candidates for that flag.
 

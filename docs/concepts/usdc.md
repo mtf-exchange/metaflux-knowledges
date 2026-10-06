@@ -126,7 +126,7 @@ Cancel the bid and the escrow returns to the pool.
 ## The standard-mode split {#standard-split}
 
 :::info
-**Live from node 0.9.7, block 5,710,001.** An account already in `standard` at the swap keeps one
+**In effect from node 0.9.7, block 5,710,001.** An account already in `standard` at the swap keeps one
 balance until it leaves the mode and enters again.
 :::
 
@@ -188,7 +188,7 @@ needs no gate.
 The bridge withdraw fee is a governance parameter in 6-decimal units. The chain withholds it from
 the released amount. You are debited the gross `amount`, the outbound message carries the net, and
 the difference accrues to the protocol. The action rejects when `amount` does not exceed the fee.
-This page does not publish the live fee value. Read the rejection, or quote the withdrawal in your
+This page does not publish the current fee value. Read the rejection, or quote the withdrawal in your
 client and compare the gross amount with the released amount.
 
 ## Precision by surface {#precision}
@@ -297,7 +297,7 @@ bridge. Two thirds of active validator stake co-sign it. There is no Circle CCTP
 
 ## Not covered here {#not-covered}
 
-- The live bridge withdraw-fee value. The mechanism is above. The number is a governance parameter,
+- The current bridge withdraw-fee value. The mechanism is above. The number is a governance parameter,
   and no `/info` read publishes it.
 - Per-chain USDC contract addresses. See the [bridge page](../bridge/index.md).
 - Non-USDC collateral. Cross-asset collateral haircuts belong to

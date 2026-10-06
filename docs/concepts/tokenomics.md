@@ -7,7 +7,7 @@ description: "The MTF token economic model: utility, fixed supply, allocation an
 This page describes the MTF token: its uses, its supply, how fees flow back to it and how staking works.
 
 :::info
-**Status.** The utility layer is built and live. It covers gas, staking discounts, consensus,
+**Status.** The utility layer is built and active. It covers gas, staking discounts, consensus,
 governance and the fee-driven buyback. The economic parameters below are final: total supply,
 allocation, vesting, fee split and the staking multiplier curve. Tier thresholds and the fee
 split are network parameters. Governance can tune them within the bounds in
@@ -36,7 +36,7 @@ down.
 
 ## Token utility {#token-utility}
 
-Everything in this section is live.
+Everything in this section is active.
 
 ### Gas on the EVM sidechain {#1-gas-on-the-evm-sidechain}
 
@@ -194,7 +194,7 @@ There is none. Staking yield comes from two non-dilutive sources:
 
 1. Validator bootstrap (early). The 80M bucket emits along a stake curve. The curve is flat at or
    below a floor stake and decays as `1/√stake` above it, so the budget lasts longer when more
-   MTF is staked. Read the current APR and its inputs from the live
+   MTF is staked. Read the current APR and its inputs from the current
    [`staking_state`](./staking.md#apr-estimation) path.
 2. Revenue share (ongoing). 20% of net fee revenue, converted to MTF on the book and paid to
    locked stakers through validators.
@@ -239,7 +239,7 @@ TRADERS ──fees──▶ COLLECTED FEES
 Three rings reinforce each other:
 
 - Lock ring. Volume produces fees, fees fund the buyback, and the buyback removes MTF
-  permanently. This is the primary value-accrual path. It is live.
+  permanently. This is the primary value-accrual path. It is active.
 - Yield ring. Volume funds the validator pool, the pool buys MTF, locked stakers earn that MTF,
   and the yield gives a reason to acquire and lock. Less MTF stays in the float.
 - Security ring. Locked MTF secures consensus. A more valuable token makes the chain more

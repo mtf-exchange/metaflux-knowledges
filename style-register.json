@@ -79,6 +79,13 @@
       "allowFiles": [
         "docs/networks.md"
       ]
+    },
+    {
+      "id": "live-word",
+      "pattern": "(?<![-#{\\w])(?:[Ll]ive|LIVE)(?![-\\w}])",
+      "flags": "g",
+      "control": "The feature is live.",
+      "say": "Do not write \"live\". Say what is true: active, in effect, available, current, running or real-time. \"Liveness\" and \"time-to-live\" are fine."
     }
   ]
 }

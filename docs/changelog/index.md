@@ -14,9 +14,9 @@ Read a page here when a client written against an older release fails, or when y
 
 One release moves every behavior at one height. The chain gains one boundary per release, not one per change. A page here covers a whole release, not a single field.
 
-The pin sits one block above the swap height. The outgoing binary commits the swap block and then halts, so that block still runs the old rules. A pin at the swap height itself would make the live chain and a replay of it disagree about that block.
+The pin sits one block above the swap height. The outgoing binary commits the swap block and then halts, so that block still runs the old rules. A pin at the swap height itself would make the running chain and a replay of it disagree about that block.
 
-`{"type":"account_state","address":"0x…"}` returns the live `height`. Use it to compare the chain with any boundary below.
+`{"type":"account_state","address":"0x…"}` returns the current `height`. Use it to compare the chain with any boundary below.
 
 ## Entries {#entries}
 

@@ -232,10 +232,10 @@ ring.
 | `fills[*].oid` | decimal-digit string | This party's order id |
 | `fills[*].tid` | decimal-digit string | Deterministic trade id, shared by both legs of the print. It is a 64-bit hash-derived value and often exceeds 2^53, so it is a string. A JSON number loses its low digits in JavaScript, and a join of `user_fills` to `trades` by `tid` then silently matches nothing. Compare it as a string, or convert it with `BigInt` |
 | `fills[*].fee` | Decimal string | Fee this party paid. Read `fee_token` for the denomination, because it is not always USDC. Warning: on a spot fill this field reads `"0"` on both legs today. The chain does charge the seller's USDC fee, and it leaves the unified balance. The spot lane records no fee on the fill, so the row cannot report it. Derive a spot fee from the balance delta, or from the pair's rate times the notional. Do not read `"0"` as free |
-| `fills[*].fee_token` | string | Coin symbol the `fee` is charged in. A perp fill and a spot sell pay `"USDC"`. A spot buy pays the base token, so a `BTC/USDC` buy pays its fee in BTC. That rule has been live since block 6,565,000. The field is derived per record, so an older fill correctly reports `"USDC"` on both sides. Without this field, a sum of `fee` across a spot account adds one token to another. On a spot buy it also shows that `fee` is not the whole charge. The base fee is netted out of the size delivered, not debited, so `fee` can read `"0"` while the real charge is the gap between `sz` and the balance credit. See [a spot buy pays its fee in the base token](../../../concepts/fees.md#spot-buy-fee-in-base) |
+| `fills[*].fee_token` | string | Coin symbol the `fee` is charged in. A perp fill and a spot sell pay `"USDC"`. A spot buy pays the base token, so a `BTC/USDC` buy pays its fee in BTC. That rule has been in effect since block 6,565,000. The field is derived per record, so an older fill correctly reports `"USDC"` on both sides. Without this field, a sum of `fee` across a spot account adds one token to another. On a spot buy it also shows that `fee` is not the whole charge. The base fee is netted out of the size delivered, not debited, so `fee` can read `"0"` while the real charge is the gap between `sz` and the balance credit. See [a spot buy pays its fee in the base token](../../../concepts/fees.md#spot-buy-fee-in-base) |
 | `fills[*].closed_pnl` | Decimal string | Realized PnL on the closed portion, decimal USDC (signed). Always `"0"` on a spot fill, because spot holds no position and realizes no PnL |
 | `fills[*].dir` | string | Direction label. A perp fill uses six tokens: `"Open Long"`, `"Close Long"`, `"Open Short"`, `"Close Short"`, and `"Long > Short"` or `"Short > Long"` when the fill crosses through zero. A spot fill uses `"Buy"` (side `"B"`) or `"Sell"` (side `"A"`). Spot holds no position, so no open or close token applies. Switch on `side` for spot and on this field for perps |
-| `fills[*].start_position` | Decimal string | Signed leg size before the fill, base units (whole-unit, signed). A spot fill holds no position leg, so the value is zero. It renders at the market's `sz_decimals`, the same plane as `sz`: a two-decimal market reads `"0.00"`. Live from node 0.9.7. An older node renders a bare `"0"` on a spot row |
+| `fills[*].start_position` | Decimal string | Signed leg size before the fill, base units (whole-unit, signed). A spot fill holds no position leg, so the value is zero. It renders at the market's `sz_decimals`, the same plane as `sz`: a two-decimal market reads `"0.00"`. In effect from node 0.9.7. An older node renders a bare `"0"` on a spot row |
 | `fills[*].block` | uint64 | Committed block height the fill settled in |
 | `fills[*].cause` | string | Present only when this leg did not execute by its own order crossing. `"forced_close_partial"` and `"forced_close_full"` mean the liquidation ladder. `"forced_close_isolated"` means an isolated leg breached its own bucket. `"forced_close_governance"` means a validator-quorum forced close settled against the book. `"trigger"` means a TP/SL fired. `"twap"` means a TWAP slice. Absent on an ordinary fill and on every maker leg, because a counterparty that was only hit is not itself forced. `forced_close_governance` is a forced close that is not a liquidation. It charges no liquidation fee and does not count toward liquidation totals |
 | `fills[*].liquidated_user` | hex address | Present on a forced-close leg only, on both sides of the print. The account whose position was closed. A taker can see whose liquidation it absorbed |
@@ -261,7 +261,7 @@ ring.
 
 #### Aggregated rows: `aggregate` {#user_fills-aggregate}
 
-This feature is live from node 0.9.7. An older node does not reject `aggregate`. It ignores
+This feature is active from node 0.9.7. An older node does not reject `aggregate`. It ignores
 the field and returns the per-leg rows with no `n` key, and a caller cannot see
 this failure. Detect it by the presence of `n`, never by the row count. A
 response whose rows carry no `n` came from a node without this feature. A folded
@@ -333,7 +333,7 @@ Or by client order id:
 
 If neither field is present, the read returns `400 INVALID_REQUEST`. A
 malformed `cloid` returns `400`. Resolution stops at the first hit, in this
-order: live resting order, then parked trigger, then the fills of the order, then terminal outcome, then unknown.
+order: resting order, then parked trigger, then the fills of the order, then terminal outcome, then unknown.
 
 A `cloid` resolves at every one of those stages. It used to stop resolving when
 the write completed: the fill ring is keyed by `oid` and carried no cloid, so a
@@ -358,7 +358,7 @@ change.
 
 The `data.status` field discriminates which shape follows.
 
-`"resting"` is a live order open in a perp or spot book:
+`"resting"` is an order open in a perp or spot book:
 
 ```json
 {
@@ -448,7 +448,7 @@ carries neither:
 
 `fills` is a list because an order can fill in more than one print. The read
 used to serve a single `fill` object that held one arbitrary leg, with nothing to
-mark it partial. Measured live, order `32535358` filled `0.62` and then `0.87`,
+mark it partial. Measured on testnet, order `32535358` filled `0.62` and then `0.87`,
 and the read answered `0.62`, which is wrong by 58%. Compare `total_filled_sz` with the
 size of the order to tell a full fill from a partial one. To get one leg,
 read `fills[0]`.
@@ -489,7 +489,7 @@ prose and its wording changes:
 | Token | What it means |
 |-------|---------------|
 | `canceled` | The cancel ran and succeeded. `reason` is `null` |
-| `cancel_rejected` | The cancel request failed. The order had already left the live view of this node. The order is gone, and the cancel did not run. `reason` carries the refusal text |
+| `cancel_rejected` | The cancel request failed. The order had already left the current view of this node. The order is gone, and the cancel did not run. `reason` carries the refusal text |
 | `rejected` | The node refused the order itself. It never rested and it never got an id, so only `cloid` reaches it, and `outcome.oid` is `null`. `reason` carries the refusal text |
 
 There is no `expired` token. No node path writes one. Do not code a branch

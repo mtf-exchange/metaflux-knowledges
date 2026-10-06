@@ -3,7 +3,7 @@
 Staking delegates MTF to a validator for a share of protocol fee revenue. This page describes the actions, the reward sources, lock and unbonding, and slashing.
 
 :::info
-**Live on testnet.** Deposit, delegation, undelegation, reward claims and
+**Active on testnet.** Deposit, delegation, undelegation, reward claims and
 validator registration are active, and they are verified end to end across
 consensus on testnet.
 :::
@@ -162,7 +162,7 @@ validator 20% funds this path.
 Two separate durations apply. Only one of them is a choice per delegation:
 
 - **Lock tier** (`lock_months`: `0`/`1`/`6`/`24`). You choose it when you delegate. A locked row cannot start unbonding before it matures. A flexible (`0`) row can undelegate at any time.
-- **Unbonding window.** Governance sets it: **7 days** on live testnet today. A vote can only raise it, never below a 7-day floor. It applies after the undelegation, for every lock tier. Read the maturity of your own entry from `pending_unstakes[].matures_at_ts` on [`staking_state`](../api/rest/info/vaults-staking.md#staking_state). Do not assume a fixed value.
+- **Unbonding window.** Governance sets it: **7 days** on testnet today. A vote can only raise it, never below a 7-day floor. It applies after the undelegation, for every lock tier. Read the maturity of your own entry from `pending_unstakes[].matures_at_ts` on [`staking_state`](../api/rest/info/vaults-staking.md#staking_state). Do not assume a fixed value.
 
 | State | Earns rewards? | Slashable? |
 |-------|:--------------:|:----------:|
@@ -218,12 +218,12 @@ Pick by:
 - **Commission** (`commission_bps`): lower commission gives a higher net APR. Look out for a validator that raises its commission later.
 - **Self-stake** (`self_stake`): higher self-stake means that the operator has more of its own stake at risk.
 - **Jail status** (`is_jailed`): a jailed validator earns nothing until it is unjailed.
-- **Active** (`is_active`): only validators with `is_active: true` are in the live signing set.
+- **Active** (`is_active`): only validators with `is_active: true` are in the current signing set.
 
 ## APR estimation {#apr-estimation}
 
 The [`staking_state`](../api/rest/info/vaults-staking.md#staking_state) `/info`
-query type is live. It returns the effective bootstrap-reward APR that the
+query type is active. It returns the effective bootstrap-reward APR that the
 begin-block reward effect applies, and its committed inputs:
 
 ```bash

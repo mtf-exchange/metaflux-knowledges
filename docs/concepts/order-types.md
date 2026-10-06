@@ -130,7 +130,7 @@ mark price crosses its `trigger_px`. A trigger always reduces a position. It can
 grow a position.
 
 :::info
-Market and limit triggers are live. `is_market` controls the exit: `is_market: true` fires a
+Market and limit triggers are active. `is_market` controls the exit: `is_market: true` fires a
 market exit, and `is_market: false` rests a limit exit.
 :::
 
@@ -237,7 +237,7 @@ stay armed as you add to the position or reduce it.
 ## Scale orders {#scale-orders}
 
 :::info
-Live on the hosted sandbox and on mainnet. The feature is active from block 0 on chain `114514`
+Active on the hosted sandbox and on mainnet. The feature is active from block 0 on chain `114514`
 and on chain `8964`, with no vote and no activation height. A node you run yourself under the
 default chain id `31337` must arm the feature by validator vote first.
 :::
@@ -294,7 +294,7 @@ field table and admission rules.
 ## Chase orders {#chase-orders}
 
 :::info
-Live on the hosted sandbox and on mainnet, with the same gate as the scale ladder. The feature is
+Active on the hosted sandbox and on mainnet, with the same gate as the scale ladder. The feature is
 active from block 0 on chain `114514` and on chain `8964`. A node you run yourself under the
 default chain id `31337` must arm the feature by validator vote first.
 :::
@@ -391,7 +391,7 @@ Two rules change what you get back:
   asked. A 60-slice TWAP at `delay_ms: 1000` takes 10 minutes, not 1. The parent stores the
   clamped value, so a later parameter change does not affect it.
 - `slice_count` has a governed ceiling (default `10000`). An account can hold a governed number
-  of live parents at once (default `100`). The chain rejects a breach of either limit at commit.
+  of active parents at once (default `100`). The chain rejects a breach of either limit at commit.
 
 By default the slice sizes are equal and the timing is fixed. So an observer who watches the tape
 can predict the schedule. Send `randomize: true` to draw each slice size and each delay between
@@ -412,7 +412,7 @@ filled. Future slices stop.
 ## TWAP, scale and chase on a spot pair {#synth-on-spot}
 
 :::info
-Live. `twap_order`, `scale_order` and `chase_order` accept a spot pair id in `market`. The order
+Active. `twap_order`, `scale_order` and `chase_order` accept a spot pair id in `market`. The order
 runs on the spot book under the rules below.
 :::
 
@@ -440,7 +440,7 @@ Each of the three is a refusal. The chain does not drop the field silently. It r
 action and places nothing. To drop a field you signed would execute an order you did not sign, so
 the chain refuses. Clear the field, then sign again.
 
-One live-parent budget covers both homes. The governed cap on live TWAP parents (default `100`)
+One active-parent budget covers both homes. The governed cap on active TWAP parents (default `100`)
 counts your perp parents and your spot parents together. It is one allowance per account, not
 one per market class.
 

@@ -408,7 +408,7 @@ opposite side, waits. The chain never force-sells into an empty book.
 
 ### Metaliquidity vault takeover {#mlp-first-bite}
 
-Live on the core markets since 2026-08-18. Before the netting runs, the protocol's
+Active on the core markets since 2026-08-18. Before the netting runs, the protocol's
 [Metaliquidity vault](./vaults.md#metaliquidity-vault) takes over as much of the failing position
 as its bounded capacity allows. The takeover strikes at the same committed mark that the netting
 uses, so the failing account realizes at that mark either way. Only what the vault declines
@@ -419,7 +419,7 @@ values below as today's values, not as constants. No public read serves them:
 
 | Bound | Value today | What it limits |
 |-------|-------------|----------------|
-| Equity fraction | 40% of the vault's live NAV | One takeover. The chain subtracts the inventory that the vault already holds, so the ceiling shrinks as the vault absorbs. A deficit that the vault only covers records nothing, so this row does not bound a sequence of those |
+| Equity fraction | 40% of the vault's current NAV | One takeover. The chain subtracts the inventory that the vault already holds, so the ceiling shrinks as the vault absorbs. A deficit that the vault only covers records nothing, so this row does not bound a sequence of those |
 | Per-block cap | 100,000 USDC | Everything the vault absorbs in one block, across every failing account. It bounds a correlated cascade. It does not bound a drain spread over many blocks |
 
 Read the two rows together. Each one bounds an episode, not a lifetime. No public read serves
@@ -448,7 +448,7 @@ debt in a fixed order. ADL comes before the insurance fund. The realized gains o
 winners absorb first, which keeps the fund for real tail events.
 
 1. **Metaliquidity vault.** On a core market only, the vault pays the deficit first, inside the
-   same bounds as [the first bite](#mlp-first-bite). Live since 2026-08-18. A
+   same bounds as [the first bite](#mlp-first-bite). In effect since 2026-08-18. A
    [builder-deployed market](../mip/mip-3.md#liquidation) skips this step.
 2. **ADL haircut.** An adaptive severity controller claws back realized gains. It never takes more
    than a winner received, and it never takes unrealized paper PnL.

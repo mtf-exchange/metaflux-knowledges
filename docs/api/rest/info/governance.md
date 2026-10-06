@@ -110,7 +110,7 @@ reads `data.type` to route the reply gets `undefined`.
 **`casts[*].value` on a `dynamic_risk` row is a raw `0x` blob, not a number.**
 The payload packs several fields together, so there is no single value to
 decode. A client that shows it as the voted leverage prints a long hex string
-where a number should be. Live `dynamic_risk` casts have 116 to 150
+where a number should be. Active `dynamic_risk` casts have 116 to 150
 characters, and the length changes with the payload.
 
 **Read `changes[]` for the values, not `casts[*].value`.** `changes[]` is the
@@ -306,7 +306,7 @@ and leave no row. [`validator_votes`](#validator_votes) with
 **A node that you run yourself still answers all three.** Only the public
 gateway retired them. The `/info` of the node still serves `gov_state`,
 `gov_proposals` and `gov_history` for validator operators. Operators need the
-live vote machinery to cast a vote. These reads are not part of the public
+running vote machinery to cast a vote. These reads are not part of the public
 API.
 :::
 

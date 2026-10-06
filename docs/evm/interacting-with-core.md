@@ -3,9 +3,9 @@
 This page describes how an EVM contract reads from Core and writes to Core.
 
 :::tip
-**Live on testnet.** CoreWriter actions work. The stateless MTF derivatives precompiles
+**Active on testnet.** CoreWriter actions work. The stateless MTF derivatives precompiles
 (`0x0900`–`0x0904`) also work. Read precompiles backed by Core state, which query the
-positions and books of the chain directly, are upcoming. The [bridge](../bridge/) is live.
+positions and books of the chain directly, are upcoming. The [bridge](../bridge/) is active.
 :::
 
 A contract on the MetaFlux EVM talks to Core (the L1 perps clearinghouse and on-chain
@@ -14,7 +14,7 @@ CLOB) in two directions:
 - **Read.** A `staticcall` to a system precompile gets a value derived from Core.
 - **Write.** A call to the CoreWriter system contract submits an L1 action.
 
-With read precompiles and a write contract, an EVM contract composes directly with live L1
+With read precompiles and a write contract, an EVM contract composes directly with current L1
 state. It can quote against the formulas of the chain and then act on the clearinghouse,
 without a step outside the VM.
 
@@ -151,12 +151,12 @@ fixed-point plane (`px_e8`, `size_e8`). USDC margins are 1e6.
 
 Today these are stateless quoting precompiles. The caller passes the inputs (positions,
 queue levels, quotes, …), and the precompile returns the result. A contract can therefore
-reproduce a Core calculation with the formulas of the chain. Reads backed by live Core
+reproduce a Core calculation with the formulas of the chain. Reads backed by current Core
 state, which query the positions and books of the chain directly, are upcoming.
 
 ### `portfolio_margin_eval` (v1 ABI) {#portfolio_margin_eval-v1-abi}
 
-The `0x0900` margin precompile uses the same SPAN engine that margins live accounts (see
+The `0x0900` margin precompile uses the same SPAN engine that margins active accounts (see
 [portfolio margin](../concepts/portfolio-margin.md)). An off-chain quote therefore matches
 on-chain maintenance exactly. There is no second copy of the math.
 

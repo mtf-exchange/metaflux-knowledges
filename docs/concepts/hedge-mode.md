@@ -3,7 +3,7 @@
 Hedge mode lets an account hold a long leg and a short leg in the same market. This page describes how to enable it, place orders, and read the legs.
 
 :::info
-**Live.** The opt-in toggle, explicit per-side order routing, independent
+**Active.** The opt-in toggle, explicit per-side order routing, independent
 per-leg margin and dual-leg position reports are shipped. An account can switch
 to hedge mode while it is flat. It routes each order to an explicit leg with
 `position_side`. Each leg posts its own margin and reports as its own position
@@ -37,7 +37,7 @@ market.
 | Reporting | one net position object | one object per non-zero leg (each labelled `position_side`) |
 
 The toggle, per-side routing, independent per-leg margin and dual-leg reports
-are live. Per-leg liquidation selection is in place. The per-leg close is still
+are active. Per-leg liquidation selection is in place. The per-leg close is still
 rolling out. See the status note above.
 
 ## Enabling hedge mode {#enabling-it}
@@ -127,7 +127,7 @@ deterministic close order through the standard
 [tiered liquidation](./tiered-liquidation.md) ladder. The leg with the larger
 maintenance goes first. On a tie, long goes before short. The order is identical
 on all validators. The per-leg close against the book is still rolling out. When
-it is live, the liquidation of one leg will not change the other.
+it is active, the liquidation of one leg will not change the other.
 
 ## Reporting {#reporting}
 

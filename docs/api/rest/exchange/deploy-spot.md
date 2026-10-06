@@ -10,7 +10,7 @@ They are actions on [`POST /exchange`](../exchange.md). That page describes the
 request envelope, the EIP-712 signing rules, the number planes and the response
 shape. These apply to every action here.
 
-This is the permissionless spot deployer lane. It is live on testnet. See the
+This is the permissionless spot deployer lane. It is active on testnet. See the
 [catalog entry](../exchange.md#spot-deployment) for the fee model, and
 [MIP-1](../../../mip/mip-1.md) for the concepts.
 
@@ -34,7 +34,7 @@ through [validator governance](../info/governance.md):
 
 :::warning
 **`0` means no cap. It does not mean blocked.** Both parameters are `0` on the
-live network today, and `0` leaves the lane fully open. These parameters control the
+running network today, and `0` leaves the lane fully open. These parameters control the
 rate. The off-switches are `mip1_enabled` and `mip3_enabled`. Never read a `0`
 cap as "deployment is closed".
 :::
@@ -75,7 +75,7 @@ action charges the `TokenRegister` Dutch-clock ask at commit.
 | `max_deploy_fee` | decimal string | `≥ 0` | The highest deploy fee that you accept, in whole USDC. Send it as a JSON string |
 
 :::info
-**`wei_decimals = 0` is now rejected. Live.** A token registered with `0` loses
+**`wei_decimals = 0` is now rejected. Active.** A token registered with `0` loses
 value when governance binds an EVM contract to it. The Core-to-EVM path then
 divides by `10^8` and destroys any balance below one whole token. Admission
 refuses `0`. It does not clamp the value, because you signed the declared
