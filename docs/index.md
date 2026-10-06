@@ -1,9 +1,8 @@
 ---
+title: Overview
 description: Integration reference, API surface, and core concepts for the MetaFlux derivatives exchange.
 slug: /
 ---
-
-<img src="/img/og.png" alt="MetaFlux — derivatives, on first principles" class="hero-banner" />
 
 # MetaFlux Knowledge Base
 

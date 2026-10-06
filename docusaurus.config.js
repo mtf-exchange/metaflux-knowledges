@@ -1,17 +1,7 @@
 // @ts-check
 
-/**
- * Syntax highlighting, on the theme's own palette.
- *
- * Three hues and nothing else: the primary carries keywords, the second voice
- * carries strings, the warn hue carries numbers, and everything structural —
- * function names, tags, properties — is plain ink. Off-the-shelf themes reach for
- * eight or ten, which on a reference page means the code block is louder than the
- * prose explaining it. Neutrals are the same ink ramp the body text uses, so the
- * block reads as part of the page rather than a pasted-in terminal.
- *
- * Each entry is measured against the card surface it sits on, not against white.
- */
+// Monochrome code: weight and grey steps carry the syntax. Green and red mark
+// inserted and deleted lines only, the one place direction means something.
 const codeTheme = (p) => ({
   plain: {color: p.ink2, backgroundColor: p.card},
   styles: [
@@ -19,26 +9,27 @@ const codeTheme = (p) => ({
     {types: ['punctuation', 'operator', 'entity'], style: {color: p.ink3}},
     {
       types: ['keyword', 'atrule', 'rule', 'important', 'builtin', 'boolean', 'null', 'unit'],
-      style: {color: p.key},
+      style: {color: p.ink, fontWeight: 600},
     },
-    {types: ['string', 'char', 'attr-value', 'regex', 'url', 'inserted'], style: {color: p.str}},
-    {types: ['number', 'constant', 'symbol'], style: {color: p.num}},
+    {types: ['string', 'char', 'attr-value', 'regex', 'url'], style: {color: p.str}},
+    {types: ['number', 'constant', 'symbol'], style: {color: p.ink}},
     {
       types: ['function', 'class-name', 'tag', 'selector', 'property', 'attr-name', 'variable'],
       style: {color: p.ink},
     },
+    {types: ['inserted'], style: {color: p.ins}},
     {types: ['deleted'], style: {color: p.del}},
     {types: ['namespace'], style: {opacity: 0.7}},
   ],
 });
 
 const prismLight = codeTheme({
-  card: '#f1f1ec', ink: '#322f28', ink2: '#625e53', ink3: '#6f6a5e',
-  key: '#1a6670', str: '#4e6b3a', num: '#8a5a12', del: '#a33b52',
+  card: '#f4f5f7', ink: '#0b0c0e', ink2: '#2a2d33', ink3: '#5b616c', str: '#474c55',
+  ins: '#0f9b67', del: '#d93f45',
 });
 const prismDark = codeTheme({
-  card: '#24231f', ink: '#e9e3d8', ink2: '#aba598', ink3: '#948e80',
-  key: '#7fc7ce', str: '#a9c294', num: '#e0b450', del: '#e88b9f',
+  card: '#14161a', ink: '#f3f4f6', ink2: '#d4d7dc', ink3: '#9aa1ac', str: '#b8bdc6',
+  ins: '#3dd68c', del: '#ff6b70',
 });
 
 // Use Algolia only when real creds are present; otherwise fall back to the
@@ -194,10 +185,11 @@ const config = {
         theme: {light: 'neutral', dark: 'dark'},
         options: {
           themeVariables: {
-            // The two voices: teal primary, sage second.
-            primaryColor: '#1a6670',
-            lineColor: '#5b7449',
-            fontFamily: 'Figtree, system-ui, sans-serif',
+            fontFamily: "'Hanken Grotesk', system-ui, sans-serif",
+            // Both stock themes paint sequence notes yellow.
+            noteBkgColor: '#f4f5f7',
+            noteTextColor: '#0b0c0e',
+            noteBorderColor: '#9aa1ac',
           },
         },
       },
@@ -214,15 +206,11 @@ const config = {
         },
       }),
       navbar: {
-        // The brand is the real lockup asset — mark + drawn wordmark — straight
-        // from ../metaflux-web/static/brand, in the same two theme cuts the app's
-        // BrandLockup swaps between. It is NOT type set in the UI's own faces, and
-        // it does NOT follow the accent: the v2 retheme changed the product
-        // palette, not the identity, so the wordmark keeps its own flux gradient.
+        title: 'MetaFlux',
+        style: 'dark',
+        // The mono mark draws in currentColor, which an <img> resolves to black; CSS turns it white.
         logo: {
-          alt: 'MetaFlux',
-          src: 'brand/metaflux-lockup-color-light.svg',
-          srcDark: 'brand/metaflux-lockup-color-dark.svg',
+          src: 'brand/metaflux-mark-mono.svg',
           href: '/',
         },
         items: [
@@ -246,7 +234,38 @@ const config = {
           },
         ],
       },
-      // Footer intentionally omitted (removed per request).
+      footer: {
+        style: 'dark',
+        links: [
+          {
+            title: 'Trade',
+            items: [
+              {label: 'Launch app', href: 'https://app.mtf.exchange/'},
+              {label: 'Points', href: 'https://mtf.exchange/tge.html'},
+              {label: 'Faucet', href: 'https://app.mtf.exchange/faucet'},
+            ],
+          },
+          {
+            title: 'Build',
+            items: [
+              {label: 'Quickstart', to: '/integration/quickstart'},
+              {label: 'API reference', to: '/api'},
+              {label: 'TypeScript SDK', to: '/integration/typescript-sdk'},
+              {label: 'Rust SDK', to: '/integration/rust-sdk'},
+            ],
+          },
+          {
+            title: 'Foundation',
+            items: [
+              {label: 'Whitepaper', href: 'https://mtf.exchange/whitepaper.html'},
+              {label: 'X / Twitter', href: 'https://x.com/MetaFluxDex'},
+              {label: 'Terms', href: 'https://mtf.exchange/terms.html'},
+              {label: 'Privacy', href: 'https://mtf.exchange/privacy.html'},
+            ],
+          },
+        ],
+        copyright: '© 2026 MetaFlux Foundation',
+      },
       prism: {
         theme: prismLight,
         darkTheme: prismDark,
