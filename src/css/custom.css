@@ -530,3 +530,7 @@ pre {
     max-width: 100%;
   }
 }
+
+/* Owner 2026-10-06: no visible scrollbars anywhere; every area still scrolls. */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
