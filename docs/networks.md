@@ -74,14 +74,15 @@ The wire shape is identical to mainnet. A client tested here needs only a new `c
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
-  -d '{"address":"0x<YOUR_ADDRESS>"}'
+  -d '{"address":"0x<YOUR_ADDRESS>","expires":<unix seconds>,"signature":"0x<personal_sign result>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
 - The grant is 3000 USDC cross-collateral and 10 MTF spot, once ever per address. A second claim returns `429 address already funded`.
-- `amount` is optional (whole USDC). It caps the USDC grant downward (at most 3000). The MTF grant is fixed. See [Limits](api/rest/faucet.md#limits).
+- The recipient signs the claim with `personal_sign`. Not active yet: the node checks the signature from its next release, and the node on the current release ignores the two fields. See [sign the claim](api/rest/faucet.md#sign).
+- The grant is fixed. Send no `amount`. The node ignores it from its next release, and until then it only lowers the USDC grant. See [Limits](api/rest/faucet.md#limits).
 - Each source IP gets one claim per minute. The per-IP window combines with the per-address rule: a new address behind a used IP waits, and a used address is refused from any IP.
-- Errors: `400` invalid address, `429` already funded or IP-throttled, `503` backlog full. The body is `{"error":"…"}`.
+- Errors: `400` invalid address, `429` already funded or IP-throttled, `503` backlog full. The body is `{"error":"…"}`. From the next node release, `400` and `403` also refuse an unsigned, expired or wrongly signed claim. See [errors](api/rest/faucet.md#errors).
 
 :::info
 `"queued"` means staged, not credited. The faucet transfers out of a reserve account and does not create tokens, so the grant lands about one block later. The faucet checks the reserve before it responds, so a `200` means the reserve could pay at that moment. Confirm the balance with `account_state` before you trade. See [the reserve](api/rest/faucet.md#reserve).

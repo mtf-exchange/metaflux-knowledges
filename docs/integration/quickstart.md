@@ -39,15 +39,19 @@ at `http://localhost:8080`. See [`POST /faucet`](../api/rest/faucet.md).
 ```bash
 curl -X POST https://api.testnet.mtf.exchange/faucet \
   -H 'content-type: application/json' \
-  -d '{"address":"0x<YOUR_ADDRESS>"}'
+  -d '{"address":"0x<YOUR_ADDRESS>","expires":<unix seconds>,"signature":"0x<personal_sign result>"}'
 # -> {"address":"0x…","usdc":3000,"mtf":10,"status":"queued"}
 ```
 
+The recipient signs the claim with EIP-191 `personal_sign`, over a four-line text that names the
+address, the chain id and `expires`. Not active yet: the node checks the signature from its next
+release. The node on the current release ignores the two fields, so send them now. See
+[sign the claim](../api/rest/faucet.md#sign).
+
 One claim grants 3000 USDC cross-collateral and 10 MTF spot tokens. Each address can claim only
 once. A second claim returns `429 address already funded`. The faucet also limits each source IP
-to one claim per minute, in addition to the rule per address. The optional `amount` can only
-lower the USDC grant (≤ 3000). The MTF grant is fixed. See
-[Limits](../api/rest/faucet.md#limits). The grant is `"queued"` and lands about 1 block later.
+to one claim per minute, in addition to the rule per address. The grant is fixed. Send no
+`amount`. See [Limits](../api/rest/faucet.md#limits). The grant is `"queued"` and lands about 1 block later.
 Wait a moment before you confirm the balance:
 
 :::info `"queued"` means staged, not credited
