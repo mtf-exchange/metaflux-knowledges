@@ -6,13 +6,11 @@ description: The testnet faucet. One claim transfers test USDC and MTF from a fu
 
 `POST /faucet` sends test USDC and MTF to an address on testnet.
 
-:::caution
-**Signed claims and a fixed grant are not active yet.** They start with the
-next node release. From that release, the node refuses a claim that has no
-valid `expires` and `signature`, and it ignores `amount`. The node on the
-current release ignores `expires` and `signature`, so a client can send them
-now. A signed claim with no `amount` works before and after the release. See
-[the changelog](../../changelog/next-release.md#faucet-signed-claims).
+:::info
+**Signed claims and a fixed grant are in effect since node 0.9.17**, from
+[block 34,135,466](../../changelog/block-34135466.md#faucet-signed-claims). The
+node refuses a claim that has no valid `expires` and `signature`, and it
+ignores `amount`.
 :::
 
 :::warning
@@ -32,7 +30,7 @@ devnet holds nothing. See [the reserve](#reserve).
 
 One `POST /faucet` claim transfers 3000 USDC of cross collateral and 10 MTF
 spot tokens (token id `104`) to an address. Each address can claim once only.
-The recipient [signs the claim](#sign). This rule is not active yet. The response is `"queued"`. The credits are staged for the next block.
+The recipient [signs the claim](#sign). The response is `"queued"`. The credits are staged for the next block.
 They are not committed synchronously.
 
 **`"queued"` is not acceptance.** When the block applies the claim, the chain
@@ -77,14 +75,13 @@ past, so the node refuses it. Sign your own claim.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `address` | `0x`-hex 20-byte address | yes | Recipient and signer. Accepts 40 or 42 chars (`0x` optional). The zero address is rejected. |
-| `expires` | uint64 (unix seconds) | yes, from the next node release | The claim is void after this time. Set it to the current time plus 300. The node refuses a value in the past and a value more than 600 s ahead of its clock. |
-| `signature` | `0x`-hex, 65 bytes | yes, from the next node release | EIP-191 `personal_sign` by `address` over the [claim text](#sign). The layout is `r ‖ s ‖ v`, with `v` 27 or 28, as a wallet returns it. The node also accepts `v` 0 or 1. |
+| `expires` | uint64 (unix seconds) | yes | The claim is void after this time. Set it to the current time plus 300. The node refuses a value in the past and a value more than 600 s ahead of its clock. |
+| `signature` | `0x`-hex, 65 bytes | yes | EIP-191 `personal_sign` by `address` over the [claim text](#sign). The layout is `r ‖ s ‖ v`, with `v` 27 or 28, as a wallet returns it. The node also accepts `v` 0 or 1. |
 
-**The grant is fixed: 3000 USDC and 10 MTF.** From the next node release, the
-node ignores an `amount` field. The signature does not cover `amount`. If the
-node used it, anyone who saw a signed body could send it first with a small
-amount and use the one claim of that address. The node on the current release
-still caps the USDC grant at `amount`, so do not send it.
+**The grant is fixed: 3000 USDC and 10 MTF.** The node ignores an `amount`
+field. The signature does not cover `amount`. If the node used it, anyone who
+saw a signed body could send it first with a small amount and use the one claim
+of that address.
 
 ```bash
 curl -s -X POST https://api.testnet.mtf.exchange/faucet \
@@ -93,10 +90,6 @@ curl -s -X POST https://api.testnet.mtf.exchange/faucet \
 ```
 
 ## Sign the claim {#sign}
-
-:::caution
-**Not active yet.** The node checks the signature from the next node release.
-:::
 
 The recipient signs this text with EIP-191 `personal_sign`. The text has four
 lines joined by `\n` (byte `0x0a`), with no newline at the end:
@@ -223,19 +216,17 @@ see the balance:
 ### Errors {#errors}
 
 Every refusal answers `{"error":"<text>"}` and a non-2xx status. Show the text
-to the user as it is. The rows marked **Not active yet** start with the next
-node release.
+to the user as it is.
 
 | HTTP | Body | Cause |
 |------|------|-------|
 | 400 | `{"error":"invalid address: <detail>"}` | `address` is not valid `0x`-hex, for example the wrong length |
 | 400 | `{"error":"zero address not allowed"}` | The recipient is the zero address |
-| 400 | `{"error":"amount must be positive"}` | An explicit `amount` of `0`. The next node release removes this refusal, because it ignores `amount` |
-| 400 | `{"error":"faucet claim needs expires and signature: sign the claim text with the receiving wallet"}` | `expires` or `signature` is missing. **Not active yet** |
-| 400 | `{"error":"faucet claim expired; sign a new one"}` | `expires` is before the node clock. **Not active yet** |
-| 400 | `{"error":"faucet claim expires more than 600 s ahead"}` | `expires` is more than 600 s after the node clock. **Not active yet** |
-| 400 | `{"error":"faucet claim signature must be 0x and 65 bytes"}` | `signature` is not `0x` and 130 hex digits. **Not active yet** |
-| 403 | `{"error":"faucet claim signature is not from the receiving wallet"}` | The signature recovers to a different address. A different key signed, or the signed text is different: check the lowercase address, the chain id and `expires`. **Not active yet** |
+| 400 | `{"error":"faucet claim needs expires and signature: sign the claim text with the receiving wallet"}` | `expires` or `signature` is missing. |
+| 400 | `{"error":"faucet claim expired; sign a new one"}` | `expires` is before the node clock. |
+| 400 | `{"error":"faucet claim expires more than 600 s ahead"}` | `expires` is more than 600 s after the node clock. |
+| 400 | `{"error":"faucet claim signature must be 0x and 65 bytes"}` | `signature` is not `0x` and 130 hex digits. |
+| 403 | `{"error":"faucet claim signature is not from the receiving wallet"}` | The signature recovers to a different address. A different key signed, or the signed text is different: check the lowercase address, the chain id and `expires`. |
 | 429 | `{"error":"address already funded"}` | This address claimed before. Each address claims once only. The faucet reads the committed claim record before it queues, so the refusal holds across a node restart. See [Limits](#limits) |
 | 429 | `{"error":"rate limit: this IP requested too recently"}` | The source IP claimed inside the per-IP window. The window is a node setting. See [Limits](#limits) |
 | 403 | `{"error":"faucet disabled on this network"}` | Defensive guard. It should be unreachable, because mainnet never mounts the route |
@@ -247,8 +238,7 @@ node release.
 { "error": "address already funded" }   // HTTP 429
 ```
 
-**A signature refusal does not use the IP window.** From the next node release,
-the node checks the claim before it records the claim in the per-IP window.
+**A signature refusal does not use the IP window.** The node checks the claim before it records the claim in the per-IP window.
 
 ## Refusal after queueing {#refused-after-queueing}
 
@@ -325,9 +315,7 @@ the faucet of a network seems dead, check this first: read `account_state` for
   `429 address already funded`, also from a different IP and also much later.
 
   The committed row is a one-time claim record. The handler reads it before it
-  queues and answers `429` at once. On the current node release, a request for
-  less than the full grant uses the slot. You cannot come back for the
-  remainder. A set in the memory of the
+  queues and answers `429` at once. A set in the memory of the
   faucet node closes the window between the queue and the commit inside one
   block. The rule is in force since
   [block 11,550,001](../../changelog/block-11550001.md#faucet-rules). Before
@@ -346,9 +334,7 @@ the faucet of a network seems dead, check this first: read `account_state` for
   memory of the faucet node, it is not chain-wide, and it resets when that node
   restarts. The committed per-address rule and the reserve balance limit what
   the faucet gives out.
-- **Fixed grant.** 3000 USDC and 10 MTF. From the next node release, the node
-  ignores `amount`. The node on the current release caps the USDC grant at
-  `amount`, so do not send it.
+- **Fixed grant.** 3000 USDC and 10 MTF. The node ignores `amount`.
 
 ## Separation from `/exchange` {#why-this-is-not-on-exchange}
 

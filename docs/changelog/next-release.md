@@ -1,5 +1,5 @@
 ---
-description: "One change waits for the next node release: signed faucet claims and a fixed faucet grant. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
+description: "No change waits for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
@@ -7,28 +7,12 @@ description: "One change waits for the next node release: signed faucet claims a
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-One change on this page waits for the next node release: [signed faucet claims](#faucet-signed-claims). Every section the page staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
+No change on this page waits for the next node release. Signed faucet claims and the fixed faucet grant are in effect, and they moved to [block 34,135,466](./block-34135466.md). Every section the page staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
 
 The [archive candle row](#archive-candle-plane) waits for a measurement. It is in the shipped code, but nobody has read it on the running chain. The row says what settles it.
 
 The page also keeps [five corrections](#corrections) to this reference. They are not chain changes.
 :::
-
-## Faucet claims are signed {#faucet-signed-claims}
-
-Status: not active yet. It waits for the next node release.
-
-[`POST /faucet`](../api/rest/faucet.md) gains two required fields, and the grant becomes fixed:
-
-- **`expires`**, unix seconds. The node refuses a value in the past and a value more than 600 s ahead of its clock. Set it to the current time plus 300.
-- **`signature`**, an EIP-191 `personal_sign` by the recipient over a four-line text that names the address, the chain id and `expires`. See [sign the claim](../api/rest/faucet.md#sign), with a worked example.
-- **The grant is fixed, and the node ignores `amount`.** The signature does not cover `amount`. If the node used it, anyone who saw a signed body could send it first with a small amount and use the one claim of that address.
-
-The [errors table](../api/rest/faucet.md#errors) has each new refusal and its exact text. The rule of one claim per address does not change.
-
-**Why.** Each address can claim once only. Without a signature, any caller can use the one claim of an address that it does not control.
-
-**What to do now.** Sign every claim, and send no `amount`. The node on the current release ignores `expires` and `signature`, so a signed claim works before and after the release. An unsigned claim stops working at the release. The node on the current release still caps the USDC grant at `amount`.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

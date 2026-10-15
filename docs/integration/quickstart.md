@@ -44,8 +44,7 @@ curl -X POST https://api.testnet.mtf.exchange/faucet \
 ```
 
 The recipient signs the claim with EIP-191 `personal_sign`, over a four-line text that names the
-address, the chain id and `expires`. Not active yet: the node checks the signature from its next
-release. The node on the current release ignores the two fields, so send them now. See
+address, the chain id and `expires`. The node refuses an unsigned claim since node 0.9.17. See
 [sign the claim](../api/rest/faucet.md#sign).
 
 One claim grants 3000 USDC cross-collateral and 10 MTF spot tokens. Each address can claim only

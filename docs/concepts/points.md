@@ -6,14 +6,14 @@ description: The MTF points program. Testnet trading volume earns points each we
 
 The points program pays points each week for testnet trading volume. Points convert to MTF at the TGE.
 
-:::caution
-**The weekly table and its three reads are not active yet.** The reads
+:::info
+**The three reads are served, and no week is published yet.** The reads
 [`points_weeks`](../api/rest/info.md#points_weeks),
 [`points_leaderboard`](../api/rest/info.md#points_leaderboard) and
-[`points_user`](../api/rest/info.md#points_user) ship with the next archive and
-gateway release. Until then, each one answers `400` `UNKNOWN_TYPE`. Points
-still count from genesis, so no week is lost. When publication starts after the
-release, the archive publishes every past week.
+[`points_user`](../api/rest/info.md#points_user) answer with empty `rows` until
+the first week is published. The archive publishes weeks only after the
+operator starts the program. Points still count from genesis, so no week is
+lost. When publication starts, the archive publishes every past week.
 :::
 
 Accounts that trade on the testnet earn points each week. Each week shares a
@@ -191,8 +191,8 @@ that is at most 0.025 MTF per $1.
 
 ## How to check {#how-to-check}
 
-Not active yet. The three reads below answer `UNKNOWN_TYPE` until the next archive
-and gateway release.
+The three reads below are served. Each answers with empty `rows` until the first
+week is published.
 
 | You want | Read |
 |---|---|

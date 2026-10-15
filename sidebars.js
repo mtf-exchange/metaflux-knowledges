@@ -208,6 +208,7 @@ const sidebars = {
         'changelog/next-release',
         'changelog/migrations',
         'changelog/ids-and-wire-shapes',
+        'changelog/block-34135466',
         'changelog/block-25599540',
         'changelog/block-17113494',
         'changelog/block-16450001',

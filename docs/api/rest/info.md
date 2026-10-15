@@ -283,7 +283,7 @@ answers. Each link opens the request fields and the response schema of that type
 | **[Governance](./info/governance.md)**<br/>proposals, votes and the parameter set | [`validator_votes`](./info/governance.md#validator_votes) · [`gov_state`](./info/governance.md#gov_state) · [`gov_proposals`](./info/governance.md#gov_proposals) · [`gov_history`](./info/governance.md#gov_history) |
 | **[Chain activity](./info/chain.md)**<br/>recent blocks, and one action's outcome | [`recent_blocks`](./info/chain.md#recent_blocks) · [`recent_transactions`](./info/chain.md#recent_transactions) |
 | **[Node snapshots](./info/node.md)**<br/>peers, sync state and node-scoped figures | [`exchange_status`](./info/node.md#exchange_status) · [`user_twaps`](./info/node.md#user_twaps) · [`vault_summaries`](./info/node.md#vault_summaries) · [`user_rate_limit`](./info/node.md#user_rate_limit) · [`approved_brokers`](./info/node.md#approved_brokers) · [`validator_l1_votes`](./info/node.md#validator_l1_votes) · [`validator_summaries`](./info/node.md#validator_summaries) · [`gossip_root_ips`](./info/node.md#gossip_root_ips) |
-| **[Points](#points-reads)** (not active yet)<br/>the weekly points table | [`points_weeks`](#points_weeks) · [`points_leaderboard`](#points_leaderboard) · [`points_user`](#points_user) |
+| **[Points](#points-reads)**<br/>the weekly points table | [`points_weeks`](#points_weeks) · [`points_leaderboard`](#points_leaderboard) · [`points_user`](#points_user) |
 
 ## Removed reads {#retired-reads}
 
@@ -362,11 +362,12 @@ day that its capability becomes reachable.
 
 ## Points reads {#points-reads}
 
-:::caution
-**Not active yet.** These three reads ship with the next archive and gateway
-release. Until then, each one answers `400` `UNKNOWN_TYPE`, the same answer
-that a misspelled type gets. Points still count from genesis. When publication
-starts after the release, the archive publishes every past week.
+:::info
+**Served since gateway 0.9.17, and no week is published yet.** Each read
+answers with empty `rows` until the first week is published. The archive
+publishes weeks only after the operator starts the program. Points still count
+from genesis. When publication starts, the archive publishes every past week.
+See [block 34,135,466](../../changelog/block-34135466.md#points-reads).
 :::
 
 The [points program](../../concepts/points.md) publishes one table a week. The
