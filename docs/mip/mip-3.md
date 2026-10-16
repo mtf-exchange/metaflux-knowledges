@@ -29,10 +29,16 @@ A deploy has two independent barriers. A builder pays both:
 | Barrier | Amount | Paid how |
 |---------|--------|----------|
 | **Deploy fee** | The current Dutch-clock ask on the perp-deploy stream | Charged at register, from your free collateral |
-| **Staking bond** | `mip3_deploy_min_stake`, about 50,000 MTF by default | Committed stake you already hold. Slashable, not spent |
+| **Staking bond** | `mip3_deploy_min_stake`, about 50,000 MTF by default | Committed stake you already hold. Not spent. Locked while your dex has an active market (not active yet: from the next node release) |
 
 The chain checks the bond when it allocates a new market. It refuses stake below the floor
 before it writes anything. A rejected deploy is therefore a clean no-op that costs nothing.
+
+**The bond stays locked while your dex has a market that is not delisted. Not active yet: this
+takes effect with the next node release.** A staking withdraw or an undelegate that takes your
+stake below the floor is refused with `deployer bond is locked while the dex has a market`. Why:
+the chain checks the bond only at registration. Without the lock, a deployer could list, withdraw
+the bond, and keep running the oracle of an active market. The bond does not pay a deficit.
 
 :::info There is no bid, no escrow and no refund
 An earlier draft of this page described an auction. In it, builders escrowed a USDC bid that was
@@ -137,7 +143,7 @@ The deployer, or a delegate with [permission bit
 
 The deployer operates the oracle for its own market. Treat every builder-deployed market as a
 carrier of *deployer price risk*. This risk is the reason the market is isolated, and the reason
-the bond is slashable.
+its deficit stays inside the market (see [the deployed-market waterfall](../concepts/tiered-liquidation.md#deployed-market-deficit)).
 
 :::warning Two corrections to an earlier version of this page
 1. **The push is gated per chain.** It is not active on every chain. The action sits behind the

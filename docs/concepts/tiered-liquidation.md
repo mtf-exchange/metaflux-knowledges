@@ -483,6 +483,29 @@ winners absorb first, which keeps the fund for real tail events.
 The chain then sets the account's negative balance to zero. The debt now lives in the waterfall.
 See [ADL](./adl.md) for the controller math.
 
+### Deficit on a builder-deployed market {#deployed-market-deficit}
+
+**Not active yet: this takes effect with the next node release.** A deficit on a
+[builder-deployed market](../mip/mip-3.md#liquidation) stays inside that market. The protocol
+insurance fund, the Metaliquidity vault and the treasury reserve never pay it. Why: the deployer
+operates the oracle of that market, so protocol money must not stand behind it. The order is:
+
+1. **The market's own insurance.** This pool holds only the liquidation fees of that market.
+2. **ADL haircut.** The same claw on realized gains as in the core waterfall, on that market only.
+3. **Position ADL.** The chain takes the rest from the unrealized profit of open positions on that
+   market. It ranks them by return on entry, highest first, as Hyperliquid does. It moves the
+   entry price of each selected position against its owner, so the position keeps its size and
+   its margin and gives up part of its profit. A position never goes to or below its maintenance
+   margin, so this step cannot start a new liquidation.
+4. **Recorded shortfall.** Anything left stays on record against that market. The treasury reserve
+   refuses to pay it.
+
+An isolated position closed inside a fill can leave a deficit. The chain records it first and runs
+steps 2 to 4 in the next liquidation pass, when every position of the block is settled.
+
+A position ADL is not a trade. It writes no fill, so a history built from fills shows the old
+entry price. Read the entry price from the account state.
+
 ### Deficit split across markets {#which-market-pays}
 
 Each of the four stages keys on one market. A cross account can hold positions on several
