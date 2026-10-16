@@ -51,7 +51,7 @@ curl -X POST https://api.testnet.mtf.exchange/info \
 | Price grid | `tick_size` (whole units) | `"0.1"` |
 | Size precision | `sz_decimals` | `5` |
 | Size grid | `step_size` (whole units) | `"0.00001"` |
-| Smallest order | `min_order` (whole units) | `"0.00001"` |
+| Smallest order | `min_order` (whole units, equals `step_size`) | `"0.00001"` |
 
 :::warning `/info` addresses markets by `coin`, and `/exchange` takes the number
 You query a read by symbol. `asset_id` is on no part of the wire today: not as a request

@@ -54,7 +54,9 @@ Every one of these checks runs before the node charges you. The name and symbol 
 
 Your name is also your read key. Once the dex exists, its positions arrive under the key `name` in [`clearinghouse_state`](../info/account.md#clearinghouse_state). The dex reports the same string as `name` in [`perp_dexs`](../info/perpetuals.md#perp_dexs).
 
-A governance listing symbol must not contain `:`. Governance lists core markets, not this action. A core symbol with a colon would claim a namespace of a deployer, so the node refuses such a listing. This keeps the core dex and every named dex disjoint, and one symbol never belongs to two dexes.
+A governance listing of a NEW symbol must not contain `:`. Governance lists core markets, not this action. A core symbol with a colon would claim a namespace of a deployer, so the node refuses such a listing. This keeps the core dex and every named dex disjoint, and one symbol never belongs to two dexes.
+
+A deployed market registers with `sz_decimals` 0, so one lot is one whole unit. A governance listing that names an existing `<dex>:<suffix>` market raises its `sz_decimals` and creates nothing. The raise rescales every resting order and position on the market, so their value does not change. A decrease is refused. Not active yet: until the next node release, a listing with `:` is always refused.
 
 ### Set the market oracle (retired) {#perp_set_oracle}
 

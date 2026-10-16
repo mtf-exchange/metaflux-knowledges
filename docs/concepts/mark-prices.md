@@ -16,7 +16,9 @@ A margin system on the last trade price is open to abuse. A small adversarial tr
 
 ## Composition {#composition}
 
-The implemented mark is the 3-component median below (`mark_source: "MedianOfOraclesAndMid"`). It is not a flat `median(mid, oracle, ema_mid)`.
+The implemented mark is the 3-component median below (`mark_source: "oracle_median"`). It is not a flat `median(mid, oracle, ema_mid)`.
+
+**A deployed market priced by a deployer push uses a different rule (`mark_source: "deployer_oracle"`). Not active yet: this takes effect with the next node release.** On such a market the mark equals the pushed price. The book does not move it. Why: the market has no external perp feed (no C3), so a lone bid and ask with no fill could move the mark and liquidate positions at no cost to the person who quoted. The push move band limits how far each push can move the price (see [deploy a perp](../api/rest/exchange/deploy-perp.md)). Funding on these markets uses the impact-price formula: the premium compares the price to fill a fixed notional on the book with the pushed price. So funding still pulls the book toward the pushed price. A side too thin to fill that notional adds no premium sample, so a lone small quote does not move funding either.
 
 ### Computation {#how-its-computed}
 
@@ -85,7 +87,7 @@ before you compare magnitudes.
 
 The C3 component of the mark uses a separate set of feeds: perp mids from the 5 perp venues (Binance, OKX, Bybit, Gate, MEXC), not the spot oracle table. See [Oracle prices](./oracle-prices.md) for the full composition, the reliability rules and the per-symbol overrides.
 
-[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) returns `mark_source` (the descriptor `"MedianOfOraclesAndMid"`). [`markets`](../api/rest/info/perpetuals.md#markets) returns the composed `mark_px` and `oracle_px`. The individual C1/C2/C3 components and the weighted source list are not wire fields.
+[`markets_meta`](../api/rest/info/perpetuals.md#markets_meta) returns `mark_source` (for example `"oracle_median"`). [`markets`](../api/rest/info/perpetuals.md#markets) returns the composed `mark_px` and `oracle_px`. The individual C1/C2/C3 components and the weighted source list are not wire fields.
 
 ## Mark and oracle divergence {#mark-vs-oracle--why-they-diverge}
 

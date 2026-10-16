@@ -231,11 +231,13 @@ not move it.
 | `tick_size` | Minimum price increment | order-book plane (whole-USDC string) |
 | `sz_decimals` | Size precision (decimals) of the underlying token | — |
 | `step_size` | Lot step (`= 10^-sz_decimals`) | whole units |
-| `min_order` | Minimum order size | whole units |
+| `min_order` | Smallest order size. It equals `step_size`: there is no minimum above one lot | whole units |
 
 The chain snaps `mark_px` and `oracle_px` reads to `tick_size`, so a read never shows sub-tick
 precision. Submit order `limit_px` on the order-book plane. Submit order `size` as a multiple of
-`step_size`, at or above `min_order`.
+`step_size`. One lot is the smallest order.
+
+`min_order` always equals `step_size`. Not active yet: until the next node release, `min_order` can show a larger value that no order check applies. Do not refuse an order on that value.
 
 :::warning
 `sz_decimals` is per market, and it can change. Read it. Never hard-code it.
