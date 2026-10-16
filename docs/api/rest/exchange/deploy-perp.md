@@ -77,7 +77,7 @@ The `PerpSetOracle` signing type is not deleted, so every committed payload stil
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | The target market |
-| `max_leverage` | uint8 | `1`-`50` | The max leverage |
+| `max_leverage` | uint8 | `1`-`50` (`1`-`100` from the next node release) | The max leverage. A value above 50 also needs a validator vote that raises the per-market limit, and a margin-tier ladder whose maintenance ratio admits it |
 
 ### Set the fee tier {#perp_set_fee_tier}
 
@@ -264,11 +264,13 @@ The node applies these checks in order. The right-hand column is `error.message`
 | Signer is the deployer or a registered sub-deployer | `unauthorized` |
 | `px` is positive | `invalid parameters: oracle px must be positive` |
 | `px` is at or below the ceiling | `invalid parameters: oracle px exceeds ceiling 1000000000000` |
-| `px` is within ±10 % of the committed anchor | `invalid parameters: oracle px <px> outside the ±10% move band around committed anchor <anchor>` |
+| `px` is within the move band around the committed anchor | `invalid parameters: oracle px <px> outside the ±10% move band around committed anchor <anchor>`. Not active yet: from the next node release, an out-of-band push is accepted at the band edge instead (see below) |
 
 Every rejection returns before the node writes any state, so a refused push changes nothing. The push applies at commit, and this call waits for that commit. So the outcome is in the response that you already have.
 
-The anchor of the ±10 % band is the last committed oracle price for the market, or the committed mark price of the market when no oracle price exists. The anchor is the committed value, so several pushes inside one block cannot compound. They all measure against the same anchor. When the market has neither, as on the first push on a new market, there is no anchor to compare against. The node accepts any price in `(0, ceiling]` once. Choose that first price with care, because every later push is chained to it.
+**The move band narrows with leverage. Not active yet: it takes effect with the next node release.** The band is ±min(10 %, 1/(2L)), where L is the highest leverage the market admits after the maintenance-margin check. A 5x market keeps ±10 %, a 29x market gets about ±1.7 %, and a 100x market gets ±0.5 %. A push outside the band is accepted at the band edge, so the stored price moves one band per block toward the pushed price and the feed stays fresh. Why: at 100x a single 10 % push puts every position about 9 % past bankruptcy. A narrow band lets the book liquidate at each step before any position goes underwater. Until that release, a push outside ±10 % is refused and writes nothing.
+
+The anchor of the band is the last committed oracle price for the market, or the committed mark price of the market when no oracle price exists. The anchor is the committed value, so several pushes inside one block cannot compound. They all measure against the same anchor. When the market has neither, as on the first push on a new market, there is no anchor to compare against. The node accepts any price in `(0, ceiling]` once. Choose that first price with care, because every later push is chained to it.
 
 The first push changes the margin regime of the market. It is the moment that the market becomes deployer-priced. The node migrates existing cross-margin positions on the market into their own strict-isolated buckets, and this conserves value per account. Every position that opens afterwards is strict-isolated. See [MIP-3 oracle](../../../mip/mip-3.md#oracle).
 
