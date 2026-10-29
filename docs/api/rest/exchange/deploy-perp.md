@@ -56,7 +56,7 @@ Your name is also your read key. Once the dex exists, its positions arrive under
 
 A governance listing of a NEW symbol must not contain `:`. Governance lists core markets, not this action. A core symbol with a colon would claim a namespace of a deployer, so the node refuses such a listing. This keeps the core dex and every named dex disjoint, and one symbol never belongs to two dexes.
 
-A deployed market registers with `sz_decimals` 0, so one lot is one whole unit. A governance listing that names an existing `<dex>:<suffix>` market raises its `sz_decimals` and creates nothing. The raise rescales every resting order and position on the market, so their value does not change. A decrease is refused. Not active yet: until the next node release, a listing with `:` is always refused.
+A deployed market registers with `sz_decimals` 0, so one lot is one whole unit. A governance listing that names an existing `<dex>:<suffix>` market raises its `sz_decimals` and creates nothing. The raise rescales every resting order and position on the market, so their value does not change. A decrease is refused. Before [block 44,478,893](../../../changelog/block-44478893.md#deployer-markets) a listing with `:` was always refused.
 
 ### Set the market oracle (retired) {#perp_set_oracle}
 
@@ -79,7 +79,7 @@ The `PerpSetOracle` signing type is not deleted, so every committed payload stil
 | Field | Type | Range / values | Description |
 |-------|------|----------------|-------------|
 | `asset` | uint32 | a market you deployed | The target market |
-| `max_leverage` | uint8 | `1`-`50` (`1`-`100` from the next node release) | The max leverage. A value above 50 also needs a validator vote that raises the per-market limit, and a margin-tier ladder whose maintenance ratio admits it |
+| `max_leverage` | uint8 | `1`-`100` (`1`-`50` before [block 44,478,893](../../../changelog/block-44478893.md#deployer-markets)) | The max leverage. A value above 50 also needs a validator vote that raises the per-market limit, and a margin-tier ladder whose maintenance ratio admits it |
 
 ### Set the fee tier {#perp_set_fee_tier}
 
@@ -266,11 +266,11 @@ The node applies these checks in order. The right-hand column is `error.message`
 | Signer is the deployer or a registered sub-deployer | `unauthorized` |
 | `px` is positive | `invalid parameters: oracle px must be positive` |
 | `px` is at or below the ceiling | `invalid parameters: oracle px exceeds ceiling 1000000000000` |
-| `px` is within the move band around the committed anchor | `invalid parameters: oracle px <px> outside the ±10% move band around committed anchor <anchor>`. Not active yet: from the next node release, an out-of-band push is accepted at the band edge instead (see below) |
+| `px` is within the move band around the committed anchor | An out-of-band push is accepted at the band edge (see below). Before [block 44,478,893](../../../changelog/block-44478893.md#deployer-markets) it was refused: `invalid parameters: oracle px <px> outside the ±10% move band around committed anchor <anchor>` |
 
 Every rejection returns before the node writes any state, so a refused push changes nothing. The push applies at commit, and this call waits for that commit. So the outcome is in the response that you already have.
 
-**The move band narrows with leverage. Not active yet: it takes effect with the next node release.** The band is ±min(10 %, 1/(2L)), where L is the highest leverage the market admits after the maintenance-margin check. A 5x market keeps ±10 %, a 29x market gets about ±1.7 %, and a 100x market gets ±0.5 %. A push outside the band is accepted at the band edge, so the stored price moves one band per block toward the pushed price and the feed stays fresh. Why: at 100x a single 10 % push puts every position about 9 % past bankruptcy. A narrow band lets the book liquidate at each step before any position goes underwater. Until that release, a push outside ±10 % is refused and writes nothing.
+**The move band narrows with leverage** (since [block 44,478,893](../../../changelog/block-44478893.md#deployer-markets)). The band is ±min(10 %, 1/(2L)), where L is the highest leverage the market admits after the maintenance-margin check. A 5x market keeps ±10 %, a 29x market gets about ±1.7 %, and a 100x market gets ±0.5 %. A push outside the band is accepted at the band edge, so the stored price moves one band per block toward the pushed price and the feed stays fresh. Why: at 100x a single 10 % push puts every position about 9 % past bankruptcy. A narrow band lets the book liquidate at each step before any position goes underwater. Before that block, a push outside ±10 % was refused and wrote nothing.
 
 The anchor of the band is the last committed oracle price for the market, or the committed mark price of the market when no oracle price exists. The anchor is the committed value, so several pushes inside one block cannot compound. They all measure against the same anchor. When the market has neither, as on the first push on a new market, there is no anchor to compare against. The node accepts any price in `(0, ceiling]` once. Choose that first price with care, because every later push is chained to it.
 

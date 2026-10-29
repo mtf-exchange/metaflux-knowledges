@@ -39,7 +39,7 @@ The HTTP body carries no synchronous approval confirmation. Track the commit thr
 
 Common errors at commit: `cannot approve self` (the agent address equals the sender) and `zero address`. If you approve an agent that is already approved, the node overwrites its entry (`name` and `expires_at_ms`) and does not error.
 
-**One agent serves one master. Not active yet: this takes effect with the next node release.** The node refuses an agent address that another account has approved and that has not expired, with `agent already approved by another account`. Why: the signature of an agent-signed action does not cover the `owner` field. If one agent key served two masters, a relay could take an order the agent signed for one master and submit it for the other. To move an agent to a new master, retire it on the old master first (`expires_at_ms: 0`), then approve it on the new one. An approval that existed before the release stays in effect.
+**One agent serves one master** (since [block 44,478,893](../../../changelog/block-44478893.md#accounts-vaults)). The node refuses an agent address that another account has approved and that has not expired, with `agent already approved by another account`. Why: the signature of an agent-signed action does not cover the `owner` field. If one agent key served two masters, a relay could take an order the agent signed for one master and submit it for the other. To move an agent to a new master, retire it on the old master first (`expires_at_ms: 0`), then approve it on the new one. An approval that existed before that block stays in effect.
 
 The approval takes effect one block after the commit. An agent-signed action that you submit before then returns `401`.
 

@@ -1,5 +1,5 @@
 ---
-description: "One change waits for the next node release: a Metaliquidity vault may open a position on a deployer market. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
+description: "No change waits for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
@@ -7,26 +7,13 @@ description: "One change waits for the next node release: a Metaliquidity vault 
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-One change on this page waits for the next node release: the
-[vault rule on deployer markets](#vault-mip3). Signed faucet claims and the fixed faucet grant are in effect, and they moved to [block 34,135,466](./block-34135466.md). Every section the page staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
+No change on this page waits for the next node release. Node 0.9.18 took effect at
+[block 44,478,893](./block-44478893.md). Signed faucet claims and the fixed faucet grant are in effect, and they moved to [block 34,135,466](./block-34135466.md). Every section the page staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
 
 The [archive candle row](#archive-candle-plane) waits for a measurement. It is in the shipped code, but nobody has read it on the running chain. The row says what settles it.
 
 The page also keeps [five corrections](#corrections) to this reference. They are not chain changes.
 :::
-
-## A Metaliquidity vault may open on a deployer market {#vault-mip3}
-
-Status: in the code, not on the running chain.
-
-| Case | Today | Next release |
-|---|---|---|
-| A Metaliquidity vault order that opens, extends or flips a position on a deployer market | refused, `PRECONDITION_FAILED`: `metaliquidity vault cannot open or extend a position on a MIP-3 market` | admitted under the rules every account meets: isolated margin, fresh deployer feed |
-
-The backstop rule does not change: a vault never absorbs the liquidation of a deployer market.
-
-The reason for the change is in [MIP-2 scope](../mip/mip-2.md#scope): a separate vault quotes
-the deployer markets, so a core depositor still carries no deployer-oracle risk.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 

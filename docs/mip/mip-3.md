@@ -34,8 +34,8 @@ A deploy has two independent barriers. A builder pays both:
 The chain checks the bond when it allocates a new market. It refuses stake below the floor
 before it writes anything. A rejected deploy is therefore a clean no-op that costs nothing.
 
-**The bond stays locked while your dex has a market that is not delisted. Not active yet: this
-takes effect with the next node release.** A staking withdraw or an undelegate that takes your
+**The bond stays locked while your dex has a market that is not delisted.** Since
+[block 44,478,893](../changelog/block-44478893.md#deployer-markets). A staking withdraw or an undelegate that takes your
 stake below the floor is refused with `deployer bond is locked while the dex has a market`. Why:
 the chain checks the bond only at registration. Without the lock, a deployer could list, withdraw
 the bond, and keep running the oracle of an active market. The bond does not pay a deficit.

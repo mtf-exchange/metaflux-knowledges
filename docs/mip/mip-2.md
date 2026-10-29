@@ -33,12 +33,9 @@ more. The rules below separate a deployer market from the core markets.
   its own, so its operator sets the margin mode with
   [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) and the `owner` field.
 
-  :::caution Not live yet
-  The running chain still refuses a vault order that opens, extends or flips a position on a
-  deployer market, with `PRECONDITION_FAILED` and the message
-  `metaliquidity vault cannot open or extend a position on a MIP-3 market`. The refusal is
-  removed in the next node release. See [Next release](../changelog/next-release.md#vault-mip3).
-  :::
+  Before block 44,478,893 the chain refused such an order with `PRECONDITION_FAILED` and the
+  message `metaliquidity vault cannot open or extend a position on a MIP-3 market`. See
+  [block 44,478,893](../changelog/block-44478893.md#accounts-vaults).
 
 - **Backstop.** A vault never absorbs the liquidation of a deployer market. This is active. See
   [Liquidation on a deployed market](./mip-3.md#liquidation).

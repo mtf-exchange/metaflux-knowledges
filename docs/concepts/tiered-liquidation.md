@@ -224,7 +224,7 @@ buy-back (short leg): limit = mark × (1 + liq_floor)
 
 - `liq_floor` is a per-market risk parameter. By default it is half the market's maintenance
   ratio, so a market with 5% maintenance floors execution 2.5% from the mark. Not active yet:
-  from the next node release, it is half the maintenance ratio of the position's own tier. The maintenance
+  since [block 44,478,893](../changelog/block-44478893.md#liquidation), it is half the maintenance ratio of the position's own tier. The maintenance
   ratio is calibrated to cover liquidation slippage plus fees. So the floor guarantees that a
   forced close can never realize more slippage than the buffer was sized for.
 - The slice fills only at prices at or inside the floor. The chain does not sell what cannot fill
@@ -236,7 +236,7 @@ buy-back (short leg): limit = mark × (1 + liq_floor)
 - A **liquidation fee** (default 50 bps of the closed notional, configurable per market) is
   charged from the account's remaining positive equity. It never creates a deficit. The chain
   credits it to the insurance fund, which is the pool that absorbs backstop shortfalls.
-- **Not active yet: from the next node release, the fee never eats the buffer.** The rate is the
+- **The fee never eats the buffer** (since [block 44,478,893](../changelog/block-44478893.md#liquidation)). The rate is the
   smallest of the configured fee, half the maintenance ratio r of the position's tier, and
   k·r − floor − f, where k is the 1.1 trigger multiple, floor is the slippage floor and f is the
   market's worst taker fee. A forced close that fills at the floor then leaves the account at or
@@ -485,7 +485,7 @@ See [ADL](./adl.md) for the controller math.
 
 ### Deficit on a builder-deployed market {#deployed-market-deficit}
 
-**Not active yet: this takes effect with the next node release.** A deficit on a
+**Since [block 44,478,893](../changelog/block-44478893.md#deployer-markets).** A deficit on a
 [builder-deployed market](../mip/mip-3.md#liquidation) stays inside that market. The protocol
 insurance fund, the Metaliquidity vault and the treasury reserve never pay it. Why: the deployer
 operates the oracle of that market, so protocol money must not stand behind it. The order is:
