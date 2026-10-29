@@ -24,22 +24,33 @@ The design splits the parts on purpose, to keep the consensus surface small:
 
 ## Scope {#scope}
 
-The vault trades core markets only. It never takes the risk of a
-[deployer market](./mip-3.md). A deployer market is a market that a builder deployed, with an
-asset id of 1000 or more.
+A Metaliquidity vault trades the markets its operator quotes. A
+[deployer market](./mip-3.md) is a market that a builder deployed, with an asset id of 1000 or
+more. The rules below separate a deployer market from the core markets.
 
-- **Orders.** The chain refuses a vault order that opens, extends or flips a position on a
-  deployer market. The error is `PRECONDITION_FAILED`, with the message
-  `metaliquidity vault cannot open or extend a position on a MIP-3 market`. An order that only
-  closes a position passes.
-- **Backstop.** The vault never absorbs the liquidation of a deployer market. This is active. See
+- **Orders.** A vault order on a deployer market follows the same rules as any account: the open
+  must be isolated, and a stale deployer feed makes the market reduce-only. A vault has no key of
+  its own, so its operator sets the margin mode with
+  [`update_leverage`](../api/rest/exchange/margin-risk.md#update_leverage) and the `owner` field.
+
+  :::caution Not live yet
+  The running chain still refuses a vault order that opens, extends or flips a position on a
+  deployer market, with `PRECONDITION_FAILED` and the message
+  `metaliquidity vault cannot open or extend a position on a MIP-3 market`. The refusal is
+  removed in the next node release. See [Next release](../changelog/next-release.md#vault-mip3).
+  :::
+
+- **Backstop.** A vault never absorbs the liquidation of a deployer market. This is active. See
   [Liquidation on a deployed market](./mip-3.md#liquidation).
-- **Strategy.** The reference market maker refuses to start when its list names a deployer
-  market.
+- **One vault, one risk.** The protocol runs a separate Metaliquidity vault for deployer markets.
+  The core vault lists no deployer market, so a core depositor carries no deployer-oracle risk.
+  A depositor in the deployer-market vault carries that risk. The reason below says what the
+  risk is.
 
-**Reason.** A deployer market gets its price from its own deployer, and its deployer sets its
-open-interest cap. The protocol controls neither. Liquidity providers did not deposit to carry
-that risk.
+**Reason.** A deployer market gets its price from its own deployer, and its
+deployer sets its open-interest cap. The protocol controls neither. A deployer can move its
+oracle by up to 10% per update. The vault that quotes such a market holds only deposits made for
+that purpose.
 
 ## Liquidity providers {#for-liquidity-providers}
 

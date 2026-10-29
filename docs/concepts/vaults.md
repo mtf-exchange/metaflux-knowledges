@@ -15,7 +15,7 @@ Two vault kinds share one action set: the protocol-operated Metaliquidity vault 
 A vault created with `kind: "Metaliquidity"` is a Metaliquidity vault. Only an MLP-whitelisted leader can create one. It has three roles:
 
 1. Backstop counterparty. The vault takes over a failing position, and any residual loss, before the rest of the ladder runs. This is active on the core markets since 2026-08-18. Each absorption is bounded: 40% of current NAV per takeover and 100,000 USDC per block today, both set by governance. These bounds apply to one episode, not to the lifetime exposure of the vault. The vault refuses a takeover on a [builder-deployed market](../mip/mip-3.md#liquidation). See [T3 backstop](./tiered-liquidation.md#mlp-first-bite) for what a depositor now carries.
-2. Market making (planned). The vault can deploy idle capital into market-making strategies on selected core markets. The vault never quotes a [deployer market](../mip/mip-2.md#scope).
+2. Market making. The vault's operator quotes the markets the vault is for. The core vault lists core markets only. A separate Metaliquidity vault quotes the [deployer markets](../mip/mip-2.md#scope), so each depositor chooses which risk to carry.
 3. Insurance. The vault holds reserves to socialise small losses without firing T4 ADL.
 
 ## Depositing into a vault {#depositing}
