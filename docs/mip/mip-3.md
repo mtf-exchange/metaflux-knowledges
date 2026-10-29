@@ -191,11 +191,23 @@ own push cadence.
    had a chance to fire. Confirm the current values before you size a cadence. Do not assume the
    defaults.
 
-5. **Know the cost of a stale feed.** After the window, the market becomes reduce-only for
-   opens. The chain refuses an order that opens or increases a position. A closing order still
-   passes. Nobody is trapped in a position, and nobody can enter one. This is deliberate. On a
-   market where your feed is the only price, a frozen price with open entry is a free option
-   against every trader on the book.
+5. **Know what happens after the window: the off-session discovery band.** The last push
+   becomes the reference price. The indicative mark is the impact mid of the book at the
+   market's funding impact notional, clamped into one band around the reference. The band is the
+   narrower of the push move band (±min(10 %, 1/(2L))) and the risk oracle band (5 % unless
+   voted). Orders, auctions and liquidation keep running on that mark, so the market never
+   halts. A book too thin to fill the impact notional on both sides keeps the reference, so one
+   touch quote cannot move the mark. The funding premium sample stays omitted while the feed is
+   off-session; the interest term still accrues. Price discovery stays inside the band: the book
+   cannot carry the mark more than one band from the last official price, so a position cannot
+   be liquidated further than one band from it. The first push after the session reopens becomes
+   the mark again, through the same band.
+
+   :::caution Not in effect yet
+   On the running chain a market past the window is reduce-only for opens until a fresh push
+   lands. The discovery band ships in the next node release. See
+   [Next release](../changelog/next-release.md#discovery-band).
+   :::
 
 6. **Monitor with a read, not with a timer.** The operator-lane
    [`mip3_deployer_oracle`](../api/rest/info.md#operator-reads) read reports `stale`,
@@ -203,10 +215,11 @@ own push cadence.
    `until_stale_ms`, and not on your own send time. A push counts only when it is committed.
 
 :::info A part-time underlying gives a part-time market
-The staleness window is a risk bound. It is not a trading calendar. If your underlying has venue
-hours, your feed stops when the venue closes, and the market becomes reduce-only for the closure.
-A wider window that spans a weekend does not fix this. It lets anyone open positions all weekend
-against a stale Friday price. That is the exact gap risk the reduce-only change exists to stop.
+The refresh window is a risk bound. It is not a trading calendar. If your underlying has venue
+hours, your feed stops when the venue closes, and the market trades in its discovery band for the
+closure: the book prices it, inside one move band of the Friday close. A wider window that spans a
+weekend is worse, not better: it lets the Friday price stand as the mark all weekend, with no band
+and no discovery.
 To keep the market open through a closure, publish a current derived price at all hours and stay
 inside the window.
 :::
