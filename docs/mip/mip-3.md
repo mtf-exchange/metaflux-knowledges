@@ -201,13 +201,9 @@ own push cadence.
    off-session; the interest term still accrues. Price discovery stays inside the band: the book
    cannot carry the mark more than one band from the last official price, so a position cannot
    be liquidated further than one band from it. The first push after the session reopens becomes
-   the mark again, through the same band.
-
-   :::caution Not in effect yet
-   On the running chain a market past the window is reduce-only for opens until a fresh push
-   lands. The discovery band ships in the next node release. See
-   [Next release](../changelog/next-release.md#discovery-band).
-   :::
+   the mark again, through the same band. In effect since
+   [block 44,563,346](../changelog/block-44563346.md); before it, such a market was reduce-only
+   for opens until a fresh push landed.
 
 6. **Monitor with a read, not with a timer.** The operator-lane
    [`mip3_deployer_oracle`](../api/rest/info.md#operator-reads) read reports `stale`,

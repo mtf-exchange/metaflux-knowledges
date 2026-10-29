@@ -1,5 +1,5 @@
 ---
-description: "One change waits for the next node release: a deployer market past its refresh window trades in an off-session discovery band instead of turning reduce-only. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
+description: "No change waits for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
@@ -7,37 +7,14 @@ description: "One change waits for the next node release: a deployer market past
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-One change on this page waits for the next node release: the
-[off-session discovery band](#discovery-band) on deployer markets. Node 0.9.18 took effect at
+No change on this page waits for the next node release. Node 0.9.19 took effect at
+[block 44,563,346](./block-44563346.md) and node 0.9.18 at
 [block 44,478,893](./block-44478893.md). Signed faucet claims and the fixed faucet grant are in effect, and they moved to [block 34,135,466](./block-34135466.md). Every section the page staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
 
 The [archive candle row](#archive-candle-plane) waits for a measurement. It is in the shipped code, but nobody has read it on the running chain. The row says what settles it.
 
 The page also keeps [five corrections](#corrections) to this reference. They are not chain changes.
 :::
-
-## Off-session discovery band on deployer markets {#discovery-band}
-
-Status: in the code, not on the running chain.
-
-A deployer market whose push feed has aged past its refresh window (`mip3_stale_mark_ms`, default
-60,000 ms) no longer turns reduce-only. It trades in a discovery band around the last push.
-
-| Case | Today | Next release |
-|---|---|---|
-| An order that opens or extends a position on a deployer market past its refresh window | refused, `PRECONDITION_FAILED`: `deployer oracle stale: market is reduce-only` | admitted under the standing rules: isolated margin |
-| The mark of such a market | the last push, frozen | the impact mid of the book at the market's funding impact notional, clamped into `reference × (1 ± band)`. The reference is the last push; the band is the narrower of the push move band `min(10 %, 1/(2L))` and the risk oracle band (5 % unless voted). A book too thin to fill the impact notional on both sides keeps the reference, so one touch quote cannot move the mark |
-| A batch auction on such a market | parked until a fresh push | crosses on the indicative mark |
-| Liquidation on such a market | deferred | runs on the indicative mark, so no position is liquidated further than one band from the reference |
-| Funding on such a market | the premium sample is omitted | unchanged: the premium sample stays omitted while the feed is off-session. The interest term still accrues |
-| [`markets`](../api/rest/info/perpetuals.md#markets) `px_stale` on a deployer market | `true` past the window | absent: the market always has a mark |
-
-The first push after the session reopens becomes the mark again, through the same band: the move
-band already bounds how far one push may move the price.
-
-The reason is in [MIP-3](../mip/mip-3.md#oracle): an underlying with venue hours should not halt
-its perp. The band keeps the discovery honest: the book cannot carry the mark more than one band
-from the last official price.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 
