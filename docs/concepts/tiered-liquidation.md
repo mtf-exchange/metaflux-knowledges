@@ -42,8 +42,8 @@ timestamp. It is a pure decision: it reads cooldown state but never changes it. 
 exactly one outcome:
 
 ```
-if maintenance_margin == 0            → Idle
 if account_value < 0                  → Backstop { deficit = maintenance_margin + |account_value| }
+if maintenance_margin == 0            → Idle
 
 health = account_value / maintenance_margin            # Decimal division
 
@@ -55,6 +55,16 @@ if health < 0.8   (partial_threshold)                 → FullMarket { size_to_c
 if partial_cooldown_active(account)                   → FullMarket { size_to_close = maintenance_margin }
 else                                                  → PartialMarket50 { size_to_close = maintenance_margin / 2 }
 ```
+
+Negative equity is judged first. A position whose maintenance rounds down to zero whole USDC is
+still a position, so an account under water on such a leg is backstopped and never idle. The
+maintenance figure is the sum over every cross leg, floored once. Two legs of 0.5 USDC each sum
+to 1, not to 0 + 0.
+
+:::note
+Not in effect on chain 114514 yet. The running node checks `maintenance_margin == 0` first and
+floors each leg on its own. See the [next release](../changelog/next-release.md#negative-equity).
+:::
 
 | Constant | Value | Symbol |
 |----------|-------|--------|
