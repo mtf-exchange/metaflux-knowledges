@@ -33,6 +33,9 @@ component freezes at its last value and the mark keeps pricing.
 | An account with one position on such a market | the whole account's liquidation waits, on every market | judged as a whole, on that clamped mark |
 | [`account_state`](../api/rest/info/account.md#account_state) `health_deferred` | present while any position is on a stale market | present only while a position is on a stale **self-priced** market, or on a market with no oracle at all |
 | A self-priced market (MTF) whose index is stale | reduce-only; liquidation waits | unchanged. Its index is its own book, so a band around it protects nothing |
+| The mark of a [spot-margin](../products/spot-margin.md) position whose base oracle is stale | absent: the forced close and the collateral withdraw wait | the last committed oracle price. A base whose price is its own book still waits |
+| A [portfolio-margin collateral token](../concepts/portfolio-margin.md#multi-collateral-cross-collateral-haircut) whose price perpetual has a stale oracle | no credit and no seizure | credited and seized at the last committed oracle price. A token whose oracle has never sourced a price still counts for nothing |
+| A spot-margin enable vote on a pair whose base oracle is stale | refused | unchanged: a pair is not enabled against a feed nobody pushes |
 | A delisting with no voted price on a stale market | refused | unchanged: a settlement closes every position for good, so it still waits for a fresh index or a voted price |
 | The funding premium sample on a stale market | omitted | unchanged. The interest term still accrues |
 
