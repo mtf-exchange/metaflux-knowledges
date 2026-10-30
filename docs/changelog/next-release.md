@@ -47,11 +47,11 @@ initial margin does not count.
 
 | Action | Refusal |
 |---|---|
-| [`send_asset`](../api/rest/exchange/transfers.md#send_asset) (any token, either direction), [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer), [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data), the legacy `withdraw3`, [`sub_account_spot_transfer`](../api/rest/exchange/account.md#sub_account_spot_transfer) | `PRECONDITION_FAILED`: `negative cross account value: spot tokens stay` |
+| [`send_asset`](../api/rest/exchange/transfers.md#send_asset) (any token, either direction), [`core_evm_transfer`](../api/rest/exchange/transfers.md#core_evm_transfer), [`send_to_evm_with_data`](../api/rest/exchange/transfers.md#send_to_evm_with_data), the legacy `withdraw3`, [`sub_account_spot_transfer`](../api/rest/exchange/account.md#sub_account_spot_transfer), an Earn deposit of a non-USDC token, a staking delegation | `PRECONDITION_FAILED`: `negative cross account value: spot tokens stay` |
 
 Equity here is `cross_account_value` plus the loss side of unrealized PnL and of pending funding,
 with no gain counted: the same figure as free collateral before held initial margin comes off.
-Deposits into Earn and staking are not exits and are not gated. [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) moves USDC only and keeps its free-collateral refusal.
+An Earn deposit and a staking delegation keep the owner's title, but the liquidation waterfall reads only the spot ledger, so they are gated too. [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) moves USDC only and keeps its free-collateral refusal.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 
