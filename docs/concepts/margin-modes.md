@@ -56,11 +56,6 @@ figure, and a small increase can round to zero. A zero charge is not a free pass
 free collateral is negative is refused with `MARGIN_INSUFFICIENT` on every order that opens or
 extends, however small. Orders that reduce exposure stay admissible.
 
-:::note
-Not in effect on chain 114514 yet. The running node admits a zero charge without reading free
-collateral. See the [next release](../changelog/next-release.md#negative-equity).
-:::
-
 `notional` is a whole-USDC amount, and it keeps its fraction. It is not an integer. A price of
 61750.25 and a size of 0.001 give a notional of 61.75025.
 

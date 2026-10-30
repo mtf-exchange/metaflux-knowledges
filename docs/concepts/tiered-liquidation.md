@@ -61,11 +61,6 @@ still a position, so an account under water on such a leg is backstopped and nev
 maintenance figure is the sum over every cross leg, floored once. Two legs of 0.5 USDC each sum
 to 1, not to 0 + 0.
 
-:::note
-Not in effect on chain 114514 yet. The running node checks `maintenance_margin == 0` first and
-floors each leg on its own. See the [next release](../changelog/next-release.md#negative-equity).
-:::
-
 | Constant | Value | Symbol |
 |----------|-------|--------|
 | Yellow-card threshold (T0 top) | `1.1` | `default_yellow_card_threshold` |
