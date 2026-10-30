@@ -151,11 +151,11 @@ Notes on specific fields:
 | `approve_broker_fee` | `MetaFluxTransaction:ApproveBuilderFee(string metafluxChain,address builder,uint16 maxFeeBps,uint64 nonce)` |
 | `set_display_name` | `MetaFluxTransaction:SetDisplayName(string metafluxChain,string displayName,uint64 nonce)` |
 | `set_position_mode` | `MetaFluxTransaction:SetPositionMode(string metafluxChain,bool hedge,uint64 nonce)` |
-| `set_position_mode` (with owner, [not live yet](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:SetPositionMode(string metafluxChain,address owner,bool hedge,uint64 nonce)` |
+| `set_position_mode` (with owner, [not yet in effect](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:SetPositionMode(string metafluxChain,address owner,bool hedge,uint64 nonce)` |
 | `user_portfolio_margin` | `MetaFluxTransaction:UserPortfolioMargin(string metafluxChain,bool enroll,uint64 nonce)` |
 | `convert_to_multi_sig_user` | `MetaFluxTransaction:ConvertToMultiSigUser(string metafluxChain,address[] signers,uint32 threshold,uint64 nonce)` |
 | `update_leverage` | `MetaFluxTransaction:UpdateLeverage(string metafluxChain,uint32 asset,uint32 leverage,bool isIsolated,uint64 nonce)` |
-| `update_leverage` (with owner, [not live yet](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:UpdateLeverage(string metafluxChain,address owner,uint32 asset,uint32 leverage,bool isIsolated,uint64 nonce)` |
+| `update_leverage` (with owner, [not yet in effect](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:UpdateLeverage(string metafluxChain,address owner,uint32 asset,uint32 leverage,bool isIsolated,uint64 nonce)` |
 | `claim_rewards` | `MetaFluxTransaction:ClaimRewards(string metafluxChain,address validator,uint64 nonce)` |
 | `link_staking_user` | `MetaFluxTransaction:LinkStakingUser(string metafluxChain,address target,uint64 nonce)` |
 | `create_vault` | `MetaFluxTransaction:CreateVault(string metafluxChain,string name,uint64 lockPeriodSecs,uint8 kind,uint64 nonce)` |
@@ -182,9 +182,9 @@ Notes on specific fields:
 | `action.type` | `encodeType` |
 |---------------|--------------|
 | `update_isolated_margin` | `MetaFluxTransaction:UpdateIsolatedMargin(string metafluxChain,uint32 asset,string delta,uint64 nonce)` |
-| `update_isolated_margin` (with owner, [not live yet](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:UpdateIsolatedMargin(string metafluxChain,address owner,uint32 asset,string delta,uint64 nonce)` |
+| `update_isolated_margin` (with owner, [not yet in effect](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:UpdateIsolatedMargin(string metafluxChain,address owner,uint32 asset,string delta,uint64 nonce)` |
 | `top_up_isolated_only_margin` | `MetaFluxTransaction:TopUpIsolatedOnlyMargin(string metafluxChain,uint32 asset,string amount,uint64 nonce)` |
-| `top_up_isolated_only_margin` (with owner, [not live yet](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:TopUpIsolatedOnlyMargin(string metafluxChain,address owner,uint32 asset,string amount,uint64 nonce)` |
+| `top_up_isolated_only_margin` (with owner, [not yet in effect](../changelog/next-release.md#owner-bound-digest)) | `MetaFluxTransaction:TopUpIsolatedOnlyMargin(string metafluxChain,address owner,uint32 asset,string amount,uint64 nonce)` |
 
 `delta` and `amount` are canonical decimal strings (hash-then-parse). The "with owner" twins apply when the wire carries `owner`: an agent acting for a master signs the twin. See [the next-release note](../changelog/next-release.md#owner-bound-digest).
 
