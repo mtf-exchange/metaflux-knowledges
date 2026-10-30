@@ -29,7 +29,7 @@ A deploy has two independent barriers. A builder pays both:
 | Barrier | Amount | Paid how |
 |---------|--------|----------|
 | **Deploy fee** | The current Dutch-clock ask on the perp-deploy stream | Charged at register, from your free collateral |
-| **Staking bond** | `mip3_deploy_min_stake`, about 50,000 MTF by default | Committed stake you already hold. Not spent. Locked while your dex has an active market (not active yet: from the next node release) |
+| **Staking bond** | `mip3_deploy_min_stake`, about 50,000 MTF by default | Committed stake you already hold. Not spent. Locked while your dex has an active market (since [block 44,478,893](../changelog/block-44478893.md)) |
 
 The chain checks the bond when it allocates a new market. It refuses stake below the floor
 before it writes anything. A rejected deploy is therefore a clean no-op that costs nothing.
