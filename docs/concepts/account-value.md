@@ -54,7 +54,10 @@ returns. See the [lane split](../changelog/migrations.md#account-state-lane-spli
 :::caution
 `health_deferred: true` means that the risk numbers are not a solvency
 statement. The key is absent in the normal case. When it is present, at least
-one open position has no usable price. The chain then reports
+one open position is on a market with no usable price: a self-priced market
+whose index is stale, or a market with no oracle at all. (On the running chain a
+core market with a stalled validator feed counts too; see the
+[next release](../changelog/next-release.md#stale-oracle-mark).) The chain then reports
 `cross_maintenance_margin_used` of `0` and defers the decision. A `0`
 maintenance here does not mean that the account has no requirement. Do not read
 `health` or `tier` as safe while the flag is set.

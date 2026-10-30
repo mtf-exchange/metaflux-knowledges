@@ -134,6 +134,22 @@ A kept value is not a fresh price. After 60 s without a fresh price, the
 opens or adds to a position. It accepts an order that reduces a position.
 Liquidation and funding wait until a fresh price arrives.
 
+### When the validator feed stalls on a CEX-fed market {#stalled-validator-feed}
+
+A core market prices from external venues through the validator oracle. When that
+feed stops, the market also shows `px_stale: true`, but it is not reduce-only
+and it keeps a mark: the committed mark, clamped into the last oracle value
+± the oracle band (5 % unless voted). Liquidation, ADL and triggers run on that
+mark. The funding premium sample is omitted until the feed returns. This is the
+Hyperliquid shape: a stalled oracle component freezes at its last value, and the
+mark never goes absent.
+
+:::note
+Not in effect on chain 114514 yet. The running node treats a stalled validator
+feed like a self-priced market with no price, and liquidation waits. See the
+[next release](../changelog/next-release.md#stale-oracle-mark).
+:::
+
 ## Reliability rules {#reliability-rules}
 
 The aggregator holds a value instead of reporting a wrong one. Per tick, in order:

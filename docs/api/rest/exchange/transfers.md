@@ -8,6 +8,15 @@ These actions move value between accounts, between Core and the EVM, and off the
 
 That page defines the request envelope, the EIP-712 signing rules, the number planes and the response shape. They apply to every action here.
 
+:::note
+Every action on this page that moves a spot token out of an account is refused while the
+account's equity, after the losses it has not realized yet, is negative:
+`PRECONDITION_FAILED`, `negative cross account value: spot tokens stay`. The tokens are what the
+liquidation waterfall can still reach once the account is flat. Held initial margin does not count,
+so a fully margined account with positive equity is not affected. Not in effect on chain 114514
+yet; see the [next release](../../../changelog/next-release.md#negative-equity-spot).
+:::
+
 ### Send a token to another account {#send_asset}
 
 `send_asset` is the plain user-to-user transfer. It moves one asset from the recovered signer to `destination`. The action is sender-authorized: it has no `owner` field. So an agent signature moves the balance of the agent, never the balance of the master.

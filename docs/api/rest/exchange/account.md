@@ -384,6 +384,10 @@ Common errors at commit: `amount must be positive`, `sub account not found` (an 
 
 ### Transfer spot tokens between master and sub-account {#sub_account_spot_transfer}
 
+The paying side is refused while its equity, after unrealized losses, is negative
+(`negative cross account value: spot tokens stay`). See the
+[transfers note](./transfers.md). Not in effect on chain 114514 yet.
+
 `sub_account_spot_transfer` moves a spot token balance between the master account and one of its sub-accounts. The action is sender-authorized: it has no `owner` field.
 
 ```json
