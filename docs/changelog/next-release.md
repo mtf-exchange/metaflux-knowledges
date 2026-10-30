@@ -1,5 +1,5 @@
 ---
-description: "Two changes wait for the next node release: a stalled validator oracle keeps the mark, and spot tokens stay in an account at negative equity. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
+description: "Three changes wait for the next node release: a stalled validator oracle keeps the mark, spot tokens stay in an account at negative equity, and an agent signs the owner into the digest. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
@@ -7,7 +7,7 @@ description: "Two changes wait for the next node release: a stalled validator or
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-Two changes on this page wait for the next node release: [a stalled oracle keeps the mark](#stale-oracle-mark) and [spot tokens stay at negative equity](#negative-equity-spot). Both are in the shipped code and not on the running chain. Node 0.9.20 took effect at
+Three changes on this page wait for the next node release: [a stalled oracle keeps the mark](#stale-oracle-mark), [spot tokens stay at negative equity](#negative-equity-spot) and [an agent signs the owner into the digest](#owner-bound-digest). All three are in the shipped code and not on the running chain. Node 0.9.20 took effect at
 [block 45,207,953](./block-45207953.md), node 0.9.19 at
 [block 44,563,346](./block-44563346.md) and node 0.9.18 at
 [block 44,478,893](./block-44478893.md). Signed faucet claims and the fixed faucet grant are in effect, and they moved to [block 34,135,466](./block-34135466.md). Every section the page staged for node 0.9.16 is in effect, and each one moved to [block 25,599,540](./block-25599540.md). Gateway 0.9.16 shipped in the same window. The action byte cap and the per-leg `batch_cancel` reply took effect at [block 17,113,494](./block-17113494.md). The rules staged for the releases after 0.9.7 moved to [block 11,550,001](./block-11550001.md).
@@ -55,6 +55,53 @@ initial margin does not count.
 Equity here is `cross_account_value` plus the loss side of unrealized PnL and of pending funding,
 with no gain counted: the same figure as free collateral before held initial margin comes off.
 An Earn deposit and a staking delegation keep the owner's title, but the liquidation waterfall reads only the spot ledger, so they are gated too. [`bridge_withdraw`](../api/rest/exchange/transfers.md#bridge_withdraw) moves USDC only and keeps its free-collateral refusal.
+
+## An agent signs the owner into the digest {#owner-bound-digest}
+
+Status: in the shipped code, not on the running chain.
+
+Today the typed digest of `submit_order`, `cancel_order`, `schedule_cancel`, `twap_order`,
+`update_leverage`, `update_isolated_margin`, `top_up_isolated_only_margin` and
+`set_position_mode` does not carry the `owner` the action names. A relay that holds a signature an
+agent made for one account can send the same bytes under another account that approved the same
+agent. The copy runs in the second account, at its own cost. No funds move between the two
+accounts, but the chain records an agent link the first owner never made.
+
+After the height, each of those actions has two type strings, the same shape every other
+owner-bound action already has: the string as printed today, and a twin with `address owner` right
+after `metafluxChain`.
+
+| Who signs | Which string | Result |
+|---|---|---|
+| The owner, for its own account | either string | admitted |
+| An approved agent, for its master | the twin with `owner` | admitted |
+| An approved agent, the string without `owner` | | refused: `signer is neither the owner nor an approved agent` |
+
+So an agent signature now names the account it was made for, and it verifies under no other.
+`submit_order` and `cancel_order` carry `owner` on the wire always, so a client signs the twin for
+them whoever the signer is. The other six carry `owner` only when an agent acts for a master; a
+self-signed call without `owner` keeps the string it has today.
+
+The twins:
+
+| `action.type` | `encodeType` with `owner` |
+|---|---|
+| `submit_order` | `MetaFluxTransaction:SubmitOrder(string metafluxChain,address owner,uint32 market,string side,string kind,uint64 size,uint64 limitPx,string tif,string stpMode,bool reduceOnly,string cloid,uint16 builderFee,address builderUser,string positionSide,uint64 triggerPx,bool triggerIsMarket,string triggerTpsl,uint64 nonce)` |
+| `submit_order` with `trail_px` | the same, with `uint64 trailPx` before `uint64 nonce` |
+| `cancel_order` | `MetaFluxTransaction:CancelOrder(string metafluxChain,address owner,uint32 market,uint64 oid,uint64 nonce)` |
+| `schedule_cancel` | `MetaFluxTransaction:ScheduleCancel(string metafluxChain,address owner,uint64 cancelAtBlock,uint64 nonce)` |
+| `twap_order` | `MetaFluxTransaction:TwapOrder(string metafluxChain,address owner,uint32 market,string side,uint64 totalSize,uint32 sliceCount,uint64 delayMs,bool reduceOnly,uint64 nonce)` |
+| `twap_order` with `position_side` | the same, with `string positionSide` after `bool reduceOnly` |
+| `twap_order` with `randomize: true` | the same, with `string positionSide,bool randomize` after `bool reduceOnly` |
+| `update_leverage` | `MetaFluxTransaction:UpdateLeverage(string metafluxChain,address owner,uint32 asset,uint32 leverage,bool isIsolated,uint64 nonce)` |
+| `update_isolated_margin` | `MetaFluxTransaction:UpdateIsolatedMargin(string metafluxChain,address owner,uint32 asset,string delta,uint64 nonce)` |
+| `top_up_isolated_only_margin` | `MetaFluxTransaction:TopUpIsolatedOnlyMargin(string metafluxChain,address owner,uint32 asset,string amount,uint64 nonce)` |
+| `set_position_mode` | `MetaFluxTransaction:SetPositionMode(string metafluxChain,address owner,bool hedge,uint64 nonce)` |
+
+The `owner` word is the address, left-padded to 32 bytes, at index 1 of the message. The Rust SDK
+0.28.0 and the TypeScript SDK that ship with that release sign the twins. An agent that keeps an
+older SDK is refused on these eight actions from the height on. Its master's own signatures are not
+affected.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 
