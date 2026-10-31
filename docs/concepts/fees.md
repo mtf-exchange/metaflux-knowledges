@@ -465,7 +465,9 @@ flowchart TD
    [fee schedule](./fee-schedule.md)) first, from the fees collected on the same flow.
 2. **Split.** After rebates, the chain splits the remaining fee revenue three ways: ~70%
    buyback, ~20% validators and ~10% treasury. The treasury share takes the rounding dust, so the
-   split loses nothing.
+   split loses nothing. From the [next node release](../changelog/next-release.md#backstop-funding),
+   the treasury share is also the source of every top-up to the insurance fund and the treasury
+   reserve.
 3. **Buyback.** The ~70% buyback share buys MTF on the open market. It matches resting sell
    orders on the MTF/USDC book, lowest price first. The protocol never pays above a price
    ceiling that resists manipulation:

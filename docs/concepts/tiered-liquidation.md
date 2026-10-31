@@ -481,9 +481,15 @@ winners absorb first, which keeps the fund for real tail events.
    The gain was then out of reach, and the insurance fund and the treasury reserve paid the whole
    deficit.
 3. **Insurance fund.** The fund absorbs the remainder automatically. The
-   [liquidation fee](#how-a-forced-close-executes-the-price-floor) feeds this pool.
+   [liquidation fee](#how-a-forced-close-executes-the-price-floor) feeds this pool. Each market
+   has its own pool, and the [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity) of a
+   market is sized from that pool.
 4. **Treasury reserve.** Anything left queues for a treasury draw that a multisig must authorize.
    This is the last resort, with a human in the loop.
+
+Two rules wait for the [next node release](../changelog/next-release.md#backstop-funding): a later
+liquidation fee on a market pays down the debt queued on that market at once, and a reserve top-up
+pays from the treasury share of protocol fees.
 
 The chain then sets the account's negative balance to zero. The debt now lives in the waterfall.
 See [ADL](./adl.md) for the controller math.
