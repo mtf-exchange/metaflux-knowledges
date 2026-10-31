@@ -1,5 +1,5 @@
 ---
-description: "Two backstop funding rules wait for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
+description: "Three backstop funding rules wait for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
@@ -7,7 +7,7 @@ description: "Two backstop funding rules wait for the next node release. One wir
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-Two [backstop funding rules](#backstop-funding) wait for the next node release. Node 0.9.21 took effect at
+Three [backstop funding rules](#backstop-funding) wait for the next node release. Node 0.9.21 took effect at
 [block 45,811,287](./block-45811287.md), node 0.9.20 at
 [block 45,207,953](./block-45207953.md), node 0.9.19 at
 [block 44,563,346](./block-44563346.md) and node 0.9.18 at
@@ -22,8 +22,9 @@ The page also keeps [five corrections](#corrections) to this reference. They are
 
 Status: not in effect. These rules are in the code and wait for the next node release.
 
-Two rules change how the [deficit waterfall](../concepts/tiered-liquidation.md#t4--the-deficit-waterfall) is funded. Neither changes an `/info` or `/exchange` field.
+Three rules change how the [deficit waterfall](../concepts/tiered-liquidation.md#t4--the-deficit-waterfall) is funded. None changes an `/info` or `/exchange` field.
 
+- **The treasury share pays queued debt as fees accrue.** On every protocol-fee split, the [~10% treasury share](../concepts/fees.md#where-fees-go) pays the debt queued on native markets, lowest market id first, until the share is spent. Today that debt waits for a multisig treasury draw. A debt on a builder-deployed market stays its own and is never paid from the share.
 - **A liquidation fee pays down queued debt at once.** When a forced close credits the insurance fund of a market, the fund pays any debt queued on that same market before it holds the rest. Today the fund holds the fee and the debt waits for a treasury draw. The fund of one market never pays the debt of another market. The [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity) of the market falls by the amount paid, because it is sized from the fund.
 - **A reserve top-up pays from the treasury share.** The system operations that add to the insurance fund or to the treasury reserve pay from the [~10% treasury share](../concepts/fees.md#where-fees-go) of protocol fees. A top-up larger than that share is refused. Today a top-up adds to a reserve and takes the value from nowhere. A top-up is accepted only on the USDC token or on a native perp market, because those are the pools that hold USDC.
 
