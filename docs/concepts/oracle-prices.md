@@ -144,11 +144,6 @@ mark. The funding premium sample is omitted until the feed returns. This is the
 Hyperliquid shape: a stalled oracle component freezes at its last value, and the
 mark never goes absent.
 
-:::note
-Not in effect on chain 114514 yet. The running node treats a stalled validator
-feed like a self-priced market with no price, and liquidation waits. See the
-[next release](../changelog/next-release.md#stale-oracle-mark).
-:::
 
 ## Reliability rules {#reliability-rules}
 

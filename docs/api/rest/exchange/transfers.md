@@ -13,8 +13,8 @@ Every action on this page that moves a spot token out of an account is refused w
 account's equity, after the losses it has not realized yet, is negative:
 `PRECONDITION_FAILED`, `negative cross account value: spot tokens stay`. The tokens are what the
 liquidation waterfall can still reach once the account is flat. Held initial margin does not count,
-so a fully margined account with positive equity is not affected. Not in effect on chain 114514
-yet; see the [next release](../../../changelog/next-release.md#negative-equity-spot).
+so a fully margined account with positive equity is not affected. In effect since
+[block 45,811,287](../../../changelog/block-45811287.md#negative-equity-spot).
 :::
 
 ### Send a token to another account {#send_asset}

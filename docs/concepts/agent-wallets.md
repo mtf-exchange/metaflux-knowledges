@@ -78,10 +78,9 @@ This has three results:
 3. An owner-less action that an agent signs does not fail. It acts on the
    agent's own account. See [what an agent cannot do](#what-an-agent-cannot-do).
 
-From the next node release, the `owner` is also inside the signed digest of the
-order, cancel, TWAP, schedule-cancel, leverage, margin and position-mode
-actions, so an agent signature verifies under the one account it was made for.
-See [the next-release note](../changelog/next-release.md#owner-bound-digest).
+Since [block 45,811,287](../changelog/block-45811287.md#owner-bound-digest), the `owner` is also
+inside the signed digest of the order, cancel, TWAP, schedule-cancel, leverage, margin and
+position-mode actions, so an agent signature verifies under the one account it was made for.
 
 ## EIP-712 envelope {#eip-712-envelope-in-detail}
 
