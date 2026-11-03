@@ -221,6 +221,42 @@ A consumer that tails an active file must still handle a writer in the middle of
 must accept only newline-terminated lines. It must never move its read offset past a
 fragment. It must read that fragment again on the next pass.
 
+## Public archive {#public-archive}
+
+Testnet publishes three streams to a public object store. You do not need to run a node
+to read them.
+
+| Stream | Object key |
+|---|---|
+| [`node_fills`](#node_fills) | `testnet/node_fills/{YYYYMMDD}/{HH}.zst` |
+| [`node_trades`](#node_trades) | `testnet/node_trades/{YYYYMMDD}/{HH}.zst` |
+| [`l2_book_diffs`](#l2_book_diffs) | `testnet/l2_book_diffs/{FIRST}-{LAST}.jsonl.zst` |
+
+Base URL: `https://data.mtf.exchange/`. For example:
+
+```
+curl -s https://data.mtf.exchange/testnet/node_fills/20260901/15.zst | zstd -dc
+```
+
+Each object is one source file, compressed with zstd. After you decompress an hourly
+object, its bytes are identical to the [hourly file](#hourly-files) of the same name.
+An hour with no records for a stream has no file, so it has no object. A `404` on an
+hourly key means that hour has no records, or that its UTC day has not ended yet.
+
+An hourly object appears after its UTC day ends. The upload job runs every hour, so the
+delay after midnight UTC is at most about one hour.
+
+`l2_book_diffs` is one file that does not rotate, so it is published in chunks. Each
+chunk holds complete lines only. `{FIRST}` and `{LAST}` are the `block_number` of its
+first and last line, zero-padded to twelve digits, so the lexical order of the keys is
+the block order. Chunks do not overlap and leave no gap. A new chunk appears every hour.
+A chunk can start with a diff line, not a snapshot. To rebuild a book, start at a
+`snapshot` line and apply the diffs after it.
+
+The store does not list keys. Build each key from the layout above.
+
+`node_fills` records carry account addresses, the same as on the node. The public archive does not include `node_actions`, `l4_book_diffs` or any other stream.
+
 ## Number planes {#number-planes}
 
 MetaFlux carries prices and sizes on two integer planes, and money on one decimal plane.
