@@ -201,7 +201,7 @@ Lane 2 is `perp_set_sub_deployer_perms`. It is new, and it grants an exact mask.
 
 | Bit | Value | Grants |
 |-----|-------|--------|
-| 0 | 1 | [`mip3_set_oracle_px`](#mip3_set_oracle_px), the price push |
+| 0 | 1 | [`mip3_set_oracle_px`](#mip3_set_oracle_px), the price push, and its batch form [`mip3_set_oracle_pxs`](#mip3_set_oracle_pxs) |
 | 1 | 2 | [`perp_set_leverage`](#perp_set_leverage) |
 | 2 | 4 | [`perp_set_fee_tier`](#perp_set_fee_tier) |
 | 3 | 8 | [`perp_set_maker_rebate`](#perp_set_maker_rebate) |
@@ -281,5 +281,54 @@ Keep pushing while the underlying trades. When the feed ages past the refresh wi
 :::info
 `mip3_deployer_oracle` is a per-chain feature. Check it before you rely on it. It is active from genesis on a chain that started fresh. It is dormant on any other chain until a two-thirds stake `ArmFeatures` vote arms it. While it is dormant, the node refuses this action with `mip3_deployer_oracle feature not active`. That is a precondition error, not an unknown-action error. Read `feature_active` from the operator-lane [`mip3_deployer_oracle`](../info.md#operator-reads) read on the network that you target.
 :::
+
+### Push several deployer oracle prices {#mip3_set_oracle_pxs}
+
+:::caution Not in effect yet
+This action is not available on testnet (chain 114514) yet. It takes effect with the [next node release](../../../changelog/next-release.md#mip3-oracle-batch). Until then the node refuses it with `unknown variant`, the same error that an unknown action gets. Build against this shape now, but keep [`mip3_set_oracle_px`](#mip3_set_oracle_px) as your current path.
+:::
+
+This action pushes the index price of several MIP-3 markets under one signature. It is action 232. Use it when one feed prices many markets, so that one request replaces many.
+
+```json
+{
+  "type": "mip3_set_oracle_pxs",
+  "params": {
+    "pxs": [
+      { "asset": 1000, "px": "1250.500001" },
+      { "asset": 1001, "px": "0.0003" }
+    ]
+  }
+}
+```
+
+| Field | Type | Range / values | Description |
+|-------|------|----------------|-------------|
+| `pxs` | array | 1 to 64 entries, no asset twice | The pushes, in the order that you sign them |
+| `pxs[].asset` | uint32 | a MIP-3 market | The target market |
+| `pxs[].px` | string | `> 0`, at most `1000000000000` | The index price, as a whole-USDC decimal string |
+
+The rules:
+
+- **All or nothing.** The node checks every entry before it applies the first one. If one entry fails, the node rejects the whole action and changes nothing. One bad market thus stops the prices of all the other markets in the request. Send a market that can fail in a request of its own.
+- **Each entry is one single push.** Each entry passes the same checks as [`mip3_set_oracle_px`](#mip3_set_oracle_px), in the same order, with the same messages. Each entry gets the same move band and the same clamp at the band edge. The result is the same as the same entries sent as single pushes, one after the other, in one block.
+- **The signer must hold the push right on every market.** That is the market `deployer` or a sub-deployer with [bit 0](#perp_set_sub_deployers), checked per entry. An agent wallet cannot sign this action.
+- **The size is 1 to 64 entries.** An empty list or a list of more than 64 entries is rejected with `invalid parameters: batch must carry 1 to 64 entries`.
+- **No asset occurs twice.** A repeated asset is rejected with `invalid parameters: duplicate asset <id> in batch`. Why: two prices for one market in one signature have no single meaning.
+
+The EIP-712 type string is frozen:
+
+```text
+MetaFluxTransaction:Mip3SetOraclePxs(string metafluxChain,bytes32 pxs,uint64 nonce)
+```
+
+`pxs` is one `bytes32` word, not an EIP-712 array:
+
+```text
+pxs = keccak256( entry_0 ‖ entry_1 ‖ … )
+entry_i = uint256(asset_i) as 32 big-endian bytes ‖ keccak256(utf8 bytes of px_i)
+```
+
+The entries go in the order that you send them. So the digest binds each market, the exact spelling of each price and the order. The spelling rule of the single push applies to each `px`: sign the bytes that you send. The domain, `metafluxChain` and `nonce` are encoded as for every other typed action. The batch actions [`batch_order`](./orders.md#batch_order) and [`batch_cancel`](./orders.md#batch_cancel) use the same pattern of one `bytes32` word over their items.
 
 Liquidation on a deployed market follows the backstop settings of that market. See [MIP-3 liquidation](../../../mip/mip-3.md#liquidation). A market that prices from its own oracle defaults to `Disabled`.

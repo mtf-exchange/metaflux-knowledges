@@ -1,5 +1,5 @@
 ---
-description: "Three backstop funding rules wait for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
+description: "Three backstop funding rules and one new action, the batch price push mip3_set_oracle_pxs, wait for the next node release. One wire row is in the shipped code but not verified on the running chain: the size plane on archive candles. Also five corrections to this reference."
 ---
 
 # Next release and unverified wire rows
@@ -7,7 +7,7 @@ description: "Three backstop funding rules wait for the next node release. One w
 This page lists what waits for the next node release and which wire rows are unverified.
 
 :::caution
-Three [backstop funding rules](#backstop-funding) wait for the next node release. Node 0.9.21 took effect at
+Three [backstop funding rules](#backstop-funding) and [the batch deployer price push](#mip3-oracle-batch) wait for the next node release. Node 0.9.21 took effect at
 [block 45,811,287](./block-45811287.md), node 0.9.20 at
 [block 45,207,953](./block-45207953.md), node 0.9.19 at
 [block 44,563,346](./block-44563346.md) and node 0.9.18 at
@@ -27,6 +27,12 @@ Three rules change how the [deficit waterfall](../concepts/tiered-liquidation.md
 - **The treasury share pays queued debt as fees accrue.** On every protocol-fee split, the [~10% treasury share](../concepts/fees.md#where-fees-go) pays the debt queued on native markets, lowest market id first, until the share is spent. Today that debt waits for a multisig treasury draw. A debt on a builder-deployed market stays its own and is never paid from the share.
 - **A liquidation fee pays down queued debt at once.** When a forced close credits the insurance fund of a market, the fund pays any debt queued on that same market before it holds the rest. Today the fund holds the fee and the debt waits for a treasury draw. The fund of one market never pays the debt of another market. The [capacity cap](../api/rest/info/perpetuals.md#oi-cap-capacity) of the market falls by the amount paid, because it is sized from the fund.
 - **A reserve top-up pays from the treasury share.** The system operations that add to the insurance fund or to the treasury reserve pay from the [~10% treasury share](../concepts/fees.md#where-fees-go) of protocol fees. A top-up larger than that share is refused. Today a top-up adds to a reserve and takes the value from nowhere. A top-up is accepted only on the USDC token or on a native perp market, because those are the pools that hold USDC.
+
+## Batch deployer price push {#mip3-oracle-batch}
+
+Status: not in effect. The action is in the code and waits for the next node release.
+
+[`mip3_set_oracle_pxs`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_pxs) (action 232) pushes the index price of 1 to 64 MIP-3 markets under one signature. It is all or nothing, and each entry acts like one [`mip3_set_oracle_px`](../api/rest/exchange/deploy-perp.md#mip3_set_oracle_px). Until the release, the node refuses it with `unknown variant`. The single push is unchanged.
 
 ## Archive candles state their size plane {#archive-candle-plane}
 
