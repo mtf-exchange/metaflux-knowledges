@@ -284,11 +284,7 @@ Keep pushing while the underlying trades. When the feed ages past the refresh wi
 
 ### Push several deployer oracle prices {#mip3_set_oracle_pxs}
 
-:::caution Not in effect yet
-This action is not available on testnet (chain 114514) yet. It takes effect with the [next node release](../../../changelog/next-release.md#mip3-oracle-batch). Until then the node refuses it with `unknown variant`, the same error that an unknown action gets. Build against this shape now, but keep [`mip3_set_oracle_px`](#mip3_set_oracle_px) as your current path.
-:::
-
-This action pushes the index price of several MIP-3 markets under one signature. It is action 232. Use it when one feed prices many markets, so that one request replaces many.
+This action pushes the index price of several MIP-3 markets under one signature. It is action 232, in effect since [block 59,374,764](../../../changelog/block-59374764.md#mip3-oracle-batch). Use it when one feed prices many markets, so that one request replaces many.
 
 ```json
 {

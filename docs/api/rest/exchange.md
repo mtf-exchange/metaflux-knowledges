@@ -445,7 +445,7 @@ reach it.
 | [`perp_set_sub_deployers`](./exchange/deploy-perp.md#perp_set_sub_deployers) | Grant a delegate every bit, or revoke it | deployer only | no |
 | [`perp_set_sub_deployer_perms`](./exchange/deploy-perp.md#perp_set_sub_deployers) | Grant a delegate an exact permission mask | deployer only | no |
 | [`mip3_set_oracle_px`](./exchange/deploy-perp.md#mip3_set_oracle_px) | Push the market price | deployer, or bit 0 | no |
-| [`mip3_set_oracle_pxs`](./exchange/deploy-perp.md#mip3_set_oracle_pxs) | Push the price of up to 64 markets, all or nothing. **Not in effect yet**: it takes effect with the [next node release](../../changelog/next-release.md#mip3-oracle-batch) | deployer, or bit 0 on each market | no |
+| [`mip3_set_oracle_pxs`](./exchange/deploy-perp.md#mip3_set_oracle_pxs) | Push the price of up to 64 markets, all or nothing | deployer, or bit 0 on each market | no |
 | [`perp_set_oracle`](./exchange/deploy-perp.md#perp_set_oracle) | **Retired.** It writes a mask that nothing reads | deployer | no |
 
 A delegate cannot delegate. Both `perp_set_sub_deployers` and

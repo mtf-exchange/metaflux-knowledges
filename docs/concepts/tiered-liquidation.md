@@ -487,10 +487,10 @@ winners absorb first, which keeps the fund for real tail events.
 4. **Treasury reserve.** Anything left queues for a treasury draw that a multisig must authorize.
    This is the last resort, with a human in the loop.
 
-Three rules wait for the [next node release](../changelog/next-release.md#backstop-funding): the
-treasury share of protocol fees pays the queued debt of native markets on every fee split, a later
-liquidation fee on a market pays down the debt queued on that market at once, and a reserve top-up
-pays from the treasury share. The multisig draw stays as the manual path.
+**Since [block 59,374,764](../changelog/block-59374764.md#backstop-funding).** The treasury share
+of protocol fees pays the queued debt of native markets on every fee split, a later liquidation fee
+on a market pays down the debt queued on that market at once, and a reserve top-up pays from the
+treasury share. The multisig draw stays as the manual path.
 
 The chain then sets the account's negative balance to zero. The debt now lives in the waterfall.
 See [ADL](./adl.md) for the controller math.
